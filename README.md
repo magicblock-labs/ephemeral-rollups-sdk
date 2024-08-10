@@ -9,7 +9,7 @@ See the integration example: https://github.com/magicblock-labs/magicblock-engin
 
 ### Use the client SDKs
 
-This repository contains the client SDKs for deriving the PDAs need for interacting with the Ephemeral Rollups. The SDKs are available in the following languages:
+This repository contains the client SDKs for deriving the PDAs needed for interacting with the Ephemeral Rollups. The SDKs are available in the following languages:
 
 - [Rust](./sdk)
 - [JavaScript](./sdk/ts)
