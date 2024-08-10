@@ -1,0 +1,1 @@
+pub use ephemeral_rollups_sdk_attribute_delegate::delegate;
