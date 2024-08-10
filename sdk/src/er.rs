@@ -29,9 +29,5 @@ pub fn create_schedule_commit_ix<'a, 'info>(
             is_writable: x.is_writable,
         })
         .collect::<Vec<AccountMeta>>();
-    Instruction::new_with_bytes(
-        *magic_program.key,
-        &instruction_data,
-        account_metas,
-    )
+    Instruction::new_with_bytes(*magic_program.key, &instruction_data, account_metas)
 }

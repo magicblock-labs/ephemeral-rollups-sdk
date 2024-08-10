@@ -96,7 +96,6 @@ pub fn delegate_account<'a, 'info>(
     Ok(())
 }
 
-
 /// Undelegate an account
 #[inline(always)]
 pub fn undelegate_account<'a, 'info>(
@@ -137,7 +136,6 @@ pub fn undelegate_account<'a, 'info>(
     (*data).copy_from_slice(&buffer_data);
     Ok(())
 }
-
 
 /// CPI to the delegation program to delegate the account
 #[allow(clippy::too_many_arguments)]
@@ -185,7 +183,6 @@ pub fn cpi_delegate<'a, 'info>(
         signers_seeds,
     )
 }
-
 
 /// CPI to the delegation program to allow undelegation
 #[inline(always)]
