@@ -6,7 +6,7 @@ members = [
 resolver = "2"
 
 [workspace.package]
-version = "0.0.1"
+version = "0.0.2"
 authors = ["Magicblock Labs <dev@magicblock.gg>"]
 edition = "2021"
 license = "MIT"
@@ -17,7 +17,7 @@ readme = "./README.md"
 keywords = ["solana", "crypto", "delegation", "ephemeral-rollups", "magicblock"]
 
 [workspace.dependencies]
-ephemeral-rollups-sdk-attribute-delegate = { path = "sdk/delegate", version = "=0.0.1" }
+ephemeral-rollups-sdk-attribute-delegate = { path = "sdk/delegate", version = "=0.0.2" }
 
 ## External crates
 borsh = "0.10.3"
