@@ -12,15 +12,33 @@ pub fn commit_accounts<'a, 'info>(
 ) -> ProgramResult {
     let mut accounts = vec![payer];
     accounts.extend(account_infos.iter());
-    let ix = create_schedule_commit_ix(magic_program, &accounts);
+    let ix = create_schedule_commit_ix(magic_program, &accounts, false);
+    invoke(&ix, &accounts.into_iter().cloned().collect::<Vec<_>>())
+}
+
+/// CPI to trigger a commit and undelegate one or more accounts in the ER
+#[inline(always)]
+pub fn commit_and_undelegate_accounts<'a, 'info>(
+    payer: &'a AccountInfo<'info>,
+    account_infos: Vec<&'a AccountInfo<'info>>,
+    magic_program: &'a AccountInfo<'info>,
+) -> ProgramResult {
+    let mut accounts = vec![payer];
+    accounts.extend(account_infos.iter());
+    let ix = create_schedule_commit_ix(magic_program, &accounts, true);
     invoke(&ix, &accounts.into_iter().cloned().collect::<Vec<_>>())
 }
 
 pub fn create_schedule_commit_ix<'a, 'info>(
     magic_program: &'a AccountInfo<'info>,
     account_infos: &[&'a AccountInfo<'info>],
+    allow_undelegation: bool,
 ) -> Instruction {
-    let instruction_data = vec![1, 0, 0, 0];
+    let instruction_data = if allow_undelegation {
+        vec![2, 0, 0, 0]
+    } else {
+        vec![1, 0, 0, 0]
+    };
     let account_metas = account_infos
         .iter()
         .map(|x| AccountMeta {

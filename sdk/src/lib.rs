@@ -6,7 +6,7 @@ pub mod anchor;
 pub mod consts;
 pub mod cpi;
 pub mod delegate_args;
-pub mod er;
+pub mod ephem;
 pub mod pda;
 pub mod types;
 pub mod utils;
