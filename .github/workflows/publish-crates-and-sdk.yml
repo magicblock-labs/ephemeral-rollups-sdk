@@ -98,11 +98,12 @@ jobs:
           CRATES_TOKEN: ${{ secrets.CRATES_TOKEN }}
           DRY_RUN: ${{ env.DRY_RUN }}
 
-      - name: npm publish
+      - name: npm run publish
         run: |
           cd sdk/ts/
           npm install --global eslint@^8.33.0
           npm install --legacy-peer-deps
+          npm build
           echo "//registry.npmjs.org/:_authToken=${{ secrets.NPM_TOKEN }}" > ~/.npmrc
           npm set //registry.npmjs.org/:_authToken ${{ secrets.NPM_TOKEN }}
           cd sdk/ts/ && npm run build && npm run lint:fix
