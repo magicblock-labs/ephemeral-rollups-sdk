@@ -13,7 +13,9 @@ pub fn commit_accounts<'a, 'info>(
     magic_program: &'a AccountInfo<'info>,
 ) -> ProgramResult {
     let ix = create_schedule_commit_ix(payer, &account_infos, magic_context, magic_program, false);
-    invoke(&ix, &account_infos.into_iter().map(|x| x.clone()).collect::<Vec<_>>())
+    let mut all_accounts = vec![payer.clone(), magic_context.clone()];
+    all_accounts.extend(account_infos.into_iter().map(|x| x.clone()));
+    invoke(&ix, &all_accounts)
 }
 
 /// CPI to trigger a commit and undelegate one or more accounts in the ER
@@ -25,7 +27,9 @@ pub fn commit_and_undelegate_accounts<'a, 'info>(
     magic_program: &'a AccountInfo<'info>,
 ) -> ProgramResult {
     let ix = create_schedule_commit_ix(payer, &account_infos, magic_context, magic_program, true);
-    invoke(&ix, &account_infos.into_iter().map(|x| x.clone()).collect::<Vec<_>>())
+    let mut all_accounts = vec![payer.clone(), magic_context.clone()];
+    all_accounts.extend(account_infos.into_iter().map(|x| x.clone()));
+    invoke(&ix, &all_accounts)
 }
 
 pub fn create_schedule_commit_ix<'a, 'info>(
