@@ -14,7 +14,7 @@ pub fn commit_accounts<'a, 'info>(
 ) -> ProgramResult {
     let ix = create_schedule_commit_ix(payer, &account_infos, magic_context, magic_program, false);
     let mut all_accounts = vec![payer.clone(), magic_context.clone()];
-    all_accounts.extend(account_infos.into_iter().map(|x| x.clone()));
+    all_accounts.extend(account_infos.into_iter().cloned());
     invoke(&ix, &all_accounts)
 }
 
@@ -28,7 +28,7 @@ pub fn commit_and_undelegate_accounts<'a, 'info>(
 ) -> ProgramResult {
     let ix = create_schedule_commit_ix(payer, &account_infos, magic_context, magic_program, true);
     let mut all_accounts = vec![payer.clone(), magic_context.clone()];
-    all_accounts.extend(account_infos.into_iter().map(|x| x.clone()));
+    all_accounts.extend(account_infos.into_iter().cloned());
     invoke(&ix, &all_accounts)
 }
 
@@ -56,13 +56,11 @@ pub fn create_schedule_commit_ix<'a, 'info>(
             is_writable: true,
         },
     ];
-    account_metas.extend(account_infos
-        .iter()
-        .map(|x| AccountMeta {
-            pubkey: *x.key,
-            is_signer: x.is_signer,
-            is_writable: x.is_writable,
-        }));
+    account_metas.extend(account_infos.iter().map(|x| AccountMeta {
+        pubkey: *x.key,
+        is_signer: x.is_signer,
+        is_writable: x.is_writable,
+    }));
     msg!("Keys: {:?}", account_metas);
     Instruction::new_with_bytes(*magic_program.key, &instruction_data, account_metas)
 }
