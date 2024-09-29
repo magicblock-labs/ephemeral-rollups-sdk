@@ -7,6 +7,10 @@ pub const DELEGATION_PROGRAM_ID: Pubkey = pubkey!("DELeGGvXpWV2fqJUhqcF5ZSYMS4JT
 
 /// The magic program ID.
 pub const MAGIC_PROGRAM_ID: Pubkey = pubkey!("Magic11111111111111111111111111111111111111");
+
+/// The magic context ID.
+pub const MAGIC_CONTEXT_ID: Pubkey = pubkey!("MagicContext1111111111111111111111111111111");
+
 ///
 /// The seed of the authority account PDA.
 pub const DELEGATION_RECORD: &[u8] = b"delegation";
