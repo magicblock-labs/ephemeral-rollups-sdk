@@ -1,6 +1,6 @@
 [package]
-name = "ephemeral-rollups-sdk-attribute-delegate"
-description = "ephemeral-rollups-sdk-attribute-delegate"
+name = "ephemeral-rollups-sdk-attribute-commit"
+description = "ephemeral-rollups-sdk-attribute-commit"
 version = { workspace = true }
 authors = { workspace = true }
 repository = { workspace = true }
@@ -8,13 +8,10 @@ homepage = { workspace = true }
 license = { workspace = true }
 edition = { workspace = true }
 
-[features]
-default = []
-
-[lib]
-proc-macro = true
-
 [dependencies]
 proc-macro2 = { workspace = true }
 syn = { workspace = true, features = ["full"] }
 quote = { workspace = true }
+
+[lib]
+proc-macro = true
