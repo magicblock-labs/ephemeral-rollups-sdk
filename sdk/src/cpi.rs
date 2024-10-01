@@ -10,7 +10,6 @@ use crate::consts::BUFFER;
 use crate::types::DelegateAccountArgs;
 use crate::utils::{close_pda, create_pda, seeds_with_bump};
 
-/// Delegate an account
 #[allow(clippy::too_many_arguments)]
 #[inline(always)]
 pub fn delegate_account<'a, 'info>(
@@ -26,6 +25,7 @@ pub fn delegate_account<'a, 'info>(
     valid_until: i64,
     commit_frequency_ms: u32,
 ) -> ProgramResult {
+
     let buffer_seeds: &[&[u8]] = &[BUFFER, pda.key.as_ref()];
 
     let (_, delegate_account_bump) = Pubkey::find_program_address(pda_seeds, owner_program.key);
