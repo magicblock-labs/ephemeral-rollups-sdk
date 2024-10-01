@@ -25,7 +25,6 @@ pub fn delegate_account<'a, 'info>(
     valid_until: i64,
     commit_frequency_ms: u32,
 ) -> ProgramResult {
-
     let buffer_seeds: &[&[u8]] = &[BUFFER, pda.key.as_ref()];
 
     let (_, delegate_account_bump) = Pubkey::find_program_address(pda_seeds, owner_program.key);
