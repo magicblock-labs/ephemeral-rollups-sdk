@@ -1,7 +1,6 @@
 use solana_program::account_info::AccountInfo;
 use solana_program::entrypoint::ProgramResult;
 use solana_program::instruction::{AccountMeta, Instruction};
-use solana_program::msg;
 use solana_program::program::invoke;
 
 /// CPI to trigger a commit for one or more accounts in the ER
@@ -61,6 +60,5 @@ pub fn create_schedule_commit_ix<'a, 'info>(
         is_signer: x.is_signer,
         is_writable: x.is_writable,
     }));
-    msg!("Keys: {:?}", account_metas);
     Instruction::new_with_bytes(*magic_program.key, &instruction_data, account_metas)
 }
