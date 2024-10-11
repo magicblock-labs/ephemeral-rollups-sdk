@@ -44,7 +44,7 @@ export function createUndelegateInstruction(
   });
 
   const {
-    delegationPda,
+    delegationRecord,
     delegationMetadata,
     bufferPda,
     commitStateRecordPda,
@@ -83,7 +83,7 @@ export function createUndelegateInstruction(
       isSigner: false,
     },
     {
-      pubkey: accounts.delegationRecord ?? delegationPda,
+      pubkey: accounts.delegationRecord ?? delegationRecord,
       isWritable: true,
       isSigner: false,
     },

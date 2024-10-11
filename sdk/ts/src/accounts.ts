@@ -42,7 +42,7 @@ function getAccounts(
 ) {
   const pdaBytes = accountToDelegate.toBytes();
 
-  const [delegationPda] = PublicKey.findProgramAddressSync(
+  const [delegationRecord] = PublicKey.findProgramAddressSync(
     [Buffer.from(SEED_DELEGATION), pdaBytes],
     new PublicKey(DELEGATION_PROGRAM_ID),
   );
@@ -69,7 +69,7 @@ function getAccounts(
     new PublicKey(DELEGATION_PROGRAM_ID),
   );
   return {
-    delegationPda,
+    delegationRecord,
     delegationMetadata,
     bufferPda,
     commitStateRecordPda,
