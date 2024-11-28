@@ -93,6 +93,33 @@ pub fn close_pda<'a, 'info>(
     target_account.realloc(0, false).map_err(Into::into)
 }
 
+/// Close PDA with transfer
+#[inline(always)]
+pub fn close_pda_with_system_transfer<'a, 'info>(
+    target_account: &'a AccountInfo<'info>,
+    seeds: &[&[&[u8]]],
+    destination: &'a AccountInfo<'info>,
+    system_program: &'a AccountInfo<'info>,
+) -> ProgramResult {
+    let transfer_instruction = solana_program::system_instruction::transfer(
+        target_account.key,
+        destination.key,
+        target_account.lamports(),
+    );
+    target_account.realloc(0, true)?;
+    target_account.assign(&solana_program::system_program::ID);
+    solana_program::program::invoke_signed(
+        &transfer_instruction,
+        &[
+            target_account.clone(),
+            destination.clone(),
+            system_program.clone(),
+        ],
+        seeds,
+    )?;
+    Ok(())
+}
+
 /// Seeds with bump
 #[inline(always)]
 pub fn seeds_with_bump<'a>(seeds: &'a [&'a [u8]], bump: &'a [u8]) -> Vec<&'a [u8]> {

@@ -1,5 +1,5 @@
 [package]
-name = "ephemeral-rollups-sdk"
+name = "ephemeral-rollups-sdk-v2"
 description = "Ephemeral Rollups Integration SDK"
 version = { workspace = true }
 authors = { workspace = true }
@@ -17,8 +17,9 @@ anchor = ["anchor-lang"]
 
 [dependencies]
 borsh = { workspace = true }
-ephemeral-rollups-sdk-attribute-delegate = { workspace = true }
-ephemeral-rollups-sdk-attribute-commit = { workspace = true }
+ephemeral-rollups-sdk-attribute-delegate-v2 = { workspace = true }
+ephemeral-rollups-sdk-attribute-ephemeral-v2 = { workspace = true }
+ephemeral-rollups-sdk-attribute-commit-v2 = { workspace = true }
 paste = { workspace = true }
 solana-program = { workspace = true }
 anchor-lang = { workspace = true, optional = true }

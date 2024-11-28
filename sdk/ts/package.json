@@ -1,6 +1,6 @@
 {
-  "name": "@magicblock-labs/ephemeral-rollups-sdk",
-  "version": "0.0.7",
+  "name": "@magicblock-labs/ephemeral-rollups-sdk-v2",
+  "version": "0.1.1",
   "author": "MagicBlock Labs",
   "license": "MIT",
   "publishConfig": {
@@ -37,5 +37,6 @@
   "dependencies": {
     "@metaplex-foundation/beet": "^0.7.2",
     "@solana/web3.js": "^1.92.3"
-  }
+  },
+  "packageManager": "yarn@1.22.22+sha512.a6b2f7906b721bba3d67d4aff083df04dad64c399707841b7acf00f6b133b7ac24255f2652fa22ae3534329dc6180534e98d17432037ff6fd140556e2bb3137e"
 }

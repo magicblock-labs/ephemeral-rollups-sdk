@@ -1,7 +1,5 @@
 use solana_program::pubkey::Pubkey;
-
-pub use ephemeral_rollups_sdk_attribute_delegate::delegate;
-
+#[cfg(feature = "anchor")]
 pub mod anchor;
 pub mod consts;
 pub mod cpi;

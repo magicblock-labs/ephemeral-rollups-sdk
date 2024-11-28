@@ -8,28 +8,48 @@ use solana_program::pubkey::Pubkey;
 // TODO: import from the delegation program crate once open-sourced
 use crate::consts::BUFFER;
 use crate::types::DelegateAccountArgs;
-use crate::utils::{close_pda, create_pda, seeds_with_bump};
+use crate::utils::{close_pda, close_pda_with_system_transfer, create_pda, seeds_with_bump};
 
-#[allow(clippy::too_many_arguments)]
-#[inline(always)]
+pub struct DelegateAccounts<'a, 'info> {
+    pub payer: &'a AccountInfo<'info>,
+    pub pda: &'a AccountInfo<'info>,
+    pub owner_program: &'a AccountInfo<'info>,
+    pub buffer: &'a AccountInfo<'info>,
+    pub delegation_record: &'a AccountInfo<'info>,
+    pub delegation_metadata: &'a AccountInfo<'info>,
+    pub delegation_program: &'a AccountInfo<'info>,
+    pub system_program: &'a AccountInfo<'info>,
+}
+
+pub struct DelegateConfig {
+    pub valid_until: i64,
+    pub commit_frequency_ms: u32,
+    pub validator: Option<Pubkey>,
+}
+
+impl Default for DelegateConfig {
+    fn default() -> Self {
+        DelegateConfig {
+            valid_until: DelegateAccountArgs::default().valid_until,
+            commit_frequency_ms: DelegateAccountArgs::default().commit_frequency_ms,
+            validator: DelegateAccountArgs::default().validator,
+        }
+    }
+}
+
+#[allow(clippy::needless_lifetimes)]
 pub fn delegate_account<'a, 'info>(
-    payer: &'a AccountInfo<'info>,
-    pda: &'a AccountInfo<'info>,
-    owner_program: &'a AccountInfo<'info>,
-    buffer: &'a AccountInfo<'info>,
-    delegation_record: &'a AccountInfo<'info>,
-    delegation_metadata: &'a AccountInfo<'info>,
-    delegation_program: &'a AccountInfo<'info>,
-    system_program: &'a AccountInfo<'info>,
+    accounts: DelegateAccounts<'a, 'info>,
     pda_seeds: &[&[u8]],
-    valid_until: i64,
-    commit_frequency_ms: u32,
+    config: DelegateConfig,
 ) -> ProgramResult {
-    let buffer_seeds: &[&[u8]] = &[BUFFER, pda.key.as_ref()];
+    let buffer_seeds: &[&[u8]] = &[BUFFER, accounts.pda.key.as_ref()];
 
-    let (_, delegate_account_bump) = Pubkey::find_program_address(pda_seeds, owner_program.key);
+    let (_, delegate_account_bump) =
+        Pubkey::find_program_address(pda_seeds, accounts.owner_program.key);
 
-    let (_, buffer_pda_bump) = Pubkey::find_program_address(buffer_seeds, owner_program.key);
+    let (_, buffer_pda_bump) =
+        Pubkey::find_program_address(buffer_seeds, accounts.owner_program.key);
 
     // Pda signer seeds
     let delegate_account_bump_slice: &[u8] = &[delegate_account_bump];
@@ -40,63 +60,68 @@ pub fn delegate_account<'a, 'info>(
     let buffer_bump_slice: &[u8] = &[buffer_pda_bump];
     let buffer_signer_seeds: &[&[&[u8]]] = &[&*seeds_with_bump(buffer_seeds, buffer_bump_slice)];
 
-    let data_len = pda.data_len();
+    let data_len = accounts.pda.data_len();
 
     // Create the Buffer PDA
     create_pda(
-        buffer,
-        owner_program.key,
+        accounts.buffer,
+        accounts.owner_program.key,
         data_len,
         buffer_signer_seeds,
-        system_program,
-        payer,
+        accounts.system_program,
+        accounts.payer,
     )?;
 
     // Copy the date to the buffer PDA
-    let mut buffer_data = buffer.try_borrow_mut_data()?;
-    let new_data = pda.try_borrow_data()?.to_vec().clone();
+    let mut buffer_data = accounts.buffer.try_borrow_mut_data()?;
+    let new_data = accounts.pda.try_borrow_data()?.to_vec().clone();
     (*buffer_data).copy_from_slice(&new_data);
     drop(buffer_data);
 
     // Close the PDA account
-    close_pda(pda, payer)?;
+    close_pda(accounts.pda, accounts.payer)?;
 
     // Re-create the PDA setting the delegation program as owner
     create_pda(
-        pda,
-        delegation_program.key,
+        accounts.pda,
+        accounts.delegation_program.key,
         data_len,
         pda_signer_seeds,
-        system_program,
-        payer,
+        accounts.system_program,
+        accounts.payer,
     )?;
 
     let seeds_vec: Vec<Vec<u8>> = pda_seeds.iter().map(|&slice| slice.to_vec()).collect();
 
     let delegation_args = DelegateAccountArgs {
-        valid_until,
-        commit_frequency_ms,
+        valid_until: config.valid_until,
+        commit_frequency_ms: config.commit_frequency_ms,
         seeds: seeds_vec,
+        validator: config.validator,
     };
 
     cpi_delegate(
-        payer,
-        pda,
-        owner_program,
-        buffer,
-        delegation_record,
-        delegation_metadata,
-        system_program,
+        accounts.payer,
+        accounts.pda,
+        accounts.owner_program,
+        accounts.buffer,
+        accounts.delegation_record,
+        accounts.delegation_metadata,
+        accounts.system_program,
         pda_signer_seeds,
         delegation_args,
     )?;
 
-    close_pda(buffer, payer)?;
+    close_pda_with_system_transfer(
+        accounts.buffer,
+        buffer_signer_seeds,
+        accounts.payer,
+        accounts.system_program,
+    )?;
     Ok(())
 }
 
 /// Undelegate an account
-#[inline(always)]
 pub fn undelegate_account<'a, 'info>(
     delegated_account: &'a AccountInfo<'info>,
     owner_program: &Pubkey,
@@ -138,7 +163,6 @@ pub fn undelegate_account<'a, 'info>(
 
 /// CPI to the delegation program to delegate the account
 #[allow(clippy::too_many_arguments)]
-#[inline(always)]
 pub fn cpi_delegate<'a, 'info>(
     payer: &'a AccountInfo<'info>,
     delegate_account: &'a AccountInfo<'info>,
@@ -184,7 +208,6 @@ pub fn cpi_delegate<'a, 'info>(
 }
 
 /// CPI to the delegation program to allow undelegation
-#[inline(always)]
 pub fn allow_undelegation<'a, 'info>(
     delegated_account: &'a AccountInfo<'info>,
     delegation_record: &'a AccountInfo<'info>,

@@ -1,139 +1,169 @@
 use proc_macro::TokenStream;
-
-use proc_macro2::TokenStream as TokenStream2;
 use quote::quote;
-use syn::{parse_macro_input, ItemMod};
+use syn::spanned::Spanned;
+use syn::{parse_macro_input, ItemStruct};
 
-/// This macro attribute is used to inject instructions and struct needed from the delegation program.
-///
-/// Components can be delegate and undelegated to allow fast udpates in the Ephemeral Rollups.
-///
-/// # Example
-/// ```ignore
-///
-/// pub fn delegate(ctx: Context<DelegateInput>) -> Result<()> {
-///     let pda_seeds: &[&[u8]] = &[TEST_PDA_SEED];
-///
-///     let [payer, pda, owner_program, buffer, delegation_record, delegation_metadata, delegation_program, system_program] = [
-///         &ctx.accounts.payer,
-///         &ctx.accounts.pda,
-///         &ctx.accounts.owner_program,
-///         &ctx.accounts.buffer,
-///         &ctx.accounts.buffer,
-///         &ctx.accounts.delegation_record,
-///         &ctx.accounts.delegation_metadata,
-///         &ctx.accounts.delegation_program,
-///         &ctx.accounts.system_program,
-///     ];
-///
-///     delegate_account(
-///         payer,
-///         pda,
-///         owner_program,
-///         buffer,
-///         delegation_record,
-///         delegation_metadata,
-///         delegation_program,
-///         system_program,
-///         pda_seeds,
-///         0,
-///         30000
-///     )?;
-///
-///     Ok(())
-/// }
-///
-/// #[derive(Accounts)]
-/// pub struct DelegateInput<'info> {
-///     pub payer: Signer<'info>,
-///     /// CHECK: The pda to delegate
-///     #[account(mut)]
-///     pub pda: AccountInfo<'info>,
-///     /// CHECK: The owner program of the pda
-///     pub owner_program: AccountInfo<'info>,
-///     /// CHECK: The buffer to temporarily store the pda data
-///     #[account(mut)]
-///     pub buffer: AccountInfo<'info>,
-///     /// CHECK: The delegation record
-///     #[account(mut)]
-///     pub delegation_record: AccountInfo<'info>,
-///     /// CHECK: The delegation account seeds
-///     #[account(mut)]
-///     pub delegation_metadata: AccountInfo<'info>,
-///     /// CHECK: The delegation program
-///     pub delegation_program: AccountInfo<'info>,
-///     /// CHECK: The system program
-///     pub system_program: AccountInfo<'info>,
-/// }
-/// ```
 #[proc_macro_attribute]
-pub fn delegate(_args: TokenStream, input: TokenStream) -> TokenStream {
-    let ast = parse_macro_input!(input as syn::ItemMod);
-    let modified = modify_component_module(ast);
-    TokenStream::from(quote! {
-        #modified
-    })
-}
+pub fn delegate(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    let input = parse_macro_input!(item as ItemStruct);
 
-/// Modifies the component module and adds the necessary functions and structs.
-fn modify_component_module(mut module: ItemMod) -> ItemMod {
-    let (imports, undelegate_fn, undelegate_struct) = generate_undelegate();
-    module.content = module.content.map(|(brace, mut items)| {
-        items.extend(
-            vec![imports, undelegate_fn, undelegate_struct]
-                .into_iter()
-                .map(|item| {
-                    syn::parse2(item).unwrap_or_else(|e| panic!("Failed to parse item: {}", e))
-                })
-                .collect::<Vec<_>>(),
-        );
-        (brace, items)
-    });
-    module
-}
+    // Extract the struct name and fields
+    let struct_name = &input.ident;
+    let fields = &input.fields;
+    let original_attrs = &input.attrs;
 
-/// Generates the undelegate function and struct.
-fn generate_undelegate() -> (TokenStream2, TokenStream2, TokenStream2) {
-    (
-        quote! {
-            use ephemeral_rollups_sdk::cpi::undelegate_account;
-        },
-        quote! {
-            #[automatically_derived]
-            pub fn process_undelegation(ctx: Context<InitializeAfterUndelegation>, account_seeds: Vec<Vec<u8>>) -> Result<()> {
-                let [delegated_account, buffer, payer, system_program] = [
-                    &ctx.accounts.base_account,
-                    &ctx.accounts.buffer,
-                    &ctx.accounts.payer,
-                    &ctx.accounts.system_program,
-                ];
-                undelegate_account(
-                    delegated_account,
-                    &id(),
-                    buffer,
-                    payer,
-                    system_program,
-                    account_seeds,
-                )?;
-                Ok(())
+    // Process fields to modify them according to the rules
+    let mut new_fields = Vec::new();
+    let mut delegate_methods = Vec::new();
+    let mut has_owner_program = false;
+    let mut has_delegation_program = false;
+    let mut has_system_program = false;
+
+    for field in fields.iter() {
+        let mut field_attrs = field.attrs.clone();
+
+        let field_name = match &field.ident {
+            Some(name) => name,
+            None => {
+                return syn::Error::new_spanned(
+                    field,
+                    "Unnamed fields are not supported in this macro",
+                )
+                .to_compile_error()
+                .into();
             }
-        },
-        quote! {
-            #[automatically_derived]
-            #[derive(Accounts)]
-                pub struct InitializeAfterUndelegation<'info> {
-                /// CHECK:`
-                #[account(mut)]
-                pub base_account: AccountInfo<'info>,
-                /// CHECK:`
-                #[account()]
-                pub buffer: AccountInfo<'info>,
-                /// CHECK:`
-                #[account(mut)]
-                pub payer: AccountInfo<'info>,
-                /// CHECK:`
-                pub system_program: AccountInfo<'info>,
+        };
+
+        // Check if the field has the `del` attribute
+        let has_del = field_attrs
+            .iter()
+            .any(|attr| attr.path.is_ident("account") && attr.tokens.to_string().contains("del"));
+
+        if has_del {
+            let buffer_field = syn::Ident::new(&format!("buffer_{}", field_name), field.span());
+            let delegation_record_field =
+                syn::Ident::new(&format!("delegation_record_{}", field_name), field.span());
+            let delegation_metadata_field =
+                syn::Ident::new(&format!("delegation_metadata_{}", field_name), field.span());
+
+            // Remove `del` from attributes
+            for attr in &mut field_attrs {
+                if attr.path.is_ident("account") {
+                    let tokens = attr.tokens.to_string();
+                    if tokens.contains("del") {
+                        let new_tokens = tokens
+                            .replace(", del", "")
+                            .replace("del, ", "")
+                            .replace("del", "");
+                        attr.tokens = syn::parse_str(&new_tokens).unwrap();
+                    }
+                }
             }
-        },
-    )
+
+            // Add new fields
+            new_fields.push(quote! {
+                /// CHECK: The buffer account
+                #[account(
+                    mut, seeds = [ephemeral_rollups_sdk_v2::consts::BUFFER, #field_name.key().as_ref()],
+                    bump, seeds::program = crate::id()
+                )]
+                pub #buffer_field: AccountInfo<'info>,
+            });
+
+            new_fields.push(quote! {
+                /// CHECK: The delegation record account
+                #[account(
+                    mut, seeds = [ephemeral_rollups_sdk_v2::consts::DELEGATION_RECORD, #field_name.key().as_ref()],
+                    bump, seeds::program = delegation_program.key()
+                )]
+                pub #delegation_record_field: AccountInfo<'info>,
+            });
+
+            new_fields.push(quote! {
+                /// CHECK: The delegation metadata account
+                #[account(
+                    mut, seeds = [ephemeral_rollups_sdk_v2::consts::DELEGATION_METADATA, #field_name.key().as_ref()],
+                    bump, seeds::program = delegation_program.key()
+                )]
+                pub #delegation_metadata_field: AccountInfo<'info>,
+            });
+
+            // Add delegate method
+            let delegate_method_name =
+                syn::Ident::new(&format!("delegate_{}", field_name), field.span());
+            delegate_methods.push(quote! {
+                pub fn #delegate_method_name<'a>(
+                    &'a self,
+                    payer: &'a Signer<'info>,
+                    seeds: &[&[u8]],
+                    config: ::ephemeral_rollups_sdk_v2::cpi::DelegateConfig,
+                ) -> anchor_lang::solana_program::entrypoint::ProgramResult {
+                    let del_accounts = ::ephemeral_rollups_sdk_v2::cpi::DelegateAccounts {
+                        payer,
+                        pda: &self.#field_name.to_account_info(),
+                        owner_program: &self.owner_program,
+                        buffer: &self.#buffer_field,
+                        delegation_record: &self.#delegation_record_field,
+                        delegation_metadata: &self.#delegation_metadata_field,
+                        delegation_program: &self.delegation_program,
+                        system_program: &self.system_program,
+                    };
+                    ::ephemeral_rollups_sdk_v2::cpi::delegate_account(del_accounts, seeds, config)
+                }
+            });
+        }
+
+        // Add the original field without `del`
+        let field_type = &field.ty;
+        new_fields.push(quote! {
+            #(#field_attrs)*
+            pub #field_name: #field_type,
+        });
+
+        // Check for existing required fields
+        if field_name.eq("owner_program") {
+            has_owner_program = true;
+        }
+        if field_name.eq("delegation_program") {
+            has_delegation_program = true;
+        }
+        if field_name.eq("system_program") {
+            has_system_program = true;
+        }
+    }
+
+    // Add missing required fields
+    if !has_owner_program {
+        new_fields.push(quote! {
+            /// CHECK: The owner program of the pda
+            #[account(address = crate::id())]
+            pub owner_program: AccountInfo<'info>,
+        });
+    }
+    if !has_delegation_program {
+        new_fields.push(quote! {
+            /// CHECK: The delegation program
+            #[account(address = ::ephemeral_rollups_sdk_v2::id())]
+            pub delegation_program: AccountInfo<'info>,
+        });
+    }
+    if !has_system_program {
+        new_fields.push(quote! {
+            pub system_program: Program<'info, System>,
+        });
+    }
+
+    // Generate the new struct definition
+    let expanded = quote! {
+        #(#original_attrs)*
+        pub struct #struct_name<'info> {
+            #(#new_fields)*
+        }
+
+        impl<'info> #struct_name<'info> {
+            #(#delegate_methods)*
+        }
+    };
+
+    TokenStream::from(expanded)
 }
