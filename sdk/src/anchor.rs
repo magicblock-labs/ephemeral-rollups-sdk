@@ -1,8 +1,11 @@
 #[cfg(feature = "anchor")]
-pub use ephemeral_rollups_sdk_attribute_delegate::delegate;
+pub use ephemeral_rollups_sdk_attribute_ephemeral_v2::ephemeral;
 
 #[cfg(feature = "anchor")]
-pub use ephemeral_rollups_sdk_attribute_commit::commit;
+pub use ephemeral_rollups_sdk_attribute_commit_v2::commit;
+
+#[cfg(feature = "anchor")]
+pub use ephemeral_rollups_sdk_attribute_delegate_v2::delegate;
 
 #[cfg(feature = "anchor")]
 use solana_program::pubkey::Pubkey;

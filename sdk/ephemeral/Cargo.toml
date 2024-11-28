@@ -1,6 +1,6 @@
 [package]
-name = "ephemeral-rollups-sdk-attribute-delegate-v2"
-description = "ephemeral-rollups-sdk-attribute-delegate"
+name = "ephemeral-rollups-sdk-attribute-ephemeral-v2"
+description = "ephemeral-rollups-sdk-attribute-ephemeral"
 version = { workspace = true }
 authors = { workspace = true }
 repository = { workspace = true }

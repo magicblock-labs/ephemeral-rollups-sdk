@@ -1,5 +1,5 @@
 [package]
-name = "ephemeral-rollups-sdk-attribute-commit"
+name = "ephemeral-rollups-sdk-attribute-commit-v2"
 description = "ephemeral-rollups-sdk-attribute-commit"
 version = { workspace = true }
 authors = { workspace = true }

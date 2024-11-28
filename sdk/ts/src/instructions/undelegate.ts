@@ -16,7 +16,7 @@ export const undelegateStruct = new beet.FixableBeetArgsStruct<{
  */
 
 export interface UndelegateInstructionAccounts {
-  payer: web3.PublicKey;
+  validator: web3.PublicKey;
   delegatedAccount: web3.PublicKey;
   ownerProgram: web3.PublicKey;
   buffer?: web3.PublicKey;
@@ -51,9 +51,19 @@ export function createUndelegateInstruction(
     commitStatePda,
   } = UndelegateAccounts(accounts.delegatedAccount, accounts.ownerProgram);
 
+  const validatorFeesVaultPda = web3.PublicKey.findProgramAddressSync(
+    [Buffer.from("v-fees-vault"), accounts.validator.toBuffer()],
+    programId,
+  )[0];
+
+  const feesVaultPda = web3.PublicKey.findProgramAddressSync(
+    [Buffer.from("fees-vault")],
+    programId,
+  )[0];
+
   const keys: web3.AccountMeta[] = [
     {
-      pubkey: accounts.payer,
+      pubkey: accounts.validator,
       isWritable: false,
       isSigner: true,
     },
@@ -96,6 +106,16 @@ export function createUndelegateInstruction(
       pubkey: accounts.reimbursement,
       isWritable: false,
       isSigner: false,
+    },
+    {
+      pubkey: feesVaultPda,
+      isSigner: false,
+      isWritable: true,
+    },
+    {
+      pubkey: validatorFeesVaultPda,
+      isSigner: false,
+      isWritable: true,
     },
     {
       pubkey: accounts.systemProgram ?? web3.SystemProgram.programId,
