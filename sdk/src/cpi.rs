@@ -22,7 +22,6 @@ pub struct DelegateAccounts<'a, 'info> {
 }
 
 pub struct DelegateConfig {
-    pub valid_until: i64,
     pub commit_frequency_ms: u32,
     pub validator: Option<Pubkey>,
 }
@@ -30,7 +29,6 @@ pub struct DelegateConfig {
 impl Default for DelegateConfig {
     fn default() -> Self {
         DelegateConfig {
-            valid_until: DelegateAccountArgs::default().valid_until,
             commit_frequency_ms: DelegateAccountArgs::default().commit_frequency_ms,
             validator: DelegateAccountArgs::default().validator,
         }
@@ -94,7 +92,6 @@ pub fn delegate_account<'a, 'info>(
     let seeds_vec: Vec<Vec<u8>> = pda_seeds.iter().map(|&slice| slice.to_vec()).collect();
 
     let delegation_args = DelegateAccountArgs {
-        valid_until: config.valid_until,
         commit_frequency_ms: config.commit_frequency_ms,
         seeds: seeds_vec,
         validator: config.validator,

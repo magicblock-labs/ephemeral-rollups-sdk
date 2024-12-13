@@ -6,14 +6,12 @@ import { DelegateAccounts } from "../accounts";
 
 export const delegateStruct = new beet.FixableBeetArgsStruct<{
   instructionDiscriminator: number[];
-  valid_until: beet.bignum;
   commit_frequency_ms: beet.bignum;
   seeds: number[][];
   validator?: beet.COption<Uint8Array>;
 }>(
   [
     ["instructionDiscriminator", beet.uniformFixedSizeArray(beet.u8, 8)],
-    ["valid_until", beet.i64],
     ["commit_frequency_ms", beet.u32],
     ["seeds", beet.array(beet.array(beet.u8))],
     ["validator", beet.coption(beet.uniformFixedSizeArray(beet.u8, 32))],
@@ -24,7 +22,6 @@ export const delegateInstructionDiscriminator = [0, 0, 0, 0, 0, 0, 0, 0];
 
 // Define the DelegateAccountArgs structure
 interface DelegateAccountArgs {
-  valid_until: number;
   commit_frequency_ms: number;
   seeds: Uint8Array[][];
   validator?: web3.PublicKey;
@@ -49,7 +46,6 @@ export function createDelegateInstruction(
   );
 
   args = args ?? {
-    valid_until: 0,
     commit_frequency_ms: 4294967295, // 2 ** 4 - 1,
     seeds: [],
     validator: undefined,
@@ -83,7 +79,6 @@ export function createDelegateInstruction(
 
   const [data] = delegateStruct.serialize({
     instructionDiscriminator: delegateInstructionDiscriminator,
-    valid_until: args.valid_until,
     commit_frequency_ms: args.commit_frequency_ms,
     seeds: args.seeds.map((seed) => seed.map(Number)),
     validator: args.validator ? args.validator.toBytes() : undefined,
