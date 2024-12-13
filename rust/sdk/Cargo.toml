@@ -16,10 +16,10 @@ default = []
 anchor = ["anchor-lang"]
 
 [dependencies]
+anchor-lang = { workspace = true, optional = true }
 borsh = { workspace = true }
 ephemeral-rollups-sdk-attribute-delegate-v2 = { workspace = true }
 ephemeral-rollups-sdk-attribute-ephemeral-v2 = { workspace = true }
 ephemeral-rollups-sdk-attribute-commit-v2 = { workspace = true }
 paste = { workspace = true }
 solana-program = { workspace = true }
-anchor-lang = { workspace = true, optional = true }
