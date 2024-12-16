@@ -2,7 +2,7 @@ import * as beet from "@metaplex-foundation/beet";
 import * as web3 from "@solana/web3.js";
 import { DELEGATION_PROGRAM_ID } from "../constants";
 import {
-  bufferPdaFromDelegatedAccount,
+  bufferPdaFromDelegatedAccountAndOwnerProgramID,
   delegationMetadataPdaFromDelegatedAccount,
   delegationRecordPdaFromDelegatedAccount,
 } from "../pda";
@@ -21,7 +21,7 @@ export const delegateStruct = new beet.FixableBeetArgsStruct<{
     ["seeds", beet.array(beet.array(beet.u8))],
     ["validator", beet.coption(beet.uniformFixedSizeArray(beet.u8, 32))],
   ],
-  "UndelegateInstructionArgs"
+  "DelegateInstructionArgs"
 );
 export const delegateInstructionDiscriminator = [0, 0, 0, 0, 0, 0, 0, 0];
 
@@ -52,7 +52,7 @@ export function createDelegateInstruction(
   const delegationMetadataPda = delegationMetadataPdaFromDelegatedAccount(
     accounts.delegateAccount
   );
-  const bufferPda = bufferPdaFromDelegatedAccount(
+  const bufferPda = bufferPdaFromDelegatedAccountAndOwnerProgramID(
     accounts.delegateAccount,
     accounts.ownerProgram
   );

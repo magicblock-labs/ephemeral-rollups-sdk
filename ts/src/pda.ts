@@ -20,7 +20,7 @@ export function delegationMetadataPdaFromDelegatedAccount(
   )[0];
 }
 
-export function bufferPdaFromDelegatedAccount(
+export function bufferPdaFromDelegatedAccountAndOwnerProgramID(
   delegatedAccount: PublicKey,
   ownerProgramId?: PublicKey
 ) {
