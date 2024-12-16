@@ -747,7 +747,7 @@ checksum = "60b1af1c220855b6ceac025d3f6ecdd2b7c4894bfe9cd9bda4fbb4bc7c0d4cf0"
 
 [[package]]
 name = "ephemeral-rollups-sdk-attribute-commit-v2"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -756,7 +756,7 @@ dependencies = [
 
 [[package]]
 name = "ephemeral-rollups-sdk-attribute-delegate-v2"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -765,7 +765,7 @@ dependencies = [
 
 [[package]]
 name = "ephemeral-rollups-sdk-attribute-ephemeral-v2"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -774,7 +774,7 @@ dependencies = [
 
 [[package]]
 name = "ephemeral-rollups-sdk-v2"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "anchor-lang",
  "borsh 0.10.3",
