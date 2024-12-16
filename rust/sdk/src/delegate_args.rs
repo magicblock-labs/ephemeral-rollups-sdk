@@ -2,7 +2,10 @@ use solana_program::{instruction::AccountMeta, pubkey::Pubkey, system_program};
 
 use crate::{
     consts::{BUFFER, DELEGATION_PROGRAM_ID},
-    pda::{delegation_metadata_pda_from_pubkey, delegation_record_pda_from_pubkey},
+    pda::{
+        delegation_metadata_pda_from_delegated_account,
+        delegation_record_pda_from_delegated_account,
+    },
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -20,8 +23,8 @@ impl DelegateAccounts {
     pub fn new(delegate_account: Pubkey, owner_program: Pubkey) -> Self {
         let buffer =
             Pubkey::find_program_address(&[BUFFER, &delegate_account.to_bytes()], &owner_program);
-        let delegation_record = delegation_record_pda_from_pubkey(&delegate_account);
-        let delegation_metadata = delegation_metadata_pda_from_pubkey(&delegate_account);
+        let delegation_record = delegation_record_pda_from_delegated_account(&delegate_account);
+        let delegation_metadata = delegation_metadata_pda_from_delegated_account(&delegate_account);
 
         Self {
             delegate_account,

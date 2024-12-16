@@ -1,8 +1,11 @@
 import * as beet from "@metaplex-foundation/beet";
 import * as web3 from "@solana/web3.js";
-import { PublicKey } from "@solana/web3.js";
 import { DELEGATION_PROGRAM_ID } from "../constants";
-import { DelegateAccounts } from "../accounts";
+import {
+  bufferPdaFromDelegatedAccountAndOwnerProgramID,
+  delegationMetadataPdaFromDelegatedAccount,
+  delegationRecordPdaFromDelegatedAccount,
+} from "../pda";
 
 export const delegateStruct = new beet.FixableBeetArgsStruct<{
   instructionDiscriminator: number[];
@@ -16,7 +19,7 @@ export const delegateStruct = new beet.FixableBeetArgsStruct<{
     ["seeds", beet.array(beet.array(beet.u8))],
     ["validator", beet.coption(beet.uniformFixedSizeArray(beet.u8, 32))],
   ],
-  "UndelegateInstructionArgs",
+  "DelegateInstructionArgs"
 );
 export const delegateInstructionDiscriminator = [0, 0, 0, 0, 0, 0, 0, 0];
 
@@ -38,11 +41,17 @@ export function createDelegateInstruction(
     systemProgram?: web3.PublicKey;
   },
   args?: DelegateAccountArgs,
-  programId = new PublicKey(DELEGATION_PROGRAM_ID),
+  programId = DELEGATION_PROGRAM_ID
 ) {
-  const { delegationRecord, delegationMetadata, bufferPda } = DelegateAccounts(
+  const delegationRecordPda = delegationRecordPdaFromDelegatedAccount(
+    accounts.delegateAccount
+  );
+  const delegationMetadataPda = delegationMetadataPdaFromDelegatedAccount(
+    accounts.delegateAccount
+  );
+  const bufferPda = bufferPdaFromDelegatedAccountAndOwnerProgramID(
     accounts.delegateAccount,
-    accounts.ownerProgram,
+    accounts.ownerProgram
   );
 
   args = args ?? {
@@ -61,12 +70,12 @@ export function createDelegateInstruction(
       isSigner: false,
     },
     {
-      pubkey: accounts.delegationRecord ?? delegationRecord,
+      pubkey: accounts.delegationRecord ?? delegationRecordPda,
       isWritable: true,
       isSigner: false,
     },
     {
-      pubkey: accounts.delegationMetadata ?? delegationMetadata,
+      pubkey: accounts.delegationMetadata ?? delegationMetadataPda,
       isWritable: true,
       isSigner: false,
     },
