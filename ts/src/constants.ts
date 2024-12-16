@@ -10,3 +10,4 @@ export const MAGIC_PROGRAM_ID = new PublicKey(
 export const MAGIC_CONTEXT_ID = new PublicKey(
   "MagicContext1111111111111111111111111111111"
 );
+
