@@ -1,10 +1,5 @@
 [workspace]
-members = [
-    "sdk",
-	"ephemeral",
-	"delegate",
-	"commit-attribute"
-]
+members = ["sdk", "ephemeral", "delegate", "commit-attribute"]
 
 resolver = "2"
 
