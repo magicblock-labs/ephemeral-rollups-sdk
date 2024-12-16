@@ -9,6 +9,6 @@ pub mod pda;
 pub mod types;
 pub mod utils;
 
-pub fn id() -> Pubkey {
+pub const fn id() -> Pubkey {
     consts::DELEGATION_PROGRAM_ID
 }

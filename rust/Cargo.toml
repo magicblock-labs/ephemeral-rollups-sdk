@@ -1,5 +1,11 @@
 [workspace]
-members = ["sdk", "ephemeral", "delegate", "commit-attribute"]
+members = [
+	"sdk", 
+	"ephemeral", 
+	"delegate", 
+	"commit-attribute",
+	"resolver"
+]
 
 resolver = "2"
 
@@ -23,7 +29,7 @@ ephemeral-rollups-sdk-attribute-commit-v2 = { path = "commit-attribute", version
 anchor-lang = "0.30.1"
 borsh = "0.10.3"
 paste = "^1.0"
-solana-program = "^1.16"
+solana-program = "^2.1"
 proc-macro2 = "1.0"
 syn = { version = "1.0.60", features = ["full"] }
 quote = "1.0"
