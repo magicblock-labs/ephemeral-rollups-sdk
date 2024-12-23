@@ -1,8 +1,9 @@
 use solana_program::{instruction::AccountMeta, pubkey::Pubkey, system_program};
 
 use crate::{
-    consts::{BUFFER, DELEGATION_PROGRAM_ID},
+    consts::DELEGATION_PROGRAM_ID,
     pda::{
+        delegate_buffer_pda_from_delegated_account_and_owner_program,
         delegation_metadata_pda_from_delegated_account,
         delegation_record_pda_from_delegated_account,
     },
@@ -10,8 +11,9 @@ use crate::{
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DelegateAccounts {
-    pub delegate_account: Pubkey,
-    pub buffer: Pubkey,
+    pub payer: Pubkey,
+    pub delegated_account: Pubkey,
+    pub delegate_buffer: Pubkey,
     pub delegation_record: Pubkey,
     pub delegation_metadata: Pubkey,
     pub owner_program: Pubkey,
@@ -20,15 +22,18 @@ pub struct DelegateAccounts {
 }
 
 impl DelegateAccounts {
-    pub fn new(delegate_account: Pubkey, owner_program: Pubkey) -> Self {
-        let buffer =
-            Pubkey::find_program_address(&[BUFFER, &delegate_account.to_bytes()], &owner_program);
-        let delegation_record = delegation_record_pda_from_delegated_account(&delegate_account);
-        let delegation_metadata = delegation_metadata_pda_from_delegated_account(&delegate_account);
-
+    pub fn new(payer: Pubkey, delegated_account: Pubkey, owner_program: Pubkey) -> Self {
+        let delegate_buffer = delegate_buffer_pda_from_delegated_account_and_owner_program(
+            &delegated_account,
+            &owner_program,
+        );
+        let delegation_record = delegation_record_pda_from_delegated_account(&delegated_account);
+        let delegation_metadata =
+            delegation_metadata_pda_from_delegated_account(&delegated_account);
         Self {
-            delegate_account,
-            buffer: buffer.0,
+            payer,
+            delegated_account,
+            delegate_buffer,
             delegation_record,
             delegation_metadata,
             owner_program,
@@ -41,9 +46,9 @@ impl DelegateAccounts {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DelegateAccountMetas {
     pub payer: AccountMeta,
-    pub delegate_account: AccountMeta,
+    pub delegated_account: AccountMeta,
     pub owner_program: AccountMeta,
-    pub buffer: AccountMeta,
+    pub delegate_buffer: AccountMeta,
     pub delegation_record: AccountMeta,
     pub delegation_metadata: AccountMeta,
     pub delegation_program: AccountMeta,
@@ -53,10 +58,10 @@ pub struct DelegateAccountMetas {
 impl From<DelegateAccounts> for DelegateAccountMetas {
     fn from(accounts: DelegateAccounts) -> Self {
         Self {
-            payer: AccountMeta::new_readonly(accounts.delegate_account, false),
-            delegate_account: AccountMeta::new(accounts.delegate_account, false),
+            payer: AccountMeta::new(accounts.payer, true),
+            delegated_account: AccountMeta::new(accounts.delegated_account, false),
             owner_program: AccountMeta::new_readonly(accounts.owner_program, false),
-            buffer: AccountMeta::new(accounts.buffer, false),
+            delegate_buffer: AccountMeta::new(accounts.delegate_buffer, false),
             delegation_record: AccountMeta::new(accounts.delegation_record, false),
             delegation_metadata: AccountMeta::new(accounts.delegation_metadata, false),
             delegation_program: AccountMeta::new_readonly(accounts.delegation_program, false),
