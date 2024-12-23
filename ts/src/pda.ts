@@ -20,12 +20,12 @@ export function delegationMetadataPdaFromDelegatedAccount(
   )[0];
 }
 
-export function bufferPdaFromDelegatedAccountAndOwnerProgramID(
+export function delegateBufferPdaFromDelegatedAccountAndOwnerProgram(
   delegatedAccount: PublicKey,
-  ownerProgramId?: PublicKey
+  ownerProgramId: PublicKey
 ) {
   return PublicKey.findProgramAddressSync(
     [Buffer.from("buffer"), delegatedAccount.toBytes()],
-    ownerProgramId ? ownerProgramId : DELEGATION_PROGRAM_ID
+    ownerProgramId
   )[0];
 }

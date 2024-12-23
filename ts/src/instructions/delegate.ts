@@ -2,7 +2,7 @@ import * as beet from "@metaplex-foundation/beet";
 import * as web3 from "@solana/web3.js";
 import { DELEGATION_PROGRAM_ID } from "../constants";
 import {
-  bufferPdaFromDelegatedAccountAndOwnerProgramID,
+  delegateBufferPdaFromDelegatedAccountAndOwnerProgram,
   delegationMetadataPdaFromDelegatedAccount,
   delegationRecordPdaFromDelegatedAccount,
 } from "../pda";
@@ -33,9 +33,8 @@ interface DelegateAccountArgs {
 export function createDelegateInstruction(
   accounts: {
     payer: web3.PublicKey;
-    delegateAccount: web3.PublicKey;
+    delegatedAccount: web3.PublicKey;
     ownerProgram: web3.PublicKey;
-    buffer?: web3.PublicKey;
     delegationRecord?: web3.PublicKey;
     delegationMetadata?: web3.PublicKey;
     systemProgram?: web3.PublicKey;
@@ -43,15 +42,17 @@ export function createDelegateInstruction(
   args?: DelegateAccountArgs,
   programId = DELEGATION_PROGRAM_ID
 ) {
+  const delegateBufferPda =
+    delegateBufferPdaFromDelegatedAccountAndOwnerProgram(
+      accounts.delegatedAccount,
+      accounts.ownerProgram
+    );
+
   const delegationRecordPda = delegationRecordPdaFromDelegatedAccount(
-    accounts.delegateAccount
+    accounts.delegatedAccount
   );
   const delegationMetadataPda = delegationMetadataPdaFromDelegatedAccount(
-    accounts.delegateAccount
-  );
-  const bufferPda = bufferPdaFromDelegatedAccountAndOwnerProgramID(
-    accounts.delegateAccount,
-    accounts.ownerProgram
+    accounts.delegatedAccount
   );
 
   args = args ?? {
@@ -62,10 +63,10 @@ export function createDelegateInstruction(
 
   const keys: web3.AccountMeta[] = [
     { pubkey: accounts.payer, isWritable: false, isSigner: true },
-    { pubkey: accounts.delegateAccount, isWritable: true, isSigner: true },
+    { pubkey: accounts.delegatedAccount, isWritable: true, isSigner: true },
     { pubkey: accounts.ownerProgram, isWritable: false, isSigner: false },
     {
-      pubkey: accounts.buffer ?? bufferPda,
+      pubkey: delegateBufferPda,
       isWritable: true,
       isSigner: false,
     },
