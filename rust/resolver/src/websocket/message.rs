@@ -90,7 +90,7 @@ mod tests {
 
     use super::*;
     use json::from_slice;
-    use sdk::Pubkey;
+    use sdk::pubkey::Pubkey;
 
     const ACCOUNT_NOTIFICATION: &[u8] = br#"{
             "jsonrpc": "2.0",
