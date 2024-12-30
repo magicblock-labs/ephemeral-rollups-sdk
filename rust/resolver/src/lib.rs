@@ -145,7 +145,7 @@ impl Resolver {
     ) -> ResolverResult<Arc<RpcClient>> {
         let mut statuses = Vec::new();
         for (i, acc) in tx.message.account_keys.iter().enumerate() {
-            if tx.message.is_maybe_writable(i, None) {
+            if tx.message.is_writable(i) {
                 statuses.push(self.resolve_status(acc).await?);
             }
         }
