@@ -3,22 +3,20 @@
     "outDir": "lib",
     "baseUrl": "src",
     "declaration": true,
+    "declarationMap": true,
     "emitDecoratorMetadata": true,
     "experimentalDecorators": true,
-    "declarationMap": true,
     "removeComments": true,
     "preserveConstEnums": true,
     "module": "es6",
-    "noEmit": false,
-    "resolveJsonModule": true,
     "moduleResolution": "node",
     "esModuleInterop": true,
     "skipLibCheck": true,
     "sourceMap": true,
-    "strictNullChecks": true,
     "strict": true,
-    "target": "es6",
-    "lib": ["es2019", "dom"]
+    "target": "es2020",
+    "lib": ["es2020", "dom"],
+    "resolveJsonModule": true
   },
   "include": [
     "src/**/*"

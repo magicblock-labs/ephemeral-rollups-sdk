@@ -60,6 +60,5 @@ jobs:
       - name: npm run build
         working-directory: ts/
         run: |
-          npm install --global eslint@^8.33.0
-          npm install --legacy-peer-deps
+          npm install
           npm run build
