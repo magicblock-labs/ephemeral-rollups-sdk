@@ -7,7 +7,7 @@ on:
     branches:
       - 'main'
 env:
-  solana_version: v1.18.8
+  solana_version: v1.18.26
 
 jobs:
   install:
@@ -29,10 +29,9 @@ jobs:
           sudo apt-get install -y pkg-config build-essential libudev-dev
           npm install --global yarn
 
-      - name: install rust
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          toolchain: 1.82.0
+      - name: Install Rust
+        shell: "bash"
+        run: rustup toolchain install 1.83.0 --profile minimal
 
       - name: Cache rust
         uses: Swatinem/rust-cache@v2
@@ -40,8 +39,8 @@ jobs:
       - name: install solana
         if: steps.cache-solana.outputs.cache-hit != 'true'
         run: |
-          sh -c "$(curl -sSfL https://release.solana.com/${{ env.solana_version }}/install)"
-          export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"
+          sh -c "$(curl -sSfL https://release.anza.xyz/${{ env.solana_version }}/install)"
+          echo "$HOME/.local/share/solana/install/active_release/bin" >> $GITHUB_PATH
           solana --version
 
   lint:
@@ -65,20 +64,6 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/cache@v4
-        name: cache solana cli
-        id: cache-solana
-        with:
-          path: |
-            ~/.cache/solana/
-            ~/.local/share/solana/
-          key: solana-${{ runner.os }}-v0000-${{ env.solana_version }}
-
-      - name: setup solana
-        run: |
-          export PATH="/home/runner/.local/share/solana/install/active_release/bin:$PATH"
-          solana --version
-          solana-keygen new --silent --no-bip39-passphrase
 
       - name: run build
         working-directory: rust/
