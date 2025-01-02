@@ -1,7 +1,6 @@
 use solana_program::pubkey::Pubkey;
 
 /// NOTE: Copy/Pasted from delegation-program/src/pda.rs (modify there if needed)
-
 #[macro_export]
 macro_rules! delegation_record_seeds_from_delegated_account {
     ($delegated_account: expr) => {
