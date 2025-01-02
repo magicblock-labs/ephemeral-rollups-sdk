@@ -7,7 +7,8 @@ on:
     branches:
       - 'main'
 env:
-  solana_version: v1.18.26
+  rust_version: v1.83.0
+  node_version: '23'
 
 jobs:
   install:
@@ -15,15 +16,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: install essentials
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y pkg-config build-essential libudev-dev
-          npm install --global yarn
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.node_version }}
+          cache: 'npm'
 
       - name: Install Rust
         shell: "bash"
-        run: rustup toolchain install 1.83.0 --profile minimal
+        run: rustup toolchain install ${{ env.rust_version }} --profile minimal
 
       - name: Cache rust
         uses: Swatinem/rust-cache@v2
