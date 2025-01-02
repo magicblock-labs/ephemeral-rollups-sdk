@@ -1,6 +1,6 @@
 {
   "name": "@magicblock-labs/ephemeral-rollups-sdk-v2",
-  "version": "0.1.2",
+  "version": "0.1.4",
   "author": "MagicBlock Labs",
   "license": "MIT",
   "publishConfig": {
@@ -10,8 +10,7 @@
   "main": "lib/index.js",
   "scripts": {
     "clean": "rimraf lib",
-    "build": "npm run clean && tsc && npm run lint:fix",
-    "build:docs": "typedoc",
+    "build": "npm run clean && npm run lint:fix && tsc",
     "dev": "tsc --watch",
     "start": "tsc",
     "lint": "eslint -c .eslintrc.yml --ext .ts,.tsx src",
@@ -21,22 +20,23 @@
     "lib"
   ],
   "devDependencies": {
-    "@typescript-eslint/eslint-plugin": "^7.13.0",
+    "@typescript-eslint/eslint-plugin": "^6.21.0",
+    "@typescript-eslint/parser": "^6.21.0",
     "eslint": "^8.55.0",
     "eslint-config-prettier": "^9.1.0",
     "eslint-config-standard-with-typescript": "^42.0.0",
     "eslint-plugin-import": "^2.29.1",
-    "eslint-plugin-n": "^17.8.1",
-    "eslint-plugin-prettier": "^5.1.3",
+    "eslint-plugin-n": "^16.6.2",
+    "eslint-plugin-prettier": "^5.2.1",
     "eslint-plugin-promise": "^6.2.0",
     "prettier": "^3.3.2",
     "rimraf": "^3.0.2",
-    "typedoc": "^0.21.0",
-    "typescript": "^4.3.5"
+    "typescript": "^5.7.2"
   },
   "dependencies": {
     "@metaplex-foundation/beet": "^0.7.2",
-    "@solana/web3.js": "^1.98.0"
+    "@solana/web3.js": "^1.98.0",
+    "rpc-websockets": "^9.0.4"
   },
   "packageManager": "yarn@1.22.22+sha512.a6b2f7906b721bba3d67d4aff083df04dad64c399707841b7acf00f6b133b7ac24255f2652fa22ae3534329dc6180534e98d17432037ff6fd140556e2bb3137e"
 }

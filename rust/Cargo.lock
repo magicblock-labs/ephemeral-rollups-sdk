@@ -1196,7 +1196,7 @@ dependencies = [
 
 [[package]]
 name = "ephemeral-rollups-sdk-attribute-commit-v2"
-version = "0.1.2"
+version = "0.1.4"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1205,7 +1205,7 @@ dependencies = [
 
 [[package]]
 name = "ephemeral-rollups-sdk-attribute-delegate-v2"
-version = "0.1.2"
+version = "0.1.4"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1214,7 +1214,7 @@ dependencies = [
 
 [[package]]
 name = "ephemeral-rollups-sdk-attribute-ephemeral-v2"
-version = "0.1.2"
+version = "0.1.4"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1223,7 +1223,7 @@ dependencies = [
 
 [[package]]
 name = "ephemeral-rollups-sdk-v2"
-version = "0.1.2"
+version = "0.1.4"
 dependencies = [
  "anchor-lang",
  "borsh 0.10.4",
@@ -2126,7 +2126,7 @@ checksum = "a7a70ba024b9dc04c27ea2f0c0548feb474ec5c54bba33a7f72f873a39d07b24"
 
 [[package]]
 name = "magic-resolver"
-version = "0.1.2"
+version = "0.1.4"
 dependencies = [
  "base64 0.12.3",
  "bincode",

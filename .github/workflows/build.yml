@@ -1,0 +1,64 @@
+name: Build SDKs
+on:
+  push:
+    branches:
+      - 'main'
+  pull_request:
+    branches:
+      - 'main'
+env:
+  rust_version: 1.83.0
+  node_version: 23
+
+jobs:
+  install:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          cache-dependency-path: ts/package-lock.json
+          node-version: ${{ env.node_version }}
+          cache: 'npm'
+
+      - name: Install Rust
+        shell: "bash"
+        run: rustup toolchain install ${{ env.rust_version }} --profile minimal
+
+      - name: Cache rust
+        uses: Swatinem/rust-cache@v2
+
+  lint:
+    needs: install
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: rust/
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run fmt
+        run: cargo fmt -- --check
+
+      - name: Run clippy
+        run: cargo clippy -- --deny=warnings
+
+  build:
+    needs: [install, lint]
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: run build
+        working-directory: rust/
+        run: |
+          cargo build
+
+      - name: npm run build
+        working-directory: ts/
+        run: |
+          npm install
+          npm run build

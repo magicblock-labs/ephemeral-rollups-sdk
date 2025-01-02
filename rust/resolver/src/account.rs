@@ -38,7 +38,7 @@ pub struct AccountValue<'a> {
     pub data: SmallVec<[&'a str; 2]>,
 }
 
-impl<'a> AccountValue<'a> {
+impl AccountValue<'_> {
     /// Check if owner account is Delegation Program, and that account is not closed
     pub fn is_delegated(&self) -> bool {
         self.owner == DELEGATION_PROGRAM_ID && self.lamports != 0
