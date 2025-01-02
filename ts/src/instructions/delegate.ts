@@ -19,7 +19,7 @@ export const delegateStruct = new beet.FixableBeetArgsStruct<{
     ["seeds", beet.array(beet.array(beet.u8))],
     ["validator", beet.coption(beet.uniformFixedSizeArray(beet.u8, 32))],
   ],
-  "DelegateInstructionArgs"
+  "DelegateInstructionArgs",
 );
 export const delegateInstructionDiscriminator = [0, 0, 0, 0, 0, 0, 0, 0];
 
@@ -40,19 +40,19 @@ export function createDelegateInstruction(
     systemProgram?: web3.PublicKey;
   },
   args?: DelegateAccountArgs,
-  programId = DELEGATION_PROGRAM_ID
+  programId = DELEGATION_PROGRAM_ID,
 ) {
   const delegateBufferPda =
     delegateBufferPdaFromDelegatedAccountAndOwnerProgram(
       accounts.delegatedAccount,
-      accounts.ownerProgram
+      accounts.ownerProgram,
     );
 
   const delegationRecordPda = delegationRecordPdaFromDelegatedAccount(
-    accounts.delegatedAccount
+    accounts.delegatedAccount,
   );
   const delegationMetadataPda = delegationMetadataPdaFromDelegatedAccount(
-    accounts.delegatedAccount
+    accounts.delegatedAccount,
   );
 
   args = args ?? {
