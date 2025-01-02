@@ -4,7 +4,7 @@ import {
   AccountInfo,
   Transaction,
 } from "@solana/web3.js";
-import { DELEGATION_PROGRAM_ID } from "./constants";
+import { DELEGATION_PROGRAM_ID } from "./constants.js";
 /**
  * Interface representing the configuration for the connection resolver.
  */

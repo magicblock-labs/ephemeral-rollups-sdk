@@ -1,6 +1,6 @@
 import { PublicKey } from "@solana/web3.js";
 
-import { DELEGATION_PROGRAM_ID } from "./constants";
+import { DELEGATION_PROGRAM_ID } from "./constants.js";
 
 export function delegationRecordPdaFromDelegatedAccount(
   delegatedAccount: PublicKey,
