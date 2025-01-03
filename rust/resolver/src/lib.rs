@@ -28,7 +28,7 @@ type DelegationsDB = Arc<HashCache<Pubkey, DelegationRecord>>;
 /// Conveniece wrapper for results with possible resolver errors
 type ResolverResult<T> = Result<T, Error>;
 
-const DELEGATION_PROGRAM_ID: Pubkey = ephemeral_rollups_sdk_v2::id();
+const DELEGATION_PROGRAM_ID: Pubkey = ephemeral_rollups_sdk::id();
 /// The fixed size of delegation record account's data,
 /// NOTE: this value should be updated if the ABI of delegation
 /// program changes in the future, that will affect the size

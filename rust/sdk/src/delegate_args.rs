@@ -11,7 +11,6 @@ use crate::{
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DelegateAccounts {
-    pub payer: Pubkey,
     pub delegated_account: Pubkey,
     pub delegate_buffer: Pubkey,
     pub delegation_record: Pubkey,
@@ -22,7 +21,7 @@ pub struct DelegateAccounts {
 }
 
 impl DelegateAccounts {
-    pub fn new(payer: Pubkey, delegated_account: Pubkey, owner_program: Pubkey) -> Self {
+    pub fn new(delegated_account: Pubkey, owner_program: Pubkey) -> Self {
         let delegate_buffer = delegate_buffer_pda_from_delegated_account_and_owner_program(
             &delegated_account,
             &owner_program,
@@ -31,7 +30,6 @@ impl DelegateAccounts {
         let delegation_metadata =
             delegation_metadata_pda_from_delegated_account(&delegated_account);
         Self {
-            payer,
             delegated_account,
             delegate_buffer,
             delegation_record,
@@ -45,7 +43,6 @@ impl DelegateAccounts {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DelegateAccountMetas {
-    pub payer: AccountMeta,
     pub delegated_account: AccountMeta,
     pub owner_program: AccountMeta,
     pub delegate_buffer: AccountMeta,
@@ -58,7 +55,6 @@ pub struct DelegateAccountMetas {
 impl From<DelegateAccounts> for DelegateAccountMetas {
     fn from(accounts: DelegateAccounts) -> Self {
         Self {
-            payer: AccountMeta::new(accounts.payer, true),
             delegated_account: AccountMeta::new(accounts.delegated_account, false),
             owner_program: AccountMeta::new_readonly(accounts.owner_program, false),
             delegate_buffer: AccountMeta::new(accounts.delegate_buffer, false),

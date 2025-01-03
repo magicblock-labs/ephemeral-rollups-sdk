@@ -1,5 +1,5 @@
 [package]
-name = "ephemeral-rollups-sdk-attribute-ephemeral-v2"
+name = "ephemeral-rollups-sdk-attribute-ephemeral"
 description = "ephemeral-rollups-sdk-attribute-ephemeral"
 version = { workspace = true }
 authors = { workspace = true }
