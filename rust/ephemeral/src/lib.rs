@@ -96,7 +96,7 @@ fn modify_component_module(mut module: ItemMod) -> ItemMod {
 fn generate_undelegate() -> (TokenStream2, TokenStream2, TokenStream2) {
     (
         quote! {
-            use ephemeral_rollups_sdk_v2::cpi::undelegate_account;
+            use ephemeral_rollups_sdk::cpi::undelegate_account;
         },
         quote! {
             #[automatically_derived]
