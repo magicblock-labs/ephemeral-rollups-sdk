@@ -64,7 +64,7 @@ pub fn delegate(_attr: TokenStream, item: TokenStream) -> TokenStream {
             new_fields.push(quote! {
                 /// CHECK: The buffer account
                 #[account(
-                    mut, seeds = [ephemeral_rollups_sdk_v2::consts::BUFFER, #field_name.key().as_ref()],
+                    mut, seeds = [ephemeral_rollups_sdk::consts::BUFFER, #field_name.key().as_ref()],
                     bump, seeds::program = crate::id()
                 )]
                 pub #buffer_field: AccountInfo<'info>,
@@ -73,7 +73,7 @@ pub fn delegate(_attr: TokenStream, item: TokenStream) -> TokenStream {
             new_fields.push(quote! {
                 /// CHECK: The delegation record account
                 #[account(
-                    mut, seeds = [ephemeral_rollups_sdk_v2::consts::DELEGATION_RECORD, #field_name.key().as_ref()],
+                    mut, seeds = [ephemeral_rollups_sdk::consts::DELEGATION_RECORD, #field_name.key().as_ref()],
                     bump, seeds::program = delegation_program.key()
                 )]
                 pub #delegation_record_field: AccountInfo<'info>,
@@ -82,7 +82,7 @@ pub fn delegate(_attr: TokenStream, item: TokenStream) -> TokenStream {
             new_fields.push(quote! {
                 /// CHECK: The delegation metadata account
                 #[account(
-                    mut, seeds = [ephemeral_rollups_sdk_v2::consts::DELEGATION_METADATA, #field_name.key().as_ref()],
+                    mut, seeds = [ephemeral_rollups_sdk::consts::DELEGATION_METADATA, #field_name.key().as_ref()],
                     bump, seeds::program = delegation_program.key()
                 )]
                 pub #delegation_metadata_field: AccountInfo<'info>,
@@ -96,9 +96,9 @@ pub fn delegate(_attr: TokenStream, item: TokenStream) -> TokenStream {
                     &'a self,
                     payer: &'a Signer<'info>,
                     seeds: &[&[u8]],
-                    config: ::ephemeral_rollups_sdk_v2::cpi::DelegateConfig,
+                    config: ::ephemeral_rollups_sdk::cpi::DelegateConfig,
                 ) -> anchor_lang::solana_program::entrypoint::ProgramResult {
-                    let del_accounts = ::ephemeral_rollups_sdk_v2::cpi::DelegateAccounts {
+                    let del_accounts = ::ephemeral_rollups_sdk::cpi::DelegateAccounts {
                         payer,
                         pda: &self.#field_name.to_account_info(),
                         owner_program: &self.owner_program,
@@ -108,7 +108,7 @@ pub fn delegate(_attr: TokenStream, item: TokenStream) -> TokenStream {
                         delegation_program: &self.delegation_program,
                         system_program: &self.system_program,
                     };
-                    ::ephemeral_rollups_sdk_v2::cpi::delegate_account(del_accounts, seeds, config)
+                    ::ephemeral_rollups_sdk::cpi::delegate_account(del_accounts, seeds, config)
                 }
             });
         }
@@ -143,7 +143,7 @@ pub fn delegate(_attr: TokenStream, item: TokenStream) -> TokenStream {
     if !has_delegation_program {
         new_fields.push(quote! {
             /// CHECK: The delegation program
-            #[account(address = ::ephemeral_rollups_sdk_v2::id())]
+            #[account(address = ::ephemeral_rollups_sdk::id())]
             pub delegation_program: AccountInfo<'info>,
         });
     }

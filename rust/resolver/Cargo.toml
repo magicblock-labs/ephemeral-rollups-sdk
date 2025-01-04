@@ -12,6 +12,10 @@ license = { workspace = true }
 edition = { workspace = true }
 
 [dependencies]
+ephemeral-rollups-sdk = { workspace = true }
+
+## External crates
+
 # runtime
 tokio = { version = "1.0", features = [ "rt", "sync", "macros" ] }
 futures = "0.3"
@@ -25,10 +29,6 @@ reqwest = { version = "0.12" }
 sdk = { package = "solana-sdk", version = "1.18.26" }
 rpc = { package = "solana-rpc-client", version = "1.18.26" }
 rpc-api = { package = "solana-rpc-client-api", version = "1.18.26" }
-
-# ephemeral rollups
-ephemeral-rollups-sdk = { path = "../sdk" }
-
 
 # parsing
 serde = { version = "1.0", features = [ "derive" ] }

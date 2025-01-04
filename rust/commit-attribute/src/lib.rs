@@ -30,7 +30,7 @@ pub fn commit(_attr: TokenStream, item: TokenStream) -> TokenStream {
             new_fields.push(
                     Field::parse_named
                         .parse2(quote! {
-                            pub magic_program: Program<'info, ::ephemeral_rollups_sdk_v2::anchor::MagicProgram>
+                            pub magic_program: Program<'info, ::ephemeral_rollups_sdk::anchor::MagicProgram>
                         })
                         .unwrap(),
                 );
@@ -40,7 +40,7 @@ pub fn commit(_attr: TokenStream, item: TokenStream) -> TokenStream {
             new_fields.push(
                 Field::parse_named
                     .parse2(quote! {
-                        #[account(mut, address = ::ephemeral_rollups_sdk_v2::consts::MAGIC_CONTEXT_ID)]
+                        #[account(mut, address = ::ephemeral_rollups_sdk::consts::MAGIC_CONTEXT_ID)]
                         /// CHECK:`
                         pub magic_context: AccountInfo<'info>
                     })
@@ -49,6 +49,7 @@ pub fn commit(_attr: TokenStream, item: TokenStream) -> TokenStream {
         }
 
         quote! {
+            use ::ephemeral_rollups_sdk::anchor::MagicProgram;
             #(#attrs)*
             pub struct #name<'info> {
                 #new_fields

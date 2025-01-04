@@ -56,6 +56,10 @@ jobs:
         run: |
           cargo build
 
+      - name: Set DRY_RUN based on trigger
+        run: echo "DRY_RUN=true" >> $GITHUB_ENV
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/heads/release/v')
+
       - name: cargo publish
         working-directory: rust/
         run: |
