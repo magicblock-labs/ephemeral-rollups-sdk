@@ -3,11 +3,11 @@
 1. **Create a Release Branch**  
    Create a new branch named `release/v*.*.*`.
 
-2. **Update Version in `Cargo.toml`**  
+2. **Update Version in `rust/Cargo.toml`**  
    Increment the version number in the `Cargo.toml` file according to the release type (major, minor, or patch).
 
 3. **Align Versions**  
-   Run the `./scripts/version-align.sh` script. This will:
+   Run the `.version-align.sh` script. This will:
     - Update the version of all internal crates and npm packages.
     - Generate the updated crates.
 
