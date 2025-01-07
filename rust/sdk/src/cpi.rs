@@ -23,6 +23,31 @@ pub struct DelegateAccounts<'a, 'info> {
     pub system_program: &'a AccountInfo<'info>,
 }
 
+impl<'a, 'info> TryFrom<&'a [AccountInfo<'info>]> for DelegateAccounts<'a, 'info> {
+    type Error = ProgramError;
+    fn try_from(accounts: &'a [AccountInfo<'info>]) -> Result<Self, Self::Error> {
+        let mut iter = accounts.iter();
+        let payer = next_account_info(&mut iter)?;
+        let pda = next_account_info(&mut iter)?;
+        let owner_program = next_account_info(&mut iter)?;
+        let buffer = next_account_info(&mut iter)?;
+        let delegation_record = next_account_info(&mut iter)?;
+        let delegation_metadata = next_account_info(&mut iter)?;
+        let delegation_program = next_account_info(&mut iter)?;
+        let system_program = next_account_info(&mut iter)?;
+        Ok(Self {
+            payer,
+            pda,
+            owner_program,
+            buffer,
+            delegation_program,
+            delegation_metadata,
+            delegation_record,
+            system_program,
+        })
+    }
+}
+
 pub struct DelegateConfig {
     pub commit_frequency_ms: u32,
     pub validator: Option<Pubkey>,
