@@ -1,4 +1,4 @@
-use borsh::BorshSerialize;
+use borsh::to_vec;
 use solana_program::account_info::AccountInfo;
 use solana_program::entrypoint::ProgramResult;
 use solana_program::instruction::{AccountMeta, Instruction};
@@ -172,7 +172,7 @@ pub fn cpi_delegate<'a, 'info>(
     args: DelegateAccountArgs,
 ) -> ProgramResult {
     let mut data: Vec<u8> = vec![0u8; 8];
-    let serialized_seeds = args.try_to_vec()?;
+    let serialized_seeds = to_vec(&args)?;
     data.extend_from_slice(&serialized_seeds);
 
     let delegation_instruction = Instruction {

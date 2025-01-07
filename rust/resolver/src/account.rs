@@ -2,6 +2,7 @@
 
 use std::{ops::Deref, str::FromStr};
 
+use base64::prelude::{Engine, BASE64_STANDARD};
 use json::Deserialize;
 use sdk::pubkey::Pubkey;
 use serde::{de::Error as _, Deserializer};
@@ -56,9 +57,9 @@ impl AccountValue<'_> {
         let encoded = *self.data.first().unwrap();
         match encoding {
             "base58" => bs58::decode(encoded).into_vec().ok(),
-            "base64" => base64::decode(encoded).ok(),
+            "base64" => BASE64_STANDARD.decode(encoded).ok(),
             "base64+zstd" => {
-                let decoded = base64::decode(encoded).ok()?;
+                let decoded = BASE64_STANDARD.decode(encoded).ok()?;
                 zstd::decode_all(decoded.as_slice()).ok()
             }
             _ => None,
