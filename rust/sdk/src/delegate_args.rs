@@ -77,3 +77,37 @@ impl DelegateAccountMetas {
         ]
     }
 }
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct UndelegateAccountMetas {
+    pub delegated_account: AccountMeta,
+    pub delegate_buffer: AccountMeta,
+    pub payer: AccountMeta,
+    pub system_program: AccountMeta,
+}
+
+impl UndelegateAccountMetas {
+    pub fn new(payer: Pubkey, delegated_account: Pubkey, owner_program: Pubkey) -> Self {
+        let delegate_buffer = delegate_buffer_pda_from_delegated_account_and_owner_program(
+            &delegated_account,
+            &owner_program,
+        );
+        Self {
+            delegated_account: AccountMeta::new(delegated_account, false),
+            delegate_buffer: AccountMeta::new_readonly(delegate_buffer, false),
+            payer: AccountMeta::new(payer, true),
+            system_program: AccountMeta::new_readonly(system_program::id(), false),
+        }
+    }
+}
+
+impl UndelegateAccountMetas {
+    pub fn into_vec(self) -> Vec<AccountMeta> {
+        vec![
+            self.delegated_account,
+            self.delegate_buffer,
+            self.payer,
+            self.system_program,
+        ]
+    }
+}
