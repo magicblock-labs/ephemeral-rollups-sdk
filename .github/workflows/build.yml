@@ -7,7 +7,7 @@ on:
     branches:
       - 'main'
 env:
-  rust_version: 1.83.0
+  rust_version: 1.85.0
   node_version: 23
 
 jobs:
