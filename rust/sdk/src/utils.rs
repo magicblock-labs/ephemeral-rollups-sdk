@@ -90,7 +90,7 @@ pub fn close_pda<'a, 'info>(
     **target_account.lamports.borrow_mut() = 0;
 
     target_account.assign(&solana_program::system_program::ID);
-    target_account.realloc(0, false).map_err(Into::into)
+    target_account.realloc(0, false)
 }
 
 /// Close PDA with transfer
