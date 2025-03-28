@@ -62,3 +62,18 @@ impl From<DelegateAccounts> for DelegateAccountMetas {
         }
     }
 }
+
+impl DelegateAccountMetas {
+    pub fn into_vec(self, payer: Pubkey) -> Vec<AccountMeta> {
+        vec![
+            AccountMeta::new(payer, true),
+            self.delegated_account,
+            self.owner_program,
+            self.delegate_buffer,
+            self.delegation_record,
+            self.delegation_metadata,
+            self.delegation_program,
+            self.system_program,
+        ]
+    }
+}
