@@ -2,7 +2,7 @@
 
 use json::{Deserialize, JsonValueTrait};
 
-use crate::account::AccountInfo;
+use crate::account::{AccountInfo, ProgramAccount};
 
 /// Represents a WebSocket message received from the Solana blockchain.
 /// can be either a result of subscription with ID or an actual state update
@@ -58,6 +58,12 @@ pub enum Notification<'a> {
     Account {
         /// account notification parameters
         params: NotificationParams<AccountInfo<'a>>,
+    },
+
+    /// A program account notification
+    #[serde(rename = "programNotification")]
+    Program {
+        params: NotificationParams<ProgramAccount<'a>>,
     },
 }
 
@@ -115,6 +121,34 @@ mod tests {
                 "subscription": 23784
             }
         }"#;
+    const PROGRAM_NOTIFICATION: &[u8] = br#"
+            {
+              "jsonrpc": "2.0",
+              "method": "programNotification",
+              "params": {
+                "result": {
+                  "context": {
+                    "slot": 5208469
+                  },
+                  "value": {
+                    "pubkey": "H4vnBqifaSACnKa7acsxstsY1iV1bvJNxsCY7enrd1hq",
+                    "account": {
+                      "data": [
+                        "11116bv5nS2h3y12kD1yUKeMZvGcKLSjQgX6BeV7u1FrjeJcKfsHPXHRDEHrBesJhZyqnnq9qJeUuF7WHxiuLuL5twc38w2TXNLxnDbjmuR",
+                        "base58"
+                      ],
+                      "executable": false,
+                      "lamports": 33594,
+                      "owner": "11111111111111111111111111111111",
+                      "rentEpoch": 636,
+                      "space": 80
+                    }
+                  }
+                },
+                "subscription": 24040
+              }
+            }
+        "#;
     const SUBSCRIPTION_RESULT: &[u8] = br#"{ "jsonrpc": "2.0", "result": 23784, "id": 1 }"#;
     const UNSUBSCRIPTION_RESULT: &[u8] = br#"{ "jsonrpc": "2.0", "result": true, "id": 1 }"#;
     const SLOT_NOTIFICATION: &[u8] = br#"{
@@ -166,6 +200,26 @@ mod tests {
             assert_eq!(params.subscription, 0);
             let SlotInfo { slot } = params.result;
             assert_eq!(slot, 76);
+        } else {
+            panic!("Invalid message type");
+        }
+    }
+
+    #[test]
+    fn test_deserialize_program_notification() {
+        let message: Notification = from_slice(PROGRAM_NOTIFICATION).unwrap();
+        if let Notification::Program { params } = message {
+            assert_eq!(params.subscription, 24040);
+            let ProgramAccount { value } = params.result;
+            assert_eq!(
+                value.pubkey,
+                Pubkey::from_str_const("H4vnBqifaSACnKa7acsxstsY1iV1bvJNxsCY7enrd1hq")
+            );
+            assert_eq!(value.account.lamports, 33594);
+            assert_eq!(
+                value.account.owner,
+                Pubkey::from_str_const("11111111111111111111111111111111")
+            );
         } else {
             panic!("Invalid message type");
         }

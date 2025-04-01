@@ -12,17 +12,19 @@ use tokio::sync::mpsc::UnboundedReceiver;
 use crate::{
     config::WebsocketConf,
     http::update_account_state,
-    websocket::message::{Notification, WebsocketMessage},
+    websocket::{
+        base::WsConnectionBase,
+        message::{Notification, WebsocketMessage},
+        subscription::AccountSubscription,
+    },
     DelegationStatus, DelegationsDB, DELEGATION_RECORD_SIZE,
 };
-
-use super::{base::WsConnectionBase, subscription::AccountSubscription};
 
 const SLOT_SUBSCRIPTION: &str =
     r#"{ "jsonrpc": "2.0", "id": 4294967295, "method": "slotSubscribe" }"#;
 
 /// Handle to a websocket connection
-pub struct WsConnection {
+pub struct WsDelegationsConnection {
     /// base websocket connection wrapper
     base: WsConnectionBase,
     /// Key-value store for delegated accounts
@@ -39,7 +41,7 @@ pub struct WsConnection {
     chain: Arc<RpcClient>,
 }
 
-impl WsConnection {
+impl WsDelegationsConnection {
     /// Try to establish new websocket connection to endpoint
     pub async fn establish(
         config: WebsocketConf,
@@ -155,6 +157,7 @@ impl WsConnection {
                                         self.unsubs.insert(account.id, account);
                                     }
                                 }
+                                unexpected => tracing::warn!("received unexpected notification on websocket connection for delegations: {unexpected:?}")
                             }
                         }
                     }
@@ -213,6 +216,6 @@ impl WsConnection {
             // way delegation status retrieval happens asynchronously
             tokio::spawn(update_account_state(chain, db, pubkey));
         }
-        tracing::info!("reconnection to websocket stream succeeded");
+        tracing::info!("reconnection to delegations websocket stream succeeded");
     }
 }

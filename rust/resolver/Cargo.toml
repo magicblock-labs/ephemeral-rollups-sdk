@@ -13,12 +13,16 @@ edition = { workspace = true }
 
 [dependencies]
 ephemeral-rollups-sdk = { workspace = true }
+magic-domain-program = { workspace = true }
 
 ## External crates
 
 # runtime
 tokio = { workspace = true }
 futures = { workspace = true }
+
+# sync
+parking_lot = { workspace = true }
 
 # network
 url = { workspace = true }
@@ -30,10 +34,11 @@ sdk = { workspace = true }
 rpc = { workspace = true }
 rpc-api = { workspace = true }
 
-# parsing
+# serialization/parsing
 serde = { workspace = true }
 json = { workspace = true }
 humantime = { workspace = true }
+borsh = { workspace = true } 
 
 # codec
 base64 = { workspace = true }

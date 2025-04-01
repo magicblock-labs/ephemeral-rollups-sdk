@@ -23,7 +23,7 @@ pub struct Configuration {
 }
 
 /// Configuration for the WebSocket connection.
-#[derive(Deserialize)]
+#[derive(Deserialize, Clone)]
 #[serde(rename_all = "kebab-case")]
 pub struct WebsocketConf {
     /// The WebSocket endpoint URL.

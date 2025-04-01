@@ -17,6 +17,20 @@ pub struct AccountInfo<'a> {
     pub value: AccountValue<'a>,
 }
 
+#[derive(Deserialize, Debug)]
+#[serde(bound(deserialize = "'de: 'a"))]
+pub struct ProgramAccount<'a> {
+    pub value: ProgramAccountValue<'a>,
+}
+
+#[derive(Deserialize, Debug)]
+#[serde(bound(deserialize = "'de: 'a"))]
+pub struct ProgramAccountValue<'a> {
+    #[serde(deserialize_with = "deserialize_pubkey_from_base58")]
+    pub pubkey: Pubkey,
+    pub account: AccountValue<'a>,
+}
+
 impl<'a> Deref for AccountInfo<'a> {
     type Target = AccountValue<'a>;
 
@@ -48,7 +62,8 @@ impl AccountValue<'_> {
         let encoding = match self.data.len() {
             1 => "base58",
             2 => self.data.last().unwrap(),
-            _ => {
+            n => {
+                tracing::warn!("unexpected length for the account's data field: {n}");
                 return None;
             }
         };
@@ -61,7 +76,10 @@ impl AccountValue<'_> {
                 let decoded = base64::decode(encoded).ok()?;
                 zstd::decode_all(decoded.as_slice()).ok()
             }
-            _ => None,
+            encoding => {
+                tracing::warn!("unexpected encoding for the account's data field: {encoding}");
+                None
+            }
         }
     }
 }
