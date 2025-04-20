@@ -107,3 +107,109 @@ pub fn delegate_account(
 
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use pinocchio::{
+        account_info::AccountInfo,
+        instruction::{AccountMeta, Seed, Signer},
+        program_error::ProgramError,
+        pubkey,
+        sysvars::{rent::Rent, Sysvar},
+        ProgramResult,
+    };
+
+    use crate::{
+        consts::{BUFFER, DELEGATION_PROGRAM_ID},
+        instruction::delegate_account,
+        types::{DelegateAccountArgs, DelegateConfig},
+        utils::{close_pda_acc, cpi_delegate, get_seeds},
+    };
+
+    #[test]
+    fn test_delegate_accounts() {
+        //Step 1 -make accounts
+        pub const PAYER: Pubkey = pubkey!("41LzznNicELmc5iCR9Jxke62a3v1VhzpBYodQF5AQwHX");
+        //PDA account
+        let (test_pda, _test_bump) =
+            Pubkey::find_program_address(&["test".as_bytes()], &DELEGATION_PROGRAM_ID);
+
+        //buffer account
+        let (buffer_pda, _buffer_bump) = Pubkey::find_program_address(
+            &[
+                BUFFER.as_bytes(),
+                random_paper_hash[..PAPER_SEED_HASH_LEN].as_ref(),
+            ],
+            &DELEGATION_PROGRAM_ID,
+        );
+        //Owner Program
+        pub const OWNER_PROGRAM: Pubkey = pubkey!("RSC35cbUwspG38apwCszUEu6hps5t9UmGRt8P3oVLyD");
+        let delegation_record = delegation_record_pda_from_delegated_account(&test_pda);
+        let delegation_metadata = delegation_metadata_pda_from_delegated_account(&test_pda);
+        let (system_program, system_account) = program::keyed_account_for_system_program();
+
+        pub struct TestData {
+            counter: u8,
+        }
+
+        impl TestData {
+            const LEN: usize = core::mem::size_of::<TestData>();
+        }
+
+        let account_metas = vec![
+            AccountMeta::new(PAYER, true, true),
+            AccountMeta::new(test_pda, true, false),
+            AccountMeta::new(buffer_pda, true, false),
+            AccountMeta::readonly(OWNER_PROGRAM),
+            AccountMeta::new(delegation_record, true, false),
+            AccountMeta::new(delegation_metadata, true, false),
+            AccountMeta::readonly(system_program),
+        ];
+
+        //Initialize the accounts
+        let payer_account = Account::new(1 * LAMPORTS_PER_SOL, 0, &system_program);
+        let mut pda_account = Account::new(1 * LAMPORTS_PER_SOL, TestData::LEN, &PROGRAM);
+        let buffer_account = Account::new(0, 0, &system_program);
+        let owner_account = Account::new(1 * LAMPORTS_PER_SOL, 0, &system_program);
+        let record_account = Account::new(0, 0, &DELEGATION_PROGRAM_ID);
+        let metadata_account = Account::new(0, 0, &DELEGATION_PROGRAM_ID);
+
+        test_pda.data = vec![3 as u8];
+        let account_infos = &vec![
+            (&PAYER, payer_account.clone()),
+            (&test_pda, pda_account.clone()),
+            (&buffer_pda, buffer_account.clone()),
+            (&OWNER_PROGRAM, owner_account.clone()),
+            (&delegation_record, record_account.clone()),
+            (&delegation_metadata, metadata_account.clone()),
+            (&system_program, system_account.clone()),
+        ];
+
+        let accounts = [
+            AccountInfo::from(account_infos[0]),
+            AccountInfo::from(account_infos[1]),
+            AccountInfo::from(account_infos[2]),
+            AccountInfo::from(account_infos[3]),
+            AccountInfo::from(account_infos[4]),
+            AccountInfo::from(account_infos[5]),
+            AccountInfo::from(account_infos[6]),
+        ];
+
+        //Step 2 - make seeds and config
+
+        let seeds = &["test".as_bytes(), &[bump]];
+        let config = DelegateConfig {
+            commit_frequency_ms: 3000,
+            validator: None,
+        };
+
+        //Call delegate_account().
+        let result = delegate_account(&accounts, seeds, config);
+        assert!(result.is_ok());
+
+        //asserts
+        //cpi_delegate() was invoked with expected args.
+        //Account data was copied to buffer.
+        //PDA was re-created.
+    }
+}

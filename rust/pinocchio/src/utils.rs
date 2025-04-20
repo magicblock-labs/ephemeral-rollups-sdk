@@ -1,4 +1,3 @@
-use borsh::ser::BorshSerialize;
 use pinocchio::{
     account_info::AccountInfo,
     cpi::invoke_signed,

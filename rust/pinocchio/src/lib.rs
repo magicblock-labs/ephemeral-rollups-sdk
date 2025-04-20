@@ -1,8 +1,4 @@
-#[cfg(feature = "std")]
-extern crate std;
-
 mod consts;
-mod error;
 mod instruction;
 mod pda;
 mod types;
