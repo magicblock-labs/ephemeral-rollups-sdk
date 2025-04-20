@@ -1,0 +1,152 @@
+use borsh::ser::BorshSerialize;
+use pinocchio::{
+    account_info::AccountInfo,
+    cpi::invoke_signed,
+    instruction::{AccountMeta, Instruction, Seed, Signer},
+    program_error::ProgramError,
+    pubkey::PUBKEY_BYTES,
+};
+
+use crate::{consts::DELEGATION_PROGRAM_ID, types::DelegateAccountArgs};
+
+//helper to serialize using bytemuck (providing slice length descriminators)
+pub fn serialize_delegate_account_args(args: &DelegateAccountArgs) -> Vec<u8> {
+    let mut data = Vec::new();
+
+    // Serialize commit_frequency_ms (4 bytes)
+    data.extend_from_slice(&args.commit_frequency_ms.to_le_bytes());
+
+    // Serialize seeds (Vec<Vec<u8>>)
+    // First, serialize the number of seeds (as a u8)
+    let num_seeds = args.seeds.len() as u8;
+    data.extend_from_slice(&num_seeds.to_le_bytes());
+
+    // Then, serialize each seed (each &[u8])
+    for seed in &args.seeds {
+        let seed_len = seed.len() as u32;
+        data.extend_from_slice(&seed_len.to_le_bytes()); // Seed length
+        data.extend_from_slice(&seed); // Seed content
+    }
+
+    // Serialize validator (32 bytes)
+    if let Some(pubkey) = args.validator {
+        data.extend_from_slice(&pubkey);
+    }
+
+    data
+}
+
+#[inline(always)]
+pub fn get_seeds<'a>(seeds_vec: Vec<&'a [u8]>) -> Result<Vec<Seed<'a>>, ProgramError> {
+    let mut seeds: Vec<Seed<'a>> = Vec::with_capacity(seeds_vec.len() + 1);
+
+    // Add the regular seeds from the provided slice
+    for seed in seeds_vec {
+        seeds.push(Seed::from(seed));
+    }
+
+    Ok(seeds)
+}
+
+pub fn close_pda_acc(
+    payer: &AccountInfo,
+    pda_acc: &AccountInfo,
+    system_program: &AccountInfo,
+) -> Result<(), ProgramError> {
+    // Step 1 - Lamports to zero
+    unsafe {
+        *payer.borrow_mut_lamports_unchecked() += *pda_acc.borrow_lamports_unchecked();
+        *pda_acc.borrow_mut_lamports_unchecked() = 0;
+    }
+
+    // Step 2 - Empty the data
+    pda_acc.realloc(0, false).unwrap();
+
+    // Step 3 - Send to System Program
+    unsafe { pda_acc.assign(system_program.key()) };
+
+    Ok(())
+}
+
+pub fn cpi_delegate(
+    payer: &AccountInfo,
+    pda_acc: &AccountInfo,
+    owner_program: &AccountInfo,
+    buffer_acc: &AccountInfo,
+    delegation_record: &AccountInfo,
+    delegation_metadata: &AccountInfo,
+    system_program: &AccountInfo,
+    delegate_args: DelegateAccountArgs,
+    signer_seeds: Signer<'_, '_>,
+) -> Result<(), ProgramError> {
+    let account_metas = vec![
+        AccountMeta::new(payer.key(), true, true),
+        AccountMeta::new(pda_acc.key(), true, false),
+        AccountMeta::readonly(owner_program.key()),
+        AccountMeta::new(buffer_acc.key(), false, false),
+        AccountMeta::new(delegation_record.key(), true, false),
+        AccountMeta::readonly(delegation_metadata.key()),
+        AccountMeta::readonly(system_program.key()),
+    ];
+
+    let mut data: Vec<u8> = vec![0u8; 8];
+    let serialized_seeds = delegate_args
+        .try_to_vec()
+        .map_err(|op| ProgramError::BorshIoError)?;
+    data.extend_from_slice(&serialized_seeds);
+
+    //call Instruction
+    let instruction = Instruction {
+        program_id: &DELEGATION_PROGRAM_ID,
+        accounts: &account_metas,
+        data: &data,
+    };
+
+    let acc_infos = [
+        payer,
+        pda_acc,
+        owner_program,
+        buffer_acc,
+        delegation_record,
+        delegation_metadata,
+        system_program,
+    ];
+
+    invoke_signed(&instruction, &acc_infos, &[signer_seeds])?;
+    Ok(())
+}
+
+pub struct CommitIx<'a> {
+    pub program_id: &'a [u8; PUBKEY_BYTES],
+    pub data: Vec<u8>,
+    pub accounts: Vec<AccountMeta<'a>>,
+}
+
+pub fn create_schedule_commit_ix<'a>(
+    payer: &'a AccountInfo,
+    account_infos: &'a [AccountInfo],
+    magic_context: &'a AccountInfo,
+    magic_program: &'a AccountInfo,
+    allow_undelegation: bool,
+) -> CommitIx<'a> {
+    let instruction_data: Vec<u8> = if allow_undelegation {
+        vec![2, 0, 0, 0]
+    } else {
+        vec![1, 0, 0, 0]
+    };
+    let mut account_metas = vec![
+        AccountMeta::new(payer.key(), true, true),
+        AccountMeta::new(magic_context.key(), true, false),
+    ];
+    account_metas.extend(
+        account_infos
+            .iter()
+            .map(|acc| AccountMeta::new(acc.key(), true, true)),
+    );
+    let instruction = CommitIx {
+        program_id: magic_program.key(),
+        data: instruction_data,
+        accounts: account_metas,
+    };
+    instruction
+}
