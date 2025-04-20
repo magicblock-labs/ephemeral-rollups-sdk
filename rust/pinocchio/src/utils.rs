@@ -9,38 +9,10 @@ use pinocchio::{
 
 use crate::{consts::DELEGATION_PROGRAM_ID, types::DelegateAccountArgs};
 
-//helper to serialize using bytemuck (providing slice length descriminators)
-pub fn serialize_delegate_account_args(args: &DelegateAccountArgs) -> Vec<u8> {
-    let mut data = Vec::new();
-
-    // Serialize commit_frequency_ms (4 bytes)
-    data.extend_from_slice(&args.commit_frequency_ms.to_le_bytes());
-
-    // Serialize seeds (Vec<Vec<u8>>)
-    // First, serialize the number of seeds (as a u8)
-    let num_seeds = args.seeds.len() as u8;
-    data.extend_from_slice(&num_seeds.to_le_bytes());
-
-    // Then, serialize each seed (each &[u8])
-    for seed in &args.seeds {
-        let seed_len = seed.len() as u32;
-        data.extend_from_slice(&seed_len.to_le_bytes()); // Seed length
-        data.extend_from_slice(&seed); // Seed content
-    }
-
-    // Serialize validator (32 bytes)
-    if let Some(pubkey) = args.validator {
-        data.extend_from_slice(&pubkey);
-    }
-
-    data
-}
-
 #[inline(always)]
 pub fn get_seeds<'a>(seeds_vec: Vec<&'a [u8]>) -> Result<Vec<Seed<'a>>, ProgramError> {
     let mut seeds: Vec<Seed<'a>> = Vec::with_capacity(seeds_vec.len() + 1);
 
-    // Add the regular seeds from the provided slice
     for seed in seeds_vec {
         seeds.push(Seed::from(seed));
     }
@@ -53,16 +25,13 @@ pub fn close_pda_acc(
     pda_acc: &AccountInfo,
     system_program: &AccountInfo,
 ) -> Result<(), ProgramError> {
-    // Step 1 - Lamports to zero
     unsafe {
         *payer.borrow_mut_lamports_unchecked() += *pda_acc.borrow_lamports_unchecked();
         *pda_acc.borrow_mut_lamports_unchecked() = 0;
     }
 
-    // Step 2 - Empty the data
     pda_acc.realloc(0, false).unwrap();
 
-    // Step 3 - Send to System Program
     unsafe { pda_acc.assign(system_program.key()) };
 
     Ok(())
@@ -95,7 +64,6 @@ pub fn cpi_delegate(
         .map_err(|op| ProgramError::BorshIoError)?;
     data.extend_from_slice(&serialized_seeds);
 
-    //call Instruction
     let instruction = Instruction {
         program_id: &DELEGATION_PROGRAM_ID,
         accounts: &account_metas,

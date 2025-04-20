@@ -19,7 +19,7 @@ pub fn undelegate(accounts: &[AccountInfo], account_signer_seeds: Vec<Vec<u8>>) 
         return Err(ProgramError::MissingRequiredSignature);
     }
 
-    //get buffer seeds
+    //Get buffer seeds
     let account_seeds: Vec<&[u8]> = account_signer_seeds.iter().map(|v| v.as_slice()).collect();
 
     //Find delegate
@@ -32,7 +32,7 @@ pub fn undelegate(accounts: &[AccountInfo], account_signer_seeds: Vec<Vec<u8>>) 
     delegate_seeds.extend_from_slice(&[delegate_bump]);
     let delegate_signer_seeds = Signer::from(delegate_seeds.as_slice());
 
-    //we create the original PDA Account Delegated
+    //Create the original PDA Account Delegated
     pinocchio_system::instructions::CreateAccount {
         from: payer,
         to: delegated_acc,

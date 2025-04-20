@@ -28,10 +28,10 @@ pub fn delegate_account(
         return Err(ProgramError::MissingRequiredSignature);
     }
 
-    //get buffer seeds
+    //Get buffer seeds
     let buffer_seeds: &[&[u8]] = &[BUFFER, pda_acc.key().as_ref()];
 
-    //Find pdas
+    //Find PDAs
     let (_, delegate_account_bump) = pubkey::find_program_address(pda_seeds, &crate::ID);
     let (_, buffer_pda_bump) = pubkey::find_program_address(buffer_seeds, &crate::ID);
 
@@ -65,7 +65,7 @@ pub fn delegate_account(
     }
     .invoke_signed(&[buffer_signer_seeds.clone()])?;
 
-    // Copy the date to the buffer PDA
+    // Copy the data to the buffer PDA
     let mut buffer_data = buffer_acc.try_borrow_mut_data()?;
     let new_data = pda_acc.try_borrow_data()?.to_vec().clone();
     (*buffer_data).copy_from_slice(&new_data);
