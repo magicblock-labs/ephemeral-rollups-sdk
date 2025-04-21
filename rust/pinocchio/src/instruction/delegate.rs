@@ -6,8 +6,6 @@ use pinocchio::{
     sysvars::{rent::Rent, Sysvar},
     ProgramResult,
 };
-extern crate alloc;
-use alloc::vec::Vec;
 
 use crate::{
     consts::{BUFFER, DELEGATION_PROGRAM_ID},

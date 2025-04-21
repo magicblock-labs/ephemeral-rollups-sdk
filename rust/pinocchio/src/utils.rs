@@ -7,9 +7,6 @@ use pinocchio::{
 };
 
 use crate::{consts::DELEGATION_PROGRAM_ID, types::DelegateAccountArgs};
-extern crate alloc;
-use alloc::vec;
-use alloc::vec::Vec;
 
 #[inline(always)]
 pub fn get_seeds<'a>(seeds_vec: Vec<&'a [u8]>) -> Result<Vec<Seed<'a>>, ProgramError> {
