@@ -78,8 +78,8 @@ pub fn delegate_account(
     pinocchio_system::instructions::CreateAccount {
         from: payer,
         to: pda_acc,
-        lamports: Rent::get()?.minimum_balance(pda_acc.data_len()),
-        space: pda_acc.data_len() as u64, //PDA acc length
+        lamports: Rent::get()?.minimum_balance(buffer_acc.data_len()),
+        space: buffer_acc.data_len() as u64, //PDA acc length
         owner: &DELEGATION_PROGRAM_ID,
     }
     .invoke_signed(&[delegate_signer_seeds.clone()])?;
