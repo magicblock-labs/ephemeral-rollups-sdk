@@ -7,11 +7,12 @@ use pinocchio::{
     ProgramResult,
 };
 
-use crate::utils::get_seeds;
+use crate::{consts::DELEGATION_PROGRAM_ID, utils::get_seeds};
+extern crate alloc;
+use alloc::vec::Vec;
 
 pub fn undelegate(accounts: &[AccountInfo], account_signer_seeds: Vec<Vec<u8>>) -> ProgramResult {
-    let [payer, delegated_acc, owner_program, buffer_acc, _system_program, _rest @ ..] = accounts
-    else {
+    let [payer, delegated_acc, owner_program, buffer_acc, _system_program] = accounts else {
         return Err(ProgramError::NotEnoughAccountKeys);
     };
 
@@ -23,7 +24,8 @@ pub fn undelegate(accounts: &[AccountInfo], account_signer_seeds: Vec<Vec<u8>>) 
     let account_seeds: Vec<&[u8]> = account_signer_seeds.iter().map(|v| v.as_slice()).collect();
 
     //Find delegate
-    let (_, delegate_account_bump) = pubkey::find_program_address(&account_seeds, &crate::ID);
+    let (_, delegate_account_bump) =
+        pubkey::find_program_address(&account_seeds, &DELEGATION_PROGRAM_ID);
 
     //Get Delegated Pda Signer Seeds
     let binding = &[delegate_account_bump];

@@ -7,6 +7,9 @@ use pinocchio::{
 };
 
 use crate::{consts::DELEGATION_PROGRAM_ID, types::DelegateAccountArgs};
+extern crate alloc;
+use alloc::vec;
+use alloc::vec::Vec;
 
 #[inline(always)]
 pub fn get_seeds<'a>(seeds_vec: Vec<&'a [u8]>) -> Result<Vec<Seed<'a>>, ProgramError> {
@@ -60,7 +63,7 @@ pub fn cpi_delegate(
     let mut data: Vec<u8> = vec![0u8; 8];
     let serialized_seeds = delegate_args
         .try_to_vec()
-        .map_err(|op| ProgramError::BorshIoError)?;
+        .map_err(|_op| ProgramError::BorshIoError)?;
     data.extend_from_slice(&serialized_seeds);
 
     let instruction = Instruction {

@@ -1,7 +1,9 @@
-mod consts;
-mod instruction;
-mod pda;
-mod types;
-mod utils;
+//Please note that to use this package the "no_allocator" can't be turned on
 
-pinocchio_pubkey::declare_id!("A24MN2mj3aBpDLRhY6FonnbTuayv7oRqhva2R2hUuyqx");
+pub mod consts;
+pub mod instruction;
+pub mod pda;
+pub mod types;
+pub mod utils;
+
+pinocchio_pubkey::declare_id!("DELeGGvXpWV2fqJUhqcF5ZSYMS4JTLjteaAMARRSaeSh");

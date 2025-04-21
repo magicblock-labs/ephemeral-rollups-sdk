@@ -1,46 +1,45 @@
 use pinocchio::pubkey;
 use pinocchio::pubkey::Pubkey;
 
-/// NOTE: Copy/Pasted from delegation-program/src/pda.rs (modify there if needed)
 #[macro_export]
 macro_rules! delegation_record_seeds_from_delegated_account {
     ($delegated_account: expr) => {
-        &[b"delegation", &$delegated_account.as_ref()]
+        &[b"delegation", $delegated_account.as_ref()]
     };
 }
 
 #[macro_export]
 macro_rules! delegation_metadata_seeds_from_delegated_account {
     ($delegated_account: expr) => {
-        &[b"delegation-metadata", &$delegated_account.as_ref()]
+        &[b"delegation-metadata", $delegated_account.as_ref()]
     };
 }
 
 #[macro_export]
 macro_rules! commit_state_seeds_from_delegated_account {
     ($delegated_account: expr) => {
-        &[b"state-diff", &$delegated_account.as_ref()]
+        &[b"state-diff", $delegated_account.as_ref()]
     };
 }
 
 #[macro_export]
 macro_rules! commit_record_seeds_from_delegated_account {
     ($delegated_account: expr) => {
-        &[b"commit-state-record", &$delegated_account.as_ref()]
+        &[b"commit-state-record", $delegated_account.as_ref()]
     };
 }
 
 #[macro_export]
 macro_rules! delegate_buffer_seeds_from_delegated_account {
     ($delegated_account: expr) => {
-        &[b"buffer", &$delegated_account.as_ref()]
+        &[b"buffer", $delegated_account.as_ref()]
     };
 }
 
 #[macro_export]
 macro_rules! undelegate_buffer_seeds_from_delegated_account {
     ($delegated_account: expr) => {
-        &[b"undelegate-buffer", &$delegated_account.as_ref()]
+        &[b"undelegate-buffer", $delegated_account.as_ref()]
     };
 }
 
@@ -54,21 +53,21 @@ macro_rules! fees_vault_seeds {
 #[macro_export]
 macro_rules! validator_fees_vault_seeds_from_validator {
     ($validator: expr) => {
-        &[b"v-fees-vault", &$validator.as_ref()]
+        &[b"v-fees-vault", $validator.as_ref()]
     };
 }
 
 #[macro_export]
 macro_rules! program_config_seeds_from_program_id {
     ($program_id: expr) => {
-        &[b"p-conf", &$program_id.as_ref()]
+        &[b"p-conf", $program_id.as_ref()]
     };
 }
 
 #[macro_export]
 macro_rules! ephemeral_balance_seeds_from_payer {
     ($payer: expr, $index: expr) => {
-        &[b"balance", &$payer.as_ref(), &[$index]]
+        &[b"balance", $payer.as_ref(), &[$index]]
     };
 }
 

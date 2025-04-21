@@ -22,10 +22,3 @@ ephemeral-rollups-sdk-attribute-delegate = { workspace = true }
 ephemeral-rollups-sdk-attribute-ephemeral = { workspace = true }
 ephemeral-rollups-sdk-attribute-commit = { workspace = true }
 
-[dev-dependencies]
-mollusk-svm = "=0.0.15"
-
-[features]
-no-entrypoint = []
-test-default = ["no-entrypoint"]
-
