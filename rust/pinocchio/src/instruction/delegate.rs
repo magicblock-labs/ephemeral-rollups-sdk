@@ -35,10 +35,10 @@ pub fn delegate_account(
 
     //Find PDAs
     let (_, delegate_account_bump) = pubkey::find_program_address(pda_seeds, owner_program.key());
-    let (_, buffer_pda_bump) = pubkey::find_program_address(buffer_seeds, &DELEGATION_PROGRAM_ID);
+    let (_, buffer_pda_bump) = pubkey::find_program_address(buffer_seeds, owner_program.key());
 
-    let seeds_vec: Vec<&[u8]> = pda_seeds.to_vec();
-    let delegate_pda_seeds = pda_seeds.iter().map(|&slice| slice.to_vec()).collect();
+    let seeds_vec: Vec<&[u8]> = pda_seeds.iter().map(|x| *x).collect();
+    let delegate_pda_seeds: Vec<Vec<u8>> = pda_seeds.iter().map(|&s| s.to_vec()).collect();
 
     //Get Delegated Pda Signer Seeds
     let binding = &[delegate_account_bump];
@@ -63,7 +63,7 @@ pub fn delegate_account(
         to: buffer_acc,
         lamports: Rent::get()?.minimum_balance(pda_acc.data_len()),
         space: pda_acc.data_len() as u64, //PDA acc length
-        owner: &&DELEGATION_PROGRAM_ID,
+        owner: &owner_program.key(),
     }
     .invoke_signed(&[buffer_signer_seeds])?;
 

@@ -39,7 +39,7 @@ pub fn undelegate(accounts: &[AccountInfo], account_signer_seeds: Vec<Vec<u8>>) 
         from: payer,
         to: delegated_acc,
         lamports: Rent::get()?.minimum_balance(buffer_acc.data_len()),
-        space: buffer_acc.data_len() as u64, //PDA acc length
+        space: buffer_acc.data_len() as u64,
         owner: &owner_program.key(),
     }
     .invoke_signed(&[delegate_signer_seeds.clone()])?;

@@ -10,11 +10,11 @@ pub fn commit_accounts(accounts: &[AccountInfo]) -> ProgramResult {
         return Err(ProgramError::NotEnoughAccountKeys);
     };
 
-    let instruction = create_schedule_commit_ix(payer, rest, magic_context, magic_program, false);
+    let (ix_data, ix_accounts) = create_schedule_commit_ix(payer, rest, magic_context, false);
     let ix = Instruction {
-        program_id: &instruction.program_id,
-        data: &instruction.data,
-        accounts: &instruction.accounts,
+        program_id: magic_program.key(),
+        data: &ix_data,
+        accounts: &ix_accounts,
     };
 
     let mut all_accounts: Vec<&AccountInfo> = vec![payer, magic_context];

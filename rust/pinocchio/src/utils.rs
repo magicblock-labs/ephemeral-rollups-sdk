@@ -86,19 +86,12 @@ pub fn cpi_delegate(
     Ok(())
 }
 
-pub struct CommitIx<'a> {
-    pub program_id: &'a [u8; PUBKEY_BYTES],
-    pub data: Vec<u8>,
-    pub accounts: Vec<AccountMeta<'a>>,
-}
-
 pub fn create_schedule_commit_ix<'a>(
     payer: &'a AccountInfo,
     account_infos: &'a [AccountInfo],
     magic_context: &'a AccountInfo,
-    magic_program: &'a AccountInfo,
     allow_undelegation: bool,
-) -> CommitIx<'a> {
+) -> (Vec<u8>, Vec<AccountMeta<'a>>) {
     let instruction_data: Vec<u8> = if allow_undelegation {
         vec![2, 0, 0, 0]
     } else {
@@ -113,10 +106,5 @@ pub fn create_schedule_commit_ix<'a>(
             .iter()
             .map(|acc| AccountMeta::new(acc.key(), true, true)),
     );
-    let instruction = CommitIx {
-        program_id: magic_program.key(),
-        data: instruction_data,
-        accounts: account_metas,
-    };
-    instruction
+    (instruction_data, account_metas)
 }
