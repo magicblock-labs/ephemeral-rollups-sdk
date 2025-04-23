@@ -3,7 +3,6 @@ use pinocchio::{
     cpi::invoke_signed,
     instruction::{AccountMeta, Instruction, Seed, Signer},
     program_error::ProgramError,
-    pubkey::PUBKEY_BYTES,
 };
 
 use crate::{consts::DELEGATION_PROGRAM_ID, types::DelegateAccountArgs};
@@ -36,6 +35,7 @@ pub fn close_pda_acc(
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn cpi_delegate(
     payer: &AccountInfo,
     pda_acc: &AccountInfo,

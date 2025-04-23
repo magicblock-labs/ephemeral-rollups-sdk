@@ -1,5 +1,4 @@
 use pinocchio::program_error::ProgramError;
-use pinocchio::pubkey;
 use pinocchio::pubkey::Pubkey;
 
 #[derive(Debug)]

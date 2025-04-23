@@ -20,6 +20,6 @@ pub fn commit_accounts(accounts: &[AccountInfo]) -> ProgramResult {
     let mut all_accounts: Vec<&AccountInfo> = vec![payer, magic_context];
     all_accounts.extend(rest.iter());
     //Invoke demands a fixed-sized array so we use slice_invoke
-    slice_invoke(&ix, &all_accounts.as_slice())?;
+    slice_invoke(&ix, all_accounts.as_slice())?;
     Ok(())
 }
