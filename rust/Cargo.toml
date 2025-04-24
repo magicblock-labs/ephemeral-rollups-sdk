@@ -27,7 +27,7 @@ ephemeral-rollups-sdk-attribute-delegate = { path = "delegate", version = "=0.2.
 ephemeral-rollups-sdk-attribute-commit = { path = "commit-attribute", version = "=0.2.5" }
 
 ## External crates
-anchor-lang = { version = ">=0.28.0" }
+anchor-lang = { version = "=0.31.1" }
 borsh = "0.10.3"
 paste = "^1.0"
 proc-macro2 = "1.0"
