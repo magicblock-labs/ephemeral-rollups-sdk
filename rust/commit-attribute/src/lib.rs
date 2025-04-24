@@ -49,7 +49,6 @@ pub fn commit(_attr: TokenStream, item: TokenStream) -> TokenStream {
         }
 
         quote! {
-            use ::ephemeral_rollups_sdk::anchor::MagicProgram;
             #(#attrs)*
             pub struct #name<'info> {
                 #new_fields
