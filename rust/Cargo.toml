@@ -44,10 +44,10 @@ websocket = { package = "tokio-websockets", version = "0.10", features = [ "clie
 reqwest = { version = "0.12" }
 
 # solana
-solana-program = { version = ">=1.16" }
-sdk = { package = "solana-sdk", version = ">=1.16" }
-rpc = { package = "solana-rpc-client", version = ">=1.16" }
-rpc-api = { package = "solana-rpc-client-api", version = ">=1.16" }
+solana-program = { version = "=2.0.25" }
+sdk = { package = "solana-sdk", version = "=2.0.25" }
+rpc = { package = "solana-rpc-client", version = "=2.0.25" }
+rpc-api = { package = "solana-rpc-client-api", version = "=2.0.25" }
 
 # parsing
 serde = { version = "1.0", features = [ "derive" ] }
