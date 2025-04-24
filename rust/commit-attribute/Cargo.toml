@@ -9,7 +9,6 @@ license = { workspace = true }
 edition = { workspace = true }
 
 [dependencies]
-proc-macro2 = { workspace = true }
 syn = { workspace = true, features = ["full"] }
 quote = { workspace = true }
 

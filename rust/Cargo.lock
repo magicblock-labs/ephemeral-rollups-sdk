@@ -992,7 +992,6 @@ dependencies = [
  "ephemeral-rollups-sdk-attribute-commit",
  "ephemeral-rollups-sdk-attribute-delegate",
  "ephemeral-rollups-sdk-attribute-ephemeral",
- "paste",
  "solana-program",
 ]
 
@@ -1000,7 +999,6 @@ dependencies = [
 name = "ephemeral-rollups-sdk-attribute-commit"
 version = "0.2.5"
 dependencies = [
- "proc-macro2",
  "quote",
  "syn 1.0.109",
 ]
