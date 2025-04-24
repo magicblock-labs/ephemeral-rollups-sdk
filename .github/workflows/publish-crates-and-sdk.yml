@@ -76,7 +76,7 @@ jobs:
           cargo publish $DRY_RUN_FLAG --manifest-path=delegate/Cargo.toml --token $CRATES_TOKEN $NO_VERIFY_FLAG
           cargo publish $DRY_RUN_FLAG --manifest-path=commit-attribute/Cargo.toml --token $CRATES_TOKEN $NO_VERIFY_FLAG
           
-          if [ "${DRY_RUN}" = "false" ]; then
+          if [ "${DRY_RUN}" != "true" ]; then
             cargo publish $DRY_RUN_FLAG --manifest-path=sdk/Cargo.toml --token $CRATES_TOKEN $NO_VERIFY_FLAG
             cargo publish $DRY_RUN_FLAG --manifest-path=resolver/Cargo.toml --token $CRATES_TOKEN $NO_VERIFY_FLAG
           fi
