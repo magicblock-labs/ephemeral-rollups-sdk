@@ -28,8 +28,7 @@ pub fn close_pda_acc(
         *pda_acc.borrow_mut_lamports_unchecked() = 0;
     }
 
-    pda_acc.realloc(0, false).unwrap();
-
+    pda_acc.realloc(0, false).map_err(|_| ProgramError::AccountDataTooSmall)?;
     unsafe { pda_acc.assign(system_program.key()) };
 
     Ok(())
