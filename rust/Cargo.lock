@@ -987,10 +987,6 @@ dependencies = [
 name = "ephemeral-rollups-pinocchio"
 version = "0.2.4"
 dependencies = [
- "borsh 0.10.4",
- "ephemeral-rollups-sdk-attribute-commit",
- "ephemeral-rollups-sdk-attribute-delegate",
- "ephemeral-rollups-sdk-attribute-ephemeral",
  "pinocchio",
  "pinocchio-log",
  "pinocchio-pubkey",

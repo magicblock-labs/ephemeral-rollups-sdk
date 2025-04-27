@@ -2,10 +2,11 @@ use pinocchio::{
     account_info::AccountInfo,
     instruction::{Seed, Signer},
     program_error::ProgramError,
-    pubkey,
+    pubkey::find_program_address,
     sysvars::{rent::Rent, Sysvar},
     ProgramResult,
 };
+use pinocchio_system::instructions::CreateAccount;
 
 use crate::{
     consts::{BUFFER, DELEGATION_PROGRAM_ID},
@@ -32,8 +33,8 @@ pub fn delegate_account(
     let buffer_seeds: &[&[u8]] = &[BUFFER, pda_acc.key().as_ref()];
 
     //Find PDAs
-    let (_, delegate_account_bump) = pubkey::find_program_address(pda_seeds, owner_program.key());
-    let (_, buffer_pda_bump) = pubkey::find_program_address(buffer_seeds, owner_program.key());
+    let (_, delegate_account_bump) = find_program_address(pda_seeds, owner_program.key());
+    let (_, buffer_pda_bump) = find_program_address(buffer_seeds, owner_program.key());
 
     #[allow(clippy::iter_cloned_collect)]
     let seeds_vec: Vec<&[u8]> = pda_seeds.iter().copied().collect();
@@ -57,7 +58,7 @@ pub fn delegate_account(
     let buffer_signer_seeds = Signer::from(&seed_b);
 
     //Create Buffer PDA account
-    pinocchio_system::instructions::CreateAccount {
+    CreateAccount {
         from: payer,
         to: buffer_acc,
         lamports: Rent::get()?.minimum_balance(pda_acc.data_len()),
@@ -76,7 +77,7 @@ pub fn delegate_account(
     close_pda_acc(payer, pda_acc, system_program)?;
 
     //Create account with Delegation Account
-    pinocchio_system::instructions::CreateAccount {
+    CreateAccount {
         from: payer,
         to: pda_acc,
         lamports: Rent::get()?.minimum_balance(buffer_acc.data_len()),
