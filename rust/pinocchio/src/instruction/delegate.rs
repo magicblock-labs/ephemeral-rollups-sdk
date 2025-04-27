@@ -85,7 +85,7 @@ pub fn delegate_account(
     }
     .invoke_signed(&[delegate_signer_seeds.clone()])?;
 
-    //Preprare delegate args
+    //Prepare delegate args
     let delegate_args = DelegateAccountArgs {
         commit_frequency_ms: config.commit_frequency_ms,
         seeds: delegate_pda_seeds,
