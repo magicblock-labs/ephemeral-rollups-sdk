@@ -4,7 +4,8 @@ members = [
 	"ephemeral", 
 	"delegate", 
 	"commit-attribute",
-	"resolver"
+	"resolver",
+	"pinocchio",
 ]
 
 resolver = "2"
@@ -48,6 +49,11 @@ solana-program = { version = ">=1.16" }
 sdk = { package = "solana-sdk", version = ">=1.16" }
 rpc = { package = "solana-rpc-client", version = ">=1.16" }
 rpc-api = { package = "solana-rpc-client-api", version = ">=1.16" }
+pinocchio = "0.8.1"
+pinocchio-log = "0.4.0"
+pinocchio-pubkey = "0.2.4"
+pinocchio-system = "0.2.3"
+pinocchio-token = "0.3.0"
 
 # parsing
 serde = { version = "1.0", features = [ "derive" ] }
