@@ -1,29 +1,27 @@
 ## Connection Resolver
 
-The Connection Resolver is a specialized library designed to
-facilitate the resolution of RPC connections for Solana blockchain
-requests. It dynamically determines the appropriate RPC client for
-processing requests based on the delegation status of the accounts
-involved. This is accomplished by maintaining an up-to-date record of
-account delegation statuses through real-time synchronization with
-the Solana base chain, achieved via WebSocket subscriptions or
-on-demand data retrieval.
+The Connection Resolver is a specialized library designed to facilitate the
+resolution of RPC connections for Solana blockchain requests. It dynamically
+determines the appropriate RPC client for processing requests based on the
+delegation status of the accounts involved. This is accomplished by maintaining
+an up-to-date record of account delegation statuses through real-time
+synchronization with the Solana base chain, achieved via WebSocket
+subscriptions or on-demand data retrieval.
 
-Upon encountering a new account through the `resolve*` or
-`track_account` functions, the Resolver fetches the account's
-delegation status directly from the blockchain and initiates a
-WebSocket subscription to capture subsequent updates. This ensures
-that the Resolver reflects the most current state of the blockchain
-(which acts as a single source of truth), enabling it to deliver the
-appropriate RPC client for any request
-involving a given account. This mechanism allows developers to
-seamlessly direct transactions and requests to the correct endpoints,
-thereby facilitating the interaction with the ephemeral rollups.
+Upon encountering a new account through the `resolve*` or `track_account`
+functions, the Resolver fetches the account's delegation status directly from
+the blockchain and initiates a WebSocket subscription to capture subsequent
+updates. This ensures that the Resolver reflects the most current state of the
+blockchain (which acts as a single source of truth), enabling it to deliver the
+appropriate RPC client for any request involving a given account. This
+mechanism allows developers to seamlessly direct transactions and requests to
+the correct endpoints, thereby facilitating the interaction with the ephemeral
+rollups.
 
 
 ### Basic Setup
 
-To begin using the Connection Resolver, configure it with the necessary parameters including the base chain, websocket, and your routing table for validators:
+To begin using the Connection Resolver, configure it with the necessary parameters including the base chain, websocket, and optionally custom routing table for ER nodes:
 
 ```rust
 use magic_resolver::config::{Configuration, WebsocketConf};
@@ -54,7 +52,13 @@ async fn main() -> anyhow::Result<()> {
         table
     };
 
-    let resolver = Resolver::new(config, routes).await?;
+    // this will use the union of on chain and custom routes
+    let resolver = Resolver::new_custom(config, true, Some(routes)).await?;
+    // additionally if you only want to use custom routes
+    // let resolver = Resolver::new_custom(config, false, Some(routes)).await?;
+    // or if you only want to use on chain routes
+    // let resolver = Resolver::new(config).await?;
+
     Ok(())
 }
 ```

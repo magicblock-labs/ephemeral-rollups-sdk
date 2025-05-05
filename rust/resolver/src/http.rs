@@ -2,14 +2,18 @@
 
 use std::sync::Arc;
 
+use borsh::BorshDeserialize;
+use mdp::state::record::ErRecord;
 use rpc::nonblocking::rpc_client::RpcClient;
-use sdk::pubkey::Pubkey;
+use sdk::{account::ReadableAccount, pubkey::Pubkey};
 
 use crate::{
     account, DelegationStatus, DelegationsDB, ResolverResult, DELEGATION_PROGRAM_ID,
     DELEGATION_RECORD_SIZE,
 };
 
+/// Updates delegation status of gvien pubkey by refetching its current state from base chain
+/// Returns the most up to date status, as observed on chain
 pub async fn update_account_state(
     chain: Arc<RpcClient>,
     db: DelegationsDB,
@@ -25,6 +29,7 @@ pub async fn update_account_state(
     Ok(status)
 }
 
+/// Retrieves delegation status of given account from base layer chain
 pub async fn fetch_account_state(
     chain: Arc<RpcClient>,
     pubkey: Pubkey,
@@ -55,4 +60,20 @@ pub async fn fetch_account_state(
         DelegationStatus::Undelegated
     };
     Ok(status)
+}
+
+/// Fetches all domain registration records from base layer chain
+/// Returns list of all available ER node records
+pub async fn fetch_domain_records(chain: &RpcClient) -> ResolverResult<Vec<ErRecord>> {
+    let accounts = chain.get_program_accounts(&mdp::id()).await?;
+    let mut records = Vec::with_capacity(accounts.len());
+    for (pk, account) in accounts {
+        match ErRecord::try_from_slice(account.data()) {
+            Ok(r) => records.push(r),
+            Err(err) => {
+                tracing::warn!("failed to parse domain account {pk}: {err}")
+            }
+        }
+    }
+    Ok(records)
 }

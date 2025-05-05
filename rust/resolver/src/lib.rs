@@ -4,18 +4,23 @@ use std::{
     collections::HashMap,
     sync::{
         atomic::{AtomicBool, Ordering},
-        Arc, RwLock,
+        Arc,
     },
 };
 
+use parking_lot::RwLock;
+
 use config::Configuration;
 use error::Error;
-use http::{fetch_account_state, update_account_state};
+use http::{fetch_account_state, fetch_domain_records, update_account_state};
 use rpc::nonblocking::rpc_client::RpcClient;
 use scc::{hash_cache::Entry, HashCache};
 use sdk::{commitment_config::CommitmentConfig, pubkey::Pubkey, transaction::Transaction};
 use tokio::sync::mpsc::{unbounded_channel, UnboundedSender};
-use websocket::{connection::WsConnection, subscription::AccountSubscription};
+use websocket::{
+    connection::{delegations::WsDelegationsConnection, routes::WsRoutesConnection},
+    subscription::AccountSubscription,
+};
 
 /// Mapping between validator(ER) identity and solana rpc client, which is
 /// configured with the URL, via which the this particular ER can be reached
@@ -41,7 +46,7 @@ pub struct Resolver {
     routes: RoutingTable,
     delegations: DelegationsDB,
     chain: Arc<RpcClient>,
-    ws: UnboundedSender<AccountSubscription>,
+    delegations_tx: UnboundedSender<AccountSubscription>,
 }
 
 /// Delegation status of account
@@ -63,38 +68,80 @@ struct DelegationRecord {
 }
 
 impl Resolver {
-    /// Initialize the resolver, by creating websocket connection
-    /// to base chain for delegation status tracking of accounts
-    pub async fn new(
+    /// Initialize the resolver with the provided configuration
+    pub async fn new(config: Configuration) -> ResolverResult<Self> {
+        Self::new_custom(config, true, None).await
+    }
+    /// Initialize the resolver:
+    /// 1. fetch routes from chain (if use_on_chain_routes is true)
+    /// 2. add custom routes to routing table, if any
+    /// 3. subscribe to on-chain route updates (if use_on_chain_routes is true)
+    /// 4. creating websocket connection to base chain for delegation status tracking of accounts
+    pub async fn new_custom(
         config: Configuration,
-        routes: HashMap<Pubkey, String>,
+        use_on_chain_routes: bool,
+        custom_routes: Option<HashMap<Pubkey, String>>,
     ) -> ResolverResult<Self> {
         let commitment = CommitmentConfig {
             commitment: config.commitment,
         };
-        let routes = routes
-            .into_iter()
-            .map(|(k, v)| (k, RpcClient::new_with_commitment(v, commitment).into()))
-            .collect();
+        let chain = Arc::new(RpcClient::new(config.chain.to_string()));
+
+        let mut routes: HashMap<_, _> = if use_on_chain_routes {
+            fetch_domain_records(&chain)
+                .await?
+                .into_iter()
+                .map(|record| {
+                    (
+                        *record.identity(),
+                        RpcClient::new_with_commitment(record.addr().to_string(), commitment)
+                            .into(),
+                    )
+                })
+                .collect()
+        } else {
+            Default::default()
+        };
+
+        routes.extend(
+            custom_routes
+                .into_iter()
+                .flatten()
+                .map(|(k, v)| (k, RpcClient::new_with_commitment(v, commitment).into())),
+        );
+
+        let routes = Arc::new(RwLock::new(routes));
 
         let delegations = Arc::new(HashCache::with_capacity(128, config.cache_size.max(256)));
-        let chain = Arc::new(RpcClient::new(config.chain.to_string()));
-        let (ws, rx) = unbounded_channel();
-        let websocket =
-            WsConnection::establish(config.websocket, chain.clone(), rx, delegations.clone())
-                .await?;
-        tokio::spawn(websocket.start());
+        let (delegations_tx, rx) = unbounded_channel();
+        let delegations_ws = WsDelegationsConnection::establish(
+            config.websocket.clone(),
+            chain.clone(),
+            rx,
+            delegations.clone(),
+        )
+        .await?;
+
+        tokio::spawn(delegations_ws.start());
+
+        if use_on_chain_routes {
+            let routes_ws =
+                WsRoutesConnection::establish(config.websocket, chain.clone(), routes.clone())
+                    .await?;
+            tokio::spawn(routes_ws.start());
+        }
+
         Ok(Self {
             chain,
             delegations,
-            ws,
-            routes: Arc::new(RwLock::new(routes)),
+            delegations_tx,
+            routes,
         })
     }
 
-    /// Start tracking account's delegation status, this is achieved by fetching delegation record
-    /// for account (if exists) and subscribing to updates of its state. The existence of
-    /// delegation record is proof that account has been delegated, and it contains critical
+    /// Start tracking account's delegation status, this is achieved by fetching the delegation
+    /// record for the account (if it exists) and subscribing to updates of its state. The existence
+    /// of the delegation record is a proof that account has been delegated, and it contains critical
     /// information like the identity of validator, to which the account was delegated
     pub async fn track_account(&self, pubkey: Pubkey) -> ResolverResult<DelegationStatus> {
         let chain = self.chain.clone();
@@ -109,7 +156,7 @@ impl Resolver {
                 let db = self.delegations.clone();
                 let subscription = AccountSubscription::new(pubkey, subscribed);
                 let status = update_account_state(chain, db, pubkey).await?;
-                let _ = self.ws.send(subscription);
+                let _ = self.delegations_tx.send(subscription);
                 Ok(status)
             }
             Entry::Occupied(e) => {
@@ -190,11 +237,7 @@ impl Resolver {
     fn resolve_client(&self, status: DelegationStatus) -> ResolverResult<Arc<RpcClient>> {
         match status {
             DelegationStatus::Delegated(validator) => {
-                let guard = self
-                    .routes
-                    .read()
-                    // not really possible, no thread can panic while holding this lock
-                    .expect("poisoned RwLock for routing table");
+                let guard = self.routes.read();
                 let client = guard.get(&validator).ok_or(Error::Resolver(format!(
                     "url not found for validator: {validator}"
                 )))?;
