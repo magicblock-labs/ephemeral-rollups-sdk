@@ -71,6 +71,9 @@ pub fn ephemeral(_args: TokenStream, input: TokenStream) -> TokenStream {
     let ast = parse_macro_input!(input as syn::ItemMod);
     let modified = modify_component_module(ast);
     TokenStream::from(quote! {
+        #[allow(unused_imports)]
+        use ::ephemeral_rollups_sdk::anchor::MagicProgram;
+
         #modified
     })
 }

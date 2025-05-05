@@ -4,13 +4,14 @@ members = [
 	"ephemeral", 
 	"delegate", 
 	"commit-attribute",
-	"resolver"
+	"resolver",
+	"pinocchio",
 ]
 
 resolver = "2"
 
 [workspace.package]
-version = "0.2.4"
+version = "0.2.5"
 authors = ["Magicblock Labs <dev@magicblock.gg>"]
 edition = "2021"
 license = "MIT"
@@ -21,10 +22,10 @@ readme = "../README.md"
 keywords = ["solana", "crypto", "delegation", "ephemeral-rollups", "magicblock"]
 
 [workspace.dependencies]
-ephemeral-rollups-sdk = { path = "sdk", version = "=0.2.4" }
-ephemeral-rollups-sdk-attribute-ephemeral = { path = "ephemeral", version = "=0.2.4" }
-ephemeral-rollups-sdk-attribute-delegate = { path = "delegate", version = "=0.2.4" }
-ephemeral-rollups-sdk-attribute-commit = { path = "commit-attribute", version = "=0.2.4" }
+ephemeral-rollups-sdk = { path = "sdk", version = "=0.2.5" }
+ephemeral-rollups-sdk-attribute-ephemeral = { path = "ephemeral", version = "=0.2.5" }
+ephemeral-rollups-sdk-attribute-delegate = { path = "delegate", version = "=0.2.5" }
+ephemeral-rollups-sdk-attribute-commit = { path = "commit-attribute", version = "=0.2.5" }
 magic-domain-program = { git = "https://github.com/magicblock-labs/magic-domain-program.git", rev = "eba7644" }
 
 ## External crates
@@ -51,6 +52,11 @@ solana-program = { version = ">=1.16" }
 sdk = { package = "solana-sdk", version = ">=1.16" }
 rpc = { package = "solana-rpc-client", version = ">=1.16" }
 rpc-api = { package = "solana-rpc-client-api", version = ">=1.16" }
+pinocchio = "0.8.1"
+pinocchio-log = "0.4.0"
+pinocchio-pubkey = "0.2.4"
+pinocchio-system = "0.2.3"
+pinocchio-token = "0.3.0"
 
 # serialization/parsing
 serde = { version = "1.0", features = [ "derive" ] }
