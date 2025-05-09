@@ -1,5 +1,5 @@
 use borsh::BorshSerialize;
-use solana_program::account_info::AccountInfo;
+use solana_program::account_info::{next_account_info, AccountInfo};
 use solana_program::entrypoint::ProgramResult;
 use solana_program::instruction::{AccountMeta, Instruction};
 use solana_program::program_error::ProgramError;
@@ -19,6 +19,34 @@ pub struct DelegateAccounts<'a, 'info> {
     pub delegation_metadata: &'a AccountInfo<'info>,
     pub delegation_program: &'a AccountInfo<'info>,
     pub system_program: &'a AccountInfo<'info>,
+}
+
+impl<'a, 'info> TryFrom<&'a [AccountInfo<'info>]> for DelegateAccounts<'a, 'info> {
+    type Error = ProgramError;
+    fn try_from(accounts: &'a [AccountInfo<'info>]) -> Result<Self, Self::Error> {
+        let mut iter = accounts.iter();
+        let payer = next_account_info(&mut iter)?;
+        let pda = next_account_info(&mut iter)?;
+        if pda.lamports() == 0 {
+            Err(ProgramError::UninitializedAccount)?;
+        }
+        let owner_program = next_account_info(&mut iter)?;
+        let buffer = next_account_info(&mut iter)?;
+        let delegation_record = next_account_info(&mut iter)?;
+        let delegation_metadata = next_account_info(&mut iter)?;
+        let delegation_program = next_account_info(&mut iter)?;
+        let system_program = next_account_info(&mut iter)?;
+        Ok(Self {
+            payer,
+            pda,
+            owner_program,
+            buffer,
+            delegation_program,
+            delegation_metadata,
+            delegation_record,
+            system_program,
+        })
+    }
 }
 
 pub struct DelegateConfig {
@@ -118,22 +146,44 @@ pub fn delegate_account<'a, 'info>(
     Ok(())
 }
 
+pub struct UndelegateAccounts<'a, 'info> {
+    pub delegated_account: &'a AccountInfo<'info>,
+    pub owner_program: &'a Pubkey,
+    pub buffer: &'a AccountInfo<'info>,
+    pub payer: &'a AccountInfo<'info>,
+    pub system_program: &'a AccountInfo<'info>,
+}
+
+impl<'a, 'info> UndelegateAccounts<'a, 'info> {
+    pub fn try_from_accounts(
+        accounts: &'a [AccountInfo<'info>],
+        owner_program: &'a Pubkey,
+    ) -> Result<Self, ProgramError> {
+        let accounts_iter = &mut accounts.iter();
+        let delegated_account = next_account_info(accounts_iter)?;
+        let buffer = next_account_info(accounts_iter)?;
+        let payer = next_account_info(accounts_iter)?;
+        let system_program = next_account_info(accounts_iter)?;
+        Ok(Self {
+            delegated_account,
+            buffer,
+            payer,
+            owner_program,
+            system_program,
+        })
+    }
+}
+
 /// Undelegate an account
-pub fn undelegate_account<'a, 'info>(
-    delegated_account: &'a AccountInfo<'info>,
-    owner_program: &Pubkey,
-    buffer: &'a AccountInfo<'info>,
-    payer: &'a AccountInfo<'info>,
-    system_program: &'a AccountInfo<'info>,
-    account_signer_seeds: Vec<Vec<u8>>,
-) -> ProgramResult {
-    if !buffer.is_signer {
+pub fn undelegate_account(accounts: UndelegateAccounts, pda_seeds: Vec<Vec<u8>>) -> ProgramResult {
+    if !accounts.buffer.is_signer {
         return Err(ProgramError::MissingRequiredSignature);
     }
 
-    let account_seeds: Vec<&[u8]> = account_signer_seeds.iter().map(|v| v.as_slice()).collect();
+    let account_seeds: Vec<&[u8]> = pda_seeds.iter().map(|v| v.as_slice()).collect();
 
-    let (_, account_bump) = Pubkey::find_program_address(account_seeds.as_ref(), owner_program);
+    let (_, account_bump) =
+        Pubkey::find_program_address(account_seeds.as_ref(), accounts.owner_program);
 
     // Account signer seeds
     let account_bump_slice: &[u8] = &[account_bump];
@@ -144,16 +194,16 @@ pub fn undelegate_account<'a, 'info>(
 
     // Re-create the original PDA
     create_pda(
-        delegated_account,
-        owner_program,
-        buffer.data_len(),
+        accounts.delegated_account,
+        accounts.owner_program,
+        accounts.buffer.data_len(),
         account_signer_seeds,
-        system_program,
-        payer,
+        accounts.system_program,
+        accounts.payer,
     )?;
 
-    let mut data = delegated_account.try_borrow_mut_data()?;
-    let buffer_data = buffer.try_borrow_data()?;
+    let mut data = accounts.delegated_account.try_borrow_mut_data()?;
+    let buffer_data = accounts.buffer.try_borrow_data()?;
     (*data).copy_from_slice(&buffer_data);
     Ok(())
 }
