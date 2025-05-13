@@ -2,7 +2,7 @@ use crate::ephem::utils::accounts_to_indices;
 use borsh::{BorshDeserialize, BorshSerialize};
 use magicblock_program::magicblock_instruction::{
     CallHandlerArgs, CommitAndUndelegateArgs, CommitTypeArgs, HandlerArgs, MagicActionArgs,
-    UndelegateTypeArgs,
+    MagicBlockInstruction, UndelegateTypeArgs,
 };
 use solana_program::account_info::AccountInfo;
 use solana_program::entrypoint::ProgramResult;
@@ -30,9 +30,9 @@ impl<'info> MagicInstructionBuilder<'info> {
         // collect all accounts to be used in instruction
         self.magic_action.collect_accounts(&mut all_accounts);
         // filter duplicates & get indices map
-        let indices_map = self.filter_duplicates_with_map(&mut all_accounts);
+        let indices_map = utils::filter_duplicates_with_map(&mut all_accounts);
 
-        // construct args
+        // construct args of ScheduleAction instruction
         let args = self.magic_action.create_args(&indices_map);
         // create accounts metas
         let accounts_meta = all_accounts
@@ -46,7 +46,11 @@ impl<'info> MagicInstructionBuilder<'info> {
 
         (
             all_accounts,
-            Instruction::new_with_bincode(*self.magic_program.key, &args, accounts_meta),
+            Instruction::new_with_bincode(
+                *self.magic_program.key,
+                &MagicBlockInstruction::ScheduleAction(args),
+                accounts_meta,
+            ),
         )
     }
 
@@ -54,29 +58,6 @@ impl<'info> MagicInstructionBuilder<'info> {
     pub fn build_and_invoke(self) -> ProgramResult {
         let (accounts, ix) = self.build();
         invoke(&ix, &accounts)
-    }
-
-    /// Removes duplicates from array by pubkey
-    /// Returns a map of key to index in cleaned array
-    fn filter_duplicates_with_map(
-        &self,
-        container: &mut Vec<AccountInfo<'info>>,
-    ) -> HashMap<Pubkey, u8> {
-        let mut map = HashMap::new();
-        container.retain(|el| match map.entry(*el.key) {
-            Entry::Occupied(_) => false,
-            Entry::Vacant(entry) => {
-                // insert dummy value. Can't use index counter here
-                entry.insert(1);
-                true
-            }
-        });
-        // update map with valid indices
-        container.iter().enumerate().for_each(|(i, account)| {
-            *map.get_mut(account.key).unwrap() = i as u8;
-        });
-
-        map
     }
 }
 
@@ -344,6 +325,7 @@ mod utils {
     use crate::ephem::EXPECTED_KEY_MSG;
     use solana_program::account_info::AccountInfo;
     use solana_program::pubkey::Pubkey;
+    use std::collections::hash_map::Entry;
     use std::collections::HashMap;
 
     #[inline(always)]
@@ -355,5 +337,25 @@ mod utils {
             .iter()
             .map(|account| *indices_map.get(account.key).expect(EXPECTED_KEY_MSG))
             .collect()
+    }
+
+    /// Removes duplicates from array by pubkey
+    /// Returns a map of key to index in cleaned array
+    pub fn filter_duplicates_with_map(container: &mut Vec<AccountInfo>) -> HashMap<Pubkey, u8> {
+        let mut map = HashMap::new();
+        container.retain(|el| match map.entry(*el.key) {
+            Entry::Occupied(_) => false,
+            Entry::Vacant(entry) => {
+                // insert dummy value. Can't use index counter here
+                entry.insert(1);
+                true
+            }
+        });
+        // update map with valid indices
+        container.iter().enumerate().for_each(|(i, account)| {
+            *map.get_mut(account.key).unwrap() = i as u8;
+        });
+
+        map
     }
 }
