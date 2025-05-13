@@ -23,3 +23,4 @@ ephemeral-rollups-sdk-attribute-ephemeral = { workspace = true }
 ephemeral-rollups-sdk-attribute-commit = { workspace = true }
 paste = { workspace = true }
 solana-program = { workspace = true }
+magicblock-program = { workspace = true }
