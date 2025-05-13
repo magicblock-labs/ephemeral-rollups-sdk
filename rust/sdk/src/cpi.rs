@@ -6,7 +6,7 @@ use solana_program::program_error::ProgramError;
 use solana_program::pubkey::Pubkey;
 
 // TODO: import from the delegation program crate once open-sourced
-use crate::consts::BUFFER;
+use crate::consts::{BUFFER, DELEGATION_PROGRAM_ID};
 use crate::types::DelegateAccountArgs;
 use crate::utils::{close_pda_with_system_transfer, create_pda, seeds_with_bump};
 
@@ -122,6 +122,9 @@ pub fn undelegate_account<'a, 'info>(
 ) -> ProgramResult {
     if !buffer.is_signer {
         return Err(ProgramError::MissingRequiredSignature);
+    }
+    if buffer.owner != &DELEGATION_PROGRAM_ID {
+        return Err(ProgramError::InvalidAccountOwner);
     }
 
     let account_seeds: Vec<&[u8]> = account_signer_seeds.iter().map(|v| v.as_slice()).collect();
