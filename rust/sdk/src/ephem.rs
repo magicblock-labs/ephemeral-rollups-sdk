@@ -14,107 +14,117 @@ use std::collections::HashMap;
 
 const EXPECTED_KEY_MSG: &str = "Key expected to exist!";
 
-/// CPI to trigger a commit for one or more accounts in the ER
-#[inline(always)]
-pub fn commit_accounts<'a, 'info>(
-    payer: &'a AccountInfo<'info>,
-    account_infos: Vec<&'a AccountInfo<'info>>,
-    magic_context: &'a AccountInfo<'info>,
-    magic_program: &'a AccountInfo<'info>,
-) -> ProgramResult {
-    let ix = create_schedule_commit_ix(payer, &account_infos, magic_context, magic_program, false);
-    let mut all_accounts = vec![payer.clone(), magic_context.clone()];
-    all_accounts.extend(account_infos.into_iter().cloned());
-    invoke(&ix, &all_accounts)
+/// Instruction builder for magicprogram
+pub struct MagicInstructionBuilder<'info> {
+    pub payer: AccountInfo<'info>,
+    pub magic_context: AccountInfo<'info>,
+    pub magic_program: AccountInfo<'info>,
+    pub magic_action: MagicAction<'info>,
 }
 
-/// CPI to trigger a commit and undelegate one or more accounts in the ER
-#[inline(always)]
-pub fn commit_and_undelegate_accounts<'a, 'info>(
-    payer: &'a AccountInfo<'info>,
-    account_infos: Vec<&'a AccountInfo<'info>>,
-    magic_context: &'a AccountInfo<'info>,
-    magic_program: &'a AccountInfo<'info>,
-) -> ProgramResult {
-    let ix = create_schedule_commit_ix(payer, &account_infos, magic_context, magic_program, true);
-    let mut all_accounts = vec![payer.clone(), magic_context.clone()];
-    all_accounts.extend(account_infos.into_iter().cloned());
-    invoke(&ix, &all_accounts)
+impl<'info> MagicInstructionBuilder<'info> {
+    /// Build instruction for supplied an action and prepares accounts
+    pub fn build(&self) -> (Vec<AccountInfo<'info>>, Instruction) {
+        // set those to be first
+        let mut all_accounts = vec![self.payer.clone(), self.magic_context.clone()];
+        // collect all accounts to be used in instruction
+        self.magic_action.collect_accounts(&mut all_accounts);
+        // filter duplicates & get indices map
+        let indices_map = self.filter_duplicates_with_map(&mut all_accounts);
+
+        // construct args
+        let args = self.magic_action.create_args(&indices_map);
+        // create accounts metas
+        let accounts_meta = all_accounts
+            .iter()
+            .map(|account| AccountMeta {
+                pubkey: *account.key,
+                is_signer: account.key == self.payer.key,
+                is_writable: account.is_writable,
+            })
+            .collect();
+
+        (
+            all_accounts,
+            Instruction::new_with_bincode(*self.magic_program.key, &args, accounts_meta),
+        )
+    }
+
+    /// Builds instruction for action & invokes magicprogram
+    pub fn build_and_invoke(self) -> ProgramResult {
+        let (accounts, ix) = self.build();
+        invoke(&ix, &accounts)
+    }
+
+    /// Removes duplicates from array by pubkey
+    /// Returns a map of key to index in cleaned array
+    fn filter_duplicates_with_map(
+        &self,
+        container: &mut Vec<AccountInfo<'info>>,
+    ) -> HashMap<Pubkey, u8> {
+        let mut map = HashMap::new();
+        container.retain(|el| match map.entry(*el.key) {
+            Entry::Occupied(_) => false,
+            Entry::Vacant(entry) => {
+                // insert dummy value. Can't use index counter here
+                entry.insert(1);
+                true
+            }
+        });
+        // update map with valid indices
+        container.iter().enumerate().for_each(|(i, account)| {
+            *map.get_mut(account.key).unwrap() = i as u8;
+        });
+
+        map
+    }
 }
 
-pub fn create_schedule_commit_ix<'a, 'info>(
-    payer: &'a AccountInfo<'info>,
-    account_infos: &[&'a AccountInfo<'info>],
-    magic_context: &'a AccountInfo<'info>,
-    magic_program: &'a AccountInfo<'info>,
-    allow_undelegation: bool,
-) -> Instruction {
-    let instruction_data = if allow_undelegation {
-        vec![2, 0, 0, 0]
-    } else {
-        vec![1, 0, 0, 0]
-    };
-    let mut account_metas = vec![
-        AccountMeta {
-            pubkey: *payer.key,
-            is_signer: true,
-            is_writable: true,
-        },
-        AccountMeta {
-            pubkey: *magic_context.key,
-            is_signer: false,
-            is_writable: true,
-        },
-    ];
-    account_metas.extend(account_infos.iter().map(|x| AccountMeta {
-        pubkey: *x.key,
-        is_signer: x.is_signer,
-        is_writable: x.is_writable,
-    }));
-    Instruction::new_with_bytes(*magic_program.key, &instruction_data, account_metas)
+/// Action that user wants to perform on base layer
+pub enum MagicAction<'info> {
+    L1Action(Vec<CallHandler<'info>>),
+    Commit(CommitType<'info>),
+    CommitAndUndelegate(CommitAndUndelegate<'info>),
 }
 
-pub struct InstructionBuilder<'info> {
-    magic_context: AccountInfo<'info>,
-    magic_program: AccountInfo<'info>,
-}
-
-impl<'info> InstructionBuilder<'info> {
-    pub fn commit(account_infos: &[AccountInfo<'info>]) -> Self {
+impl<'info> MagicAction<'info> {
+    pub fn build(self) -> Instruction {
         todo!()
     }
 
-    pub fn undelegate() -> Self {
-        todo!()
-    }
-}
-
-struct CallHandler<'info> {
-    pub args: HandlerArgs,
-    pub destination_program: AccountInfo<'info>,
-    pub accounts: Vec<AccountInfo<'info>>,
-}
-
-impl<'info> CallHandler<'info> {
-    fn collect_accounts(&self, container: &mut Vec<AccountInfo<'info>>) {
-        container.push(self.destination_program.clone());
-        container.extend(self.accounts.clone())
+    /// Collects accounts. May contain duplicates that would have to be processd
+    /// TODO: could be &mut Vec<&'a AccountInfo<'info>>
+    fn collect_accounts(&self, accounts_container: &mut Vec<AccountInfo<'info>>) {
+        match self {
+            MagicAction::L1Action(call_handlers) => call_handlers
+                .iter()
+                .for_each(|call_handler| call_handler.collect_accounts(accounts_container)),
+            MagicAction::Commit(commit_type) => commit_type.collect_accounts(accounts_container),
+            MagicAction::CommitAndUndelegate(commit_and_undelegate) => {
+                commit_and_undelegate.collect_accounts(accounts_container)
+            }
+        }
     }
 
-    fn to_args(&self, indices_map: &HashMap<Pubkey, u8>) -> CallHandlerArgs {
-        let destination_program_index = indices_map
-            .get(self.destination_program.key)
-            .expect(EXPECTED_KEY_MSG);
-        let accounts_indices = utils::accounts_to_indices(&self.accounts, indices_map);
-
-        CallHandlerArgs {
-            args: self.args.clone(),
-            destination_program: *destination_program_index,
-            accounts: accounts_indices,
+    /// Creates argument for CPI
+    fn create_args(&self, indices_map: &HashMap<Pubkey, u8>) -> MagicActionArgs {
+        match self {
+            MagicAction::L1Action(call_handlers) => {
+                let call_handlers_args = call_handlers
+                    .iter()
+                    .map(|call_handler| call_handler.to_args(indices_map))
+                    .collect();
+                MagicActionArgs::L1Action(call_handlers_args)
+            }
+            MagicAction::Commit(value) => MagicActionArgs::Commit(value.to_args(indices_map)),
+            MagicAction::CommitAndUndelegate(value) => {
+                MagicActionArgs::CommitAndUndelegate(value.to_args(indices_map))
+            }
         }
     }
 }
 
+/// Type of commit , can be whether standalone or with some custom actions on L1 post commit
 pub enum CommitType<'info> {
     /// Regular commit without actions
     Standalone(Vec<AccountInfo<'info>>), // accounts to commit
@@ -175,6 +185,7 @@ impl<'info> CommitType<'info> {
     }
 }
 
+/// Type of undelegate, can be whether standalone or with some custom actions on L1 post commit
 /// No CommitedAccounts since it is only used with CommitAction.
 pub enum UndelegateType<'info> {
     Standalone,
@@ -242,89 +253,91 @@ impl<'info> CommitAndUndelegate<'info> {
     }
 }
 
-pub enum MagicAction<'info> {
-    L1Action(Vec<CallHandler<'info>>),
-    Commit(CommitType<'info>),
-    CommitAndUndelegate(CommitAndUndelegate<'info>),
+pub struct CallHandler<'info> {
+    pub args: HandlerArgs,
+    pub destination_program: AccountInfo<'info>,
+    pub accounts: Vec<AccountInfo<'info>>,
 }
 
-impl<'info> MagicAction<'info> {
-    pub fn build(self) -> Instruction {
-        todo!()
+impl<'info> CallHandler<'info> {
+    fn collect_accounts(&self, container: &mut Vec<AccountInfo<'info>>) {
+        container.push(self.destination_program.clone());
+        container.extend(self.accounts.clone())
     }
 
-    /// Collects accounts. May contain duplicates that would have to be processd
-    /// TODO: could be &mut Vec<&'a AccountInfo<'info>>
-    fn collect_accounts(&self, accounts_container: &mut Vec<AccountInfo<'info>>) {
-        match self {
-            MagicAction::L1Action(call_handlers) => call_handlers
-                .iter()
-                .for_each(|call_handler| call_handler.collect_accounts(accounts_container)),
-            MagicAction::Commit(commit_type) => commit_type.collect_accounts(accounts_container),
-            MagicAction::CommitAndUndelegate(commit_and_undelegate) => {
-                commit_and_undelegate.collect_accounts(accounts_container)
-            }
-        }
-    }
+    fn to_args(&self, indices_map: &HashMap<Pubkey, u8>) -> CallHandlerArgs {
+        let destination_program_index = indices_map
+            .get(self.destination_program.key)
+            .expect(EXPECTED_KEY_MSG);
+        let accounts_indices = utils::accounts_to_indices(&self.accounts, indices_map);
 
-    /// Creates argument for CPI
-    fn create_args(&self, indices_map: &HashMap<Pubkey, u8>) -> MagicActionArgs {
-        match self {
-            MagicAction::L1Action(call_handlers) => {
-                let call_handlers_args = call_handlers
-                    .iter()
-                    .map(|call_handler| call_handler.to_args(indices_map))
-                    .collect();
-                MagicActionArgs::L1Action(call_handlers_args)
-            }
-            MagicAction::Commit(value) => MagicActionArgs::Commit(value.to_args(indices_map)),
-            MagicAction::CommitAndUndelegate(value) => {
-                MagicActionArgs::CommitAndUndelegate(value.to_args(indices_map))
-            }
+        CallHandlerArgs {
+            args: self.args.clone(),
+            destination_program: *destination_program_index,
+            accounts: accounts_indices,
         }
     }
 }
 
-pub struct MagicInstructionBuilder<'info> {
-    pub payer: AccountInfo<'info>,
-    pub magic_context: AccountInfo<'info>,
-    pub magic_program: AccountInfo<'info>,
-    pub magic_action: MagicAction<'info>,
+/// CPI to trigger a commit for one or more accounts in the ER
+#[inline(always)]
+pub fn commit_accounts<'a, 'info>(
+    payer: &'a AccountInfo<'info>,
+    account_infos: Vec<&'a AccountInfo<'info>>,
+    magic_context: &'a AccountInfo<'info>,
+    magic_program: &'a AccountInfo<'info>,
+) -> ProgramResult {
+    let ix = create_schedule_commit_ix(payer, &account_infos, magic_context, magic_program, false);
+    let mut all_accounts = vec![payer.clone(), magic_context.clone()];
+    all_accounts.extend(account_infos.into_iter().cloned());
+    invoke(&ix, &all_accounts)
 }
 
-impl<'info> MagicInstructionBuilder<'info> {
-    pub fn build(&self) -> Instruction {
-        // set those to be first
-        let mut all_accounts = vec![self.payer.clone(), self.magic_context.clone()];
-        self.magic_action.collect_accounts(&mut all_accounts);
+/// CPI to trigger a commit and undelegate one or more accounts in the ER
+#[inline(always)]
+pub fn commit_and_undelegate_accounts<'a, 'info>(
+    payer: &'a AccountInfo<'info>,
+    account_infos: Vec<&'a AccountInfo<'info>>,
+    magic_context: &'a AccountInfo<'info>,
+    magic_program: &'a AccountInfo<'info>,
+) -> ProgramResult {
+    let ix = create_schedule_commit_ix(payer, &account_infos, magic_context, magic_program, true);
+    let mut all_accounts = vec![payer.clone(), magic_context.clone()];
+    all_accounts.extend(account_infos.into_iter().cloned());
+    invoke(&ix, &all_accounts)
+}
 
-        // filter duplicates & get indices map
-        let indices_map = self.filter_duplicates_with_map(&mut all_accounts);
-
-
-        todo!();
-    }
-
-    fn filter_duplicates_with_map(
-        &self,
-        container: &mut Vec<AccountInfo<'info>>,
-    ) -> HashMap<Pubkey, u8> {
-        let mut map = HashMap::new();
-        container.retain(|el| match map.entry(*el.key) {
-            Entry::Occupied(_) => false,
-            Entry::Vacant(entry) => {
-                // insert dummy value. Can't use index counter here
-                entry.insert(1);
-                true
-            }
-        });
-        // update map with valid indices
-        container.iter().enumerate().for_each(|(i, account)| {
-            *map.get_mut(account.key).unwrap() = i as u8;
-        });
-
-        map
-    }
+pub fn create_schedule_commit_ix<'a, 'info>(
+    payer: &'a AccountInfo<'info>,
+    account_infos: &[&'a AccountInfo<'info>],
+    magic_context: &'a AccountInfo<'info>,
+    magic_program: &'a AccountInfo<'info>,
+    allow_undelegation: bool,
+) -> Instruction {
+    // TODO: change
+    let instruction_data = if allow_undelegation {
+        vec![2, 0, 0, 0]
+    } else {
+        vec![1, 0, 0, 0]
+    };
+    let mut account_metas = vec![
+        AccountMeta {
+            pubkey: *payer.key,
+            is_signer: true,
+            is_writable: true,
+        },
+        AccountMeta {
+            pubkey: *magic_context.key,
+            is_signer: false,
+            is_writable: true,
+        },
+    ];
+    account_metas.extend(account_infos.iter().map(|x| AccountMeta {
+        pubkey: *x.key,
+        is_signer: x.is_signer,
+        is_writable: x.is_writable,
+    }));
+    Instruction::new_with_bytes(*magic_program.key, &instruction_data, account_metas)
 }
 
 mod utils {
