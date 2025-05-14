@@ -23,3 +23,7 @@ ephemeral-rollups-sdk-attribute-ephemeral = { workspace = true }
 ephemeral-rollups-sdk-attribute-commit = { workspace = true }
 solana-program = { workspace = true }
 magicblock-program = { workspace = true }
+magicblock-delegation-program  = { workspace = true }
+
+[dev-dependencies]
+bincode = "1.3.3"

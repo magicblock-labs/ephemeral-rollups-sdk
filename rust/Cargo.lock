@@ -835,6 +835,7 @@ dependencies = [
  "fiat-crypto",
  "rand_core 0.6.4",
  "rustc_version",
+ "serde",
  "subtle",
  "zeroize",
 ]
@@ -1033,12 +1034,13 @@ name = "ephemeral-rollups-sdk"
 version = "0.2.4"
 dependencies = [
  "anchor-lang",
+ "bincode",
  "borsh 0.10.4",
  "ephemeral-rollups-sdk-attribute-commit",
  "ephemeral-rollups-sdk-attribute-delegate",
  "ephemeral-rollups-sdk-attribute-ephemeral",
+ "magicblock-delegation-program",
  "magicblock-program",
- "paste",
  "solana-program",
 ]
 
@@ -1968,6 +1970,22 @@ name = "magicblock-core"
 version = "0.1.2"
 dependencies = [
  "solana-sdk",
+]
+
+[[package]]
+name = "magicblock-delegation-program"
+version = "1.0.0"
+source = "git+https://github.com/magicblock-labs/delegation-program.git?rev=ca7ea00#ca7ea004b3f46f3cfe326e22fe5b0d71d9d39a37"
+dependencies = [
+ "bincode",
+ "borsh 1.5.5",
+ "bytemuck",
+ "num_enum",
+ "paste",
+ "solana-curve25519",
+ "solana-program",
+ "solana-security-txt",
+ "thiserror 1.0.69",
 ]
 
 [[package]]
@@ -3343,6 +3361,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "solana-curve25519"
+version = "2.2.14"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "87c69c23233a6dce77422fe4fb00ca3a5888f1ed58e6f5e3fa4c2402c953e105"
+dependencies = [
+ "bytemuck",
+ "bytemuck_derive",
+ "curve25519-dalek 4.1.3",
+ "solana-define-syscall",
+ "subtle",
+ "thiserror 2.0.12",
+]
+
+[[package]]
 name = "solana-decode-error"
 version = "2.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4378,6 +4410,12 @@ dependencies = [
  "solana-precompile-error",
  "solana-sdk-ids",
 ]
+
+[[package]]
+name = "solana-security-txt"
+version = "1.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "468aa43b7edb1f9b7b7b686d5c3aeb6630dc1708e86e31343499dd5c4d775183"
 
 [[package]]
 name = "solana-seed-derivable"

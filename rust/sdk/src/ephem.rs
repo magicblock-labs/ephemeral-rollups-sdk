@@ -1,5 +1,4 @@
 use crate::ephem::utils::accounts_to_indices;
-use borsh::{BorshDeserialize, BorshSerialize};
 use magicblock_program::magicblock_instruction::{
     CallHandlerArgs, CommitAndUndelegateArgs, CommitTypeArgs, HandlerArgs, MagicActionArgs,
     MagicBlockInstruction, UndelegateTypeArgs,
@@ -9,7 +8,6 @@ use solana_program::entrypoint::ProgramResult;
 use solana_program::instruction::{AccountMeta, Instruction};
 use solana_program::program::invoke;
 use solana_program::pubkey::Pubkey;
-use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 
 const EXPECTED_KEY_MSG: &str = "Key expected to exist!";
@@ -33,7 +31,7 @@ impl<'info> MagicInstructionBuilder<'info> {
         let indices_map = utils::filter_duplicates_with_map(&mut all_accounts);
 
         // construct args of ScheduleAction instruction
-        let args = self.magic_action.create_args(&indices_map);
+        let args = self.magic_action.build_args(&indices_map);
         // create accounts metas
         let accounts_meta = all_accounts
             .iter()
@@ -88,7 +86,7 @@ impl<'info> MagicAction<'info> {
     }
 
     /// Creates argument for CPI
-    fn create_args(&self, indices_map: &HashMap<Pubkey, u8>) -> MagicActionArgs {
+    fn build_args(&self, indices_map: &HashMap<Pubkey, u8>) -> MagicActionArgs {
         match self {
             MagicAction::L1Action(call_handlers) => {
                 let call_handlers_args = call_handlers
@@ -220,20 +218,6 @@ impl<'info> CommitAndUndelegate<'info> {
     }
 }
 
-impl<'info> CommitAndUndelegate<'info> {
-    pub fn build(&self) -> Instruction {
-        let commited_accounts = self.commit_type.commited_accounts();
-        match (&self.commit_type, &self.undelegate_type) {
-            (CommitType::Standalone(_), UndelegateType::Standalone) => {}
-            (CommitType::WithHandler { .. }, UndelegateType::Standalone) => {}
-            (CommitType::Standalone(_), UndelegateType::WithHandler(_)) => {}
-            (CommitType::WithHandler { .. }, UndelegateType::WithHandler(_)) => {}
-        }
-
-        todo!()
-    }
-}
-
 pub struct CallHandler<'info> {
     pub args: HandlerArgs,
     pub destination_program: AccountInfo<'info>,
@@ -295,11 +279,10 @@ pub fn create_schedule_commit_ix<'a, 'info>(
     magic_program: &'a AccountInfo<'info>,
     allow_undelegation: bool,
 ) -> Instruction {
-    // TODO: change
-    let instruction_data = if allow_undelegation {
-        vec![2, 0, 0, 0]
+    let instruction = if allow_undelegation {
+        MagicBlockInstruction::ScheduleCommitAndUndelegate
     } else {
-        vec![1, 0, 0, 0]
+        MagicBlockInstruction::ScheduleCommit
     };
     let mut account_metas = vec![
         AccountMeta {
@@ -318,7 +301,7 @@ pub fn create_schedule_commit_ix<'a, 'info>(
         is_signer: x.is_signer,
         is_writable: x.is_writable,
     }));
-    Instruction::new_with_bytes(*magic_program.key, &instruction_data, account_metas)
+    Instruction::new_with_bincode(*magic_program.key, &instruction, account_metas)
 }
 
 mod utils {
@@ -358,4 +341,14 @@ mod utils {
 
         map
     }
+}
+
+#[test]
+fn test_instruction_equality() {
+    let serialized = bincode::serialize(&MagicBlockInstruction::ScheduleCommit).unwrap();
+    assert_eq!(vec![1, 0, 0, 0], serialized);
+
+    let serialized =
+        bincode::serialize(&MagicBlockInstruction::ScheduleCommitAndUndelegate).unwrap();
+    assert_eq!(vec![2, 0, 0, 0], serialized);
 }
