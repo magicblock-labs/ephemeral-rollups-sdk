@@ -67,10 +67,6 @@ pub enum MagicAction<'info> {
 }
 
 impl<'info> MagicAction<'info> {
-    pub fn build(self) -> Instruction {
-        todo!()
-    }
-
     /// Collects accounts. May contain duplicates that would have to be processd
     /// TODO: could be &mut Vec<&'a AccountInfo<'info>>
     fn collect_accounts(&self, accounts_container: &mut Vec<AccountInfo<'info>>) {
