@@ -1,8 +1,9 @@
 use crate::ephem::utils::accounts_to_indices;
-use magicblock_program::magicblock_instruction::{
+use magicblock_program::args::{
     CallHandlerArgs, CommitAndUndelegateArgs, CommitTypeArgs, HandlerArgs, MagicActionArgs,
-    MagicBlockInstruction, UndelegateTypeArgs,
+    UndelegateTypeArgs,
 };
+use magicblock_program::magicblock_instruction::MagicBlockInstruction;
 use solana_program::account_info::AccountInfo;
 use solana_program::entrypoint::ProgramResult;
 use solana_program::instruction::{AccountMeta, Instruction};
@@ -152,8 +153,8 @@ impl<'info> CommitType<'info> {
                     .map(|call_handler| call_handler.to_args(indices_map))
                     .collect();
                 CommitTypeArgs::WithHandler {
-                    commited_accounts: commited_accounts_indices,
-                    call_handler: call_handlers_args,
+                    committed_accounts: commited_accounts_indices,
+                    call_handlers: call_handlers_args,
                 }
             }
         }
@@ -185,8 +186,8 @@ impl<'info> UndelegateType<'info> {
                     .iter()
                     .map(|call_handler| call_handler.to_args(indices_map))
                     .collect();
-                UndelegateTypeArgs::WithHandlder {
-                    call_handler: call_handlers_args,
+                UndelegateTypeArgs::WithHandler {
+                    call_handlers: call_handlers_args,
                 }
             }
         }
@@ -348,3 +349,27 @@ fn test_instruction_equality() {
         bincode::serialize(&MagicBlockInstruction::ScheduleCommitAndUndelegate).unwrap();
     assert_eq!(vec![2, 0, 0, 0], serialized);
 }
+
+// #[test]
+// fn test_construction() {
+//     let builder = MagicInstructionBuilder {
+//         payer: ctx.accounts.payer.to_account_info(),
+//         magic_context: ctx.accounts.magic_context.to_account_info(),
+//         magic_program: ctx.accounts.magic_program.to_account_info(),
+//         magic_action: MagicAction::Commit(
+//             CommitType::WithHandler {
+//                 commited_accounts: vec![ctx.accounts.pda1.to_account_info(), ctx.accounts.pda2.to_account_info()]
+//                 call_handlers: vec![CallHandler {
+//                     accounts: vec![ctx.accounts.actor_pda.to_account_info(), ctx.accounts.destination_to_account_info(), system_program]
+//                     args: HandlerArgs {
+//                         data,
+//                         escrow_index: 1
+//                     },
+//                     destination_program: ctx.accounts.destination_program.to_account_info()
+//                 }]
+//             }
+//         )
+//     }
+//
+//     builder.build_and_invoke()?;
+// }
