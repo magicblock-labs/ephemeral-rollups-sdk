@@ -100,24 +100,20 @@ fn generate_undelegate() -> (TokenStream2, TokenStream2, TokenStream2) {
     (
         quote! {
             use ephemeral_rollups_sdk::cpi::undelegate_account;
+            use ephemeral_rollups_sdk::cpi::UndelegateAccounts;
         },
         quote! {
             #[automatically_derived]
             pub fn process_undelegation(ctx: Context<InitializeAfterUndelegation>, account_seeds: Vec<Vec<u8>>) -> Result<()> {
-                let [delegated_account, buffer, payer, system_program] = [
+                let accounts = [
                     &ctx.accounts.base_account,
                     &ctx.accounts.buffer,
                     &ctx.accounts.payer,
                     &ctx.accounts.system_program,
                 ];
-                undelegate_account(
-                    delegated_account,
-                    &id(),
-                    buffer,
-                    payer,
-                    system_program,
-                    account_seeds,
-                )?;
+
+                let accounts = UndelegateAccounts::try_from_accounts(&ctx.accounts, &id())?;
+                undelegate_account(accounts, account_seeds)?;
                 Ok(())
             }
         },
