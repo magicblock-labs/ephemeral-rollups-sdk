@@ -31,6 +31,7 @@ type RoutingTable = Arc<RwLock<HashMap<Pubkey, Arc<RpcClient>>>>;
 /// pubkey and it's current delegation status as observed by resolver
 type DelegationsDB = Arc<HashCache<Pubkey, DelegationRecord>>;
 /// Conveniece wrapper for results with possible resolver errors
+#[allow(clippy::large_enum_variant)]
 type ResolverResult<T> = Result<T, Error>;
 
 const DELEGATION_PROGRAM_ID: Pubkey = ephemeral_rollups_sdk::id();
