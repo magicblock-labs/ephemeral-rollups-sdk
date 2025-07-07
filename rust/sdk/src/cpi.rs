@@ -8,7 +8,7 @@ use solana_program::pubkey::Pubkey;
 // TODO: import from the delegation program crate once open-sourced
 use crate::consts::BUFFER;
 use crate::types::DelegateAccountArgs;
-use crate::utils::{close_pda, close_pda_with_system_transfer, create_pda, seeds_with_bump};
+use crate::utils::{close_pda_with_system_transfer, create_pda, seeds_with_bump};
 
 pub struct DelegateAccounts<'a, 'info> {
     pub payer: &'a AccountInfo<'info>,
@@ -71,23 +71,17 @@ pub fn delegate_account<'a, 'info>(
     )?;
 
     // Copy the date to the buffer PDA
-    let mut buffer_data = accounts.buffer.try_borrow_mut_data()?;
-    let new_data = accounts.pda.try_borrow_data()?.to_vec().clone();
-    (*buffer_data).copy_from_slice(&new_data);
-    drop(buffer_data);
+    {
+        let mut buffer_data = accounts.buffer.try_borrow_mut_data()?;
+        let mut pda_data = accounts.pda.try_borrow_mut_data()?;
+        let new_data = pda_data.to_vec().clone();
+        (*buffer_data).copy_from_slice(&new_data);
 
-    // Close the PDA account
-    close_pda(accounts.pda, accounts.payer)?;
+        // Zero out the PDA data, required for changing the owner program
+        pda_data.fill(0);
+    }
 
-    // Re-create the PDA setting the delegation program as owner
-    create_pda(
-        accounts.pda,
-        accounts.delegation_program.key,
-        data_len,
-        pda_signer_seeds,
-        accounts.system_program,
-        accounts.payer,
-    )?;
+    accounts.pda.assign(accounts.delegation_program.key);
 
     let seeds_vec: Vec<Vec<u8>> = pda_seeds.iter().map(|&slice| slice.to_vec()).collect();
 
