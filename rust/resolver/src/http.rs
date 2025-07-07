@@ -65,7 +65,10 @@ pub async fn fetch_account_state(
 /// Fetches all domain registration records from base layer chain
 /// Returns list of all available ER node records
 pub async fn fetch_domain_records(chain: &RpcClient) -> ResolverResult<Vec<ErRecord>> {
-    let accounts = chain.get_program_accounts(&mdp::id()).await?;
+    let accounts = chain
+        .get_program_accounts(&mdp::id())
+        .await
+        .map_err(Box::new)?;
     let mut records = Vec::with_capacity(accounts.len());
     for (pk, account) in accounts {
         match ErRecord::try_from_slice(account.data()) {

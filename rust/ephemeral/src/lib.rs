@@ -86,7 +86,7 @@ fn modify_component_module(mut module: ItemMod) -> ItemMod {
             vec![imports, undelegate_fn, undelegate_struct]
                 .into_iter()
                 .map(|item| {
-                    syn::parse2(item).unwrap_or_else(|e| panic!("Failed to parse item: {}", e))
+                    syn::parse2(item).unwrap_or_else(|e| panic!("Failed to parse item: {e}"))
                 })
                 .collect::<Vec<_>>(),
         );
