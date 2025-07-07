@@ -74,8 +74,7 @@ pub fn delegate_account<'a, 'info>(
     {
         let mut buffer_data = accounts.buffer.try_borrow_mut_data()?;
         let mut pda_data = accounts.pda.try_borrow_mut_data()?;
-        let new_data = pda_data.to_vec().clone();
-        (*buffer_data).copy_from_slice(&new_data);
+        (*buffer_data).copy_from_slice(&pda_data);
 
         // Zero out the PDA data, required for changing the owner program
         pda_data.fill(0);
