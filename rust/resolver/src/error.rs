@@ -13,7 +13,7 @@ pub enum Error {
     HttpClient(#[from] reqwest::Error),
     /// Error making rpc request via solana client
     #[error("solana rpc-client error: {0}")]
-    Rpc(#[from] client_error::Error),
+    Rpc(#[from] Box<client_error::Error>),
     /// Error encountered during websocket connection handling
     #[error("websocket connection error: {0}")]
     Ws(#[from] websocket::Error),

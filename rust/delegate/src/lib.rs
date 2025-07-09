@@ -40,11 +40,11 @@ pub fn delegate(_attr: TokenStream, item: TokenStream) -> TokenStream {
             .any(|attr| attr.path.is_ident("account") && attr.tokens.to_string().contains("del"));
 
         if has_del {
-            let buffer_field = syn::Ident::new(&format!("buffer_{}", field_name), field.span());
+            let buffer_field = syn::Ident::new(&format!("buffer_{field_name}"), field.span());
             let delegation_record_field =
-                syn::Ident::new(&format!("delegation_record_{}", field_name), field.span());
+                syn::Ident::new(&format!("delegation_record_{field_name}"), field.span());
             let delegation_metadata_field =
-                syn::Ident::new(&format!("delegation_metadata_{}", field_name), field.span());
+                syn::Ident::new(&format!("delegation_metadata_{field_name}"), field.span());
 
             // Remove `del` from attributes
             for attr in &mut field_attrs {
@@ -90,7 +90,7 @@ pub fn delegate(_attr: TokenStream, item: TokenStream) -> TokenStream {
 
             // Add delegate method
             let delegate_method_name =
-                syn::Ident::new(&format!("delegate_{}", field_name), field.span());
+                syn::Ident::new(&format!("delegate_{field_name}"), field.span());
             delegate_methods.push(quote! {
                 pub fn #delegate_method_name<'a>(
                     &'a self,
