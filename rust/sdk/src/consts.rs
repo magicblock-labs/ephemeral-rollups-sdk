@@ -1,5 +1,4 @@
 // NOTE: this should go into a core package that both the sdk + the program can depend on
-use solana_program::pubkey;
 use solana_program::pubkey::Pubkey;
 
 pub use dlp::consts::*;
