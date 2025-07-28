@@ -195,8 +195,8 @@ impl<'info> UndelegateType<'info> {
 }
 
 pub struct CommitAndUndelegate<'info> {
-    commit_type: CommitType<'info>,
-    undelegate_type: UndelegateType<'info>,
+    pub commit_type: CommitType<'info>,
+    pub undelegate_type: UndelegateType<'info>,
 }
 
 impl<'info> CommitAndUndelegate<'info> {
