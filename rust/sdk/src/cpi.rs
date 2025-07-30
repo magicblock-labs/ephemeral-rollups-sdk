@@ -1,12 +1,12 @@
 use borsh::BorshSerialize;
+use dlp::delegation_record_seeds_from_delegated_account;
 use solana_program::account_info::AccountInfo;
 use solana_program::entrypoint::ProgramResult;
 use solana_program::instruction::{AccountMeta, Instruction};
 use solana_program::program_error::ProgramError;
 use solana_program::pubkey::Pubkey;
 
-// TODO: import from the delegation program crate once open-sourced
-use crate::consts::{BUFFER, DELEGATION_PROGRAM_ID};
+use crate::consts::DELEGATION_PROGRAM_ID;
 use crate::types::DelegateAccountArgs;
 use crate::utils::{close_pda_with_system_transfer, create_pda, seeds_with_bump};
 
@@ -41,7 +41,7 @@ pub fn delegate_account<'a, 'info>(
     pda_seeds: &[&[u8]],
     config: DelegateConfig,
 ) -> ProgramResult {
-    let buffer_seeds: &[&[u8]] = &[BUFFER, accounts.pda.key.as_ref()];
+    let buffer_seeds: &[&[u8]] = delegation_record_seeds_from_delegated_account!(accounts.pda.key);
 
     let (_, delegate_account_bump) =
         Pubkey::find_program_address(pda_seeds, accounts.owner_program.key);

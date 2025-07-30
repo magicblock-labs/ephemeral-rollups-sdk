@@ -217,6 +217,7 @@ impl<'info> CommitAndUndelegate<'info> {
 
 pub struct CallHandler<'info> {
     pub args: ActionArgs,
+    pub compute_untis: u32,
     pub escrow_authority: AccountInfo<'info>,
     pub destination_program: AccountInfo<'info>,
     pub accounts: Vec<AccountInfo<'info>>,
@@ -240,6 +241,7 @@ impl<'info> CallHandler<'info> {
 
         L1ActionArgs {
             args: self.args.clone(),
+            compute_units: self.compute_untis,
             destination_program: *destination_program_index,
             escrow_authority: *escrow_authority_index,
             accounts: accounts_indices,
