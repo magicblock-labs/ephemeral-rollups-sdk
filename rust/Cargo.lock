@@ -1992,6 +1992,7 @@ dependencies = [
 [[package]]
 name = "magicblock-core"
 version = "0.1.2"
+source = "git+https://github.com/magicblock-labs/magicblock-validator.git?rev=3b4312b05188d9a4256b906e5dcf8327c2a3c9dd#3b4312b05188d9a4256b906e5dcf8327c2a3c9dd"
 dependencies = [
  "solana-sdk",
 ]
@@ -1999,6 +2000,7 @@ dependencies = [
 [[package]]
 name = "magicblock-delegation-program"
 version = "1.0.0"
+source = "git+https://github.com/magicblock-labs/delegation-program.git?rev=374603f739a1b218b6b6f49dcd7f0ba60d662c7c#374603f739a1b218b6b6f49dcd7f0ba60d662c7c"
 dependencies = [
  "bincode",
  "borsh 1.5.7",
@@ -2014,6 +2016,7 @@ dependencies = [
 [[package]]
 name = "magicblock-metrics"
 version = "0.1.2"
+source = "git+https://github.com/magicblock-labs/magicblock-validator.git?rev=3b4312b05188d9a4256b906e5dcf8327c2a3c9dd#3b4312b05188d9a4256b906e5dcf8327c2a3c9dd"
 dependencies = [
  "http-body-util",
  "hyper 1.6.0",
@@ -2028,6 +2031,7 @@ dependencies = [
 [[package]]
 name = "magicblock-program"
 version = "0.1.2"
+source = "git+https://github.com/magicblock-labs/magicblock-validator.git?rev=3b4312b05188d9a4256b906e5dcf8327c2a3c9dd#3b4312b05188d9a4256b906e5dcf8327c2a3c9dd"
 dependencies = [
  "bincode",
  "lazy_static",
