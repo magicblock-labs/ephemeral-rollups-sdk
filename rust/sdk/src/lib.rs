@@ -11,7 +11,7 @@ pub mod types;
 pub mod utils;
 
 pub use magicblock_program::args::{
-    ActionArgs, CommitAndUndelegateArgs, CommitTypeArgs, L1ActionArgs, MagicL1MessageArgs,
+    ActionArgs, CommitAndUndelegateArgs, CommitTypeArgs, BaseActionArgs, MagicBaseIntentArgs,
     UndelegateTypeArgs,
 };
 

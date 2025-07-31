@@ -1992,7 +1992,7 @@ dependencies = [
 [[package]]
 name = "magicblock-core"
 version = "0.1.2"
-source = "git+https://github.com/magicblock-labs/magicblock-validator.git?rev=3b4312b05188d9a4256b906e5dcf8327c2a3c9dd#3b4312b05188d9a4256b906e5dcf8327c2a3c9dd"
+source = "git+https://github.com/magicblock-labs/magicblock-validator.git?rev=aed2b895daf720507ded57d63b277b0e95435f10#aed2b895daf720507ded57d63b277b0e95435f10"
 dependencies = [
  "solana-sdk",
 ]
@@ -2016,7 +2016,7 @@ dependencies = [
 [[package]]
 name = "magicblock-metrics"
 version = "0.1.2"
-source = "git+https://github.com/magicblock-labs/magicblock-validator.git?rev=3b4312b05188d9a4256b906e5dcf8327c2a3c9dd#3b4312b05188d9a4256b906e5dcf8327c2a3c9dd"
+source = "git+https://github.com/magicblock-labs/magicblock-validator.git?rev=aed2b895daf720507ded57d63b277b0e95435f10#aed2b895daf720507ded57d63b277b0e95435f10"
 dependencies = [
  "http-body-util",
  "hyper 1.6.0",
@@ -2031,7 +2031,7 @@ dependencies = [
 [[package]]
 name = "magicblock-program"
 version = "0.1.2"
-source = "git+https://github.com/magicblock-labs/magicblock-validator.git?rev=3b4312b05188d9a4256b906e5dcf8327c2a3c9dd#3b4312b05188d9a4256b906e5dcf8327c2a3c9dd"
+source = "git+https://github.com/magicblock-labs/magicblock-validator.git?rev=aed2b895daf720507ded57d63b277b0e95435f10#aed2b895daf720507ded57d63b277b0e95435f10"
 dependencies = [
  "bincode",
  "lazy_static",

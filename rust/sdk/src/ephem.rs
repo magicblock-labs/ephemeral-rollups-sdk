@@ -1,6 +1,6 @@
 use crate::ephem::utils::accounts_to_indices;
 use magicblock_program::args::{
-    ActionArgs, CommitAndUndelegateArgs, CommitTypeArgs, L1ActionArgs, MagicL1MessageArgs,
+    ActionArgs, CommitAndUndelegateArgs, CommitTypeArgs, BaseActionArgs, MagicBaseIntentArgs,
     UndelegateTypeArgs,
 };
 use magicblock_program::magicblock_instruction::MagicBlockInstruction;
@@ -47,7 +47,7 @@ impl<'info> MagicInstructionBuilder<'info> {
             all_accounts,
             Instruction::new_with_bincode(
                 *self.magic_program.key,
-                &MagicBlockInstruction::ScheduleL1Message(args),
+                &MagicBlockInstruction::ScheduleBaseIntent(args),
                 accounts_meta,
             ),
         )
@@ -62,7 +62,7 @@ impl<'info> MagicInstructionBuilder<'info> {
 
 /// Action that user wants to perform on base layer
 pub enum MagicAction<'info> {
-    L1Actions(Vec<CallHandler<'info>>),
+    BaseActions(Vec<CallHandler<'info>>),
     Commit(CommitType<'info>),
     CommitAndUndelegate(CommitAndUndelegate<'info>),
 }
@@ -72,7 +72,7 @@ impl<'info> MagicAction<'info> {
     /// TODO: could be &mut Vec<&'a AccountInfo<'info>>
     fn collect_accounts(&self, accounts_container: &mut Vec<AccountInfo<'info>>) {
         match self {
-            MagicAction::L1Actions(call_handlers) => call_handlers
+            MagicAction::BaseActions(call_handlers) => call_handlers
                 .iter()
                 .for_each(|call_handler| call_handler.collect_accounts(accounts_container)),
             MagicAction::Commit(commit_type) => commit_type.collect_accounts(accounts_container),
@@ -83,24 +83,24 @@ impl<'info> MagicAction<'info> {
     }
 
     /// Creates argument for CPI
-    fn build_args(&self, indices_map: &HashMap<Pubkey, u8>) -> MagicL1MessageArgs {
+    fn build_args(&self, indices_map: &HashMap<Pubkey, u8>) -> MagicBaseIntentArgs {
         match self {
-            MagicAction::L1Actions(call_handlers) => {
+            MagicAction::BaseActions(call_handlers) => {
                 let call_handlers_args = call_handlers
                     .iter()
                     .map(|call_handler| call_handler.to_args(indices_map))
                     .collect();
-                MagicL1MessageArgs::L1Actions(call_handlers_args)
+                MagicBaseIntentArgs::BaseActions(call_handlers_args)
             }
-            MagicAction::Commit(value) => MagicL1MessageArgs::Commit(value.to_args(indices_map)),
+            MagicAction::Commit(value) => MagicBaseIntentArgs::Commit(value.to_args(indices_map)),
             MagicAction::CommitAndUndelegate(value) => {
-                MagicL1MessageArgs::CommitAndUndelegate(value.to_args(indices_map))
+                MagicBaseIntentArgs::CommitAndUndelegate(value.to_args(indices_map))
             }
         }
     }
 }
 
-/// Type of commit , can be whether standalone or with some custom actions on L1 post commit
+/// Type of commit , can be whether standalone or with some custom actions on Base layer post commit
 pub enum CommitType<'info> {
     /// Regular commit without actions
     Standalone(Vec<AccountInfo<'info>>), // accounts to commit
@@ -152,16 +152,16 @@ impl<'info> CommitType<'info> {
                     .iter()
                     .map(|call_handler| call_handler.to_args(indices_map))
                     .collect();
-                CommitTypeArgs::WithL1Actions {
+                CommitTypeArgs::WithBaseActions {
                     committed_accounts: commited_accounts_indices,
-                    l1_actions: call_handlers_args,
+                    base_actions: call_handlers_args,
                 }
             }
         }
     }
 }
 
-/// Type of undelegate, can be whether standalone or with some custom actions on L1 post commit
+/// Type of undelegate, can be whether standalone or with some custom actions on Base layer post commit
 /// No CommitedAccounts since it is only used with CommitAction.
 pub enum UndelegateType<'info> {
     Standalone,
@@ -186,8 +186,8 @@ impl<'info> UndelegateType<'info> {
                     .iter()
                     .map(|call_handler| call_handler.to_args(indices_map))
                     .collect();
-                UndelegateTypeArgs::WithL1Actions {
-                    l1_actions: call_handlers_args,
+                UndelegateTypeArgs::WithBaseActions {
+                    base_actions: call_handlers_args,
                 }
             }
         }
@@ -230,7 +230,7 @@ impl<'info> CallHandler<'info> {
         container.extend(self.accounts.clone())
     }
 
-    fn to_args(&self, indices_map: &HashMap<Pubkey, u8>) -> L1ActionArgs {
+    fn to_args(&self, indices_map: &HashMap<Pubkey, u8>) -> BaseActionArgs {
         let destination_program_index = indices_map
             .get(self.destination_program.key)
             .expect(EXPECTED_KEY_MSG);
@@ -239,7 +239,7 @@ impl<'info> CallHandler<'info> {
             .get(self.escrow_authority.key)
             .expect(EXPECTED_KEY_MSG);
 
-        L1ActionArgs {
+        BaseActionArgs {
             args: self.args.clone(),
             compute_units: self.compute_untis,
             destination_program: *destination_program_index,
