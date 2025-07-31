@@ -8,14 +8,14 @@ use pinocchio::{
 use crate::{consts::DELEGATION_PROGRAM_ID, types::DelegateAccountArgs};
 
 #[inline(always)]
-pub fn get_seeds<'a>(seeds_vec: Vec<&'a [u8]>) -> Result<Vec<Seed<'a>>, ProgramError> {
-    let mut seeds: Vec<Seed<'a>> = Vec::with_capacity(seeds_vec.len() + 1);
+pub fn get_seeds<'a>(seeds: &[&'a [u8]]) -> Result<Vec<Seed<'a>>, ProgramError> {
+    let mut seeds_vec: Vec<Seed<'a>> = Vec::with_capacity(seeds.len() + 1);
 
-    for seed in seeds_vec {
-        seeds.push(Seed::from(seed));
+    for seed in seeds {
+        seeds_vec.push(Seed::from(*seed));
     }
 
-    Ok(seeds)
+    Ok(seeds_vec)
 }
 
 pub fn close_pda_acc(
@@ -48,7 +48,7 @@ pub fn cpi_delegate(
     delegate_args: DelegateAccountArgs,
     signer_seeds: Signer<'_, '_>,
 ) -> Result<(), ProgramError> {
-    let account_metas = vec![
+    let account_metas = [
         AccountMeta::new(payer.key(), true, true),
         AccountMeta::new(pda_acc.key(), true, false),
         AccountMeta::readonly(owner_program.key()),
@@ -64,10 +64,14 @@ pub fn cpi_delegate(
         .map_err(|_op| ProgramError::BorshIoError)?;
     data.extend_from_slice(&serialized_seeds);
 
+    drop(serialized_seeds);
+
+    let data_slice = data.as_slice();
+
     let instruction = Instruction {
         program_id: &DELEGATION_PROGRAM_ID,
         accounts: &account_metas,
-        data: &data,
+        data: &data_slice,
     };
 
     let acc_infos = [
@@ -89,11 +93,11 @@ pub fn create_schedule_commit_ix<'a>(
     account_infos: &'a [AccountInfo],
     magic_context: &'a AccountInfo,
     allow_undelegation: bool,
-) -> (Vec<u8>, Vec<AccountMeta<'a>>) {
-    let instruction_data: Vec<u8> = if allow_undelegation {
-        vec![2, 0, 0, 0]
+) -> ([u8; 4], Vec<AccountMeta<'a>>) {
+    let instruction_data: [u8; 4] = if allow_undelegation {
+        [2, 0, 0, 0]
     } else {
-        vec![1, 0, 0, 0]
+        [1, 0, 0, 0]
     };
     let mut account_metas = vec![
         AccountMeta::new(payer.key(), true, true),
