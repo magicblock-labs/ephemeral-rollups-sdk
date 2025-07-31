@@ -36,14 +36,10 @@ pub fn delegate_account(
     let (_, delegate_account_bump) = find_program_address(pda_seeds, owner_program.key());
     let (_, buffer_pda_bump) = find_program_address(buffer_seeds, owner_program.key());
 
-    #[allow(clippy::iter_cloned_collect)]
-    let seeds_vec: Vec<&[u8]> = pda_seeds.iter().copied().collect();
-    let delegate_pda_seeds: Vec<Vec<u8>> = pda_seeds.iter().map(|&s| s.to_vec()).collect();
-
     //Get Delegated Pda Signer Seeds
     let binding = &[delegate_account_bump];
     let delegate_bump = Seed::from(binding);
-    let mut delegate_seeds = get_seeds(seeds_vec)?;
+    let mut delegate_seeds = get_seeds(pda_seeds)?;
     delegate_seeds.extend_from_slice(&[delegate_bump]);
     let delegate_signer_seeds = Signer::from(delegate_seeds.as_slice());
 
@@ -69,8 +65,8 @@ pub fn delegate_account(
 
     // Copy the data to the buffer PDA
     let mut buffer_data = buffer_acc.try_borrow_mut_data()?;
-    let new_data = pda_acc.try_borrow_data()?.to_vec().clone();
-    (*buffer_data).copy_from_slice(&new_data);
+    let new_data = pda_acc.try_borrow_data()?;
+    buffer_data.copy_from_slice(new_data.as_ref());
     drop(buffer_data);
 
     //Close Delegate PDA in preparation for CPI Delegate
@@ -89,7 +85,7 @@ pub fn delegate_account(
     //Prepare delegate args
     let delegate_args = DelegateAccountArgs {
         commit_frequency_ms: config.commit_frequency_ms,
-        seeds: delegate_pda_seeds,
+        seeds: pda_seeds,
         validator: config.validator,
     };
 
