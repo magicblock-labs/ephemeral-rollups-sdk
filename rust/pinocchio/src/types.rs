@@ -2,23 +2,23 @@ use pinocchio::program_error::ProgramError;
 use pinocchio::pubkey::Pubkey;
 
 #[derive(Debug)]
-pub struct DelegateAccountArgs {
+pub struct DelegateAccountArgs<'a> {
     pub commit_frequency_ms: u32,
-    pub seeds: Vec<Vec<u8>>,
+    pub seeds: &'a [&'a [u8]],
     pub validator: Option<Pubkey>,
 }
 
-impl Default for DelegateAccountArgs {
+impl<'a> Default for DelegateAccountArgs<'a> {
     fn default() -> Self {
         DelegateAccountArgs {
             commit_frequency_ms: u32::MAX,
-            seeds: vec![],
+            seeds: &[],
             validator: None,
         }
     }
 }
 
-impl DelegateAccountArgs {
+impl<'a> DelegateAccountArgs<'a> {
     pub fn try_to_vec(&self) -> Result<Vec<u8>, ProgramError> {
         let mut data_vec = Vec::new();
 
@@ -27,9 +27,9 @@ impl DelegateAccountArgs {
 
         //Serialize seeds
         data_vec.extend(&(self.seeds.len() as u32).to_le_bytes());
-        for seed in &self.seeds {
+        for seed in self.seeds {
             data_vec.extend(&(seed.len() as u32).to_le_bytes());
-            data_vec.extend(seed);
+            data_vec.extend(*seed);
         }
         // Serialize validator
         match &self.validator {
