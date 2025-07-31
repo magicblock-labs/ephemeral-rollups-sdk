@@ -6,7 +6,7 @@ use pinocchio::{
 use crate::utils::create_schedule_commit_ix;
 
 pub fn commit_and_undelegate_accounts(accounts: &[AccountInfo]) -> ProgramResult {
-    let [payer, magic_context, magic_program, rest @ ..] = accounts else {
+    let [magic_context, payer, magic_program, rest @ ..] = accounts else {
         return Err(ProgramError::NotEnoughAccountKeys);
     };
 
@@ -17,9 +17,15 @@ pub fn commit_and_undelegate_accounts(accounts: &[AccountInfo]) -> ProgramResult
         accounts: &ix_accounts,
     };
 
-    let mut all_accounts: Vec<&AccountInfo> = vec![payer, magic_context];
-    all_accounts.extend(rest.iter());
-    //Invoke demands a fixed-sized array so we use slice_invoke
-    slice_invoke(&ix, all_accounts.as_slice())?;
+    let accounts_for_execute = &accounts[1..];
+
+    let account_refs: &[&AccountInfo] = unsafe {
+        std::slice::from_raw_parts(
+            accounts_for_execute.as_ptr() as *const &AccountInfo,
+            accounts_for_execute.len()
+        )
+    };
+
+    slice_invoke(&ix, account_refs)?;
     Ok(())
 }
