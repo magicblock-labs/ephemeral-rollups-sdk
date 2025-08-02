@@ -1,5 +1,13 @@
+use pinocchio::{pubkey::Pubkey, 
+    program_error::ProgramError,
+    pubkey::{MAX_SEED_LEN, MAX_SEEDS},
+};
+use std::mem::size_of;
 
-use pinocchio::pubkey::Pubkey;
+pub const MAX_DELEGATE_ACCOUNT_ARGS_SIZE: usize = size_of::<u32>() // commit_frequency_ms
+    + size_of::<u32>() // seeds length
+    + MAX_SEEDS * (size_of::<u32>() + MAX_SEED_LEN) // seeds
+    + 1 + size_of::<Pubkey>(); // validator
 
 #[derive(Debug)]
 pub struct DelegateAccountArgs<'a> {
@@ -14,6 +22,57 @@ impl<'a> Default for DelegateAccountArgs<'a> {
             commit_frequency_ms: u32::MAX,
             seeds: &[],
             validator: None,
+        }
+    }
+}
+
+impl<'a> DelegateAccountArgs<'a> {
+    pub fn try_to_slice(&self) -> Result<&[u8], ProgramError> {
+        if self.seeds.len() >= MAX_SEEDS {
+            return Err(ProgramError::InvalidArgument);
+        }
+        
+        for seed in self.seeds {
+            if seed.len() > MAX_SEED_LEN {
+                return Err(ProgramError::InvalidArgument);
+            }
+        }
+
+        let mut data = [0u8; MAX_DELEGATE_ACCOUNT_ARGS_SIZE];
+        let mut offset = 0;
+
+        // Serialize commit_frequency_ms (4 bytes)
+        data[offset..offset + 4].copy_from_slice(&self.commit_frequency_ms.to_le_bytes());
+        offset += 4;
+
+        // Serialize seeds length (4 bytes)
+        data[offset..offset + 4].copy_from_slice(&(self.seeds.len() as u32).to_le_bytes());
+        offset += 4;
+
+        // Serialize each seed
+        for seed in self.seeds {
+            data[offset..offset + 4].copy_from_slice(&(seed.len() as u32).to_le_bytes());
+            offset += 4;
+            data[offset..offset + seed.len()].copy_from_slice(seed);
+            offset += seed.len();
+        }
+
+        match &self.validator {
+            Some(pubkey) => {
+                data[offset] = 1;
+                offset += 1;
+                data[offset..offset + 32].copy_from_slice(pubkey.as_ref());
+                offset += 32;
+            }
+            None => {
+                data[offset] = 0;
+                offset += 1;
+            }
+        }
+
+        unsafe {
+            // SAFETY: offset <= MAX_DELEGATE_ACCOUNT_ARGS_SIZE and we've written to data[..offset]
+            Ok(core::slice::from_raw_parts(data.as_ptr(), offset))
         }
     }
 }
