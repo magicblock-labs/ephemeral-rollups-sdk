@@ -4,9 +4,11 @@ use pinocchio::{
     program_error::ProgramError,
     pubkey::find_program_address,
     sysvars::{rent::Rent, Sysvar},
+    cpi::MAX_CPI_ACCOUNTS,
     ProgramResult,
 };
 use pinocchio_system::instructions::CreateAccount;
+use core::mem::MaybeUninit;
 
 use crate::{
     consts::{BUFFER, DELEGATION_PROGRAM_ID},
@@ -39,10 +41,32 @@ pub fn delegate_account(
     //Get Delegated Pda Signer Seeds
     let binding = &[delegate_account_bump];
     let delegate_bump = Seed::from(binding);
-    let mut delegate_seeds = get_seeds(pda_seeds)?;
-    delegate_seeds.extend_from_slice(&[delegate_bump]);
-    let delegate_signer_seeds = Signer::from(delegate_seeds.as_slice());
+    let delegate_seeds = get_seeds(pda_seeds)?;
+    
+    let num_seeds = delegate_seeds.len() + 1;
+    if num_seeds > MAX_CPI_ACCOUNTS {
+        return Err(ProgramError::InvalidArgument);
+    }
+    
+    const UNINIT_SEED: MaybeUninit<Seed> = MaybeUninit::<Seed>::uninit();
+    let mut combined_seeds = [UNINIT_SEED; MAX_CPI_ACCOUNTS];
+    
+    unsafe {
+        for i in 0..num_seeds - 1 {
+            let seed = delegate_seeds.get_unchecked(i);
+            combined_seeds.get_unchecked_mut(i).write(Seed::from(seed.as_ref()));
+        }
 
+        combined_seeds.get_unchecked_mut(num_seeds - 1).write(delegate_bump);
+    }
+    
+    let all_delegate_seeds = unsafe {
+        core::slice::from_raw_parts(combined_seeds.as_ptr() as *const Seed, num_seeds)
+    };
+    
+    let delegate_signer_seeds = Signer::from(all_delegate_seeds);
+
+    
     //Get Buffer signer seeds
     let bump = [buffer_pda_bump];
     let seed_b = [
