@@ -20,7 +20,8 @@ pub fn undelegate(accounts: &[AccountInfo], account_signer_seeds: &[&[u8]]) -> P
     }
 
     //Find delegate
-    let (_, delegate_account_bump) = find_program_address(account_signer_seeds, &DELEGATION_PROGRAM_ID);
+    let (_, delegate_account_bump) =
+        find_program_address(account_signer_seeds, &DELEGATION_PROGRAM_ID);
 
     //Get Delegated Pda Signer Seeds
     let delegate_account_bump_binding = &[delegate_account_bump];

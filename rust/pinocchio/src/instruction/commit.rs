@@ -3,7 +3,7 @@ use pinocchio::{
     program_error::ProgramError, ProgramResult,
 };
 
-use crate::utils::create_schedule_commit_ix;
+use crate::utils::{concate_accounts_with_remaining_accounts, create_schedule_commit_ix};
 
 pub fn commit_accounts(accounts: &[AccountInfo]) -> ProgramResult {
     let [payer, magic_context, magic_program, rest @ ..] = accounts else {
@@ -17,9 +17,8 @@ pub fn commit_accounts(accounts: &[AccountInfo]) -> ProgramResult {
         accounts: &ix_accounts,
     };
 
-    let mut all_accounts: Vec<&AccountInfo> = vec![payer, magic_context];
-    all_accounts.extend(rest.iter());
+    let all_accounts = concate_accounts_with_remaining_accounts(&[payer, magic_context], rest)?;
     //Invoke demands a fixed-sized array so we use slice_invoke
-    slice_invoke(&ix, all_accounts.as_slice())?;
+    slice_invoke(&ix, all_accounts)?;
     Ok(())
 }

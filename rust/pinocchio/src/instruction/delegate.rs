@@ -1,34 +1,28 @@
 use pinocchio::{
     account_info::AccountInfo,
-    instruction::{ Seed, Signer },
+    instruction::{Seed, Signer},
     program_error::ProgramError,
     pubkey::find_program_address,
     seeds,
-    sysvars::{ rent::Rent, Sysvar },
+    sysvars::{rent::Rent, Sysvar},
     ProgramResult,
 };
 use pinocchio_system::instructions::CreateAccount;
 
 use crate::{
-    consts::{ BUFFER, DELEGATION_PROGRAM_ID },
-    types::{ DelegateAccountArgs, DelegateConfig },
-    utils::{ close_pda_acc, cpi_delegate },
+    consts::{BUFFER, DELEGATION_PROGRAM_ID},
+    types::{DelegateAccountArgs, DelegateConfig},
+    utils::{close_pda_acc, cpi_delegate},
 };
 
 pub fn delegate_account(
     accounts: &[AccountInfo],
     pda_seeds: &[&[u8]],
-    config: DelegateConfig
+    config: DelegateConfig,
 ) -> ProgramResult {
-    let [
-        payer,
-        pda_acc,
-        owner_program,
-        buffer_acc,
-        delegation_record,
-        delegation_metadata,
-        system_program,
-    ] = accounts else {
+    let [payer, pda_acc, owner_program, buffer_acc, delegation_record, delegation_metadata, system_program] =
+        accounts
+    else {
         return Err(ProgramError::NotEnoughAccountKeys);
     };
 
@@ -64,7 +58,8 @@ pub fn delegate_account(
         lamports: Rent::get()?.minimum_balance(pda_acc.data_len()),
         space: pda_acc.data_len() as u64, //PDA acc length
         owner: owner_program.key(),
-    }).invoke_signed(&[buffer_signer_seeds])?;
+    })
+    .invoke_signed(&[buffer_signer_seeds])?;
 
     // Copy the data to the buffer PDA
     let mut buffer_data = buffer_acc.try_borrow_mut_data()?;
@@ -82,7 +77,8 @@ pub fn delegate_account(
         lamports: Rent::get()?.minimum_balance(buffer_acc.data_len()),
         space: buffer_acc.data_len() as u64, //PDA acc length
         owner: &DELEGATION_PROGRAM_ID,
-    }).invoke_signed(&[delegate_signer_seeds.clone()])?;
+    })
+    .invoke_signed(&[delegate_signer_seeds.clone()])?;
 
     //Prepare delegate args
     let delegate_args = DelegateAccountArgs {
@@ -100,7 +96,7 @@ pub fn delegate_account(
         delegation_metadata,
         system_program,
         delegate_args,
-        delegate_signer_seeds
+        delegate_signer_seeds,
     )?;
 
     close_pda_acc(payer, buffer_acc, system_program)?;
