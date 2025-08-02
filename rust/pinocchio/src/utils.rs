@@ -90,15 +90,14 @@ pub fn cpi_delegate(
         account_metas.get_unchecked_mut(6).write(AccountMeta::readonly(system_program.key()));
     }
     
-    let data = [0u8; 8];
-    let data_len = 8;
+    let data = delegate_args.try_to_slice()?;
 
     let instruction = Instruction {
         program_id: &DELEGATION_PROGRAM_ID,
         accounts: unsafe {
             core::slice::from_raw_parts(account_metas.as_ptr() as *const AccountMeta, num_accounts)
         },
-        data: &data[..data_len],
+        data,
     };
 
     let acc_infos = [
