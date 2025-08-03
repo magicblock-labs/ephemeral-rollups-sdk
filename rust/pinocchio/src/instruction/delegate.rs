@@ -12,7 +12,7 @@ use pinocchio_system::instructions::CreateAccount;
 use crate::{
     consts::{BUFFER, DELEGATION_PROGRAM_ID},
     types::{DelegateAccountArgs, DelegateConfig},
-    utils::{close_pda_acc, cpi_delegate},
+    utils::{close_pda_acc, cpi_delegate, Seeds},
 };
 
 pub fn delegate_account(
@@ -39,11 +39,9 @@ pub fn delegate_account(
 
     //Get Delegated Pda Signer Seeds
     let delegate_account_bump_binding = &[delegate_account_bump];
-    let delegate_seeds = [pda_seeds, &[delegate_account_bump_binding]]
-        .concat()
-        .iter()
-        .map(|s| Seed::from(*s))
-        .collect::<Vec<Seed>>();
+    let delegate_seeds = [pda_seeds, &[delegate_account_bump_binding]].concat();
+    let delegate_seeds =
+        Seeds::try_from(delegate_seeds.as_slice()).map_err(|_| ProgramError::InvalidArgument)?;
     let delegate_signer_seeds = Signer::from(delegate_seeds.as_slice());
 
     //Get Buffer signer seeds
