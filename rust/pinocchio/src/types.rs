@@ -1,5 +1,10 @@
 use pinocchio::program_error::ProgramError;
-use pinocchio::pubkey::Pubkey;
+use pinocchio::pubkey::{Pubkey, MAX_SEEDS, MAX_SEED_LEN};
+
+pub const MAX_DELEGATE_ACCOUNT_ARGS_SIZE: usize = size_of::<u32>() // commit_frequency_ms
+    + size_of::<u32>() // seeds length
+    + MAX_SEEDS * (size_of::<u32>() + MAX_SEED_LEN) // seeds
+    + 1 + size_of::<Pubkey>(); // validator
 
 #[derive(Debug)]
 pub struct DelegateAccountArgs<'a> {
@@ -19,33 +24,52 @@ impl Default for DelegateAccountArgs<'_> {
 }
 
 impl<'a> DelegateAccountArgs<'a> {
-    pub fn try_to_serialize(&self) -> Result<Vec<u8>, ProgramError> {
-        let mut data_vec = Vec::new();
+    pub fn try_to_serialize(&self) -> Result<&[u8], ProgramError> {
+        if self.seeds.len() >= MAX_SEEDS {
+            return Err(ProgramError::InvalidArgument);
+        }
 
-        // Serialize commit_frequency_ms
-        data_vec.extend_from_slice(&self.commit_frequency_ms.to_le_bytes());
+        for seed in self.seeds {
+            if seed.len() > MAX_SEED_LEN {
+                return Err(ProgramError::InvalidArgument);
+            }
+        }
 
-        // Serialize seeds count
-        data_vec.extend_from_slice(&(self.seeds.len() as u32).to_le_bytes());
+        let mut data = [0u8; MAX_DELEGATE_ACCOUNT_ARGS_SIZE];
+        let mut offset = 0;
+
+        // Serialize commit_frequency_ms (4 bytes)
+        data[offset..offset + 4].copy_from_slice(&self.commit_frequency_ms.to_le_bytes());
+        offset += 4;
+
+        // Serialize seeds length (4 bytes)
+        data[offset..offset + 4].copy_from_slice(&(self.seeds.len() as u32).to_le_bytes());
+        offset += 4;
 
         // Serialize each seed
         for seed in self.seeds {
-            data_vec.extend_from_slice(&(seed.len() as u32).to_le_bytes());
-            data_vec.extend_from_slice(seed);
+            data[offset..offset + 4].copy_from_slice(&(seed.len() as u32).to_le_bytes());
+            offset += 4;
+            data[offset..offset + seed.len()].copy_from_slice(seed);
+            offset += seed.len();
         }
 
-        // Serialize validator
         match &self.validator {
             Some(pubkey) => {
-                data_vec.push(1);
-                data_vec.extend_from_slice(pubkey.as_ref());
+                data[offset] = 1;
+                offset += 1;
+                data[offset..offset + 32].copy_from_slice(pubkey.as_ref());
+                offset += 32;
             }
             None => {
-                data_vec.push(0);
+                data[offset] = 0;
+                offset += 1;
             }
         }
-
-        Ok(data_vec)
+        unsafe {
+            // SAFETY: offset <= MAX_DELEGATE_ACCOUNT_ARGS_SIZE and we've written to data[..offset]
+            Ok(core::slice::from_raw_parts(data.as_ptr(), offset))
+        }
     }
 }
 

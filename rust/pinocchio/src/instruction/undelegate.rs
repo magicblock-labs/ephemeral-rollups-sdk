@@ -1,6 +1,6 @@
 use pinocchio::{
     account_info::AccountInfo,
-    instruction::{Seed, Signer},
+    instruction::Signer,
     program_error::ProgramError,
     pubkey::find_program_address,
     sysvars::{rent::Rent, Sysvar},
@@ -8,7 +8,7 @@ use pinocchio::{
 };
 use pinocchio_system::instructions::CreateAccount;
 
-use crate::consts::DELEGATION_PROGRAM_ID;
+use crate::{consts::DELEGATION_PROGRAM_ID, utils::Seeds};
 
 pub fn undelegate(accounts: &[AccountInfo], account_signer_seeds: &[&[u8]]) -> ProgramResult {
     let [payer, delegated_acc, owner_program, buffer_acc, _system_program] = accounts else {
@@ -25,11 +25,9 @@ pub fn undelegate(accounts: &[AccountInfo], account_signer_seeds: &[&[u8]]) -> P
 
     //Get Delegated Pda Signer Seeds
     let delegate_account_bump_binding = &[delegate_account_bump];
-    let delegate_seeds = [account_signer_seeds, &[delegate_account_bump_binding]]
-        .concat()
-        .iter()
-        .map(|s| Seed::from(*s))
-        .collect::<Vec<Seed>>();
+    let delegate_seeds = [account_signer_seeds, &[delegate_account_bump_binding]].concat();
+    let delegate_seeds =
+        Seeds::try_from(delegate_seeds.as_slice()).map_err(|_| ProgramError::InvalidArgument)?;
     let delegate_signer_seeds = Signer::from(delegate_seeds.as_slice());
 
     //Create the original PDA Account Delegated
@@ -44,7 +42,7 @@ pub fn undelegate(accounts: &[AccountInfo], account_signer_seeds: &[&[u8]]) -> P
 
     let mut data = delegated_acc.try_borrow_mut_data()?;
     let buffer_data = buffer_acc.try_borrow_data()?;
-    (*data).copy_from_slice(&buffer_data);
+    data.copy_from_slice(&buffer_data);
 
     Ok(())
 }

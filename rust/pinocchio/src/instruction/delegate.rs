@@ -64,7 +64,7 @@ pub fn delegate_account(
     // Copy the data to the buffer PDA
     let mut buffer_data = buffer_acc.try_borrow_mut_data()?;
     let new_data = pda_acc.try_borrow_data()?;
-    (*buffer_data).copy_from_slice(&new_data);
+    buffer_data.copy_from_slice(&new_data);
     drop(buffer_data);
 
     //Close Delegate PDA in preparation for CPI Delegate

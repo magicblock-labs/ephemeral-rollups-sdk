@@ -1,13 +1,59 @@
 use std::mem::MaybeUninit;
+use std::ops::Deref;
 
 use pinocchio::{
     account_info::AccountInfo,
     cpi::{invoke_signed, MAX_CPI_ACCOUNTS},
-    instruction::{AccountMeta, Instruction, Signer},
+    instruction::{AccountMeta, Instruction, Seed, Signer},
     program_error::ProgramError,
 };
 
 use crate::{consts::DELEGATION_PROGRAM_ID, types::DelegateAccountArgs};
+
+pub struct Seeds<'a>(&'a [Seed<'a>]);
+
+impl<'a> Seeds<'a> {
+    /// Returns the inner slice of seeds
+    pub fn as_slice(&self) -> &'a [Seed<'a>] {
+        self.0
+    }
+}
+
+impl<'a> Deref for Seeds<'a> {
+    type Target = [Seed<'a>];
+
+    fn deref(&self) -> &Self::Target {
+        self.0
+    }
+}
+
+impl<'a> TryFrom<&'a [&[u8]]> for Seeds<'a> {
+    type Error = ProgramError;
+
+    fn try_from(seeds_array: &'a [&[u8]]) -> Result<Self, Self::Error> {
+        let seeds_len = seeds_array.len();
+        if seeds_len >= MAX_CPI_ACCOUNTS {
+            return Err(ProgramError::InvalidArgument);
+        }
+
+        let mut seeds: [MaybeUninit<Seed<'a>>; MAX_CPI_ACCOUNTS] =
+            [const { MaybeUninit::uninit() }; MAX_CPI_ACCOUNTS];
+
+        for i in 0..seeds_len {
+            // SAFETY: The number of seeds has been validated to be less than
+            // `MAX_CPI_ACCOUNTS`.
+            unsafe {
+                let seed = seeds_array.get_unchecked(i).as_ref();
+                seeds.get_unchecked_mut(i).write(Seed::from(seed));
+            }
+        }
+
+        // SAFETY: The seeds have been validated.
+        Ok(Seeds(unsafe {
+            std::slice::from_raw_parts(seeds.as_ptr() as *const Seed<'a>, seeds_len)
+        }))
+    }
+}
 
 pub fn close_pda_acc(
     payer: &AccountInfo,
@@ -82,22 +128,43 @@ pub fn create_schedule_commit_ix<'a>(
     account_infos: &'a [AccountInfo],
     magic_context: &'a AccountInfo,
     allow_undelegation: bool,
-) -> ([u8; 4], Vec<AccountMeta<'a>>) {
+) -> Result<([u8; 4], &'a [AccountMeta<'a>]), ProgramError> {
+    let num_accounts = 2 + account_infos.len(); // 2 for payer and magic_context
+
+    if num_accounts > MAX_CPI_ACCOUNTS {
+        return Err(ProgramError::InvalidArgument);
+    }
+
     let instruction_data = if allow_undelegation {
         [2, 0, 0, 0]
     } else {
         [1, 0, 0, 0]
     };
-    let mut account_metas = vec![
-        AccountMeta::new(payer.key(), true, true),
-        AccountMeta::new(magic_context.key(), true, false),
-    ];
-    account_metas.extend(
-        account_infos
-            .iter()
-            .map(|acc| AccountMeta::new(acc.key(), true, true)),
-    );
-    (instruction_data, account_metas)
+    const UNINIT_META: MaybeUninit<AccountMeta> = MaybeUninit::<AccountMeta>::uninit();
+    let mut account_metas = [UNINIT_META; MAX_CPI_ACCOUNTS];
+
+    unsafe {
+        // SAFETY: num_accounts <= MAX_CPI_ACCOUNTS
+        account_metas
+            .get_unchecked_mut(0)
+            .write(AccountMeta::new(payer.key(), true, true));
+        account_metas.get_unchecked_mut(1).write(AccountMeta::new(
+            magic_context.key(),
+            true,
+            false,
+        ));
+
+        for i in 0..account_infos.len() {
+            let account = account_infos.get_unchecked(i);
+            account_metas
+                .get_unchecked_mut(2 + i)
+                .write(AccountMeta::new(account.key(), true, true));
+        }
+    }
+
+    Ok((instruction_data, unsafe {
+        core::slice::from_raw_parts(account_metas.as_ptr() as *const AccountMeta, num_accounts)
+    }))
 }
 
 pub fn concate_accounts_with_remaining_accounts<'a, T>(
@@ -116,29 +183,33 @@ pub fn concate_accounts_with_remaining_accounts<'a, T>(
 
     let mut accounts: [MaybeUninit<&T>; MAX_CPI_ACCOUNTS] =
         [const { MaybeUninit::uninit() }; MAX_CPI_ACCOUNTS];
-    let mut len = 0;
+    let mut accounts_offset = 0;
 
-    for account_info in account_infos.iter() {
+    for i in 0..account_infos.len() {
         // SAFETY: The number of accounts has been validated to be less than
         // `MAX_CPI_ACCOUNTS`.
         unsafe {
-            accounts.get_unchecked_mut(len).write(account_info);
+            accounts
+                .get_unchecked_mut(accounts_offset)
+                .write(account_infos.get_unchecked(i));
         }
 
-        len += 1;
+        accounts_offset += 1;
     }
 
-    for account_info in remaining_accounts.iter() {
+    for i in 0..remaining_accounts.len() {
         // SAFETY: The number of accounts has been validated to be less than
         // `MAX_CPI_ACCOUNTS`.
         unsafe {
-            accounts.get_unchecked_mut(len).write(account_info);
+            accounts
+                .get_unchecked_mut(accounts_offset)
+                .write(remaining_accounts.get_unchecked(i));
         }
 
-        len += 1;
+        accounts_offset += 1;
     }
     // SAFETY: The accounts have been validated.
-    Ok(unsafe { std::slice::from_raw_parts(accounts.as_ptr() as *const &T, len) })
+    Ok(unsafe { std::slice::from_raw_parts(accounts.as_ptr() as *const &T, accounts_offset) })
 }
 
 #[cfg(test)]
@@ -232,6 +303,15 @@ mod tests {
     }
 
     #[test]
+    fn test_seeds_try_from() {
+        let seeds = vec![b"seed1".as_slice(), b"seed2".as_slice()];
+        let result = Seeds::try_from(seeds.as_slice()).unwrap();
+        assert_eq!(result.len(), 2);
+        assert_eq!(result[0].as_ref(), b"seed1");
+        assert_eq!(result[1].as_ref(), b"seed2");
+    }
+
+    #[test]
     fn test_close_pda_acc() {
         let payer = create_account_info_mock(
             Pubkey::from([7u8; 32]),
@@ -301,7 +381,8 @@ mod tests {
 
         let account_infos = &[account_1.clone(), account_2.clone()];
 
-        let (data, metas) = create_schedule_commit_ix(&payer, account_infos, &magic_context, true);
+        let (data, metas) =
+            create_schedule_commit_ix(&payer, account_infos, &magic_context, true).unwrap();
 
         assert_eq!(data, [2, 0, 0, 0]);
         assert_eq!(metas.len(), 4);
