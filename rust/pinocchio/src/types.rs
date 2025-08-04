@@ -1,8 +1,9 @@
-use pinocchio::{pubkey::Pubkey, 
-    program_error::ProgramError,
-    pubkey::{MAX_SEED_LEN, MAX_SEEDS},
-};
 use core::mem::size_of;
+use pinocchio::{
+    program_error::ProgramError,
+    pubkey::Pubkey,
+    pubkey::{MAX_SEEDS, MAX_SEED_LEN},
+};
 
 pub const MAX_DELEGATE_ACCOUNT_ARGS_SIZE: usize = size_of::<u32>() // commit_frequency_ms
     + size_of::<u32>() // seeds length
@@ -31,7 +32,7 @@ impl<'a> DelegateAccountArgs<'a> {
         if self.seeds.len() >= MAX_SEEDS {
             return Err(ProgramError::InvalidArgument);
         }
-        
+
         for seed in self.seeds {
             if seed.len() > MAX_SEED_LEN {
                 return Err(ProgramError::InvalidArgument);
