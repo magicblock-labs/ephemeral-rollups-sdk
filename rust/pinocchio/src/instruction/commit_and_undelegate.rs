@@ -7,7 +7,7 @@ use core::mem::MaybeUninit;
 use crate::utils::create_schedule_commit_ix;
 
 pub fn commit_and_undelegate_accounts(accounts: &[AccountInfo]) -> ProgramResult {
-    let [magic_context, payer, magic_program, rest @ ..] = accounts else {
+    let [payer, magic_context, magic_program, rest @ ..] = accounts else {
         return Err(ProgramError::NotEnoughAccountKeys);
     };
 
