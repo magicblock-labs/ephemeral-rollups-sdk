@@ -39,7 +39,7 @@ pub fn undelegate(accounts: &[AccountInfo], account_signer_seeds: &[&[u8]]) -> P
     let mut combined_seeds = [UNINIT_SEED; MAX_CPI_ACCOUNTS];
     
     unsafe {
-        for i in 0..num_seeds -1 {
+        for i in 0..num_seeds - 1 {
             let seed = delegate_seeds.get_unchecked(i);
             combined_seeds.get_unchecked_mut(i).write(Seed::from(seed.as_ref()));
         }
