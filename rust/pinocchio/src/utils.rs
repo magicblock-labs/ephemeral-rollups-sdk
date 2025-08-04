@@ -6,7 +6,7 @@ use pinocchio::{
 };
 use core::mem::MaybeUninit;
 
-use crate::{consts::DELEGATION_PROGRAM_ID, types::DelegateAccountArgs};
+use crate::{consts::DELEGATION_PROGRAM_ID, types::{DelegateAccountArgs, MAX_DELEGATE_ACCOUNT_ARGS_SIZE}};
 
 #[inline(always)]
 pub fn get_seeds<'a>(seeds_slice: &[&'a [u8]]) -> Result<&'a [Seed<'a>], ProgramError> {
@@ -89,15 +89,17 @@ pub fn cpi_delegate(
         account_metas.get_unchecked_mut(5).write(AccountMeta::readonly(delegation_metadata.key()));
         account_metas.get_unchecked_mut(6).write(AccountMeta::readonly(system_program.key()));
     }
+
+    let mut data = [0u8; MAX_DELEGATE_ACCOUNT_ARGS_SIZE];
     
-    let data = delegate_args.try_to_slice()?;
+    let serialized_data = delegate_args.try_to_slice(&mut data)?;
 
     let instruction = Instruction {
         program_id: &DELEGATION_PROGRAM_ID,
         accounts: unsafe {
             core::slice::from_raw_parts(account_metas.as_ptr() as *const AccountMeta, num_accounts)
         },
-        data,
+        data: serialized_data,
     };
 
     let acc_infos = [

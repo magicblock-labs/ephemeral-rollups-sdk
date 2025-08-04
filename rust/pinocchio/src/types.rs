@@ -2,7 +2,7 @@ use pinocchio::{pubkey::Pubkey,
     program_error::ProgramError,
     pubkey::{MAX_SEED_LEN, MAX_SEEDS},
 };
-use std::mem::size_of;
+use core::mem::size_of;
 
 pub const MAX_DELEGATE_ACCOUNT_ARGS_SIZE: usize = size_of::<u32>() // commit_frequency_ms
     + size_of::<u32>() // seeds length
@@ -27,7 +27,7 @@ impl<'a> Default for DelegateAccountArgs<'a> {
 }
 
 impl<'a> DelegateAccountArgs<'a> {
-    pub fn try_to_slice(&self) -> Result<&[u8], ProgramError> {
+    pub fn try_to_slice<'b>(&self, data: &'b mut [u8]) -> Result<&'b [u8], ProgramError> {
         if self.seeds.len() >= MAX_SEEDS {
             return Err(ProgramError::InvalidArgument);
         }
@@ -38,7 +38,10 @@ impl<'a> DelegateAccountArgs<'a> {
             }
         }
 
-        let mut data = [0u8; MAX_DELEGATE_ACCOUNT_ARGS_SIZE];
+        if data.len() != MAX_DELEGATE_ACCOUNT_ARGS_SIZE {
+            return Err(ProgramError::InvalidArgument);
+        }
+
         let mut offset = 0;
 
         // Serialize commit_frequency_ms (4 bytes)
@@ -70,10 +73,7 @@ impl<'a> DelegateAccountArgs<'a> {
             }
         }
 
-        unsafe {
-            // SAFETY: offset <= MAX_DELEGATE_ACCOUNT_ARGS_SIZE and we've written to data[..offset]
-            Ok(core::slice::from_raw_parts(data.as_ptr(), offset))
-        }
+        Ok(&data[..offset])
     }
 }
 
