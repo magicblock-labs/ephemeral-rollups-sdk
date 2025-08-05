@@ -1,9 +1,9 @@
 use crate::ephem::utils::accounts_to_indices;
-use magicblock_program::args::{
-    ActionArgs, CommitAndUndelegateArgs, CommitTypeArgs, BaseActionArgs, MagicBaseIntentArgs,
+use magicblock_core::magic_program::args::{
+    ActionArgs, BaseActionArgs, CommitAndUndelegateArgs, CommitTypeArgs, MagicBaseIntentArgs,
     UndelegateTypeArgs,
 };
-use magicblock_program::magicblock_instruction::MagicBlockInstruction;
+use magicblock_core::magic_program::instruction::MagicBlockInstruction;
 use solana_program::account_info::AccountInfo;
 use solana_program::entrypoint::ProgramResult;
 use solana_program::instruction::{AccountMeta, Instruction};

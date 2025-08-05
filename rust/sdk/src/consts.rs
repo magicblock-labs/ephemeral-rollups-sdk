@@ -2,10 +2,10 @@
 use solana_program::pubkey::Pubkey;
 
 pub use dlp::consts::*;
-use magicblock_program::MAGIC_CONTEXT_PUBKEY;
+use magicblock_core::magic_program::MAGIC_CONTEXT_PUBKEY;
 
 /// The magic program ID.
-pub const MAGIC_PROGRAM_ID: Pubkey = magicblock_program::ID;
+pub const MAGIC_PROGRAM_ID: Pubkey = magicblock_core::magic_program::ID;
 
 /// The magic context ID.
 pub const MAGIC_CONTEXT_ID: Pubkey = MAGIC_CONTEXT_PUBKEY;

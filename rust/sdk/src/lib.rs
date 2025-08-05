@@ -10,8 +10,8 @@ pub mod ephem;
 pub mod types;
 pub mod utils;
 
-pub use magicblock_program::args::{
-    ActionArgs, CommitAndUndelegateArgs, CommitTypeArgs, BaseActionArgs, MagicBaseIntentArgs,
+pub use magicblock_core::magic_program::args::{
+    ActionArgs, BaseActionArgs, CommitAndUndelegateArgs, CommitTypeArgs, MagicBaseIntentArgs,
     UndelegateTypeArgs,
 };
 

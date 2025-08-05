@@ -1,5 +1,5 @@
 use borsh::BorshSerialize;
-use dlp::delegation_record_seeds_from_delegated_account;
+use dlp::delegate_buffer_seeds_from_delegated_account;
 use solana_program::account_info::AccountInfo;
 use solana_program::entrypoint::ProgramResult;
 use solana_program::instruction::{AccountMeta, Instruction};
@@ -41,7 +41,7 @@ pub fn delegate_account<'a, 'info>(
     pda_seeds: &[&[u8]],
     config: DelegateConfig,
 ) -> ProgramResult {
-    let buffer_seeds: &[&[u8]] = delegation_record_seeds_from_delegated_account!(accounts.pda.key);
+    let buffer_seeds: &[&[u8]] = delegate_buffer_seeds_from_delegated_account!(accounts.pda.key);
 
     let (_, delegate_account_bump) =
         Pubkey::find_program_address(pda_seeds, accounts.owner_program.key);
