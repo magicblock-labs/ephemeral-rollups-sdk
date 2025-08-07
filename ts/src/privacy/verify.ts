@@ -1,4 +1,3 @@
-import init, { js_get_collateral, js_verify } from "@phala/dcap-qvl-web";
 import axios from "axios";
 
 interface QuoteResponse {
@@ -12,6 +11,13 @@ interface QuoteResponse {
  * @returns True if the quote is valid, false otherwise
  */
 export async function verifyTeeRpcIntegrity(rpcUrl: string): Promise<boolean> {
+  // Import the WASM module
+  const {
+    default: init,
+    js_get_collateral: jsGetCollateral,
+    js_verify: jsVerify,
+  } = await import("@phala/dcap-qvl-web");
+
   const challengeBytes = Buffer.from(
     Uint8Array.from(
       Array(32)
@@ -35,14 +41,14 @@ export async function verifyTeeRpcIntegrity(rpcUrl: string): Promise<boolean> {
 
   // Get the quote collateral
   const pccsUrl = "https://pccs.phala.network/tdx/certification/v4";
-  const quoteCollateral = await js_get_collateral(pccsUrl, rawQuote);
+  const quoteCollateral = await jsGetCollateral(pccsUrl, rawQuote);
 
   // Current timestamp
   const now = BigInt(Math.floor(Date.now() / 1000));
 
   // Call the js_verify function
   try {
-    js_verify(rawQuote, quoteCollateral, now);
+    jsVerify(rawQuote, quoteCollateral, now);
     return true;
   } catch (error) {
     return false;
