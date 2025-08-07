@@ -1,4 +1,3 @@
-pub use dlp::pda;
 use solana_program::pubkey::Pubkey;
 
 #[cfg(feature = "anchor")]
@@ -10,6 +9,8 @@ pub mod ephem;
 pub mod types;
 pub mod utils;
 
+pub use dlp::args::{CallHandlerArgs, Context};
+pub use dlp::pda;
 pub use magicblock_core::magic_program::args::{
     ActionArgs, BaseActionArgs, CommitAndUndelegateArgs, CommitTypeArgs, MagicBaseIntentArgs,
     UndelegateTypeArgs,
