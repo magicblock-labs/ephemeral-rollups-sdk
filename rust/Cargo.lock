@@ -1928,7 +1928,7 @@ dependencies = [
 [[package]]
 name = "magicblock-core"
 version = "0.1.7"
-source = "git+https://github.com/magicblock-labs/magicblock-validator.git?rev=44f535a#44f535a4dedcec5b208d6546dd625fa0111b71fd"
+source = "git+https://github.com/magicblock-labs/magicblock-validator.git?rev=f08144#f08144a02d9f4742a3db0a02211feeb03d0c77f2"
 dependencies = [
  "bincode",
  "serde",
@@ -1938,7 +1938,7 @@ dependencies = [
 [[package]]
 name = "magicblock-delegation-program"
 version = "1.0.0"
-source = "git+https://github.com/magicblock-labs/delegation-program.git?rev=b149f8a#b149f8ae8f0d16b779e5974e65b5edbb94e520de"
+source = "git+https://github.com/magicblock-labs/delegation-program.git?rev=00d720#00d72053093a9ca10f1812b4448b807a7e4036c8"
 dependencies = [
  "bincode",
  "borsh 1.5.7",

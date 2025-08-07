@@ -29,8 +29,8 @@ ephemeral-rollups-sdk-attribute-commit = { path = "commit-attribute", version = 
 magic-domain-program = { version = "0.0.1" }
 
 # Magicblock
-magicblock-delegation-program = { git = "https://github.com/magicblock-labs/delegation-program.git", rev = "b149f8a" }
-magicblock-core = { git = "https://github.com/magicblock-labs/magicblock-validator.git", rev = "44f535a" }
+magicblock-delegation-program = { git = "https://github.com/magicblock-labs/delegation-program.git", rev = "00d720", features = ["no-entrypoint"] }
+magicblock-core = { git = "https://github.com/magicblock-labs/magicblock-validator.git", rev = "f08144" }
 
 ## External crates
 anchor-lang = { version = ">=0.28.0" }
