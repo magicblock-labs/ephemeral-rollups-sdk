@@ -8,6 +8,10 @@
     "registry": "https://registry.npmjs.org/"
   },
   "main": "lib/index.js",
+  "exports": {
+    ".": "lib/index.js",
+    "./privacy": "./lib/privacy/index.js"
+  },
   "scripts": {
     "clean": "rimraf lib",
     "build": "npm run clean && npm run lint:fix && tsc",
@@ -36,11 +40,13 @@
     "prettier": "^3.3.2",
     "rimraf": "^3.0.2",
     "ts-jest": "^29.1.1",
-    "typescript": "^5.7.2"
+    "typescript": "^5.3.0"
   },
   "dependencies": {
     "@metaplex-foundation/beet": "^0.7.2",
+    "@phala/dcap-qvl-web": "^0.2.7",
     "@solana/web3.js": "^1.98.0",
+    "axios": "^1.11.0",
     "bs58": "^6.0.0",
     "rpc-websockets": "^9.0.4"
   },
