@@ -38,7 +38,7 @@ impl<'info> MagicInstructionBuilder<'info> {
             .iter()
             .map(|account| AccountMeta {
                 pubkey: *account.key,
-                is_signer: account.key == self.payer.key,
+                is_signer: account.is_signer,
                 is_writable: account.is_writable,
             })
             .collect();
