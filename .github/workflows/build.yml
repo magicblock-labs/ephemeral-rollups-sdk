@@ -58,8 +58,9 @@ jobs:
           cargo build
           cargo test
 
-      - name: npm run build
+      - name: npm run build and test
         working-directory: ts/
         run: |
           npm install
+          npm test
           npm run build
