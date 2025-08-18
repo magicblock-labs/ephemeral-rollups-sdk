@@ -8,7 +8,7 @@ on:
       - 'main'
 env:
   rust_version: 1.85.0
-  node_version: 23
+  node_version: 22
 
 jobs:
   install:
@@ -19,7 +19,6 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          cache-dependency-path: ts/package-lock.json
           node-version: ${{ env.node_version }}
           cache: 'npm'
 
