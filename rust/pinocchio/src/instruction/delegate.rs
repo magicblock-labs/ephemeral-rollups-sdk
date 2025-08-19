@@ -15,6 +15,7 @@ use crate::{
     utils::{close_pda_acc, cpi_delegate, Seeds},
 };
 
+#[allow(clippy::cloned_ref_to_slice_refs)]
 pub fn delegate_account(
     accounts: &[AccountInfo],
     pda_seeds: &[&[u8]],
