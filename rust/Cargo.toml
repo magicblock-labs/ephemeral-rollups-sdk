@@ -26,11 +26,10 @@ ephemeral-rollups-sdk = { path = "sdk", version = "=0.2.7" }
 ephemeral-rollups-sdk-attribute-ephemeral = { path = "ephemeral", version = "=0.2.7" }
 ephemeral-rollups-sdk-attribute-delegate = { path = "delegate", version = "=0.2.7" }
 ephemeral-rollups-sdk-attribute-commit = { path = "commit-attribute", version = "=0.2.7" }
-magic-domain-program = { git = "https://github.com/magicblock-labs/magic-domain-program.git", rev = "eba7644" }
+magic-domain-program = { version = "0.0.1" }
 
 ## External crates
 anchor-lang = { version = ">=0.28.0" }
-paste = "^1.0"
 proc-macro2 = "1.0"
 syn = { version = "1.0.60", features = ["full"] }
 quote = "1.0"
