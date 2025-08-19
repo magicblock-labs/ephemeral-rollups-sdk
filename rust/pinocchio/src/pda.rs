@@ -4,8 +4,10 @@ use pinocchio::pubkey::Pubkey;
 
 /// Generic DRY function to find a PDA from a typed `Seed`
 fn find_seed_pda(seed: &Seed, program_id: &Pubkey) -> Pubkey {
-    let seeds = seed.as_seed_slice();
-    pubkey::find_program_address(&seeds, program_id).0
+    let mut buf: [&[u8]; 3] = [&[]; 3];
+    let mut index_buf = [0u8; 1];
+    let seeds = seed.fill_seed_slice(&mut buf, &mut index_buf);
+    pubkey::find_program_address(seeds, program_id).0
 }
 
 // Specialized functions calling the generic one

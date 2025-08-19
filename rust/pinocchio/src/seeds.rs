@@ -15,20 +15,65 @@ pub enum Seed<'a> {
 }
 
 impl<'a> Seed<'a> {
-    pub fn as_seed_slice(&self) -> Vec<&[u8]> {
+    pub fn fill_seed_slice<'b>(
+        &'a self,
+        out: &'b mut [&'a [u8]; 3],
+        index_buf: &'b mut [u8; 1],
+    ) -> &'b [&'a [u8]]
+    where
+        'b: 'a,
+    {
         match self {
-            Seed::Delegation(pubkey) => vec![b"delegation", pubkey.as_ref()],
-            Seed::DelegationMetadata(pubkey) => vec![b"delegation-metadata", pubkey.as_ref()],
-            Seed::Buffer(pubkey) => vec![b"buffer", pubkey.as_ref()],
-            Seed::CommitState(pubkey) => vec![b"state-diff", pubkey.as_ref()],
-            Seed::CommitRecord(pubkey) => vec![b"commit-state-record", pubkey.as_ref()],
-            Seed::UndelegateBuffer(pubkey) => vec![b"undelegate-buffer", pubkey.as_ref()],
-            Seed::ValidatorFeesVault(pubkey) => vec![b"v-fees-vault", pubkey.as_ref()],
-            Seed::ProgramConfig(program_id) => vec![b"p-conf", program_id.as_ref()],
-            Seed::FeesVault => vec![b"fees-vault"],
+            Seed::Delegation(pubkey) => {
+                out[0] = b"delegation";
+                out[1] = pubkey.as_ref();
+                &out[..2]
+            }
+            Seed::DelegationMetadata(pubkey) => {
+                out[0] = b"delegation-metadata";
+                out[1] = pubkey.as_ref();
+                &out[..2]
+            }
+            Seed::Buffer(pubkey) => {
+                out[0] = b"buffer";
+                out[1] = pubkey.as_ref();
+                &out[..2]
+            }
+            Seed::CommitState(pubkey) => {
+                out[0] = b"state-diff";
+                out[1] = pubkey.as_ref();
+                &out[..2]
+            }
+            Seed::CommitRecord(pubkey) => {
+                out[0] = b"commit-state-record";
+                out[1] = pubkey.as_ref();
+                &out[..2]
+            }
+            Seed::UndelegateBuffer(pubkey) => {
+                out[0] = b"undelegate-buffer";
+                out[1] = pubkey.as_ref();
+                &out[..2]
+            }
+            Seed::ValidatorFeesVault(pubkey) => {
+                out[0] = b"v-fees-vault";
+                out[1] = pubkey.as_ref();
+                &out[..2]
+            }
+            Seed::ProgramConfig(program_id) => {
+                out[0] = b"p-conf";
+                out[1] = program_id.as_ref();
+                &out[..2]
+            }
+            Seed::FeesVault => {
+                out[0] = b"fees-vault";
+                &out[..1]
+            }
             Seed::EphemeralBalance { payer, index } => {
-                let index_ref = std::slice::from_ref(index);
-                vec![b"balance", payer.as_ref(), index_ref]
+                out[0] = b"balance";
+                out[1] = payer.as_ref();
+                index_buf[0] = *index;
+                out[2] = &index_buf[..];
+                &out[..3]
             }
         }
     }
