@@ -18,7 +18,7 @@ license = "MIT"
 homepage = "https://www.magicblock.gg/"
 documentation = "https://docs.magicblock.gg/"
 repository = "https://github.com/magicblock-labs/delegation-program"
-readme = "../README.md"
+readme = "README.md"
 keywords = ["solana", "crypto", "delegation", "ephemeral-rollups", "magicblock"]
 
 [workspace.dependencies]

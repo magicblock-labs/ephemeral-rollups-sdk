@@ -1,5 +1,8 @@
 ## Connection Resolver
 
+Quickstart and integration guide:
+https://docs.magicblock.gg/pages/get-started/how-integrate-your-program/quickstart
+
 The Connection Resolver is a specialized library designed to facilitate the
 resolution of RPC connections for Solana blockchain requests. It dynamically
 determines the appropriate RPC client for processing requests based on the
