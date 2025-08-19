@@ -12,6 +12,7 @@ use pinocchio_system::instructions::CreateAccount;
 
 use crate::{consts::DELEGATION_PROGRAM_ID, utils::get_seeds};
 
+#[allow(clippy::cloned_ref_to_slice_refs)]
 pub fn undelegate(accounts: &[AccountInfo], account_signer_seeds: &[&[u8]]) -> ProgramResult {
     let [payer, delegated_acc, owner_program, buffer_acc, _system_program] = accounts else {
         return Err(ProgramError::NotEnoughAccountKeys);
