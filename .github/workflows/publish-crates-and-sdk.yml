@@ -55,6 +55,7 @@ jobs:
         working-directory: rust/
         run: |
           cargo build
+          cargo test
 
       - name: Set DRY_RUN based on trigger
         run: echo "DRY_RUN=true" >> $GITHUB_ENV
@@ -91,6 +92,7 @@ jobs:
           npm install --global eslint@^8.33.0
           npm install --legacy-peer-deps
           npm run build
+          npm test
           echo "//registry.npmjs.org/:_authToken=${{ secrets.NPM_TOKEN }}" > ~/.npmrc
           npm set //registry.npmjs.org/:_authToken ${{ secrets.NPM_TOKEN }}
           npm run build && npm run lint:fix
