@@ -1,5 +1,5 @@
-use std::mem::MaybeUninit;
-use std::ops::Deref;
+use core::mem::MaybeUninit;
+use core::ops::Deref;
 
 use pinocchio::{
     account_info::AccountInfo,
