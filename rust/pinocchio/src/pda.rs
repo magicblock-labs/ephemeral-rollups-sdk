@@ -1,6 +1,6 @@
+use crate::seeds::Seed;
 use pinocchio::pubkey;
 use pinocchio::pubkey::Pubkey;
-use crate::seeds::Seed;
 
 /// Generic DRY function to find a PDA from a typed `Seed`
 fn find_seed_pda(seed: &Seed, program_id: &Pubkey) -> Pubkey {
