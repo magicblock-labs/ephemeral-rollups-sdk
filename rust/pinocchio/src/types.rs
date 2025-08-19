@@ -1,47 +1,80 @@
-use pinocchio::program_error::ProgramError;
-use pinocchio::pubkey::Pubkey;
+use core::mem::size_of;
+use pinocchio::{
+    program_error::ProgramError,
+    pubkey::Pubkey,
+    pubkey::{MAX_SEEDS, MAX_SEED_LEN},
+};
+
+pub const MAX_DELEGATE_ACCOUNT_ARGS_SIZE: usize = size_of::<u32>() // commit_frequency_ms
+    + size_of::<u32>() // seeds length
+    + MAX_SEEDS * (size_of::<u32>() + MAX_SEED_LEN) // seeds
+    + 1 + size_of::<Pubkey>(); // validator
 
 #[derive(Debug)]
-pub struct DelegateAccountArgs {
+pub struct DelegateAccountArgs<'a> {
     pub commit_frequency_ms: u32,
-    pub seeds: Vec<Vec<u8>>,
+    pub seeds: &'a [&'a [u8]],
     pub validator: Option<Pubkey>,
 }
 
-impl Default for DelegateAccountArgs {
+impl<'a> Default for DelegateAccountArgs<'a> {
     fn default() -> Self {
         DelegateAccountArgs {
             commit_frequency_ms: u32::MAX,
-            seeds: vec![],
+            seeds: &[],
             validator: None,
         }
     }
 }
 
-impl DelegateAccountArgs {
-    pub fn try_to_vec(&self) -> Result<Vec<u8>, ProgramError> {
-        let mut data_vec = Vec::new();
-
-        //Serialize commit_frequency_ms
-        data_vec.extend(&self.commit_frequency_ms.to_le_bytes());
-
-        //Serialize seeds
-        data_vec.extend(&(self.seeds.len() as u32).to_le_bytes());
-        for seed in &self.seeds {
-            data_vec.extend(&(seed.len() as u32).to_le_bytes());
-            data_vec.extend(seed);
+impl<'a> DelegateAccountArgs<'a> {
+    pub fn try_to_slice<'b>(&self, data: &'b mut [u8]) -> Result<&'b [u8], ProgramError> {
+        if self.seeds.len() >= MAX_SEEDS {
+            return Err(ProgramError::InvalidArgument);
         }
-        // Serialize validator
+
+        for seed in self.seeds {
+            if seed.len() > MAX_SEED_LEN {
+                return Err(ProgramError::InvalidArgument);
+            }
+        }
+
+        if data.len() != MAX_DELEGATE_ACCOUNT_ARGS_SIZE {
+            return Err(ProgramError::InvalidArgument);
+        }
+
+        let mut offset = 0;
+
+        // Serialize commit_frequency_ms (4 bytes)
+        data[offset..offset + 4].copy_from_slice(&self.commit_frequency_ms.to_le_bytes());
+        offset += 4;
+
+        // Serialize seeds length (4 bytes)
+        data[offset..offset + 4].copy_from_slice(&(self.seeds.len() as u32).to_le_bytes());
+        offset += 4;
+
+        // Serialize each seed
+        for seed in self.seeds {
+            data[offset..offset + 4].copy_from_slice(&(seed.len() as u32).to_le_bytes());
+            offset += 4;
+            data[offset..offset + seed.len()].copy_from_slice(seed);
+            offset += seed.len();
+        }
+
         match &self.validator {
             Some(pubkey) => {
-                data_vec.push(1);
-                data_vec.extend(pubkey);
+                data[offset] = 1;
+                offset += 1;
+                data[offset..offset + 32].copy_from_slice(pubkey.as_ref());
+                offset += 32;
             }
             None => {
-                data_vec.push(0);
+                data[offset] = 0;
+                offset += 1;
             }
         }
-        Ok(data_vec)
+
+        Ok(&data[..offset])
     }
 }
 
