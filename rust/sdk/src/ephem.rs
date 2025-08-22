@@ -357,27 +357,3 @@ fn test_instruction_equality() {
         bincode::serialize(&MagicBlockInstruction::ScheduleCommitAndUndelegate).unwrap();
     assert_eq!(vec![2, 0, 0, 0], serialized);
 }
-
-// #[test]
-// fn test_construction() {
-//     let builder = MagicInstructionBuilder {
-//         payer: ctx.accounts.payer.to_account_info(),
-//         magic_context: ctx.accounts.magic_context.to_account_info(),
-//         magic_program: ctx.accounts.magic_program.to_account_info(),
-//         magic_action: MagicAction::Commit(
-//             CommitType::WithHandler {
-//                 commited_accounts: vec![ctx.accounts.pda1.to_account_info(), ctx.accounts.pda2.to_account_info()]
-//                 call_handlers: vec![CallHandler {
-//                     accounts: vec![ctx.accounts.actor_pda.to_account_info(), ctx.accounts.destination_to_account_info(), system_program]
-//                     args: HandlerArgs {
-//                         data,
-//                         escrow_index: 1
-//                     },
-//                     destination_program: ctx.accounts.destination_program.to_account_info()
-//                 }]
-//             }
-//         )
-//     }
-//
-//     builder.build_and_invoke()?;
-// }
