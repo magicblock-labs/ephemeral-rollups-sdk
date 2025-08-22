@@ -986,7 +986,7 @@ dependencies = [
 
 [[package]]
 name = "ephemeral-rollups-pinocchio"
-version = "0.2.6"
+version = "0.2.7"
 dependencies = [
  "pinocchio",
  "pinocchio-log",
@@ -997,7 +997,7 @@ dependencies = [
 
 [[package]]
 name = "ephemeral-rollups-sdk"
-version = "0.2.6"
+version = "0.2.7"
 dependencies = [
  "anchor-lang",
  "bincode",
@@ -1012,7 +1012,7 @@ dependencies = [
 
 [[package]]
 name = "ephemeral-rollups-sdk-attribute-commit"
-version = "0.2.6"
+version = "0.2.7"
 dependencies = [
  "quote",
  "syn 1.0.109",
@@ -1020,7 +1020,7 @@ dependencies = [
 
 [[package]]
 name = "ephemeral-rollups-sdk-attribute-delegate"
-version = "0.2.6"
+version = "0.2.7"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1029,7 +1029,7 @@ dependencies = [
 
 [[package]]
 name = "ephemeral-rollups-sdk-attribute-ephemeral"
-version = "0.2.6"
+version = "0.2.7"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1888,7 +1888,8 @@ checksum = "30bde2b3dc3671ae49d8e2e9f044c7c005836e7a023ee57cffa25ab82764bb9e"
 [[package]]
 name = "magic-domain-program"
 version = "0.0.1"
-source = "git+https://github.com/magicblock-labs/magic-domain-program.git?rev=eba7644#eba76443b39047e1be1dd5a1d72fc1943e5e1fc0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a2135b5d45be91cc38df06e7ab99920d26f4fea13fb7cc0bf538570ba1d8cd61"
 dependencies = [
  "borsh 1.5.7",
  "bytemuck_derive",
@@ -1898,7 +1899,7 @@ dependencies = [
 
 [[package]]
 name = "magic-resolver"
-version = "0.2.6"
+version = "0.2.7"
 dependencies = [
  "base64 0.12.3",
  "bincode",
