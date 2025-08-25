@@ -114,10 +114,10 @@ pub enum CommitType<'info> {
 impl<'info> CommitType<'info> {
     pub fn commited_accounts(&self) -> &[AccountInfo<'info>] {
         match self {
-            Self::Standalone(commited_accounts) => &commited_accounts,
+            Self::Standalone(commited_accounts) => commited_accounts,
             Self::WithHandler {
                 commited_accounts, ..
-            } => &commited_accounts,
+            } => commited_accounts,
         }
     }
 
@@ -146,8 +146,7 @@ impl<'info> CommitType<'info> {
                 commited_accounts,
                 call_handlers,
             } => {
-                let commited_accounts_indices =
-                    accounts_to_indices(&commited_accounts, indices_map);
+                let commited_accounts_indices = accounts_to_indices(commited_accounts, indices_map);
                 let call_handlers_args = call_handlers
                     .iter()
                     .map(|call_handler| call_handler.to_args(indices_map))
@@ -317,8 +316,8 @@ mod utils {
     use std::collections::HashMap;
 
     #[inline(always)]
-    pub fn accounts_to_indices<'info>(
-        accounts: &[AccountInfo<'info>],
+    pub fn accounts_to_indices(
+        accounts: &[AccountInfo],
         indices_map: &HashMap<Pubkey, u8>,
     ) -> Vec<u8> {
         accounts

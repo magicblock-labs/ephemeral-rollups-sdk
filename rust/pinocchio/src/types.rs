@@ -17,7 +17,7 @@ pub struct DelegateAccountArgs<'a> {
     pub validator: Option<Pubkey>,
 }
 
-impl<'a> Default for DelegateAccountArgs<'a> {
+impl Default for DelegateAccountArgs<'_> {
     fn default() -> Self {
         DelegateAccountArgs {
             commit_frequency_ms: u32::MAX,
@@ -27,7 +27,7 @@ impl<'a> Default for DelegateAccountArgs<'a> {
     }
 }
 
-impl<'a> DelegateAccountArgs<'a> {
+impl DelegateAccountArgs<'_> {
     pub fn try_to_slice<'b>(&self, data: &'b mut [u8]) -> Result<&'b [u8], ProgramError> {
         if self.seeds.len() >= MAX_SEEDS {
             return Err(ProgramError::InvalidArgument);
