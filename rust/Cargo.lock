@@ -816,6 +816,7 @@ dependencies = [
  "fiat-crypto",
  "rand_core 0.6.4",
  "rustc_version",
+ "serde",
  "subtle",
  "zeroize",
 ]
@@ -999,10 +1000,13 @@ name = "ephemeral-rollups-sdk"
 version = "0.2.7"
 dependencies = [
  "anchor-lang",
+ "bincode",
  "borsh 1.5.7",
  "ephemeral-rollups-sdk-attribute-commit",
  "ephemeral-rollups-sdk-attribute-delegate",
  "ephemeral-rollups-sdk-attribute-ephemeral",
+ "magicblock-core",
+ "magicblock-delegation-program",
  "solana-program",
 ]
 
@@ -1923,6 +1927,32 @@ dependencies = [
 ]
 
 [[package]]
+name = "magicblock-core"
+version = "0.1.7"
+source = "git+https://github.com/magicblock-labs/magicblock-validator.git?rev=f08144#f08144a02d9f4742a3db0a02211feeb03d0c77f2"
+dependencies = [
+ "bincode",
+ "serde",
+ "solana-program",
+]
+
+[[package]]
+name = "magicblock-delegation-program"
+version = "1.0.0"
+source = "git+https://github.com/magicblock-labs/delegation-program.git?rev=00d720#00d72053093a9ca10f1812b4448b807a7e4036c8"
+dependencies = [
+ "bincode",
+ "borsh 1.5.7",
+ "bytemuck",
+ "num_enum",
+ "paste",
+ "solana-curve25519",
+ "solana-program",
+ "solana-security-txt",
+ "thiserror 1.0.69",
+]
+
+[[package]]
 name = "memchr"
 version = "2.7.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2208,9 +2238,9 @@ checksum = "8b870d8c151b6f2fb93e84a13146138f05d02ed11c7e7c54f8826aaaf7c9f184"
 
 [[package]]
 name = "pinocchio"
-version = "0.8.3"
+version = "0.8.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "81225b3b8ce092ac54e0d1c55a962be61efcad1d021030f0eb660875703db562"
+checksum = "7c33b58567c11b07749cefbb8320ac023f3387c57807aeb8e3b1262501b6e9f0"
 
 [[package]]
 name = "pinocchio-log"
@@ -3219,6 +3249,20 @@ dependencies = [
  "solana-program-error",
  "solana-pubkey",
  "solana-stable-layout",
+]
+
+[[package]]
+name = "solana-curve25519"
+version = "2.2.20"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "411f8a1fcbc3781bdc6ee3457bb6275eab8a7bd05154f1e73ecfdbba508d1ea4"
+dependencies = [
+ "bytemuck",
+ "bytemuck_derive",
+ "curve25519-dalek 4.1.3",
+ "solana-define-syscall",
+ "subtle",
+ "thiserror 2.0.12",
 ]
 
 [[package]]
