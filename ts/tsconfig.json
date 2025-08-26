@@ -1,7 +1,7 @@
 {
   "compilerOptions": {
     "outDir": "lib",
-    "baseUrl": "src",
+    "baseUrl": "./src",
     "declaration": true,
     "declarationMap": true,
     "emitDecoratorMetadata": true,
