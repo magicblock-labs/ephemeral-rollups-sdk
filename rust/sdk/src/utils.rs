@@ -134,8 +134,7 @@ pub fn close_pda_with_system_transfer<'a, 'info>(
 /// Seeds with bump
 #[inline(always)]
 pub fn seeds_with_bump<'a>(seeds: &'a [&'a [u8]], bump: &'a [u8]) -> Vec<&'a [u8]> {
-    let mut combined: Vec<&'a [u8]> = Vec::with_capacity(seeds.len() + 1);
-    combined.extend_from_slice(seeds);
-    combined.push(bump);
-    combined
+    let mut v = Vec::from(seeds);
+    v.push(bump);
+    v
 }

@@ -76,13 +76,13 @@ pub fn delegate_account<'a, 'info>(
     {
         let pda_ro = accounts.pda.try_borrow_data()?;
         let mut buf = accounts.buffer.try_borrow_mut_data()?;
-        sol_memcpy(&mut buf[..], &pda_ro[..], data_len);
+        sol_memcpy(&mut buf, &pda_ro, data_len);
     }
 
     // Zero PDA (single RW borrow)
     {
         let mut pda_mut = accounts.pda.try_borrow_mut_data()?;
-        sol_memset(&mut pda_mut[..], 0, data_len);
+        sol_memset(&mut pda_mut, 0, data_len);
     }
 
     accounts.pda.assign(accounts.delegation_program.key);
