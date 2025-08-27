@@ -11,7 +11,7 @@ members = [
 resolver = "2"
 
 [workspace.package]
-version = "0.2.7"
+version = "0.2.8"
 authors = ["Magicblock Labs <dev@magicblock.gg>"]
 edition = "2021"
 license = "MIT"
@@ -22,17 +22,17 @@ readme = "README.md"
 keywords = ["solana", "crypto", "delegation", "ephemeral-rollups", "magicblock"]
 
 [workspace.dependencies]
-ephemeral-rollups-sdk = { path = "sdk", version = "=0.2.7" }
-ephemeral-rollups-sdk-attribute-ephemeral = { path = "ephemeral", version = "=0.2.7" }
-ephemeral-rollups-sdk-attribute-delegate = { path = "delegate", version = "=0.2.7" }
-ephemeral-rollups-sdk-attribute-commit = { path = "commit-attribute", version = "=0.2.7" }
-magic-domain-program = { version = "0.0.1" }
+ephemeral-rollups-sdk = { path = "sdk", version = "=0.2.8" }
+ephemeral-rollups-sdk-attribute-ephemeral = { path = "ephemeral", version = "=0.2.8" }
+ephemeral-rollups-sdk-attribute-delegate = { path = "delegate", version = "=0.2.8" }
+ephemeral-rollups-sdk-attribute-commit = { path = "commit-attribute", version = "=0.2.8" }
 
 ## External crates
 anchor-lang = { version = ">=0.28.0" }
 proc-macro2 = "1.0"
 syn = { version = "1.0.60", features = ["full"] }
 quote = "1.0"
+magic-domain-program = { version = "=0.0.1" }
 
 # runtime
 tokio = { version = "1.0", features = [ "rt", "sync", "macros" ] }
