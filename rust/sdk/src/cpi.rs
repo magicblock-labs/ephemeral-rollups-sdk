@@ -3,6 +3,7 @@ use solana_program::account_info::AccountInfo;
 use solana_program::entrypoint::ProgramResult;
 use solana_program::instruction::{AccountMeta, Instruction};
 use solana_program::program_error::ProgramError;
+use solana_program::program_memory::{sol_memcpy, sol_memset};
 use solana_program::pubkey::Pubkey;
 
 // TODO: import from the delegation program crate once open-sourced
@@ -68,16 +69,20 @@ pub fn delegate_account<'a, 'info>(
         buffer_signer_seeds,
         accounts.system_program,
         accounts.payer,
+        false,
     )?;
 
-    // Copy the date to the buffer PDA
+    // Copy PDA -> buffer (RO pda, RW buffer)
     {
-        let mut buffer_data = accounts.buffer.try_borrow_mut_data()?;
-        let mut pda_data = accounts.pda.try_borrow_mut_data()?;
-        (*buffer_data).copy_from_slice(&pda_data);
+        let pda_ro = accounts.pda.try_borrow_data()?;
+        let mut buf = accounts.buffer.try_borrow_mut_data()?;
+        sol_memcpy(&mut buf[..], &pda_ro[..], data_len);
+    }
 
-        // Zero out the PDA data, required for changing the owner program
-        pda_data.fill(0);
+    // Zero PDA (single RW borrow)
+    {
+        let mut pda_mut = accounts.pda.try_borrow_mut_data()?;
+        sol_memset(&mut pda_mut[..], 0, data_len);
     }
 
     accounts.pda.assign(accounts.delegation_program.key);
@@ -143,6 +148,7 @@ pub fn undelegate_account<'a, 'info>(
         account_signer_seeds,
         system_program,
         payer,
+        true,
     )?;
 
     let mut data = delegated_account.try_borrow_mut_data()?;
