@@ -1,6 +1,9 @@
-# ephemeral-rollups-sdk
+# Ephemeral Rollups SDK (Rust)
 
-Rust SDK for integrating with Ephemeral Rollups on Solana.
+This crate provides helper utilities and attributes to integrate with Magicblock's Ephemeral Rollups on Solana.
 
-Quickstart and integration guide:
-https://docs.magicblock.gg/pages/get-started/how-integrate-your-program/quickstart
+- Crate: `ephemeral-rollups-sdk`
+- Docs: https://docs.magicblock.gg/
+- Repository: https://github.com/magicblock-labs/delegation-program
+
+For a high-level overview and examples, see the repository README at the project root.
