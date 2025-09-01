@@ -1,8 +1,10 @@
-import axios from "axios";
-
 interface QuoteResponse {
   quote: string;
   error?: string;
+}
+
+interface ErrorResponse {
+  error: string;
 }
 
 /**
@@ -28,16 +30,17 @@ export async function verifyTeeRpcIntegrity(rpcUrl: string): Promise<boolean> {
   const challenge = challengeBytes.toString("base64");
   const url = `${rpcUrl}/quote?challenge=${encodeURIComponent(challenge)}`;
 
-  const response = await axios.get<QuoteResponse>(url);
+  const response = await fetch(url);
+  const responseBody: QuoteResponse | ErrorResponse = await response.json();
 
-  if (response.status !== 200) {
-    throw new Error(response.data.error);
+  if (response.status !== 200 || !("quote" in responseBody)) {
+    throw new Error(responseBody.error ?? "Failed to get quote");
   }
 
   // Initialize the WASM module
   await init();
 
-  const rawQuote = Uint8Array.from(Buffer.from(response.data.quote, "base64"));
+  const rawQuote = Uint8Array.from(Buffer.from(responseBody.quote, "base64"));
 
   // Get the quote collateral
   const pccsUrl = "https://pccs.phala.network/tdx/certification/v4";

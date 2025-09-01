@@ -46,7 +46,6 @@
     "@metaplex-foundation/beet": "^0.7.2",
     "@phala/dcap-qvl-web": "^0.2.7",
     "@solana/web3.js": "^1.98.0",
-    "axios": "^1.11.0",
     "bs58": "^6.0.0",
     "rpc-websockets": "^9.0.4"
   },
