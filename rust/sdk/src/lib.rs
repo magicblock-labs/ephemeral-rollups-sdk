@@ -11,7 +11,7 @@ pub mod utils;
 
 pub use dlp::args::{CallHandlerArgs, Context};
 pub use dlp::pda;
-pub use magicblock_core::magic_program::args::{
+pub use magicblock_magic_program_api::args::{
     ActionArgs, BaseActionArgs, CommitAndUndelegateArgs, CommitTypeArgs, MagicBaseIntentArgs,
     UndelegateTypeArgs,
 };

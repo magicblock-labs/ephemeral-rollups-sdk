@@ -22,7 +22,7 @@ ephemeral-rollups-sdk-attribute-delegate = { workspace = true }
 ephemeral-rollups-sdk-attribute-ephemeral = { workspace = true }
 ephemeral-rollups-sdk-attribute-commit = { workspace = true }
 solana-program = { workspace = true }
-magicblock-core = { workspace = true }
+magicblock-magic-program-api = { workspace = true }
 magicblock-delegation-program  = { workspace = true, features = ["no-entrypoint"] }
 
 [dev-dependencies]
