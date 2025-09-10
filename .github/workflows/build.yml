@@ -91,15 +91,6 @@ jobs:
           sh -c "$(curl -sSfL https://release.solana.com/stable/install)"
           echo "$HOME/.local/share/solana/install/active_release/bin" >> "$GITHUB_PATH"
 
-      - name: Install Anchor via AVM
-        shell: bash
-        run: |
-          cargo install --git https://github.com/coral-xyz/anchor avm --locked --force
-          ~/.cargo/bin/avm install latest
-          ~/.cargo/bin/avm use latest
-          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
-          echo "$HOME/.local/share/avm/bin" >> "$GITHUB_PATH"
-
       - name: Clone delegation program repository
         shell: bash
         run: |
