@@ -63,3 +63,65 @@ jobs:
           npm install
           npm test
           npm run build
+  integration-tests:
+    name: Delegation Program Integration Tests (Anchor)
+    needs: [install, lint, build]
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.node_version }}
+          cache: 'npm'
+
+      - name: Install Rust toolchain
+        shell: bash
+        run: rustup toolchain install ${{ env.rust_version }} --profile minimal
+
+      - name: Cache Rust
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install Solana CLI (stable)
+        shell: bash
+        run: |
+          sh -c "$(curl -sSfL https://release.solana.com/stable/install)"
+          echo "$HOME/.local/share/solana/install/active_release/bin" >> "$GITHUB_PATH"
+
+      - name: Install Anchor via AVM
+        shell: bash
+        run: |
+          cargo install --git https://github.com/coral-xyz/anchor avm --locked --force
+          ~/.cargo/bin/avm install latest
+          ~/.cargo/bin/avm use latest
+          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+          echo "$HOME/.local/share/avm/bin" >> "$GITHUB_PATH"
+
+      - name: Clone delegation program repository
+        shell: bash
+        run: |
+          git clone https://github.com/magicblock-labs/delegation-program.git
+
+      - name: Build delegation program
+        working-directory: delegation-program
+        env:
+          RUSTUP_TOOLCHAIN: ${{ env.rust_version }}
+        run: |
+          export PATH="/home/runner/.local/share/solana/install/active_release/bin:$PATH"
+          solana --version
+          cargo build-sbf --features unit_test_config
+
+      - name: Run Anchor tests
+        working-directory: delegation-program/tests/integration
+        env:
+          RUSTUP_TOOLCHAIN: ${{ env.rust_version }}
+        run: |
+          corepack enable
+          yarn set version stable
+          yarn install --frozen-lockfile || yarn install
+          yarn add file:../../../ts
+          anchor --version
+          solana --version
+          anchor test
