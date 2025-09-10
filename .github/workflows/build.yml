@@ -9,6 +9,7 @@ on:
 env:
   rust_version: 1.85.0
   node_version: 22
+  anchor_version: 0.31.1
 
 jobs:
   install:
@@ -118,6 +119,8 @@ jobs:
         env:
           RUSTUP_TOOLCHAIN: ${{ env.rust_version }}
         run: |
+          export PATH="/home/runner/.local/share/solana/install/active_release/bin:$PATH"
+          cargo install --locked --version ${{ env.anchor_version }} anchor-cli
           corepack enable
           yarn set version stable
           yarn install --frozen-lockfile || yarn install
