@@ -115,7 +115,7 @@ jobs:
           export PATH="/home/runner/.local/share/solana/install/active_release/bin:$PATH"
           cargo install --locked --version ${{ env.anchor_version }} anchor-cli
           yarn set version stable
-          yarn install --immutable=false
+          yarn install --refresh-lockfile
           yarn add file:../../../ts
           anchor --version
           solana --version
