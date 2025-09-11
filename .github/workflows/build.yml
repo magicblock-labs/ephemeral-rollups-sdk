@@ -120,7 +120,7 @@ jobs:
           yarn set version stable
           # Allow lockfile updates for this install
           yarn install --no-immutable
-          yarn add file:../../../ts --no-immutable
+          yarn add file:../../../ts
           anchor --version
           solana --version
           anchor test
