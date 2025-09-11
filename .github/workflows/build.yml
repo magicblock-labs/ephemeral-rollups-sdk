@@ -116,7 +116,7 @@ jobs:
           cargo install --locked --version ${{ env.anchor_version }} anchor-cli
           corepack enable
           yarn set version stable
-          yarn install --frozen-lockfile || yarn install
+          yarn install
           yarn add file:../../../ts
           anchor --version
           solana --version
