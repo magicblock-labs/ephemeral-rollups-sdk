@@ -7,9 +7,10 @@ on:
     branches:
       - 'main'
 env:
-  rust_version: 1.85.0
+  rust_version: 1.89.0
   node_version: 22
   anchor_version: 0.31.1
+  solana_version: v2.1.21
 
 jobs:
   install:
@@ -85,11 +86,11 @@ jobs:
       - name: Cache Rust
         uses: Swatinem/rust-cache@v2
 
-      - name: Install Solana CLI (stable)
-        shell: bash
+      - name: Setup solana
         run: |
-          sh -c "$(curl -sSfL https://release.solana.com/stable/install)"
-          echo "$HOME/.local/share/solana/install/active_release/bin" >> "$GITHUB_PATH"
+          export PATH="/home/runner/.local/share/solana/install/active_release/bin:$PATH"
+          solana --version
+          solana-keygen new --silent --no-bip39-passphrase
 
       - name: Clone delegation program repository
         shell: bash
@@ -101,6 +102,7 @@ jobs:
         env:
           RUSTUP_TOOLCHAIN: ${{ env.rust_version }}
         run: |
+          sh -c "$(curl -sSfL https://release.anza.xyz/${{ env.solana_version }}/install)"
           export PATH="/home/runner/.local/share/solana/install/active_release/bin:$PATH"
           solana --version
           cargo build-sbf --features unit_test_config
