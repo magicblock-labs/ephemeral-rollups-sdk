@@ -111,12 +111,16 @@ jobs:
         working-directory: delegation-program/tests/integration
         env:
           RUSTUP_TOOLCHAIN: ${{ env.rust_version }}
+          YARN_ENABLE_HARDENED_MODE: "0"
         run: |
           export PATH="/home/runner/.local/share/solana/install/active_release/bin:$PATH"
           cargo install --locked --version ${{ env.anchor_version }} anchor-cli
+          corepack enable
+          corepack prepare yarn@stable --activate
           yarn set version stable
-          yarn install --refresh-lockfile
-          yarn add file:../../../ts
+          # Allow lockfile updates for this install
+          yarn install --no-immutable
+          yarn add file:../../../ts --no-immutable
           anchor --version
           solana --version
           anchor test
