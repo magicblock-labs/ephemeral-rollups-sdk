@@ -7,8 +7,10 @@ on:
     branches:
       - 'main'
 env:
-  rust_version: 1.85.0
-  node_version: 22
+  rust_version: 1.89.0
+  node_version: 23
+  anchor_version: 0.31.1
+  solana_version: v2.1.21
 
 jobs:
   install:
@@ -63,3 +65,66 @@ jobs:
           npm install
           npm test
           npm run build
+  integration-tests:
+    name: Delegation Program Integration Tests (Anchor)
+    needs: [install, lint, build]
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.node_version }}
+          cache: 'npm'
+
+      - name: Install Rust toolchain
+        shell: bash
+        run: rustup toolchain install ${{ env.rust_version }} --profile minimal
+
+      - name: Cache Rust
+        uses: Swatinem/rust-cache@v2
+
+      - name: Setup solana
+        run: |
+          sh -c "$(curl -sSfL https://release.anza.xyz/${{ env.solana_version }}/install)"
+          export PATH="/home/runner/.local/share/solana/install/active_release/bin:$PATH"
+          solana --version
+          solana-keygen new --silent --no-bip39-passphrase
+
+      - name: Clone delegation program repository
+        shell: bash
+        run: |
+          git clone https://github.com/magicblock-labs/delegation-program.git
+
+      - name: Build delegation program
+        working-directory: delegation-program
+        env:
+          RUSTUP_TOOLCHAIN: ${{ env.rust_version }}
+        run: |
+          export PATH="/home/runner/.local/share/solana/install/active_release/bin:$PATH"
+          solana --version
+          cargo build-sbf --features unit_test_config
+
+      - name: Run Anchor build
+        working-directory: delegation-program/tests/integration
+        env:
+          RUSTUP_TOOLCHAIN: ${{ env.rust_version }}
+          YARN_ENABLE_HARDENED_MODE: "0"
+        run: |
+          export PATH="/home/runner/.local/share/solana/install/active_release/bin:$PATH"
+          cargo install --locked --version ${{ env.anchor_version }} anchor-cli
+          cargo install cargo-edit
+          cargo rm ephemeral-rollups-sdk --manifest-path programs/test-delegation/Cargo.toml || true
+          cargo add ephemeral-rollups-sdk --path ../../../rust/sdk --features anchor  --manifest-path programs/test-delegation/Cargo.toml
+          npm install -g yarn@1.22.22
+          yarn --version
+          yarn add -D file:../../../ts
+          yarn install --no-immutable --non-interactive
+          cargo update -p ephemeral-rollups-sdk
+          cat programs/test-delegation/Cargo.toml
+          anchor --version
+          solana --version
+          cargo build
+          anchor build --no-idl
