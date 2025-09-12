@@ -122,6 +122,8 @@ jobs:
           yarn --version
           yarn install --no-immutable --non-interactive
           yarn add -D file:../../../ts
+          cargo update -p ephemeral-rollups-sdk
+          cat programs/test-delegation/Cargo.toml
           anchor --version
           solana --version
           anchor build
