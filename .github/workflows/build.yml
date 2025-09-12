@@ -115,6 +115,9 @@ jobs:
         run: |
           export PATH="/home/runner/.local/share/solana/install/active_release/bin:$PATH"
           cargo install --locked --version ${{ env.anchor_version }} anchor-cli
+          cargo install cargo-edit
+          cargo rm ephemeral-rollups-sdk --manifest-path programs/test-delegation/Cargo.toml || true
+          cargo add ephemeral-rollups-sdk --path ../../../rust/sdk --features anchor  --manifest-path programs/test-delegation/Cargo.toml
           corepack enable
           corepack prepare yarn@stable --activate
           yarn set version stable
@@ -123,4 +126,5 @@ jobs:
           yarn add @magicblock-labs/ephemeral-rollups-sdk@portal:../../../ts
           anchor --version
           solana --version
+          anchor build
           anchor test
