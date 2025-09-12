@@ -118,12 +118,9 @@ jobs:
           cargo install cargo-edit
           cargo rm ephemeral-rollups-sdk --manifest-path programs/test-delegation/Cargo.toml || true
           cargo add ephemeral-rollups-sdk --path ../../../rust/sdk --features anchor  --manifest-path programs/test-delegation/Cargo.toml
-          corepack enable
-          corepack prepare yarn@1.22.22 --activate
-          yarn set version stable
-          # Allow lockfile updates for this install
+          npm install -g yarn@1.22.22
           yarn --version
-          yarn install --no-immutable
+          yarn install --no-immutable --non-interactive
           yarn add -D file:../../../ts
           anchor --version
           solana --version
