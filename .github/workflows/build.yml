@@ -119,9 +119,10 @@ jobs:
           cargo rm ephemeral-rollups-sdk --manifest-path programs/test-delegation/Cargo.toml || true
           cargo add ephemeral-rollups-sdk --path ../../../rust/sdk --features anchor  --manifest-path programs/test-delegation/Cargo.toml
           corepack enable
-          corepack prepare yarn@stable --activate
+          corepack prepare yarn@1.22.22 --activate
           yarn set version stable
           # Allow lockfile updates for this install
+          yarn --version
           yarn install --no-immutable
           yarn add -D file:../../../ts
           anchor --version
