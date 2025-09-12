@@ -20,7 +20,8 @@
     "lint": "eslint -c .eslintrc.yml --ext .ts,.tsx src",
     "lint:fix": "eslint -c .eslintrc.yml --ext .ts,.tsx src --fix",
     "pretest": "tsc",
-    "test": "jest --config ./jest.lib.config.cjs"
+    "test": "jest --config ./jest.lib.config.cjs",
+    "prepare": "npm run build"
   },
   "files": [
     "lib"
