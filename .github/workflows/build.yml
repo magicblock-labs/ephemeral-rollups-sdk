@@ -123,7 +123,7 @@ jobs:
           yarn set version stable
           # Allow lockfile updates for this install
           yarn install --no-immutable
-          yarn add @magicblock-labs/ephemeral-rollups-sdk@portal:../../../ts
+          yarn add -D file:../../../ts
           anchor --version
           solana --version
           anchor build
