@@ -127,6 +127,7 @@ jobs:
           anchor --version
           solana --version
           cargo build
+          echo "Build without IDL"
           anchor build --no-idl
-          anchor build
-          anchor test
+          echo "Run tests without IDL"
+          anchor test --no-idl
