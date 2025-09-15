@@ -11,11 +11,7 @@ members = [
 resolver = "2"
 
 [workspace.package]
-<<<<<<< HEAD
-version = "0.2.10"
-=======
 version = "0.2.11"
->>>>>>> c88485c (WIP: saving changes before rebase)
 authors = ["Magicblock Labs <dev@magicblock.gg>"]
 edition = "2021"
 license = "MIT"
@@ -26,17 +22,10 @@ readme = "README.md"
 keywords = ["solana", "crypto", "delegation", "ephemeral-rollups", "magicblock"]
 
 [workspace.dependencies]
-<<<<<<< HEAD
-ephemeral-rollups-sdk = { path = "sdk", version = "=0.2.10" }
-ephemeral-rollups-sdk-attribute-ephemeral = { path = "ephemeral", version = "=0.2.10" }
-ephemeral-rollups-sdk-attribute-delegate = { path = "delegate", version = "=0.2.10" }
-ephemeral-rollups-sdk-attribute-commit = { path = "commit-attribute", version = "=0.2.10" }
-=======
 ephemeral-rollups-sdk = { path = "sdk", version = "=0.2.11" }
 ephemeral-rollups-sdk-attribute-ephemeral = { path = "ephemeral", version = "=0.2.11" }
 ephemeral-rollups-sdk-attribute-delegate = { path = "delegate", version = "=0.2.11" }
 ephemeral-rollups-sdk-attribute-commit = { path = "commit-attribute", version = "=0.2.11" }
->>>>>>> c88485c (WIP: saving changes before rebase)
 
 ## External crates
 anchor-lang = { version = ">=0.28.0" }
