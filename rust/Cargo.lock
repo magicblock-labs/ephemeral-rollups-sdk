@@ -985,7 +985,11 @@ dependencies = [
 
 [[package]]
 name = "ephemeral-rollups-pinocchio"
+<<<<<<< HEAD
 version = "0.2.10"
+=======
+version = "0.2.11"
+>>>>>>> c88485c (WIP: saving changes before rebase)
 dependencies = [
  "pinocchio",
  "pinocchio-log",
@@ -996,7 +1000,11 @@ dependencies = [
 
 [[package]]
 name = "ephemeral-rollups-sdk"
+<<<<<<< HEAD
 version = "0.2.10"
+=======
+version = "0.2.11"
+>>>>>>> c88485c (WIP: saving changes before rebase)
 dependencies = [
  "anchor-lang",
  "borsh 1.5.7",
@@ -1008,7 +1016,11 @@ dependencies = [
 
 [[package]]
 name = "ephemeral-rollups-sdk-attribute-commit"
+<<<<<<< HEAD
 version = "0.2.10"
+=======
+version = "0.2.11"
+>>>>>>> c88485c (WIP: saving changes before rebase)
 dependencies = [
  "quote",
  "syn 1.0.109",
@@ -1016,7 +1028,11 @@ dependencies = [
 
 [[package]]
 name = "ephemeral-rollups-sdk-attribute-delegate"
+<<<<<<< HEAD
 version = "0.2.10"
+=======
+version = "0.2.11"
+>>>>>>> c88485c (WIP: saving changes before rebase)
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1025,7 +1041,11 @@ dependencies = [
 
 [[package]]
 name = "ephemeral-rollups-sdk-attribute-ephemeral"
+<<<<<<< HEAD
 version = "0.2.10"
+=======
+version = "0.2.11"
+>>>>>>> c88485c (WIP: saving changes before rebase)
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1895,7 +1915,11 @@ dependencies = [
 
 [[package]]
 name = "magic-resolver"
+<<<<<<< HEAD
 version = "0.2.10"
+=======
+version = "0.2.11"
+>>>>>>> c88485c (WIP: saving changes before rebase)
 dependencies = [
  "base64 0.12.3",
  "bincode",
