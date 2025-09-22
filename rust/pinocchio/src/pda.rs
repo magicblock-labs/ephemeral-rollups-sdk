@@ -1,151 +1,55 @@
+use crate::seeds::Seed;
 use pinocchio::pubkey;
 use pinocchio::pubkey::Pubkey;
 
-#[macro_export]
-macro_rules! delegation_record_seeds_from_delegated_account {
-    ($delegated_account: expr) => {
-        &[b"delegation", $delegated_account.as_ref()]
-    };
+/// Generic DRY function to find a PDA from a typed `Seed`
+fn find_seed_pda(seed: &Seed, program_id: &Pubkey) -> Pubkey {
+    let mut buf: [&[u8]; 3] = [&[]; 3];
+    let mut index_buf = [0u8; 1];
+    let seeds = seed.fill_seed_slice(&mut buf, &mut index_buf);
+    pubkey::find_program_address(seeds, program_id).0
 }
 
-#[macro_export]
-macro_rules! delegation_metadata_seeds_from_delegated_account {
-    ($delegated_account: expr) => {
-        &[b"delegation-metadata", $delegated_account.as_ref()]
-    };
+// Specialized functions calling the generic one
+pub fn delegation_record_pda_from_delegated_account(delegated: &Pubkey) -> Pubkey {
+    find_seed_pda(&Seed::Delegation(delegated), &crate::id())
 }
 
-#[macro_export]
-macro_rules! commit_state_seeds_from_delegated_account {
-    ($delegated_account: expr) => {
-        &[b"state-diff", $delegated_account.as_ref()]
-    };
+pub fn delegation_metadata_pda_from_delegated_account(delegated: &Pubkey) -> Pubkey {
+    find_seed_pda(&Seed::DelegationMetadata(delegated), &crate::id())
 }
 
-#[macro_export]
-macro_rules! commit_record_seeds_from_delegated_account {
-    ($delegated_account: expr) => {
-        &[b"commit-state-record", $delegated_account.as_ref()]
-    };
+pub fn commit_state_pda_from_delegated_account(delegated: &Pubkey) -> Pubkey {
+    find_seed_pda(&Seed::CommitState(delegated), &crate::id())
 }
 
-#[macro_export]
-macro_rules! delegate_buffer_seeds_from_delegated_account {
-    ($delegated_account: expr) => {
-        &[b"buffer", $delegated_account.as_ref()]
-    };
-}
-
-#[macro_export]
-macro_rules! undelegate_buffer_seeds_from_delegated_account {
-    ($delegated_account: expr) => {
-        &[b"undelegate-buffer", $delegated_account.as_ref()]
-    };
-}
-
-#[macro_export]
-macro_rules! fees_vault_seeds {
-    () => {
-        &[b"fees-vault"]
-    };
-}
-
-#[macro_export]
-macro_rules! validator_fees_vault_seeds_from_validator {
-    ($validator: expr) => {
-        &[b"v-fees-vault", $validator.as_ref()]
-    };
-}
-
-#[macro_export]
-macro_rules! program_config_seeds_from_program_id {
-    ($program_id: expr) => {
-        &[b"p-conf", $program_id.as_ref()]
-    };
-}
-
-#[macro_export]
-macro_rules! ephemeral_balance_seeds_from_payer {
-    ($payer: expr, $index: expr) => {
-        &[b"balance", $payer.as_ref(), &[$index]]
-    };
-}
-
-pub fn delegation_record_pda_from_delegated_account(delegated_account: &Pubkey) -> Pubkey {
-    pubkey::find_program_address(
-        delegation_record_seeds_from_delegated_account!(delegated_account),
-        &crate::id(),
-    )
-    .0
-}
-
-pub fn delegation_metadata_pda_from_delegated_account(delegated_account: &Pubkey) -> Pubkey {
-    pubkey::find_program_address(
-        delegation_metadata_seeds_from_delegated_account!(delegated_account),
-        &crate::id(),
-    )
-    .0
-}
-
-pub fn commit_state_pda_from_delegated_account(delegated_account: &Pubkey) -> Pubkey {
-    pubkey::find_program_address(
-        commit_state_seeds_from_delegated_account!(delegated_account),
-        &crate::id(),
-    )
-    .0
-}
-
-pub fn commit_record_pda_from_delegated_account(delegated_account: &Pubkey) -> Pubkey {
-    pubkey::find_program_address(
-        commit_record_seeds_from_delegated_account!(delegated_account),
-        &crate::id(),
-    )
-    .0
+pub fn commit_record_pda_from_delegated_account(delegated: &Pubkey) -> Pubkey {
+    find_seed_pda(&Seed::CommitRecord(delegated), &crate::id())
 }
 
 pub fn delegate_buffer_pda_from_delegated_account_and_owner_program(
-    delegated_account: &Pubkey,
+    delegated: &Pubkey,
     owner_program: &Pubkey,
 ) -> Pubkey {
-    pubkey::find_program_address(
-        delegate_buffer_seeds_from_delegated_account!(delegated_account),
-        owner_program,
-    )
-    .0
+    find_seed_pda(&Seed::Buffer(delegated), owner_program)
 }
 
-pub fn undelegate_buffer_pda_from_delegated_account(delegated_account: &Pubkey) -> Pubkey {
-    pubkey::find_program_address(
-        undelegate_buffer_seeds_from_delegated_account!(delegated_account),
-        &crate::id(),
-    )
-    .0
+pub fn undelegate_buffer_pda_from_delegated_account(delegated: &Pubkey) -> Pubkey {
+    find_seed_pda(&Seed::UndelegateBuffer(delegated), &crate::id())
 }
 
 pub fn fees_vault_pda() -> Pubkey {
-    pubkey::find_program_address(fees_vault_seeds!(), &crate::id()).0
+    find_seed_pda(&Seed::FeesVault, &crate::id())
 }
 
 pub fn validator_fees_vault_pda_from_validator(validator: &Pubkey) -> Pubkey {
-    pubkey::find_program_address(
-        validator_fees_vault_seeds_from_validator!(validator),
-        &crate::id(),
-    )
-    .0
+    find_seed_pda(&Seed::ValidatorFeesVault(validator), &crate::id())
 }
 
 pub fn program_config_from_program_id(program_id: &Pubkey) -> Pubkey {
-    pubkey::find_program_address(
-        program_config_seeds_from_program_id!(program_id),
-        &crate::id(),
-    )
-    .0
+    find_seed_pda(&Seed::ProgramConfig(program_id), &crate::id())
 }
 
 pub fn ephemeral_balance_pda_from_payer(payer: &Pubkey, index: u8) -> Pubkey {
-    pubkey::find_program_address(
-        ephemeral_balance_seeds_from_payer!(payer, index),
-        &crate::id(),
-    )
-    .0
+    find_seed_pda(&Seed::EphemeralBalance { payer, index }, &crate::id())
 }

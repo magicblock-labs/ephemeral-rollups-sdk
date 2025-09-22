@@ -12,15 +12,21 @@ pub fn create_pda<'a, 'info>(
     pda_seeds: &[&[&[u8]]],
     system_program: &'a AccountInfo<'info>,
     payer: &'a AccountInfo<'info>,
+    rent_exempt: bool,
 ) -> ProgramResult {
     let rent = Rent::get()?;
     if target_account.lamports().eq(&0) {
+        let lamports = if rent_exempt {
+            rent.minimum_balance(space)
+        } else {
+            0
+        };
         // If balance is zero, create account
         solana_program::program::invoke_signed(
             &solana_program::system_instruction::create_account(
                 payer.key,
                 target_account.key,
-                rent.minimum_balance(space),
+                lamports,
                 space as u64,
                 owner,
             ),
@@ -34,22 +40,24 @@ pub fn create_pda<'a, 'info>(
     } else {
         // Otherwise, if balance is nonzero:
         // 1) transfer sufficient lamports for rent exemption
-        let rent_exempt_balance = rent
-            .minimum_balance(space)
-            .saturating_sub(target_account.lamports());
-        if rent_exempt_balance.gt(&0) {
-            solana_program::program::invoke(
-                &solana_program::system_instruction::transfer(
-                    payer.key,
-                    target_account.key,
-                    rent_exempt_balance,
-                ),
-                &[
-                    payer.as_ref().clone(),
-                    target_account.as_ref().clone(),
-                    system_program.as_ref().clone(),
-                ],
-            )?;
+        if rent_exempt {
+            let rent_exempt_balance = rent
+                .minimum_balance(space)
+                .saturating_sub(target_account.lamports());
+            if rent_exempt_balance.gt(&0) {
+                solana_program::program::invoke(
+                    &solana_program::system_instruction::transfer(
+                        payer.key,
+                        target_account.key,
+                        rent_exempt_balance,
+                    ),
+                    &[
+                        payer.as_ref().clone(),
+                        target_account.as_ref().clone(),
+                        system_program.as_ref().clone(),
+                    ],
+                )?;
+            }
         }
 
         // 2) allocate space for the account
@@ -101,30 +109,32 @@ pub fn close_pda_with_system_transfer<'a, 'info>(
     destination: &'a AccountInfo<'info>,
     system_program: &'a AccountInfo<'info>,
 ) -> ProgramResult {
-    let transfer_instruction = solana_program::system_instruction::transfer(
-        target_account.key,
-        destination.key,
-        target_account.lamports(),
-    );
-    target_account.realloc(0, true)?;
+    target_account.realloc(0, false)?;
     target_account.assign(&solana_program::system_program::ID);
-    solana_program::program::invoke_signed(
-        &transfer_instruction,
-        &[
-            target_account.clone(),
-            destination.clone(),
-            system_program.clone(),
-        ],
-        seeds,
-    )?;
+    if target_account.lamports() > 0 {
+        let transfer_instruction = solana_program::system_instruction::transfer(
+            target_account.key,
+            destination.key,
+            target_account.lamports(),
+        );
+        solana_program::program::invoke_signed(
+            &transfer_instruction,
+            &[
+                target_account.clone(),
+                destination.clone(),
+                system_program.clone(),
+            ],
+            seeds,
+        )?;
+    }
+
     Ok(())
 }
 
 /// Seeds with bump
 #[inline(always)]
 pub fn seeds_with_bump<'a>(seeds: &'a [&'a [u8]], bump: &'a [u8]) -> Vec<&'a [u8]> {
-    let mut combined: Vec<&'a [u8]> = Vec::with_capacity(seeds.len() + 1);
-    combined.extend_from_slice(seeds);
-    combined.push(bump);
-    combined
+    let mut v = Vec::from(seeds);
+    v.push(bump);
+    v
 }

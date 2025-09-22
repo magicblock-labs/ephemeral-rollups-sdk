@@ -1,7 +1,7 @@
 {
   "compilerOptions": {
     "outDir": "lib",
-    "baseUrl": "src",
+    "baseUrl": "./src",
     "declaration": true,
     "declarationMap": true,
     "emitDecoratorMetadata": true,
@@ -18,11 +18,6 @@
     "lib": ["es2020", "dom"],
     "resolveJsonModule": true
   },
-  "include": [
-    "src/**/*"
-  ],
-  "exclude": [
-    "node_modules",
-    "lib"
-  ]
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "lib"]
 }

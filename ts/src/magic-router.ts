@@ -167,15 +167,12 @@ export async function sendMagicTransaction(
     latestBlockhash.lastValidBlockHeight;
   (transaction as any).recentBlockhash = latestBlockhash.blockhash;
 
-  // If signers are provided, call transaction.sign for compatibility with tests/mocks
+  // If signers are provided, call transaction.sign
   if (Array.isArray(signersOrOptions)) {
     (transaction as any).sign?.(...signersOrOptions);
   }
 
-  // Do not attempt to actually sign or serialize the transaction as that would require
-  // valid keypairs/public keys in this environment. Instead, rely on the mocked
-  // connection.sendRawTransaction and forward a placeholder buffer.
-  const wireTransaction = Buffer.from("mock");
+  const wireTransaction = transaction.serialize();
   return connection.sendRawTransaction(wireTransaction, sendOpts);
 }
 
