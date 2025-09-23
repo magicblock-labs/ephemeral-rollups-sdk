@@ -201,3 +201,36 @@ pub fn cpi_delegate<'a, 'info>(
         signers_seeds,
     )
 }
+
+#[cfg(feature = "light")]
+pub fn cpi_delegate_compressed<'a, 'info>(
+    payer: &'a AccountInfo<'info>,
+    delegated_account: &'a AccountInfo<'info>,
+    owner_program: &'a AccountInfo<'info>,
+    args: crate::types::DelegateCompressedArgs,
+) -> ProgramResult {
+    if owner_program.key == &crate::id() {
+        return Err(ProgramError::IncorrectProgramId);
+    }
+
+    let mut data = 16_u64.to_le_bytes().to_vec();
+    data.extend_from_slice(&borsh::to_vec(&args).unwrap());
+
+    let ix = Instruction {
+        program_id: crate::id(),
+        accounts: vec![
+            AccountMeta::new(*payer.key, true),
+            AccountMeta::new(*delegated_account.key, true),
+            AccountMeta::new_readonly(*owner_program.key, false),
+        ],
+        data,
+    };
+    solana_program::program::invoke(
+        &ix,
+        &[
+            payer.clone(),
+            delegated_account.clone(),
+            owner_program.clone(),
+        ],
+    )
+}

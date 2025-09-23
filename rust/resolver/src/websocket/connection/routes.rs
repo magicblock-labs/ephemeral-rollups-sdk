@@ -69,7 +69,8 @@ impl WsRoutesConnection {
                             let Some(data) = account.data() else {
                                 continue;
                             };
-                            let record = match ErRecord::try_from_slice(&data) {
+                            let record = match borsh::try_from_slice_with_schema::<ErRecord>(&data)
+                            {
                                 Ok(record) => record,
                                 Err(err) => {
                                     tracing::warn!(

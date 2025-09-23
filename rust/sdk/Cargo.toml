@@ -12,8 +12,9 @@ license = { workspace = true }
 edition = { workspace = true }
 
 [features]
-default = []
+default = ["light"]
 anchor = ["anchor-lang"]
+light = ["dep:light-sdk", "dep:light-sdk-types"]
 
 [dependencies]
 anchor-lang = { workspace = true, optional = true }
@@ -22,3 +23,5 @@ ephemeral-rollups-sdk-attribute-delegate = { workspace = true }
 ephemeral-rollups-sdk-attribute-ephemeral = { workspace = true }
 ephemeral-rollups-sdk-attribute-commit = { workspace = true }
 solana-program = { workspace = true }
+light-sdk = { workspace = true, optional = true }
+light-sdk-types = { workspace = true, optional = true }
