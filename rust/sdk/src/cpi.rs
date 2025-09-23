@@ -203,11 +203,11 @@ pub fn cpi_delegate<'a, 'info>(
 }
 
 #[cfg(feature = "light")]
-pub fn cpi_delegate_compressed<'a, 'info, 'info2: 'info>(
+pub fn cpi_delegate_compressed<'a, 'info>(
     payer: &'a AccountInfo<'info>,
     delegated_account: &'a AccountInfo<'info>,
     owner_program: &'a AccountInfo<'info>,
-    remaining_accounts: &'a [AccountInfo<'info2>],
+    remaining_accounts: &'a [AccountInfo<'info>],
     signer_seeds: &[&[u8]],
     args: crate::types::DelegateCompressedArgs,
 ) -> ProgramResult {
