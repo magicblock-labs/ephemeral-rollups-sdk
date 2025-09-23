@@ -2032,10 +2032,10 @@ dependencies = [
 [[package]]
 name = "light-account-checks"
 version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f3fd000a2b8e0cc9d0b7b7712964870df51f2114f1693b9d8f0414f6f3ec16bd"
+source = "git+https://github.com/Lightprotocol/light-protocol?branch=jorrit%2Ffeat-opt-ctoken-mint-pinocchio#ffd23e24f7ce51b65e934138e76ebddd1da02409"
 dependencies = [
  "solana-account-info",
+ "solana-msg",
  "solana-program-error",
  "solana-pubkey",
  "solana-sysvar",
@@ -2045,13 +2045,14 @@ dependencies = [
 [[package]]
 name = "light-compressed-account"
 version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4f15113babaca9efb592631ec1e7e78c1c83413818a6e1e4248b7df53d88fe65"
+source = "git+https://github.com/Lightprotocol/light-protocol?branch=jorrit%2Ffeat-opt-ctoken-mint-pinocchio#ffd23e24f7ce51b65e934138e76ebddd1da02409"
 dependencies = [
  "borsh 0.10.4",
  "light-hasher",
  "light-macros",
+ "light-profiler",
  "light-zero-copy",
+ "solana-msg",
  "thiserror 2.0.12",
  "zerocopy 0.8.27",
 ]
@@ -2059,8 +2060,7 @@ dependencies = [
 [[package]]
 name = "light-hasher"
 version = "3.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c6445937ea244bebae0558e2aaec375791895d08c785b87cc45b62cd80d69139"
+source = "git+https://github.com/Lightprotocol/light-protocol?branch=jorrit%2Ffeat-opt-ctoken-mint-pinocchio#ffd23e24f7ce51b65e934138e76ebddd1da02409"
 dependencies = [
  "ark-bn254 0.5.0",
  "ark-ff 0.5.0",
@@ -2077,8 +2077,7 @@ dependencies = [
 [[package]]
 name = "light-macros"
 version = "2.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "861c0817697c1201c2235cd831fcbaa2564a5f778e5229e9f5cc21035e97c273"
+source = "git+https://github.com/Lightprotocol/light-protocol?branch=jorrit%2Ffeat-opt-ctoken-mint-pinocchio#ffd23e24f7ce51b65e934138e76ebddd1da02409"
 dependencies = [
  "bs58",
  "proc-macro2",
@@ -2099,10 +2098,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "light-profiler"
+version = "0.1.0"
+source = "git+https://github.com/Lightprotocol/light-protocol?branch=jorrit%2Ffeat-opt-ctoken-mint-pinocchio#ffd23e24f7ce51b65e934138e76ebddd1da02409"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.100",
+]
+
+[[package]]
 name = "light-sdk"
 version = "0.13.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "043b8e1c5172494c65373330710df30b06e66582135b9c0342455c2c1d0ef247"
+source = "git+https://github.com/Lightprotocol/light-protocol?branch=jorrit%2Ffeat-opt-ctoken-mint-pinocchio#ffd23e24f7ce51b65e934138e76ebddd1da02409"
 dependencies = [
  "borsh 0.10.4",
  "light-account-checks",
@@ -2125,8 +2133,7 @@ dependencies = [
 [[package]]
 name = "light-sdk-macros"
 version = "0.13.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "951ce0cad71f6c774bb6585281a3a5c636920b05b4d3e5ef27b5050f57b6032b"
+source = "git+https://github.com/Lightprotocol/light-protocol?branch=jorrit%2Ffeat-opt-ctoken-mint-pinocchio#ffd23e24f7ce51b65e934138e76ebddd1da02409"
 dependencies = [
  "light-hasher",
  "light-poseidon",
@@ -2139,8 +2146,7 @@ dependencies = [
 [[package]]
 name = "light-sdk-types"
 version = "0.13.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8a641277a3e4272f3f619743f0ac31f81f9a085b69108bb625134ebce7a5a12c"
+source = "git+https://github.com/Lightprotocol/light-protocol?branch=jorrit%2Ffeat-opt-ctoken-mint-pinocchio#ffd23e24f7ce51b65e934138e76ebddd1da02409"
 dependencies = [
  "borsh 0.10.4",
  "light-account-checks",
@@ -2148,17 +2154,29 @@ dependencies = [
  "light-hasher",
  "light-macros",
  "light-zero-copy",
+ "solana-msg",
  "thiserror 2.0.12",
 ]
 
 [[package]]
 name = "light-zero-copy"
 version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a34d759f65547a6540db7047f38f4cb2c3f01658deca95a1dd06f26b578de947"
+source = "git+https://github.com/Lightprotocol/light-protocol?branch=jorrit%2Ffeat-opt-ctoken-mint-pinocchio#ffd23e24f7ce51b65e934138e76ebddd1da02409"
 dependencies = [
- "thiserror 2.0.12",
+ "arrayvec",
+ "light-zero-copy-derive",
  "zerocopy 0.8.27",
+]
+
+[[package]]
+name = "light-zero-copy-derive"
+version = "0.1.0"
+source = "git+https://github.com/Lightprotocol/light-protocol?branch=jorrit%2Ffeat-opt-ctoken-mint-pinocchio#ffd23e24f7ce51b65e934138e76ebddd1da02409"
+dependencies = [
+ "lazy_static",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.100",
 ]
 
 [[package]]
