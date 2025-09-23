@@ -39,3 +39,11 @@ pub struct DelegateCompressedArgs {
     /// The account data
     pub account_data: Vec<u8>,
 }
+
+#[cfg(feature = "idl-build")]
+impl anchor_lang::IdlBuild for DelegateCompressedArgs {}
+
+#[cfg(feature = "idl-build")]
+impl anchor_lang::Discriminator for DelegateCompressedArgs {
+    const DISCRIMINATOR: &'static [u8] = &[];
+}

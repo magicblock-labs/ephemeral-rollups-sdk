@@ -203,12 +203,16 @@ pub fn cpi_delegate<'a, 'info>(
 }
 
 #[cfg(feature = "light")]
-pub fn cpi_delegate_compressed<'a, 'info>(
+pub fn cpi_delegate_compressed<'a, 'info, 'info2: 'info>(
     payer: &'a AccountInfo<'info>,
     delegated_account: &'a AccountInfo<'info>,
     owner_program: &'a AccountInfo<'info>,
+    remaining_accounts: &'a [AccountInfo<'info2>],
+    signer_seeds: &[&[u8]],
     args: crate::types::DelegateCompressedArgs,
 ) -> ProgramResult {
+    use solana_program::msg;
+
     if owner_program.key == &crate::id() {
         return Err(ProgramError::IncorrectProgramId);
     }
@@ -216,21 +220,47 @@ pub fn cpi_delegate_compressed<'a, 'info>(
     let mut data = 16_u64.to_le_bytes().to_vec();
     data.extend_from_slice(&borsh::to_vec(&args).unwrap());
 
+    let remaining_accounts_metas = remaining_accounts
+        .iter()
+        .map(|a| AccountMeta {
+            pubkey: *a.key,
+            is_signer: a.is_signer,
+            is_writable: a.is_writable,
+        })
+        .collect::<Vec<_>>();
     let ix = Instruction {
         program_id: crate::id(),
-        accounts: vec![
-            AccountMeta::new(*payer.key, true),
-            AccountMeta::new(*delegated_account.key, true),
-            AccountMeta::new_readonly(*owner_program.key, false),
-        ],
+        accounts: [
+            &[
+                AccountMeta::new(*payer.key, true),
+                AccountMeta::new_readonly(*delegated_account.key, true),
+                AccountMeta::new_readonly(*owner_program.key, false),
+            ],
+            remaining_accounts_metas.as_slice(),
+        ]
+        .concat(),
         data,
     };
-    solana_program::program::invoke(
+    msg!(
+        "cpi_delegate_compressed: {}",
+        ix.accounts
+            .iter()
+            .map(|a| format!("{:?}", a))
+            .collect::<Vec<_>>()
+            .join("\n")
+    );
+
+    solana_program::program::invoke_signed(
         &ix,
-        &[
-            payer.clone(),
-            delegated_account.clone(),
-            owner_program.clone(),
-        ],
+        &vec![
+            &[
+                payer.clone(),
+                delegated_account.clone(),
+                owner_program.clone(),
+            ],
+            remaining_accounts,
+        ]
+        .concat(),
+        &[signer_seeds],
     )
 }

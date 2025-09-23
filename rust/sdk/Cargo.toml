@@ -15,13 +15,15 @@ edition = { workspace = true }
 default = ["light"]
 anchor = ["anchor-lang"]
 light = ["dep:light-sdk", "dep:light-sdk-types"]
+idl-build = []
 
 [dependencies]
 anchor-lang = { workspace = true, optional = true }
-borsh = { workspace = true }
 ephemeral-rollups-sdk-attribute-delegate = { workspace = true }
 ephemeral-rollups-sdk-attribute-ephemeral = { workspace = true }
 ephemeral-rollups-sdk-attribute-commit = { workspace = true }
 solana-program = { workspace = true }
 light-sdk = { workspace = true, optional = true }
 light-sdk-types = { workspace = true, optional = true }
+
+borsh = { version = "1.5.7", workspace = true }
