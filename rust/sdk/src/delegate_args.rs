@@ -1,13 +1,10 @@
+use dlp::pda::{
+    delegate_buffer_pda_from_delegated_account_and_owner_program,
+    delegation_metadata_pda_from_delegated_account, delegation_record_pda_from_delegated_account,
+};
 use solana_program::{instruction::AccountMeta, pubkey::Pubkey, system_program};
 
-use crate::{
-    consts::DELEGATION_PROGRAM_ID,
-    pda::{
-        delegate_buffer_pda_from_delegated_account_and_owner_program,
-        delegation_metadata_pda_from_delegated_account,
-        delegation_record_pda_from_delegated_account,
-    },
-};
+use crate::consts::DELEGATION_PROGRAM_ID;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DelegateAccounts {

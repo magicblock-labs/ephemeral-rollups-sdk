@@ -27,6 +27,10 @@ ephemeral-rollups-sdk-attribute-ephemeral = { path = "ephemeral", version = "=0.
 ephemeral-rollups-sdk-attribute-delegate = { path = "delegate", version = "=0.2.12" }
 ephemeral-rollups-sdk-attribute-commit = { path = "commit-attribute", version = "=0.2.12" }
 
+# Magicblock
+magicblock-delegation-program = { version = "1.1.1", features = ["no-entrypoint"] }
+magicblock-magic-program-api = "0.1.7"
+
 ## External crates
 anchor-lang = { version = ">=0.28.0" }
 proc-macro2 = "1.0"

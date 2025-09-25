@@ -64,7 +64,7 @@ pub fn delegate(_attr: TokenStream, item: TokenStream) -> TokenStream {
             new_fields.push(quote! {
                 /// CHECK: The buffer account
                 #[account(
-                    mut, seeds = [ephemeral_rollups_sdk::consts::BUFFER, #field_name.key().as_ref()],
+                    mut, seeds = [ephemeral_rollups_sdk::pda::DELEGATE_BUFFER_TAG, #field_name.key().as_ref()],
                     bump, seeds::program = crate::id()
                 )]
                 pub #buffer_field: AccountInfo<'info>,
@@ -73,7 +73,7 @@ pub fn delegate(_attr: TokenStream, item: TokenStream) -> TokenStream {
             new_fields.push(quote! {
                 /// CHECK: The delegation record account
                 #[account(
-                    mut, seeds = [ephemeral_rollups_sdk::consts::DELEGATION_RECORD, #field_name.key().as_ref()],
+                    mut, seeds = [ephemeral_rollups_sdk::pda::DELEGATION_RECORD_TAG, #field_name.key().as_ref()],
                     bump, seeds::program = delegation_program.key()
                 )]
                 pub #delegation_record_field: AccountInfo<'info>,
@@ -82,7 +82,7 @@ pub fn delegate(_attr: TokenStream, item: TokenStream) -> TokenStream {
             new_fields.push(quote! {
                 /// CHECK: The delegation metadata account
                 #[account(
-                    mut, seeds = [ephemeral_rollups_sdk::consts::DELEGATION_METADATA, #field_name.key().as_ref()],
+                    mut, seeds = [ephemeral_rollups_sdk::pda::DELEGATION_METADATA_TAG, #field_name.key().as_ref()],
                     bump, seeds::program = delegation_program.key()
                 )]
                 pub #delegation_metadata_field: AccountInfo<'info>,
