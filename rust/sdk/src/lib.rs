@@ -20,7 +20,7 @@ pub use dlp::{
 };
 pub use magicblock_magic_program_api::args::{
     ActionArgs, BaseActionArgs, CommitAndUndelegateArgs, CommitTypeArgs, MagicBaseIntentArgs,
-    UndelegateTypeArgs,
+    ShortAccountMeta, UndelegateTypeArgs,
 };
 
 pub const fn id() -> Pubkey {
