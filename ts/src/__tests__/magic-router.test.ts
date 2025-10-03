@@ -173,7 +173,7 @@ describe("getClosestValidator", () => {
     jest.clearAllMocks();
   });
 
-  it("fetches and returns the closest validator public key", async () => {
+  it("fetches and returns the closest validator info", async () => {
     const mockIdentityData = {
       result: {
         identity: "mock-validator-identity",
@@ -198,7 +198,7 @@ describe("getClosestValidator", () => {
       }),
     });
 
-    expect(result.toBase58()).toBe("mock-validator-identity");
+    expect(result.identity).toBe("mock-validator-identity");
   });
 
   it("handles fetch errors gracefully", async () => {
