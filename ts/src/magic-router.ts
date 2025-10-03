@@ -182,14 +182,24 @@ export async function sendAndConfirmMagicTransaction(
     options,
   );
   let status;
-  if ((transaction.recentBlockhash != null) && (transaction.lastValidBlockHeight != null)) {
+  if (
+    transaction.recentBlockhash !== null &&
+    transaction.recentBlockhash !== undefined &&
+    transaction.lastValidBlockHeight !== null &&
+    transaction.lastValidBlockHeight !== undefined
+  ) {
       status = (await connection.confirmTransaction({
       abortSignal: options?.abortSignal,
       signature: signature,
       blockhash: transaction.recentBlockhash,
       lastValidBlockHeight: transaction.lastValidBlockHeight
       }, options?.commitment)).value;
-  } else if ((transaction.minNonceContextSlot != null) && (transaction.nonceInfo != null)) {
+  } else if (
+    transaction.minNonceContextSlot !== null &&
+    transaction.minNonceContextSlot !== undefined &&
+    transaction.nonceInfo !== null &&
+    transaction.nonceInfo !== undefined
+  ) {
       const {
       nonceInstruction
       } = transaction.nonceInfo;
