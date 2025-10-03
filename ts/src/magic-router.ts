@@ -182,33 +182,29 @@ export async function sendAndConfirmMagicTransaction(
     options,
   );
   let status;
+  const { recentBlockhash, lastValidBlockHeight, minNonceContextSlot, nonceInfo } = transaction;
   if (
-    transaction.recentBlockhash !== null &&
-    transaction.recentBlockhash !== undefined &&
-    transaction.lastValidBlockHeight !== null &&
-    transaction.lastValidBlockHeight !== undefined
+    recentBlockhash != null && lastValidBlockHeight != null
   ) {
       status = (await connection.confirmTransaction({
       abortSignal: options?.abortSignal,
       signature: signature,
-      blockhash: transaction.recentBlockhash,
-      lastValidBlockHeight: transaction.lastValidBlockHeight
+      blockhash: recentBlockhash,
+      lastValidBlockHeight: lastValidBlockHeight
       }, options?.commitment)).value;
   } else if (
-    transaction.minNonceContextSlot !== null &&
-    transaction.minNonceContextSlot !== undefined &&
-    transaction.nonceInfo !== null &&
-    transaction.nonceInfo !== undefined
+    minNonceContextSlot != null &&
+    nonceInfo != null
   ) {
       const {
-      nonceInstruction
-      } = transaction.nonceInfo;
+        nonceInstruction
+      } = nonceInfo;
       const nonceAccountPubkey = nonceInstruction.keys[0].pubkey;
       status = (await connection.confirmTransaction({
       abortSignal: options?.abortSignal,
-      minContextSlot: transaction.minNonceContextSlot,
+      minContextSlot: minNonceContextSlot,
       nonceAccountPubkey,
-      nonceValue: transaction.nonceInfo.nonce,
+      nonceValue: nonceInfo.nonce,
       signature
       }, options?.commitment)).value;
   } else {
