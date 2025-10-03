@@ -72,7 +72,7 @@ pub fn ephemeral(_args: TokenStream, input: TokenStream) -> TokenStream {
     let modified = modify_component_module(ast);
     TokenStream::from(quote! {
         #[allow(unused_imports)]
-        use ::ephemeral_rollups_sdk::anchor::MagicProgram;
+        use ephemeral_rollups_sdk::anchor::MagicProgram;
 
         #modified
     })
