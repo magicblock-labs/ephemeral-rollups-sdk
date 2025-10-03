@@ -49,7 +49,7 @@ export async function getClosestValidator(routerConnection: Connection) : Promis
 
   const identityData = (await response.json())?.result;
 
-  if (identityData == undefined || identityData.identity == undefined) {
+  if ((identityData == null) || (identityData.identity == null)) {
     throw new Error("Invalid response");
   }
 
@@ -208,13 +208,13 @@ export async function sendAndConfirmMagicTransaction(
       signature
       }, options?.commitment)).value;
   } else {
-      if (options?.abortSignal !== undefined) {
+      if (options?.abortSignal !== null) {
       console.warn('sendAndConfirmTransaction(): A transaction with a deprecated confirmation strategy was ' + 'supplied along with an `abortSignal`. Only transactions having `lastValidBlockHeight` ' + 'or a combination of `nonceInfo` and `minNonceContextSlot` are abortable.');
       }
       status = (await connection.confirmTransaction(signature, options?.commitment)).value;
   }
   if (status.err) {
-      if (signature !== undefined) {
+      if (signature !== null) {
       throw new SendTransactionError({
           action: 'send',
           signature: signature,
