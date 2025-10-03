@@ -188,7 +188,7 @@ export async function sendAndConfirmMagicTransaction(
       signature: signature,
       blockhash: transaction.recentBlockhash,
       lastValidBlockHeight: transaction.lastValidBlockHeight
-      }, options && options.commitment)).value;
+      }, options?.commitment)).value;
   } else if (transaction.minNonceContextSlot != null && transaction.nonceInfo != null) {
       const {
       nonceInstruction
@@ -200,7 +200,7 @@ export async function sendAndConfirmMagicTransaction(
       nonceAccountPubkey,
       nonceValue: transaction.nonceInfo.nonce,
       signature
-      }, options && options.commitment)).value;
+      }, options?.commitment)).value;
   } else {
       if (options?.abortSignal != null) {
       console.warn('sendAndConfirmTransaction(): A transaction with a deprecated confirmation strategy was ' + 'supplied along with an `abortSignal`. Only transactions having `lastValidBlockHeight` ' + 'or a combination of `nonceInfo` and `minNonceContextSlot` are abortable.');
