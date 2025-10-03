@@ -49,9 +49,10 @@ export async function getClosestValidator(routerConnection: Connection) : Promis
 
   const identityData = (await response.json())?.result;
 
-  if (!identityData || !identityData.identity) {
+  if (identityData == null || identityData.identity == null) {
     throw new Error("Invalid response");
   }
+
 
   return identityData;
 }
