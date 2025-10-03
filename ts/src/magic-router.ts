@@ -205,7 +205,7 @@ export async function sendAndConfirmMagicTransaction(
       if (options?.abortSignal != null) {
       console.warn('sendAndConfirmTransaction(): A transaction with a deprecated confirmation strategy was ' + 'supplied along with an `abortSignal`. Only transactions having `lastValidBlockHeight` ' + 'or a combination of `nonceInfo` and `minNonceContextSlot` are abortable.');
       }
-      status = (await connection.confirmTransaction(signature, options && options.commitment)).value;
+      status = (await connection.confirmTransaction(signature, options?.commitment)).value;
   }
   if (status.err) {
       if (signature != null) {
