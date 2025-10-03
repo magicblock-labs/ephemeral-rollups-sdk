@@ -35,7 +35,9 @@ export function getWritableAccounts(transaction: Transaction) {
 /**
  * Get the closest validator info from the router connection.
  */
-export async function getClosestValidator(routerConnection: Connection) : Promise<{ identity: string; fqdn?: string }> {
+export async function getClosestValidator(
+  routerConnection: Connection,
+): Promise<{ identity: string; fqdn?: string }> {
   const response = await fetch(routerConnection.rpcEndpoint, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -49,10 +51,9 @@ export async function getClosestValidator(routerConnection: Connection) : Promis
 
   const identityData = (await response.json())?.result;
 
-  if ((identityData == null) || (identityData.identity == null)) {
+  if (identityData?.identity == null) {
     throw new Error("Invalid response");
   }
-
 
   return identityData;
 }
@@ -182,46 +183,62 @@ export async function sendAndConfirmMagicTransaction(
     options,
   );
   let status;
-  const { recentBlockhash, lastValidBlockHeight, minNonceContextSlot, nonceInfo } = transaction;
-  if (
-    recentBlockhash !== undefined && lastValidBlockHeight !== undefined
-  ) {
-      status = (await connection.confirmTransaction({
-      abortSignal: options?.abortSignal,
-      signature: signature,
-      blockhash: recentBlockhash,
-      lastValidBlockHeight: lastValidBlockHeight
-      }, options?.commitment)).value;
-  } else if (
-    minNonceContextSlot !== undefined &&
-    nonceInfo !== undefined
-  ) {
-      const {
-        nonceInstruction
-      } = nonceInfo;
-      const nonceAccountPubkey = nonceInstruction.keys[0].pubkey;
-      status = (await connection.confirmTransaction({
-      abortSignal: options?.abortSignal,
-      minContextSlot: minNonceContextSlot,
-      nonceAccountPubkey,
-      nonceValue: nonceInfo.nonce,
-      signature
-      }, options?.commitment)).value;
+  const {
+    recentBlockhash,
+    lastValidBlockHeight,
+    minNonceContextSlot,
+    nonceInfo,
+  } = transaction;
+  if (recentBlockhash !== undefined && lastValidBlockHeight !== undefined) {
+    status = (
+      await connection.confirmTransaction(
+        {
+          abortSignal: options?.abortSignal,
+          signature,
+          blockhash: recentBlockhash,
+          lastValidBlockHeight,
+        },
+        options?.commitment,
+      )
+    ).value;
+  } else if (minNonceContextSlot !== undefined && nonceInfo !== undefined) {
+    const { nonceInstruction } = nonceInfo;
+    const nonceAccountPubkey = nonceInstruction.keys[0].pubkey;
+    status = (
+      await connection.confirmTransaction(
+        {
+          abortSignal: options?.abortSignal,
+          minContextSlot: minNonceContextSlot,
+          nonceAccountPubkey,
+          nonceValue: nonceInfo.nonce,
+          signature,
+        },
+        options?.commitment,
+      )
+    ).value;
   } else {
-      if (options?.abortSignal !== null) {
-      console.warn('sendAndConfirmTransaction(): A transaction with a deprecated confirmation strategy was ' + 'supplied along with an `abortSignal`. Only transactions having `lastValidBlockHeight` ' + 'or a combination of `nonceInfo` and `minNonceContextSlot` are abortable.');
-      }
-      status = (await connection.confirmTransaction(signature, options?.commitment)).value;
+    if (options?.abortSignal !== null) {
+      console.warn(
+        "sendAndConfirmTransaction(): A transaction with a deprecated confirmation strategy was " +
+          "supplied along with an `abortSignal`. Only transactions having `lastValidBlockHeight` " +
+          "or a combination of `nonceInfo` and `minNonceContextSlot` are abortable.",
+      );
+    }
+    status = (
+      await connection.confirmTransaction(signature, options?.commitment)
+    ).value;
   }
-  if (status.err) {
-      if (signature !== null) {
+  if (status.err != null) {
+    if (signature !== null) {
       throw new SendTransactionError({
-          action: 'send',
-          signature: signature,
-          transactionMessage: `Status: (${JSON.stringify(status)})`
+        action: "send",
+        signature,
+        transactionMessage: `Status: (${JSON.stringify(status)})`,
       });
-      }
-      throw new Error(`Transaction ${signature} failed (${JSON.stringify(status)})`);
+    }
+    throw new Error(
+      `Transaction ${signature} failed (${JSON.stringify(status)})`,
+    );
   }
   return signature;
 }
