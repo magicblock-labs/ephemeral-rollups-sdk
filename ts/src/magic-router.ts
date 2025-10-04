@@ -218,4 +218,4 @@ export function getWritableAccounts(transaction: Transaction) {
   return signature;
 };
 
-export default Connection;
+export { Connection };
