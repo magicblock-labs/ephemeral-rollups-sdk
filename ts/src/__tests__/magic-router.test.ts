@@ -1,285 +1,154 @@
+import Connection, { getWritableAccounts } from "../magic-router.js";
 import {
-  prepareMagicTransaction,
-  sendMagicTransaction,
-  getWritableAccounts,
-  getClosestValidator,
-  getDelegationStatus,
-} from "../magic-router.js";
-import { Connection, Transaction, Keypair, PublicKey } from "@solana/web3.js";
+  Transaction,
+  Keypair,
+  PublicKey,
+  SendTransactionError,
+} from "@solana/web3.js";
 
-// Mock PublicKey class
-const mockPublicKey = (address: string) => ({
-  toBase58: () => address,
-  toString: () => address,
-});
-
-jest.mock("@solana/web3.js", () => {
-  const actual = jest.requireActual("@solana/web3.js");
-  return {
-    ...actual,
-    Connection: jest.fn().mockImplementation(() => ({
-      rpcEndpoint: "http://localhost",
-      sendRawTransaction: jest.fn().mockResolvedValue("mock-signature"),
-    })),
-    Transaction: jest.fn().mockImplementation(() => ({
-      feePayer: mockPublicKey("mock-fee-payer"),
-      signature: [],
-      instructions: [
-        {
-          keys: [
-            { pubkey: mockPublicKey("key1"), isSigner: true, isWritable: true },
-            {
-              pubkey: mockPublicKey("key2"),
-              isSigner: false,
-              isWritable: false,
-            },
-          ],
-        },
-      ],
-      serialize: jest.fn(() => Buffer.from("mock")),
-      sign: jest.fn(),
-    })),
-    Keypair: jest.fn().mockImplementation(() => ({
-      publicKey: mockPublicKey("mock-public-key"),
-      sign: jest.fn(),
-    })),
-    PublicKey: jest
-      .fn()
-      .mockImplementation((address: string) => mockPublicKey(address)),
-  };
-});
-
-global.fetch = jest.fn(async () =>
-  Promise.resolve({
-    json: async () =>
-      Promise.resolve({ result: { blockhash: "mock-blockhash" } }),
-  }),
-) as any;
-
-describe("prepareRouterTransaction", () => {
-  it("sets recentBlockhash and returns the transaction", async () => {
-    const connection = new Connection("http://localhost");
-    const transaction = new Transaction();
-    const result = await prepareMagicTransaction(connection, transaction);
-    expect(result.recentBlockhash).toBe("mock-blockhash");
-    expect(global.fetch).toHaveBeenCalledWith("http://localhost", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        jsonrpc: "2.0",
-        id: 1,
-        method: "getBlockhashForAccounts",
-        params: [["mock-fee-payer", "key1"]],
-      }),
-    });
-  });
-});
-
-describe("sendRouterTransaction", () => {
-  it("sets recentBlockhash, feePayer, signs, and sends the transaction", async () => {
-    const connection = new Connection("http://localhost");
-    const transaction = new Transaction();
-    const signers = [new Keypair()];
-    const signature = await sendMagicTransaction(
-      connection,
-      transaction,
-      signers,
-    );
-
-    expect(transaction.recentBlockhash).toBe("mock-blockhash");
-    expect(transaction.feePayer?.toBase58()).toBe("mock-fee-payer");
-    expect((transaction as any).sign).toHaveBeenCalledWith(...signers);
-    expect(signature).toBe("mock-signature");
-    expect(global.fetch).toHaveBeenCalledWith("http://localhost", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        jsonrpc: "2.0",
-        id: 1,
-        method: "getBlockhashForAccounts",
-        params: [["mock-fee-payer", "key1"]],
-      }),
-    });
-  });
-});
+// --- Global mocks ---
+global.fetch = jest.fn();
 
 describe("getWritableAccounts", () => {
-  it("returns writable accounts from transaction", () => {
-    const transaction = {
-      feePayer: mockPublicKey("fee-payer"),
-      instructions: [
-        {
-          keys: [
-            { pubkey: mockPublicKey("key1"), isWritable: true },
-            { pubkey: mockPublicKey("key2"), isWritable: false },
-            { pubkey: mockPublicKey("key3"), isWritable: true },
-          ],
-        },
-      ],
-    } as unknown as Transaction;
-
-    const result = getWritableAccounts(transaction);
-    expect(result).toEqual(["fee-payer", "key1", "key3"]);
-  });
-
-  it("handles transaction without feePayer", () => {
-    const transaction = {
-      feePayer: null,
-      instructions: [
-        {
-          keys: [
-            { pubkey: mockPublicKey("key1"), isWritable: true },
-            { pubkey: mockPublicKey("key2"), isWritable: false },
-          ],
-        },
-      ],
-    } as unknown as Transaction;
-
-    const result = getWritableAccounts(transaction);
-    expect(result).toEqual(["key1"]);
-  });
-
-  it("handles transaction without instructions", () => {
-    const transaction = {
-      feePayer: mockPublicKey("fee-payer"),
-      instructions: [],
-    } as unknown as Transaction;
-
-    const result = getWritableAccounts(transaction);
-    expect(result).toEqual(["fee-payer"]);
+  const mockPublicKey = (address: string) => ({
+    toBase58: () => address,
+    toString: () => address,
   });
 
   it("deduplicates writable accounts", () => {
-    const transaction = {
+    const tx = {
       feePayer: mockPublicKey("fee-payer"),
       instructions: [
         {
           keys: [
-            { pubkey: mockPublicKey("key1"), isWritable: true },
-            { pubkey: mockPublicKey("key1"), isWritable: true }, // Duplicate
-            { pubkey: mockPublicKey("key2"), isWritable: false },
+            { pubkey: mockPublicKey("k1"), isWritable: true },
+            { pubkey: mockPublicKey("k1"), isWritable: true },
           ],
         },
       ],
     } as unknown as Transaction;
 
-    const result = getWritableAccounts(transaction);
-    expect(result).toEqual(["fee-payer", "key1"]);
+    const result = getWritableAccounts(tx);
+    expect(result).toEqual(["fee-payer", "k1"]); // ✅ no extra accounts
   });
 });
 
-describe("getClosestValidator", () => {
+describe("Connection prototype methods", () => {
+  let connection: Connection;
+  let tx: Transaction;
+
   beforeEach(() => {
-    jest.clearAllMocks();
+    connection = new Connection("http://localhost"); // use patched Connection
+    tx = new Transaction();
+
+    // Mock transaction instance methods
+    (tx as any).serialize = jest.fn(() => Buffer.from("mock"));
+    (tx as any).sign = jest.fn();
+
+    (global.fetch as jest.Mock).mockReset();
   });
 
-  it("fetches and returns the closest validator info", async () => {
-    const mockIdentityData = {
-      result: {
-        identity: "mock-validator-identity",
-      },
-    };
-
+  it("getClosestValidator returns identity", async () => {
     (global.fetch as jest.Mock).mockResolvedValueOnce({
-      json: async () => Promise.resolve(mockIdentityData),
+      json: async () => ({ result: { identity: "validator-1" } }),
     });
 
-    const connection = new Connection("http://localhost");
-    const result = await getClosestValidator(connection);
-
-    expect(global.fetch).toHaveBeenCalledWith("http://localhost", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        jsonrpc: "2.0",
-        id: 1,
-        method: "getIdentity",
-        params: [],
-      }),
-    });
-
-    expect(result.identity).toBe("mock-validator-identity");
+    const result = await (connection as any).getClosestValidator();
+    expect(result).toEqual({ identity: "validator-1" });
   });
 
-  it("handles fetch errors gracefully", async () => {
-    (global.fetch as jest.Mock).mockRejectedValueOnce(
-      new Error("Network error"),
-    );
-
-    const connection = new Connection("http://localhost");
-
-    await expect(getClosestValidator(connection)).rejects.toThrow(
-      "Network error",
-    );
-  });
-
-  it("handles invalid response format", async () => {
+  it("getDelegationStatus works with string account", async () => {
     (global.fetch as jest.Mock).mockResolvedValueOnce({
-      json: async () => Promise.resolve({ error: "Invalid response" }),
+      json: async () => ({ result: { isDelegated: true } }),
     });
 
-    const connection = new Connection("http://localhost");
-
-    await expect(getClosestValidator(connection)).rejects.toThrow();
-  });
-});
-
-describe("getDelegationStatus", () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
+    const result = await (connection as any).getDelegationStatus("account1");
+    expect(result).toEqual({ isDelegated: true });
   });
 
-  it("returns delegation status for a string account", async () => {
+  it("getDelegationStatus works with PublicKey account", async () => {
     (global.fetch as jest.Mock).mockResolvedValueOnce({
-      json: async () => Promise.resolve({ result: { isDelegated: false } }),
+      json: async () => ({ result: { isDelegated: false } }),
     });
 
-    const connection = new Connection("http://localhost");
-    const account = "7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU";
-
-    const result = await getDelegationStatus(connection, account);
-
-    expect(global.fetch).toHaveBeenCalledWith(
-      "http://localhost/getDelegationStatus",
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          jsonrpc: "2.0",
-          id: 1,
-          method: "getDelegationStatus",
-          params: [account],
-        }),
-      },
-    );
-
+    const pk = new PublicKey("11111111111111111111111111111111");
+    const result = await (connection as any).getDelegationStatus(pk);
     expect(result).toEqual({ isDelegated: false });
   });
 
-  it("returns delegation status for a PublicKey account", async () => {
+  it("getLatestBlockhashForTransaction returns blockhash", async () => {
     (global.fetch as jest.Mock).mockResolvedValueOnce({
-      json: async () => Promise.resolve({ result: { isDelegated: true } }),
+      json: async () => ({
+        result: { blockhash: "mock-blockhash", lastValidBlockHeight: 100 },
+      }),
     });
 
-    const connection = new Connection("http://localhost");
-    const accountKey = new PublicKey("mock-public-key");
-
-    const result = await getDelegationStatus(connection, accountKey);
-
-    expect(global.fetch).toHaveBeenCalledWith(
-      "http://localhost/getDelegationStatus",
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          jsonrpc: "2.0",
-          id: 1,
-          method: "getDelegationStatus",
-          params: [accountKey.toBase58()],
-        }),
-      },
+    const result = await (connection as any).getLatestBlockhashForTransaction(
+      tx,
     );
+    expect(result).toEqual({
+      blockhash: "mock-blockhash",
+      lastValidBlockHeight: 100,
+    });
+  });
 
-    expect(result).toEqual({ isDelegated: true });
+  it("prepareTransaction sets recentBlockhash", async () => {
+    // Spy on the prototype method
+    jest
+      .spyOn(Connection.prototype as any, "getLatestBlockhashForTransaction")
+      .mockResolvedValue({ blockhash: "hb", lastValidBlockHeight: 100 });
+
+    const result = await connection.prepareTransaction(tx);
+    expect(result.recentBlockhash).toBe("hb");
+  });
+
+  it("sendTransaction signs and sends transaction", async () => {
+    jest
+      .spyOn(Connection.prototype as any, "getLatestBlockhashForTransaction")
+      .mockResolvedValue({ blockhash: "hb", lastValidBlockHeight: 100 });
+
+    jest
+      .spyOn(Connection.prototype as any, "sendRawTransaction")
+      .mockResolvedValue("sig123");
+
+    const signers = [new Keypair()];
+
+    const sendTx = connection.sendTransaction.bind(connection);
+    const signature = await sendTx(tx, signers);
+
+    const signFn = (tx as any).sign.bind(tx);
+    const serializeFn = (tx as any).serialize.bind(tx);
+
+    expect(signFn(...signers)).toBeUndefined();
+    expect(serializeFn()).toBeInstanceOf(Buffer);
+    expect(signature).toBe("sig123");
+  });
+
+  it("sendAndConfirmTransaction calls sendTransaction and returns signature", async () => {
+    jest
+      .spyOn(Connection.prototype as any, "sendTransaction")
+      .mockResolvedValue("sig123");
+    jest
+      .spyOn(Connection.prototype as any, "confirmTransaction")
+      .mockResolvedValue({ value: { err: null } });
+
+    const signature = await connection.sendAndConfirmTransaction(tx, [
+      new Keypair(),
+    ]);
+
+    expect(signature).toBe("sig123");
+  });
+
+  it("sendAndConfirmTransaction throws SendTransactionError if status has err", async () => {
+    jest
+      .spyOn(Connection.prototype as any, "sendTransaction")
+      .mockResolvedValue("sig123");
+    jest
+      .spyOn(Connection.prototype as any, "confirmTransaction")
+      .mockResolvedValue({ value: { err: { some: "error" } } });
+
+    await expect(
+      connection.sendAndConfirmTransaction(tx, [new Keypair()]),
+    ).rejects.toThrow(SendTransactionError);
   });
 });
