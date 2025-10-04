@@ -1,7 +1,7 @@
 use crate::ephem::utils::accounts_to_indices;
 use magicblock_magic_program_api::args::{
     ActionArgs, BaseActionArgs, CommitAndUndelegateArgs, CommitTypeArgs, MagicBaseIntentArgs,
-    UndelegateTypeArgs,
+    ShortAccountMeta, UndelegateTypeArgs,
 };
 use magicblock_magic_program_api::instruction::MagicBlockInstruction;
 use solana_program::account_info::AccountInfo;
@@ -23,9 +23,9 @@ pub struct MagicInstructionBuilder<'info> {
 
 impl<'info> MagicInstructionBuilder<'info> {
     /// Build instruction for supplied an action and prepares accounts
-    pub fn build(&self) -> (Vec<AccountInfo<'info>>, Instruction) {
+    pub fn build(self) -> (Vec<AccountInfo<'info>>, Instruction) {
         // set those to be first
-        let mut all_accounts = vec![self.payer.clone(), self.magic_context.clone()];
+        let mut all_accounts = vec![self.payer, self.magic_context];
         // collect all accounts to be used in instruction
         self.magic_action.collect_accounts(&mut all_accounts);
         // filter duplicates & get indices map
@@ -83,18 +83,18 @@ impl<'info> MagicAction<'info> {
     }
 
     /// Creates argument for CPI
-    fn build_args(&self, indices_map: &HashMap<Pubkey, u8>) -> MagicBaseIntentArgs {
+    fn build_args(self, indices_map: &HashMap<Pubkey, u8>) -> MagicBaseIntentArgs {
         match self {
             MagicAction::BaseActions(call_handlers) => {
                 let call_handlers_args = call_handlers
-                    .iter()
-                    .map(|call_handler| call_handler.to_args(indices_map))
+                    .into_iter()
+                    .map(|call_handler| call_handler.into_args(indices_map))
                     .collect();
                 MagicBaseIntentArgs::BaseActions(call_handlers_args)
             }
-            MagicAction::Commit(value) => MagicBaseIntentArgs::Commit(value.to_args(indices_map)),
+            MagicAction::Commit(value) => MagicBaseIntentArgs::Commit(value.into_args(indices_map)),
             MagicAction::CommitAndUndelegate(value) => {
-                MagicBaseIntentArgs::CommitAndUndelegate(value.to_args(indices_map))
+                MagicBaseIntentArgs::CommitAndUndelegate(value.into_args(indices_map))
             }
         }
     }
@@ -136,7 +136,7 @@ impl<'info> CommitType<'info> {
         }
     }
 
-    fn to_args(&self, indices_map: &HashMap<Pubkey, u8>) -> CommitTypeArgs {
+    fn into_args(self, indices_map: &HashMap<Pubkey, u8>) -> CommitTypeArgs {
         match self {
             Self::Standalone(accounts) => {
                 let accounts_indices = accounts_to_indices(accounts.as_slice(), indices_map);
@@ -146,10 +146,11 @@ impl<'info> CommitType<'info> {
                 commited_accounts,
                 call_handlers,
             } => {
-                let commited_accounts_indices = accounts_to_indices(commited_accounts, indices_map);
+                let commited_accounts_indices =
+                    accounts_to_indices(commited_accounts.as_slice(), indices_map);
                 let call_handlers_args = call_handlers
-                    .iter()
-                    .map(|call_handler| call_handler.to_args(indices_map))
+                    .into_iter()
+                    .map(|call_handler| call_handler.into_args(indices_map))
                     .collect();
                 CommitTypeArgs::WithBaseActions {
                     committed_accounts: commited_accounts_indices,
@@ -177,13 +178,13 @@ impl<'info> UndelegateType<'info> {
         }
     }
 
-    fn to_args(&self, indices_map: &HashMap<Pubkey, u8>) -> UndelegateTypeArgs {
+    fn into_args(self, indices_map: &HashMap<Pubkey, u8>) -> UndelegateTypeArgs {
         match self {
             Self::Standalone => UndelegateTypeArgs::Standalone,
             Self::WithHandler(call_handlers) => {
                 let call_handlers_args = call_handlers
-                    .iter()
-                    .map(|call_handler| call_handler.to_args(indices_map))
+                    .into_iter()
+                    .map(|call_handler| call_handler.into_args(indices_map))
                     .collect();
                 UndelegateTypeArgs::WithBaseActions {
                     base_actions: call_handlers_args,
@@ -204,9 +205,9 @@ impl<'info> CommitAndUndelegate<'info> {
         self.undelegate_type.collect_accounts(accounts_container);
     }
 
-    fn to_args(&self, indices_map: &HashMap<Pubkey, u8>) -> CommitAndUndelegateArgs {
-        let commit_type_args = self.commit_type.to_args(indices_map);
-        let undelegate_type_args = self.undelegate_type.to_args(indices_map);
+    fn into_args(self, indices_map: &HashMap<Pubkey, u8>) -> CommitAndUndelegateArgs {
+        let commit_type_args = self.commit_type.into_args(indices_map);
+        let undelegate_type_args = self.undelegate_type.into_args(indices_map);
         CommitAndUndelegateArgs {
             commit_type: commit_type_args,
             undelegate_type: undelegate_type_args,
@@ -218,32 +219,26 @@ pub struct CallHandler<'info> {
     pub args: ActionArgs,
     pub compute_units: u32,
     pub escrow_authority: AccountInfo<'info>,
-    pub destination_program: AccountInfo<'info>,
-    pub accounts: Vec<AccountInfo<'info>>,
+    pub destination_program: Pubkey,
+    pub accounts: Vec<ShortAccountMeta>,
 }
 
 impl<'info> CallHandler<'info> {
     fn collect_accounts(&self, container: &mut Vec<AccountInfo<'info>>) {
-        container.push(self.destination_program.clone());
         container.push(self.escrow_authority.clone());
-        container.extend(self.accounts.clone())
     }
 
-    fn to_args(&self, indices_map: &HashMap<Pubkey, u8>) -> BaseActionArgs {
-        let destination_program_index = indices_map
-            .get(self.destination_program.key)
-            .expect(EXPECTED_KEY_MSG);
-        let accounts_indices = accounts_to_indices(&self.accounts, indices_map);
+    fn into_args(self, indices_map: &HashMap<Pubkey, u8>) -> BaseActionArgs {
         let escrow_authority_index = indices_map
             .get(self.escrow_authority.key)
             .expect(EXPECTED_KEY_MSG);
 
         BaseActionArgs {
-            args: self.args.clone(),
+            args: self.args,
             compute_units: self.compute_units,
-            destination_program: *destination_program_index,
+            destination_program: self.destination_program,
             escrow_authority: *escrow_authority_index,
-            accounts: accounts_indices,
+            accounts: self.accounts,
         }
     }
 }
