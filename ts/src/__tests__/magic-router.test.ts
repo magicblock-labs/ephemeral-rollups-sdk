@@ -1,4 +1,4 @@
-import Connection, { getWritableAccounts } from "../magic-router.js";
+import { Connection, getWritableAccounts } from "../magic-router.js";
 import {
   Transaction,
   Keypair,
