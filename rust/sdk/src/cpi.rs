@@ -3,7 +3,7 @@ use crate::utils::{close_pda_with_system_transfer, create_pda, seeds_with_bump};
 use borsh::BorshSerialize;
 use dlp::consts::DELEGATION_PROGRAM_ID;
 use dlp::delegate_buffer_seeds_from_delegated_account;
-use solana_program::account_info::AccountInfo;
+use solana_program::account_info::{next_account_info, AccountInfo};
 use solana_program::entrypoint::ProgramResult;
 use solana_program::instruction::{AccountMeta, Instruction};
 use solana_program::program::invoke_signed;
@@ -188,7 +188,7 @@ pub fn undelegate_account(accounts: UndelegateAccounts, pda_seeds: Vec<Vec<u8>>)
     if !accounts.buffer.is_signer {
         return Err(ProgramError::MissingRequiredSignature);
     }
-    if buffer.owner != &DELEGATION_PROGRAM_ID {
+    if accounts.buffer.owner != &DELEGATION_PROGRAM_ID {
         return Err(ProgramError::InvalidAccountOwner);
     }
 
@@ -210,8 +210,8 @@ pub fn undelegate_account(accounts: UndelegateAccounts, pda_seeds: Vec<Vec<u8>>)
         accounts.owner_program,
         accounts.buffer.data_len(),
         account_signer_seeds,
-        system_program,
-        payer,
+        accounts.system_program,
+        accounts.payer,
         true,
     )?;
 
