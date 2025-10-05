@@ -4,6 +4,7 @@ import {
   Keypair,
   PublicKey,
   SendTransactionError,
+  sendAndConfirmTransaction,
 } from "@solana/web3.js";
 
 // --- Global mocks ---
@@ -138,7 +139,7 @@ describe("Connection prototype methods", () => {
       .spyOn(ConnectionMagicRouter.prototype as any, "confirmTransaction")
       .mockResolvedValue({ value: { err: null } });
 
-    const signature = await connection.sendAndConfirmTransaction(tx, [
+    const signature = await sendAndConfirmTransaction(connection, tx, [
       new Keypair(),
     ]);
 
@@ -154,7 +155,7 @@ describe("Connection prototype methods", () => {
       .mockResolvedValue({ value: { err: { some: "error" } } });
 
     await expect(
-      connection.sendAndConfirmTransaction(tx, [new Keypair()]),
+      sendAndConfirmTransaction(connection, tx, [new Keypair()]),
     ).rejects.toThrow(SendTransactionError);
   });
 });
