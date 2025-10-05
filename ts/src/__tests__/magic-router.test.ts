@@ -1,4 +1,4 @@
-import { Connection, getWritableAccounts } from "../magic-router.js";
+import { ConnectionMagicRouter, getWritableAccounts } from "../magic-router.js";
 import {
   Transaction,
   Keypair,
@@ -34,11 +34,11 @@ describe("getWritableAccounts", () => {
 });
 
 describe("Connection prototype methods", () => {
-  let connection: Connection;
+  let connection: ConnectionMagicRouter;
   let tx: Transaction;
 
   beforeEach(() => {
-    connection = new Connection("http://localhost"); // use patched Connection
+    connection = new ConnectionMagicRouter("http://localhost"); // use patched Connection
     tx = new Transaction();
 
     // Mock transaction instance methods
@@ -95,7 +95,10 @@ describe("Connection prototype methods", () => {
   it("prepareTransaction sets recentBlockhash", async () => {
     // Spy on the prototype method
     jest
-      .spyOn(Connection.prototype as any, "getLatestBlockhashForTransaction")
+      .spyOn(
+        ConnectionMagicRouter.prototype as any,
+        "getLatestBlockhashForTransaction",
+      )
       .mockResolvedValue({ blockhash: "hb", lastValidBlockHeight: 100 });
 
     const result = await connection.prepareTransaction(tx);
@@ -104,11 +107,14 @@ describe("Connection prototype methods", () => {
 
   it("sendTransaction signs and sends transaction", async () => {
     jest
-      .spyOn(Connection.prototype as any, "getLatestBlockhashForTransaction")
+      .spyOn(
+        ConnectionMagicRouter.prototype as any,
+        "getLatestBlockhashForTransaction",
+      )
       .mockResolvedValue({ blockhash: "hb", lastValidBlockHeight: 100 });
 
     jest
-      .spyOn(Connection.prototype as any, "sendRawTransaction")
+      .spyOn(ConnectionMagicRouter.prototype as any, "sendRawTransaction")
       .mockResolvedValue("sig123");
 
     const signers = [new Keypair()];
@@ -126,10 +132,10 @@ describe("Connection prototype methods", () => {
 
   it("sendAndConfirmTransaction calls sendTransaction and returns signature", async () => {
     jest
-      .spyOn(Connection.prototype as any, "sendTransaction")
+      .spyOn(ConnectionMagicRouter.prototype as any, "sendTransaction")
       .mockResolvedValue("sig123");
     jest
-      .spyOn(Connection.prototype as any, "confirmTransaction")
+      .spyOn(ConnectionMagicRouter.prototype as any, "confirmTransaction")
       .mockResolvedValue({ value: { err: null } });
 
     const signature = await connection.sendAndConfirmTransaction(tx, [
@@ -141,10 +147,10 @@ describe("Connection prototype methods", () => {
 
   it("sendAndConfirmTransaction throws SendTransactionError if status has err", async () => {
     jest
-      .spyOn(Connection.prototype as any, "sendTransaction")
+      .spyOn(ConnectionMagicRouter.prototype as any, "sendTransaction")
       .mockResolvedValue("sig123");
     jest
-      .spyOn(Connection.prototype as any, "confirmTransaction")
+      .spyOn(ConnectionMagicRouter.prototype as any, "confirmTransaction")
       .mockResolvedValue({ value: { err: { some: "error" } } });
 
     await expect(
