@@ -243,6 +243,11 @@ impl<'info> CallHandler<'info> {
     }
 }
 
+pub enum CommitPolicy {
+    UseDiff,
+    UseFullBytes
+}
+
 /// CPI to trigger a commit for one or more accounts in the ER
 #[inline(always)]
 pub fn commit_accounts<'a, 'info>(
@@ -251,7 +256,21 @@ pub fn commit_accounts<'a, 'info>(
     magic_context: &'a AccountInfo<'info>,
     magic_program: &'a AccountInfo<'info>,
 ) -> ProgramResult {
-    let ix = create_schedule_commit_ix(payer, &account_infos, magic_context, magic_program, false);
+    let ix = create_schedule_commit_ix(payer, &account_infos, magic_context, magic_program, false, CommitPolicy::UseFullBytes);
+    let mut all_accounts = vec![payer.clone(), magic_context.clone()];
+    all_accounts.extend(account_infos.into_iter().cloned());
+    invoke(&ix, &all_accounts)
+}
+
+/// CPI to trigger a commit and undelegate one or more accounts in the ER
+#[inline(always)]
+pub fn commit_diff_and_undelegate_accounts<'a, 'info>(
+    payer: &'a AccountInfo<'info>,
+    account_infos: Vec<&'a AccountInfo<'info>>,
+    magic_context: &'a AccountInfo<'info>,
+    magic_program: &'a AccountInfo<'info>,
+) -> ProgramResult {
+    let ix = create_schedule_commit_ix(payer, &account_infos, magic_context, magic_program, true, CommitPolicy::UseDiff);
     let mut all_accounts = vec![payer.clone(), magic_context.clone()];
     all_accounts.extend(account_infos.into_iter().cloned());
     invoke(&ix, &all_accounts)
@@ -265,7 +284,7 @@ pub fn commit_and_undelegate_accounts<'a, 'info>(
     magic_context: &'a AccountInfo<'info>,
     magic_program: &'a AccountInfo<'info>,
 ) -> ProgramResult {
-    let ix = create_schedule_commit_ix(payer, &account_infos, magic_context, magic_program, true);
+    let ix = create_schedule_commit_ix(payer, &account_infos, magic_context, magic_program, true, CommitPolicy::UseFullBytes);
     let mut all_accounts = vec![payer.clone(), magic_context.clone()];
     all_accounts.extend(account_infos.into_iter().cloned());
     invoke(&ix, &all_accounts)
@@ -277,10 +296,19 @@ pub fn create_schedule_commit_ix<'a, 'info>(
     magic_context: &'a AccountInfo<'info>,
     magic_program: &'a AccountInfo<'info>,
     allow_undelegation: bool,
+    commit_policy: CommitPolicy
 ) -> Instruction {
     let instruction = if allow_undelegation {
-        MagicBlockInstruction::ScheduleCommitAndUndelegate
+        if let CommitPolicy::UseDiff = commit_policy {
+            MagicBlockInstruction::ScheduleCommitDiffAndUndelegate
+        }
+        else {
+            MagicBlockInstruction::ScheduleCommitAndUndelegate
+        }
     } else {
+        if let CommitPolicy::UseDiff = commit_policy {
+            panic!("sdk: CommitPolicy::UseDiff not supported yet for ScheduleCommit");
+        }
         MagicBlockInstruction::ScheduleCommit
     };
     let mut account_metas = vec![
