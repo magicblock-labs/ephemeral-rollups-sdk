@@ -9,7 +9,7 @@ pub mod ephem;
 pub mod types;
 pub mod utils;
 
-pub use dlp::args::{CallHandlerArgs, Context};
+pub use dlp::args::CallHandlerArgs;
 pub use dlp::pda;
 pub use dlp::{
     commit_record_seeds_from_delegated_account, commit_state_seeds_from_delegated_account,
