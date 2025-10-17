@@ -17,7 +17,7 @@ edition = "2021"
 license = "MIT"
 homepage = "https://www.magicblock.gg/"
 documentation = "https://docs.magicblock.gg/"
-repository = "https://github.com/magicblock-labs/delegation-program"
+repository = "https://github.com/magicblock-labs/ephemeral-rollups-sdk"
 readme = "README.md"
 keywords = ["solana", "crypto", "delegation", "ephemeral-rollups", "magicblock"]
 
