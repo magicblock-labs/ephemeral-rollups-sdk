@@ -28,10 +28,7 @@ ephemeral-rollups-sdk-attribute-delegate = { path = "delegate", version = "=0.3.
 ephemeral-rollups-sdk-attribute-commit = { path = "commit-attribute", version = "=0.3.4" }
 
 # Magicblock
-magicblock-delegation-program = { git = "https://github.com/magicblock-labs/delegation-program.git", rev = "aa1de56d90c", features = [
-	"no-entrypoint",
-] }
-#magicblock-delegation-program = { version = "1.1.1", features = ["no-entrypoint"] }
+magicblock-delegation-program = { version = "1.1.2", features = ["no-entrypoint"] }
 magicblock-magic-program-api = { version = "0.2.1" }
 
 ## External crates
