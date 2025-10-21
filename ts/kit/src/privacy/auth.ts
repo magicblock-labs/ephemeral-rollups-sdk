@@ -1,4 +1,4 @@
-import { PublicKey } from "@solana/web3.js";
+import { Address } from "@solana/kit";
 
 interface AuthChallengeResponse {
   challenge: string;
@@ -18,7 +18,7 @@ interface AuthLoginResponse {
  */
 export async function getAuthToken(
   rpcUrl: string,
-  publicKey: PublicKey,
+  publicKey: Address,
   signMessage: (message: Uint8Array) => Promise<Uint8Array>,
 ) {
   // Import this way because bs58 is an ECMAScript module

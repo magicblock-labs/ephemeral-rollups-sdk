@@ -3,4 +3,5 @@ export * from "./instructions/delegate.js";
 export * from "./pda.js";
 export * from "./utils.js";
 export * from "./resolver.js";
-export * from "./magic-router.js";
+export * from "./connection.js";
+export * from "./confirmation.js";

@@ -1,10 +1,27 @@
 import {
-  PublicKey,
-  Connection,
-  AccountInfo,
-  Transaction,
-} from "@solana/web3.js";
+  Address,
+  address,
+  AccountInfoBase,
+  lamports,
+  getAddressEncoder,
+  getProgramDerivedAddress,
+  createSolanaRpcSubscriptions,
+  TransactionMessage,
+  RpcSubscriptions,
+  SolanaRpcSubscriptionsApi,
+  createSolanaRpc,
+  Rpc,
+  SolanaRpcApiDevnet,
+  getBase64Decoder,
+  AccountInfoWithBase64EncodedData,
+  getStructCodec,
+  getAddressCodec,
+  getOptionCodec,
+  getU8Codec,
+  AccountRole
+} from "@solana/kit";
 import { DELEGATION_PROGRAM_ID } from "./constants.js";
+
 /**
  * Interface representing the configuration for the connection resolver.
  */
@@ -23,22 +40,21 @@ enum DelegationStatus {
 
 /** Type representing a delegation record with status and optional validator information */
 type DelegationRecord =
-  | { status: DelegationStatus.Delegated; validator: PublicKey }
+  | { status: DelegationStatus.Delegated; validator: Address }
   | { status: DelegationStatus.Undelegated };
 
 /** Class responsible for resolving connections to Solana validators */
 export class Resolver {
-  private readonly routes = new Map<string, Connection>();
+  private readonly routes = new Map<string, Rpc<SolanaRpcApiDevnet>>();
   private readonly delegations = new Map<string, DelegationRecord>();
-  private readonly chain: Connection;
-  private readonly ws: Connection;
-  private readonly subs = new Set<number>();
+  private readonly chain: Rpc<SolanaRpcApiDevnet>;
+  private readonly ws: RpcSubscriptions<SolanaRpcSubscriptionsApi>;
 
   constructor(config: Configuration, routes: Map<string, string>) {
-    this.chain = new Connection(config.chain);
-    this.ws = new Connection(config.websocket);
+    this.chain = createSolanaRpc(config.chain);
+    this.ws = createSolanaRpcSubscriptions(config.websocket);
     this.routes = new Map(
-      [...routes.entries()].map(([k, v]) => [k, new Connection(v)]),
+      [...routes.entries()].map(([k, v]) => [k, createSolanaRpc(v)]),
     );
   }
 
@@ -47,7 +63,7 @@ export class Resolver {
    * @param pubkey - The public key of the account to track.
    * @returns The current delegation record of the account.
    */
-  public async trackAccount(pubkey: PublicKey): Promise<DelegationRecord> {
+  public async trackAccount(pubkey: Address): Promise<DelegationRecord> {
     const pubkeyStr = pubkey.toString();
     if (this.delegations.has(pubkeyStr)) {
       const record = this.delegations.get(pubkeyStr);
@@ -58,26 +74,39 @@ export class Resolver {
         `Expected a delegation record for ${pubkeyStr}, but found undefined.`,
       );
     }
-    const seed = new TextEncoder().encode("delegation");
-    const seeds = [seed, pubkey.toBytes()];
 
-    const [delegationRecord] = PublicKey.findProgramAddressSync(
-      seeds,
-      DELEGATION_PROGRAM_ID,
+    const addressEncoder = getAddressEncoder()
+    const [delegationRecord, bump] = await getProgramDerivedAddress(
+      {
+        programAddress: DELEGATION_PROGRAM_ID,
+        seeds: [Buffer.from("delegation"), addressEncoder.encode(pubkey)]
+      }
     );
 
-    const id = this.ws.onAccountChange(
+    const abortController = new AbortController();
+    const accountNotifications = await this.ws.accountNotifications(
       delegationRecord,
-      (acc) => this.updateStatus(acc, pubkey),
-      "confirmed",
-    );
-    this.subs.add(id);
+      {
+       commitment: "confirmed",
+       encoding: "base64"
+      }
+    ).subscribe({ abortSignal: abortController.signal });
+
+    for await (const accountNotification of accountNotifications) {
+      this.updateStatus(accountNotification.value, pubkey)
+      abortController.abort()
+    }
+    
 
     const accountInfo = await this.chain.getAccountInfo(
       delegationRecord,
-      "confirmed",
-    );
-    return this.updateStatus(accountInfo, pubkey);
+      {
+        commitment: "confirmed",
+        encoding: "base64"
+      }
+    ).send();
+
+    return this.updateStatus(accountInfo.value, pubkey);
   }
 
   /**
@@ -85,13 +114,13 @@ export class Resolver {
    * @param pubkey - The public key for which the connection is requested.
    * @returns The connection object or undefined if the connection is unresolvable.
    */
-  public async resolve(pubkey: PublicKey): Promise<Connection | undefined> {
-    let record = this.delegations.get(pubkey.toString());
+  public async resolve(pubkey: Address): Promise<Rpc<SolanaRpcApiDevnet> | undefined> {
+    let record = this.delegations.get(pubkey);
     if (!record) {
       record = await this.trackAccount(pubkey);
     }
     return record.status === DelegationStatus.Delegated
-      ? this.routes.get(record.validator.toString())
+      ? this.routes.get(record.validator)
       : this.chain;
   }
 
@@ -101,14 +130,16 @@ export class Resolver {
    * @returns The connection object or undefined if the transaction references multiple delegated validators.
    */
   public async resolveForTransaction(
-    tx: Transaction,
-  ): Promise<Connection | undefined> {
+    tx: TransactionMessage,
+  ): Promise<Rpc<SolanaRpcApiDevnet> | undefined> {
     const validators = new Set<string>();
-    for (const { pubkey, isWritable } of tx.instructions.flatMap(
-      (i) => i.keys,
+    for (const account of tx.instructions.flatMap(
+      (i) => i.accounts,
     )) {
-      if (!isWritable) continue;
-      const record = await this.trackAccount(pubkey);
+      if (!account) continue;
+        const { address, role } = account;
+      if (role == AccountRole.READONLY || role == AccountRole.READONLY_SIGNER) continue;
+        const record = await this.trackAccount(address);
       if (record.status === DelegationStatus.Delegated) {
         validators.add(record.validator.toString());
       }
@@ -121,33 +152,30 @@ export class Resolver {
         : undefined;
   }
 
-  /**
-   * Terminates all active WebSocket subscriptions.
-   * Should be called to clean up resources when the resolver is no longer needed.
-   */
-  public async terminate() {
-    await Promise.all(
-      [...this.subs].map(async (sub) =>
-        this.ws.removeAccountChangeListener(sub),
-      ),
-    );
-  }
-
   private updateStatus(
-    account: AccountInfo<Buffer> | null,
-    pubkey: PublicKey,
+    account: AccountInfoBase & AccountInfoWithBase64EncodedData | null,
+    pubkey: Address,
   ): DelegationRecord {
     const isDelegated =
       account !== null &&
-      account.owner.equals(DELEGATION_PROGRAM_ID) &&
-      account.lamports !== 0;
+      account.owner == DELEGATION_PROGRAM_ID &&
+      account.lamports !== lamports(BigInt(0));
+
     const record: DelegationRecord = isDelegated
       ? {
           status: DelegationStatus.Delegated,
-          validator: new PublicKey(account.data.subarray(8, 40)),
+          validator: (() => {
+            const decodedData = delegationRecordCodec.decode(Buffer.from(account.data[0], "base64"))
+            return address(decodedData.validator);
+        })(),
         }
       : { status: DelegationStatus.Undelegated };
     this.delegations.set(pubkey.toString(), record);
     return record;
   }
 }
+
+const delegationRecordCodec = getStructCodec([
+    ['delegationStatus', getU8Codec()],
+    ['validator', getAddressCodec()],
+]);
