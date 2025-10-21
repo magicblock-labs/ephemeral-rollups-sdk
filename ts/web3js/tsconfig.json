@@ -1,0 +1,23 @@
+{
+  "compilerOptions": {
+    "outDir": "./lib",
+    "baseUrl": "./src",
+    "declaration": true,
+    "declarationMap": true,
+    "emitDecoratorMetadata": true,
+    "experimentalDecorators": true,
+    "removeComments": true,
+    "preserveConstEnums": true,
+    "module": "NodeNext",
+    "moduleResolution": "nodenext",
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "sourceMap": true,
+    "strict": true,
+    "target": "es2020",
+    "lib": ["es2020", "dom"],
+    "resolveJsonModule": true
+  },
+  "include": ["src/**/*", "__test__", "__test__"],
+  "exclude": ["../node_modules", "../lib"]
+}
