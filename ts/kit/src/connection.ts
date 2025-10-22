@@ -180,7 +180,12 @@ export class Connection {
    * @returns The signature of the sent transaction.
    */
   public async sendTransaction(
-    transaction: TransactionMessage & TransactionMessageWithFeePayer,
+    transaction:
+      | (TransactionMessage & TransactionMessageWithFeePayer)
+      | Readonly<{
+          messageBytes: TransactionMessageBytes;
+          signatures: SignaturesMap;
+        }>,
     signers: CryptoKeyPair[],
     options?: {
       skipPreflight?: boolean;
@@ -197,34 +202,39 @@ export class Connection {
       (transaction.lifetimeConstraint as { blockhash?: unknown }).blockhash !==
         undefined;
 
-    if (!hasBlockhash) {
-      transaction =
-        await this.prepareTransactionWithLatestBlockhash(transaction);
+    if ("signatures" in transaction && "messageBytes" in transaction) {
+      const serializedTransaction =
+        getBase64EncodedWireTransaction(transaction);
+      const signature = await this.rpc
+        .sendTransaction(serializedTransaction, {
+          encoding: "base64",
+          skipPreflight,
+          preflightCommitment,
+          ...options,
+        })
+        .send();
+      return signature;
+    } else {
+      if (!hasBlockhash) {
+        transaction =
+          await this.prepareTransactionWithLatestBlockhash(transaction);
+      }
+      const signedTransaction = await this.partiallySignTransaction(
+        signers,
+        transaction,
+      );
+      const serializedTransaction =
+        getBase64EncodedWireTransaction(signedTransaction);
+      const signature = await this.rpc
+        .sendTransaction(serializedTransaction, {
+          encoding: "base64",
+          skipPreflight,
+          preflightCommitment,
+          ...options,
+        })
+        .send();
+      return signature;
     }
-    const isAlreadySigned: boolean =
-      (transaction as any).signatures &&
-      Object.keys((transaction as any).signatures).length > 0;
-
-    const signedTransaction =
-      isAlreadySigned &&
-      "messageBytes" in transaction &&
-      "signatures" in transaction
-        ? (transaction as Readonly<{
-            messageBytes: TransactionMessageBytes;
-            signatures: SignaturesMap;
-          }>)
-        : await this.partiallySignTransaction(signers, transaction);
-    const serializedTransaction =
-      getBase64EncodedWireTransaction(signedTransaction);
-    const signature = await this.rpc
-      .sendTransaction(serializedTransaction, {
-        encoding: "base64",
-        skipPreflight,
-        preflightCommitment,
-        ...options,
-      })
-      .send();
-    return signature;
   }
 
   /**
@@ -328,20 +338,18 @@ export class Connection {
         blockhash: result.blockhash as Blockhash,
         lastValidBlockHeight: BigInt(result.lastValidBlockHeight),
       };
+    } else {
+      const blockhashResponse = await this.rpc.getLatestBlockhash().send();
+      if (
+        blockhashResponse?.value?.blockhash == null ||
+        blockhashResponse?.value?.lastValidBlockHeight == null
+      ) {
+        throw new Error(
+          `Invalid blockhash response: ${JSON.stringify(blockhashResponse)}`,
+        );
+      }
+      return blockhashResponse.value;
     }
-
-    const blockhashResponse = await this.rpc.getLatestBlockhash().send();
-
-    if (
-      !blockhashResponse?.value?.blockhash ||
-      !blockhashResponse?.value?.lastValidBlockHeight
-    ) {
-      throw new Error(
-        `Invalid blockhash response: ${JSON.stringify(blockhashResponse)}`,
-      );
-    }
-
-    return blockhashResponse.value;
   }
 
   /**
