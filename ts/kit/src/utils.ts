@@ -6,18 +6,23 @@ import { AccountRole, Signature, TransactionMessage } from "@solana/kit";
  * @param transactionMessage - The transaction message to analyze.
  * @returns An array of writable account addresses.
  */
-export function getWritableAccounts(transactionMessage: TransactionMessage): string[] {
-    const writableAccounts = new Set<string>();
-    for (const instruction of transactionMessage.instructions) {
-        if (instruction.accounts) {
-            for (const account of instruction.accounts) {
-                if (account.role === AccountRole.WRITABLE || account.role === AccountRole.WRITABLE_SIGNER) {
-                    writableAccounts.add(account.address.toString());
-                }
-            }
+export function getWritableAccounts(
+  transactionMessage: TransactionMessage,
+): string[] {
+  const writableAccounts = new Set<string>();
+  for (const instruction of transactionMessage.instructions) {
+    if (instruction.accounts) {
+      for (const account of instruction.accounts) {
+        if (
+          account.role === AccountRole.WRITABLE ||
+          account.role === AccountRole.WRITABLE_SIGNER
+        ) {
+          writableAccounts.add(account.address.toString());
         }
+      }
     }
-    return Array.from(writableAccounts);
+  }
+  return Array.from(writableAccounts);
 }
 
 /**
@@ -27,24 +32,27 @@ export function getWritableAccounts(transactionMessage: TransactionMessage): str
  * @returns `true` if router support is detected, otherwise `false`.
  */
 export async function isRouter(clusterUrlHttp: string): Promise<boolean> {
-    const response = await fetch(clusterUrlHttp, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-        jsonrpc: "2.0",
-        id: 1,
-        method: "getBlockhashForAccounts",
-        params: [[]]
-        })
-    });
+  const response = await fetch(clusterUrlHttp, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      jsonrpc: "2.0",
+      id: 1,
+      method: "getBlockhashForAccounts",
+      params: [[]],
+    }),
+  });
 
-    const { result } = (await response.json()) as {
-        result: { blockhash: string; lastValidBlockHeight: number };
-    };
+  const { result } = (await response.json()) as {
+    result: { blockhash: string; lastValidBlockHeight: number };
+  };
 
-    return !!(result && result.blockhash);
+  return (
+    result != null &&
+    typeof result.blockhash === "string" &&
+    result.blockhash.length > 0
+  );
 }
-
 
 /**
  * Parses log messages from a scheduling transaction to extract the scheduled commit signature.
@@ -55,7 +63,9 @@ export async function isRouter(clusterUrlHttp: string): Promise<boolean> {
  * @param logMessages - An array of log messages from a transaction's meta.
  * @returns The extracted `Signature` if found, or `null` if no matching log message exists.
  */
-export function parseScheduleCommitsLogsMessage(logMessages: readonly string[]): Signature | null {
+export function parseScheduleCommitsLogsMessage(
+  logMessages: readonly string[],
+): Signature | null {
   for (const message of logMessages) {
     const signaturePrefix = "ScheduledCommitSent signature: ";
     if (message.includes(signaturePrefix)) {
@@ -74,7 +84,9 @@ export function parseScheduleCommitsLogsMessage(logMessages: readonly string[]):
  * @param logMessages - An array of log messages from a transaction's meta.
  * @returns The extracted `Signature` if found, or `null` if no matching log message exists.
  */
-export function parseCommitsLogsMessage(logMessages: readonly string[]): Signature | null {
+export function parseCommitsLogsMessage(
+  logMessages: readonly string[],
+): Signature | null {
   for (const message of logMessages) {
     const signaturePrefix = "ScheduledCommitSent signature[0]: ";
     if (message.includes(signaturePrefix)) {

@@ -1,5 +1,5 @@
 import * as beet from "@metaplex-foundation/beet";
-import { AccountMeta, Address, AccountRole, address, Instruction } from "@solana/kit";
+import { AccountMeta, Address, AccountRole, Instruction } from "@solana/kit";
 import { SYSTEM_PROGRAM_ADDRESS } from "@solana-program/system";
 import { DELEGATION_PROGRAM_ID } from "../constants";
 import {
@@ -44,10 +44,11 @@ export async function createDelegateInstruction(
   args?: DelegateAccountArgs,
   programId = DELEGATION_PROGRAM_ID,
 ) {
-  const delegateBufferPda = await delegateBufferPdaFromDelegatedAccountAndOwnerProgram(
-    accountsInput.delegatedAccount,
-    accountsInput.ownerProgram,
-  );
+  const delegateBufferPda =
+    await delegateBufferPdaFromDelegatedAccountAndOwnerProgram(
+      accountsInput.delegatedAccount,
+      accountsInput.ownerProgram,
+    );
 
   const delegationRecordPda = await delegationRecordPdaFromDelegatedAccount(
     accountsInput.delegatedAccount,
@@ -62,39 +63,43 @@ export async function createDelegateInstruction(
   };
 
   const accounts: AccountMeta[] = [
-    { 
-      address: accountsInput.payer, 
-      role: AccountRole.READONLY_SIGNER
+    {
+      address: accountsInput.payer,
+      role: AccountRole.READONLY_SIGNER,
     },
-    { 
-      address: accountsInput.delegatedAccount, 
-      role: AccountRole.WRITABLE_SIGNER
+    {
+      address: accountsInput.delegatedAccount,
+      role: AccountRole.WRITABLE_SIGNER,
     },
-    { 
+    {
       address: accountsInput.ownerProgram,
-      role: AccountRole.READONLY
+      role: AccountRole.READONLY,
     },
     {
       address: delegateBufferPda,
-      role: AccountRole.WRITABLE
+      role: AccountRole.WRITABLE,
     },
     {
       address: accountsInput.delegationRecord ?? delegationRecordPda,
-      role: AccountRole.WRITABLE
+      role: AccountRole.WRITABLE,
     },
     {
       address: accountsInput.delegationMetadata ?? delegationMetadataPda,
-      role: AccountRole.WRITABLE
+      role: AccountRole.WRITABLE,
     },
     {
       address: accountsInput.systemProgram ?? SYSTEM_PROGRAM_ADDRESS,
-      role: AccountRole.READONLY
+      role: AccountRole.READONLY,
     },
     // Only add validator if it exists
-    ...(accountsInput.validator ? [{
-      address: accountsInput.validator,
-      role: AccountRole.READONLY
-    }] : [])
+    ...(accountsInput.validator
+      ? [
+          {
+            address: accountsInput.validator,
+            role: AccountRole.READONLY,
+          },
+        ]
+      : []),
   ];
 
   const [data] = delegateStruct.serialize({
@@ -103,11 +108,11 @@ export async function createDelegateInstruction(
     seeds: args.seeds.map((seed) => seed.map(Number)),
   });
 
-  const delegateInstruction : Instruction = {
+  const delegateInstruction: Instruction = {
     accounts,
     data,
-    programAddress: programId
-  }
+    programAddress: programId,
+  };
 
-  return delegateInstruction
+  return delegateInstruction;
 }

@@ -1,11 +1,6 @@
 {
-<<<<<<< HEAD:ts/package.json
-  "name": "@magicblock-labs/ephemeral-rollups-sdk",
-  "version": "0.3.5",
-=======
   "name": "@magicblock-labs/ephemeral-rollups-kit",
-  "version": "0.3.4",
->>>>>>> f80709d (feat: added solana/kit + adjusted delegate instruction):ts/kit/package.json
+  "version": "0.3.5",
   "author": "MagicBlock Labs",
   "license": "MIT",
   "publishConfig": {

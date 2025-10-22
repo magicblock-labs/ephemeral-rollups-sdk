@@ -12,13 +12,11 @@ import {
   createSolanaRpc,
   Rpc,
   SolanaRpcApiDevnet,
-  getBase64Decoder,
   AccountInfoWithBase64EncodedData,
   getStructCodec,
   getAddressCodec,
-  getOptionCodec,
   getU8Codec,
-  AccountRole
+  AccountRole,
 } from "@solana/kit";
 import { DELEGATION_PROGRAM_ID } from "./constants.js";
 
@@ -75,36 +73,31 @@ export class Resolver {
       );
     }
 
-    const addressEncoder = getAddressEncoder()
-    const [delegationRecord, bump] = await getProgramDerivedAddress(
-      {
-        programAddress: DELEGATION_PROGRAM_ID,
-        seeds: [Buffer.from("delegation"), addressEncoder.encode(pubkey)]
-      }
-    );
+    const addressEncoder = getAddressEncoder();
+    const [delegationRecord] = await getProgramDerivedAddress({
+      programAddress: DELEGATION_PROGRAM_ID,
+      seeds: [Buffer.from("delegation"), addressEncoder.encode(pubkey)],
+    });
 
     const abortController = new AbortController();
-    const accountNotifications = await this.ws.accountNotifications(
-      delegationRecord,
-      {
-       commitment: "confirmed",
-       encoding: "base64"
-      }
-    ).subscribe({ abortSignal: abortController.signal });
+    const accountNotifications = await this.ws
+      .accountNotifications(delegationRecord, {
+        commitment: "confirmed",
+        encoding: "base64",
+      })
+      .subscribe({ abortSignal: abortController.signal });
 
     for await (const accountNotification of accountNotifications) {
-      this.updateStatus(accountNotification.value, pubkey)
-      abortController.abort()
+      this.updateStatus(accountNotification.value, pubkey);
+      abortController.abort();
     }
-    
 
-    const accountInfo = await this.chain.getAccountInfo(
-      delegationRecord,
-      {
+    const accountInfo = await this.chain
+      .getAccountInfo(delegationRecord, {
         commitment: "confirmed",
-        encoding: "base64"
-      }
-    ).send();
+        encoding: "base64",
+      })
+      .send();
 
     return this.updateStatus(accountInfo.value, pubkey);
   }
@@ -114,7 +107,9 @@ export class Resolver {
    * @param pubkey - The public key for which the connection is requested.
    * @returns The connection object or undefined if the connection is unresolvable.
    */
-  public async resolve(pubkey: Address): Promise<Rpc<SolanaRpcApiDevnet> | undefined> {
+  public async resolve(
+    pubkey: Address,
+  ): Promise<Rpc<SolanaRpcApiDevnet> | undefined> {
     let record = this.delegations.get(pubkey);
     if (!record) {
       record = await this.trackAccount(pubkey);
@@ -133,13 +128,12 @@ export class Resolver {
     tx: TransactionMessage,
   ): Promise<Rpc<SolanaRpcApiDevnet> | undefined> {
     const validators = new Set<string>();
-    for (const account of tx.instructions.flatMap(
-      (i) => i.accounts,
-    )) {
+    for (const account of tx.instructions.flatMap((i) => i.accounts)) {
       if (!account) continue;
-        const { address, role } = account;
-      if (role == AccountRole.READONLY || role == AccountRole.READONLY_SIGNER) continue;
-        const record = await this.trackAccount(address);
+      const { address, role } = account;
+      if (role === AccountRole.READONLY || role === AccountRole.READONLY_SIGNER)
+        continue;
+      const record = await this.trackAccount(address);
       if (record.status === DelegationStatus.Delegated) {
         validators.add(record.validator.toString());
       }
@@ -153,21 +147,23 @@ export class Resolver {
   }
 
   private updateStatus(
-    account: AccountInfoBase & AccountInfoWithBase64EncodedData | null,
+    account: (AccountInfoBase & AccountInfoWithBase64EncodedData) | null,
     pubkey: Address,
   ): DelegationRecord {
     const isDelegated =
       account !== null &&
-      account.owner == DELEGATION_PROGRAM_ID &&
+      account.owner === DELEGATION_PROGRAM_ID &&
       account.lamports !== lamports(BigInt(0));
 
     const record: DelegationRecord = isDelegated
       ? {
           status: DelegationStatus.Delegated,
           validator: (() => {
-            const decodedData = delegationRecordCodec.decode(Buffer.from(account.data[0], "base64"))
+            const decodedData = delegationRecordCodec.decode(
+              Buffer.from(account.data[0], "base64"),
+            );
             return address(decodedData.validator);
-        })(),
+          })(),
         }
       : { status: DelegationStatus.Undelegated };
     this.delegations.set(pubkey.toString(), record);
@@ -176,6 +172,6 @@ export class Resolver {
 }
 
 const delegationRecordCodec = getStructCodec([
-    ['delegationStatus', getU8Codec()],
-    ['validator', getAddressCodec()],
+  ["delegationStatus", getU8Codec()],
+  ["validator", getAddressCodec()],
 ]);

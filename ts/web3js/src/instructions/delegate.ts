@@ -85,17 +85,21 @@ export function createDelegateInstruction(
       isSigner: false,
     },
     // Only add validator if it exists
-    ...(accounts.validator ? [{
-      pubkey: accounts.validator,
-      isWritable: false,
-      isSigner:false
-    }] : [])
+    ...(accounts.validator
+      ? [
+          {
+            pubkey: accounts.validator,
+            isWritable: false,
+            isSigner: false,
+          },
+        ]
+      : []),
   ];
 
   const [data] = delegateStruct.serialize({
     instructionDiscriminator: delegateInstructionDiscriminator,
     commit_frequency_ms: args.commit_frequency_ms,
-    seeds: args.seeds.map((seed) => seed.map(Number))
+    seeds: args.seeds.map((seed) => seed.map(Number)),
   });
 
   return new web3.TransactionInstruction({

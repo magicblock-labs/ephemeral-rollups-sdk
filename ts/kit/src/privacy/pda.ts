@@ -1,4 +1,8 @@
-import { Address, getAddressEncoder, getProgramDerivedAddress} from "@solana/kit"
+import {
+  Address,
+  getAddressEncoder,
+  getProgramDerivedAddress,
+} from "@solana/kit";
 import { PERMISSION_PROGRAM_ID } from "./constants";
 
 const PERMISSION_SEED = Buffer.from("permission:");
@@ -11,14 +15,11 @@ const GROUP_SEED = Buffer.from("group:");
  */
 export async function permissionPdaFromAccount(account: Address) {
   const addressEncoder = getAddressEncoder();
-  const [permissionPda, bump] = await getProgramDerivedAddress({
+  const [permissionPda] = await getProgramDerivedAddress({
     programAddress: PERMISSION_PROGRAM_ID,
-    seeds: [
-        PERMISSION_SEED,
-        addressEncoder.encode(account)
-    ],
+    seeds: [PERMISSION_SEED, addressEncoder.encode(account)],
   });
-  return permissionPda
+  return permissionPda;
 }
 
 /**
@@ -28,12 +29,9 @@ export async function permissionPdaFromAccount(account: Address) {
  */
 export async function groupPdaFromId(id: Address) {
   const addressEncoder = getAddressEncoder();
-  const [groupPda, bump] = await getProgramDerivedAddress({
+  const [groupPda] = await getProgramDerivedAddress({
     programAddress: PERMISSION_PROGRAM_ID,
-    seeds: [
-        GROUP_SEED,
-        addressEncoder.encode(id)
-    ],
+    seeds: [GROUP_SEED, addressEncoder.encode(id)],
   });
-  return groupPda
+  return groupPda;
 }
