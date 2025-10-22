@@ -2,10 +2,10 @@ name: Build SDKs
 on:
   push:
     branches:
-      - 'main'
+      - "main"
   pull_request:
     branches:
-      - 'main'
+      - "main"
 env:
   rust_version: 1.89.0
   node_version: 23
@@ -22,7 +22,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.node_version }}
-          cache: 'npm'
+          cache: "npm"
 
       - name: Install Rust
         shell: "bash"
@@ -59,8 +59,14 @@ jobs:
           cargo build
           cargo test
 
-      - name: npm run build and test
-        working-directory: ts/
+      - name: npm run build and test kit
+        working-directory: ts/kit
+        run: |
+          npm install
+          npm test
+          npm run build
+      - name: npm run build and test web3js
+        working-directory: ts/web3js
         run: |
           npm install
           npm test
@@ -77,7 +83,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.node_version }}
-          cache: 'npm'
+          cache: "npm"
 
       - name: Install Rust toolchain
         shell: bash
