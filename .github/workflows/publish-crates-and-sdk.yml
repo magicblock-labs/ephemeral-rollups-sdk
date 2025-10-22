@@ -86,8 +86,27 @@ jobs:
           CRATES_TOKEN: ${{ secrets.CRATES_TOKEN }}
           DRY_RUN: ${{ env.DRY_RUN }}
 
-      - name: npm run publish
-        working-directory: ts/
+      - name: publish ephemeral-rollups-kit
+        working-directory: ts/kit/
+        run: |
+          npm install --global eslint@^8.33.0
+          npm install --legacy-peer-deps
+          npm run build
+          npm test
+          echo "//registry.npmjs.org/:_authToken=${{ secrets.NPM_TOKEN }}" > ~/.npmrc
+          npm set //registry.npmjs.org/:_authToken ${{ secrets.NPM_TOKEN }}
+          npm run build && npm run lint:fix
+          if [ "${DRY_RUN}" = "true" ]; then
+            echo "Running npm publish in dry-run mode"
+            npm publish --access public --dry-run
+          else
+            npm publish --access public
+          fi
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: publish ephemeral-rollups-sdk
+        working-directory: ts/web3js
         run: |
           npm install --global eslint@^8.33.0
           npm install --legacy-peer-deps
