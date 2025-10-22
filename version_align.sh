@@ -22,8 +22,11 @@ esac
 # Update the version for all crates in the Cargo.toml workspace.dependencies section
 sed "${sedi[@]}" -e '/\[workspace.dependencies\]/,/# Magicblock/s/version = ".*"/version = "='$version'"/' rust/Cargo.toml
 
-# Update the version in clients/bolt-sdk/package.json
-jq --arg version "$version" '.version = $version' ts/package.json > temp.json && mv temp.json ts/package.json
+# Update the version in ts/web3js/package.json
+jq --arg version "$version" '.version = $version' ts/web3js/package.json > temp.json && mv temp.json ts/web3js/package.json
+
+# Update the version in ts/kit/package.json
+jq --arg version "$version" '.version = $version' ts/kit/package.json > temp.json && mv temp.json ts/kit/package.json
 
 # Potential for collisions in Cargo.lock, use cargo update to update it
 cargo update --workspace --manifest-path rust/Cargo.toml
@@ -31,7 +34,8 @@ cargo update --workspace --manifest-path rust/Cargo.toml
 # Check if any changes have been made to the specified files, if running with --check
 if [[ "$1" == "--check" ]]; then
     files_to_check=(
-        "ts/package.json"
+        "ts/kit/package.json"
+        "ts/web3js/package.json"
         "rust/Cargo.toml"
     )
 
