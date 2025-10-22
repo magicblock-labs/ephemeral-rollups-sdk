@@ -55,11 +55,11 @@ solana-program = { version = ">=1.16" }
 sdk = { package = "solana-sdk", version = ">=1.16" }
 rpc = { package = "solana-rpc-client", version = ">=1.16" }
 rpc-api = { package = "solana-rpc-client-api", version = ">=1.16" }
-pinocchio = "0.8.1"
-pinocchio-log = "0.4.0"
-pinocchio-pubkey = "0.2.4"
-pinocchio-system = "0.2.3"
-pinocchio-token = "0.3.0"
+pinocchio = { version = "0.8.1", default-features = false }
+pinocchio-log = { version = "0.4.0", default-features = false }
+pinocchio-pubkey = { version = "0.2.4", default-features = false }
+pinocchio-system = { version = "0.2.3", default-features = false }
+pinocchio-token = { version = "0.3.0", default-features = false }
 
 # serialization/parsing
 serde = { version = "1.0", features = [ "derive" ] }

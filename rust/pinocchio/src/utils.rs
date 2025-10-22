@@ -3,6 +3,7 @@ use pinocchio::{
     account_info::AccountInfo,
     cpi::{invoke_signed, MAX_CPI_ACCOUNTS},
     instruction::{AccountMeta, Instruction, Seed, Signer},
+    msg,
     program_error::ProgramError,
 };
 
@@ -10,6 +11,23 @@ use crate::{
     consts::DELEGATION_PROGRAM_ID,
     types::{DelegateAccountArgs, MAX_DELEGATE_ACCOUNT_ARGS_SIZE},
 };
+
+// Helper: convert u64 to decimal string without heap allocation (no_std-friendly)
+fn dec_str_from_u64<'a>(mut n: u64, buf: &'a mut [u8; 21]) -> &'a str {
+    if n == 0 {
+        buf[20] = b'0';
+        // SAFETY: writing only ASCII digits
+        return unsafe { core::str::from_utf8_unchecked(&buf[20..21]) };
+    }
+    let mut i = 21usize;
+    while n > 0 {
+        i -= 1;
+        buf[i] = b'0' + (n % 10) as u8;
+        n /= 10;
+    }
+    // SAFETY: buffer contains only ASCII digits
+    unsafe { core::str::from_utf8_unchecked(&buf[i..21]) }
+}
 
 #[inline(always)]
 pub fn get_seeds<'a>(seeds_slice: &[&'a [u8]]) -> Result<&'a [Seed<'a>], ProgramError> {
@@ -42,6 +60,57 @@ pub fn get_seeds<'a>(seeds_slice: &[&'a [u8]]) -> Result<&'a [Seed<'a>], Program
             seeds.as_ptr() as *const Seed,
             num_seeds,
         ))
+    }
+}
+
+#[inline(always)]
+pub fn get_signer_seeds<'a, 'b>(
+    seeds_slice: &[&'a [u8]],
+    bump: u8,
+) -> Result<Signer<'a, 'b>, ProgramError> {
+    let num_seeds = seeds_slice.len();
+    if num_seeds + 1 > MAX_CPI_ACCOUNTS {
+        return Err(ProgramError::InvalidArgument);
+    }
+
+    let mut tmp: [MaybeUninit<Seed>; MAX_CPI_ACCOUNTS] =
+        [const { MaybeUninit::<Seed>::uninit() }; MAX_CPI_ACCOUNTS];
+
+    unsafe {
+        for i in 0..num_seeds {
+            let seed_bytes = seeds_slice.get_unchecked(i);
+            tmp.get_unchecked_mut(i).write(Seed::from(*seed_bytes));
+        }
+
+        let bump_slice: &[u8] = &[bump];
+        tmp.get_unchecked_mut(num_seeds)
+            .write(Seed::from(bump_slice));
+
+        let all_seeds = core::slice::from_raw_parts(tmp.as_ptr() as *const Seed, num_seeds + 1);
+
+        // Debug: print all_seeds before creating the Signer
+        // msg!("all_seeds:");
+        // let mut num_buf = [0u8; 21];
+        // msg!("count:");
+        // let count_str = dec_str_from_u64((num_seeds as u64) + 1, &mut num_buf);
+        // msg!(count_str);
+        // for i in 0..(num_seeds + 1) {
+        //     msg!("seed_index:");
+        //     let idx_str = dec_str_from_u64(i as u64, &mut num_buf);
+        //     msg!(idx_str);
+        //     let seed_ref = all_seeds.get_unchecked(i);
+        //     let seed_bytes: &[u8] = &*seed_ref;
+        //     msg!("seed_len:");
+        //     let len_str = dec_str_from_u64(seed_bytes.len() as u64, &mut num_buf);
+        //     msg!(len_str);
+        //     msg!("seed_bytes:");
+        //     for b in seed_bytes.iter() {
+        //         let b_str = dec_str_from_u64(*b as u64, &mut num_buf);
+        //         msg!(b_str);
+        //     }
+        // }
+
+        Ok(Signer::from(all_seeds))
     }
 }
 

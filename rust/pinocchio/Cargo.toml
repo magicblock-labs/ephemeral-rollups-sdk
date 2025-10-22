@@ -18,3 +18,9 @@ pinocchio-pubkey  = { workspace = true }
 pinocchio-system  = { workspace = true }
 pinocchio-token  = { workspace = true }
 
+[features]
+default = []
+std = [
+    "pinocchio/std",
+]
+

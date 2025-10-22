@@ -1,4 +1,4 @@
-use core::mem::MaybeUninit;
+use alloc::vec::Vec;
 use pinocchio::{
     account_info::AccountInfo,
     cpi::{slice_invoke, MAX_CPI_ACCOUNTS},
@@ -26,25 +26,14 @@ pub fn commit_and_undelegate_accounts(accounts: &[AccountInfo]) -> ProgramResult
         return Err(ProgramError::InvalidArgument);
     }
 
-    const UNINIT_REF: MaybeUninit<&AccountInfo> = MaybeUninit::<&AccountInfo>::uninit();
-    let mut account_refs = [UNINIT_REF; MAX_CPI_ACCOUNTS];
-
-    unsafe {
-        // SAFETY: num_accounts <= MAX_CPI_ACCOUNTS
-        account_refs.get_unchecked_mut(0).write(payer);
-        account_refs.get_unchecked_mut(1).write(magic_context);
-
-        // Add rest accounts
-        for i in 0..rest.len() {
-            let account = rest.get_unchecked(i);
-            account_refs.get_unchecked_mut(2 + i).write(account);
-        }
+    // Build the exact list of account references on the heap to avoid large stack frames
+    let mut all_accounts: Vec<&AccountInfo> = Vec::with_capacity(num_accounts);
+    all_accounts.push(payer);
+    all_accounts.push(magic_context);
+    for account in rest.iter() {
+        all_accounts.push(account);
     }
 
-    let all_accounts = unsafe {
-        core::slice::from_raw_parts(account_refs.as_ptr() as *const &AccountInfo, num_accounts)
-    };
-
-    slice_invoke(&ix, all_accounts)?;
+    slice_invoke(&ix, &all_accounts)?;
     Ok(())
 }
