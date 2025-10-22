@@ -126,7 +126,8 @@ jobs:
           cargo add ephemeral-rollups-sdk --path ../../../rust/sdk --features anchor  --manifest-path programs/test-delegation/Cargo.toml
           npm install -g yarn@1.22.22
           yarn --version
-          yarn add -D file:../../../ts
+          yarn add -D file:../../../ts/kit
+          yarn add -D file:../../../ts/web3js
           yarn install --no-immutable --non-interactive
           cargo update -p ephemeral-rollups-sdk
           cat programs/test-delegation/Cargo.toml
