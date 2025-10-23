@@ -17,8 +17,10 @@ import {
   setTransactionMessageLifetimeUsingBlockhash,
   SolanaRpcApi,
   TransactionWithBlockhashLifetime,
-  TransactionMessageBytes,
-  SignaturesMap,
+  isFullySignedTransaction,
+  Transaction,
+  TransactionWithLifetime,
+  assertIsTransactionWithBlockhashLifetime,
 } from "@solana/kit";
 
 import {
@@ -169,9 +171,9 @@ export class Connection {
    * Sends a transaction message to the network.
    *
    * This method:
-   * 1. Fetches the latest blockhash for the writable accounts.
-   * 2. Sets it as the transaction’s lifetime.
-   * 3. Signs and serializes the transaction.
+   * 1. Fetches the latest blockhash for the writable accounts. (optional)
+   * 2. Sets it as the transaction’s lifetime. (optional)
+   * 3. Signs and serializes the transaction. (optional)
    * 4. Sends it to the cluster.
    *
    * @param transaction - The transaction message to send.
@@ -181,19 +183,15 @@ export class Connection {
    */
   public async sendTransaction(
     transaction:
-      | (TransactionMessage & TransactionMessageWithFeePayer)
-      | Readonly<{
-          messageBytes: TransactionMessageBytes;
-          signatures: SignaturesMap;
-        }>,
+      | Transaction
+      | (Transaction & TransactionWithBlockhashLifetime)
+      | (TransactionMessage & TransactionMessageWithFeePayer),
     signers: CryptoKeyPair[],
-    options?: {
-      skipPreflight?: boolean;
-      preflightCommitment?: Commitment;
-    },
+    options?: { skipPreflight?: boolean; preflightCommitment?: Commitment },
   ): Promise<Signature> {
     const { skipPreflight = true, preflightCommitment = "confirmed" } =
       options ?? {};
+
     const hasBlockhash =
       "lifetimeConstraint" in transaction &&
       typeof transaction.lifetimeConstraint === "object" &&
@@ -202,39 +200,55 @@ export class Connection {
       (transaction.lifetimeConstraint as { blockhash?: unknown }).blockhash !==
         undefined;
 
-    if ("signatures" in transaction && "messageBytes" in transaction) {
-      const serializedTransaction =
-        getBase64EncodedWireTransaction(transaction);
-      const signature = await this.rpc
-        .sendTransaction(serializedTransaction, {
+    const serializeAndSendTransaction = async (tx: Transaction) => {
+      const serialized = getBase64EncodedWireTransaction(tx);
+      return this.rpc
+        .sendTransaction(serialized, {
           encoding: "base64",
           skipPreflight,
           preflightCommitment,
           ...options,
         })
         .send();
-      return signature;
-    } else {
-      if (!hasBlockhash) {
-        transaction =
-          await this.prepareTransactionWithLatestBlockhash(transaction);
+    };
+
+    // Case 1: Already serialized form
+    if ("signatures" in transaction && "messageBytes" in transaction) {
+      const fullySigned = (() => {
+        try {
+          isFullySignedTransaction(transaction);
+          return true;
+        } catch {
+          return false;
+        }
+      })();
+
+      if (fullySigned) {
+        return serializeAndSendTransaction(transaction);
       }
+
+      assertIsTransactionWithBlockhashLifetime(transaction);
       const signedTransaction = await this.partiallySignTransaction(
         signers,
         transaction,
       );
-      const serializedTransaction =
-        getBase64EncodedWireTransaction(signedTransaction);
-      const signature = await this.rpc
-        .sendTransaction(serializedTransaction, {
-          encoding: "base64",
-          skipPreflight,
-          preflightCommitment,
-          ...options,
-        })
-        .send();
-      return signature;
+      isFullySignedTransaction(signedTransaction);
+      return serializeAndSendTransaction(signedTransaction);
     }
+
+    // Case 2: TransactionMessage form
+    if (!hasBlockhash) {
+      transaction =
+        await this.prepareTransactionWithLatestBlockhash(transaction);
+    }
+
+    assertIsTransactionMessageWithBlockhashLifetime(transaction);
+    const compiled = compileTransaction(transaction);
+    const signedTransaction = await this.partiallySignTransaction(
+      signers,
+      compiled,
+    );
+    return serializeAndSendTransaction(signedTransaction);
   }
 
   /**
@@ -264,21 +278,11 @@ export class Connection {
    */
   public async partiallySignTransaction(
     signers: CryptoKeyPair[],
-    transaction: TransactionMessage & TransactionMessageWithFeePayer<string>,
-  ): Promise<
-    Readonly<
-      TransactionWithBlockhashLifetime &
-        Readonly<{
-          messageBytes: TransactionMessageBytes;
-          signatures: SignaturesMap;
-        }>
-    >
-  > {
-    assertIsTransactionMessageWithBlockhashLifetime(transaction);
-    const compiledTransaction = compileTransaction(transaction);
+    transaction: Transaction & TransactionWithLifetime,
+  ): Promise<Transaction & TransactionWithLifetime> {
     const signedTransaction = await partiallySignTransaction(
       signers,
-      compiledTransaction,
+      transaction,
     );
     return signedTransaction;
   }
@@ -310,7 +314,7 @@ export class Connection {
    * @returns The latest blockhash and last valid block height.
    */
   public async getLatestBlockhashForTransaction(
-    transaction: TransactionMessage,
+    transaction: TransactionMessage & TransactionMessageWithFeePayer,
   ): Promise<Readonly<LatestBlockhash>> {
     const writableAccounts = getWritableAccounts(transaction);
 

@@ -85,8 +85,10 @@ vi.mock("@solana/kit", () => ({
   partiallySignTransaction: vi.fn(),
   compileTransaction: vi.fn(),
   getBase64EncodedWireTransaction: vi.fn(),
-  pipe: vi.fn((tx, fn) => fn(tx)),
+  isFullySignedTransaction: vi.fn(),
+  assertIsTransactionWithBlockhashLifetime: vi.fn(),
   assertIsTransactionMessageWithBlockhashLifetime: vi.fn(),
+  pipe: vi.fn((tx, fn) => fn(tx)),
   setTransactionMessageLifetimeUsingBlockhash: vi.fn((blockhash, tx) => tx),
 }));
 
@@ -140,6 +142,15 @@ describe("Connection", () => {
       mockSignature,
     );
     vi.mocked(utils.parseCommitsLogsMessage).mockReturnValue(mockSignature);
+    vi.mocked(solanaKit.isFullySignedTransaction).mockImplementation(
+      () => true,
+    );
+    vi.mocked(
+      solanaKit.assertIsTransactionWithBlockhashLifetime,
+    ).mockImplementation(() => {});
+    vi.mocked(
+      solanaKit.assertIsTransactionMessageWithBlockhashLifetime,
+    ).mockImplementation(() => {});
   });
 
   it("should create a Connection instance", async () => {
@@ -177,6 +188,72 @@ describe("Connection", () => {
     expect(sig).toBe(mockSignature);
   });
 
+  it("sendTransaction - fully signed TransactionWithLifetime", async () => {
+    const connection = await Connection.create("http://localhost");
+
+    const fullySignedTx: solanaKit.Transaction &
+      solanaKit.TransactionWithLifetime = {
+      messageBytes: mockTxBytes,
+      signatures: {},
+      lifetimeConstraint: mockLifetimeConstraint,
+    };
+
+    vi.mocked(solanaKit.isFullySignedTransaction).mockImplementation(
+      () => true,
+    );
+
+    const sig = await connection.sendTransaction(fullySignedTx, mockSigners);
+    expect(sig).toBe(mockSignature);
+    expect(solanaKit.isFullySignedTransaction).toHaveBeenCalled();
+  });
+
+  it("sendTransaction - unsigned TransactionWithLifetime", async () => {
+    const connection = await Connection.create("http://localhost");
+
+    const unsignedTx: solanaKit.Transaction &
+      solanaKit.TransactionWithLifetime = {
+      messageBytes: mockTxBytes,
+      signatures: {},
+      lifetimeConstraint: mockLifetimeConstraint,
+    };
+
+    vi.mocked(solanaKit.partiallySignTransaction).mockResolvedValue({
+      messageBytes: mockTxBytes,
+      signatures: {},
+      lifetimeConstraint: mockLifetimeConstraint,
+    });
+
+    const sig = await connection.sendTransaction(unsignedTx, mockSigners);
+
+    expect(sig).toBe(mockSignature);
+    expect(solanaKit.isFullySignedTransaction).toHaveBeenCalled();
+  });
+
+  it("sendTransaction - TransactionMessage without blockhash", async () => {
+    const connection = await Connection.create("http://localhost");
+
+    const txMessage: solanaKit.TransactionMessage &
+      solanaKit.TransactionMessageWithFeePayer<string> = {
+      feePayer: "payer",
+    } as any;
+
+    const prepareSpy = vi
+      .spyOn(connection, "prepareTransactionWithLatestBlockhash")
+      .mockImplementation(async (tx) => ({
+        ...tx,
+        messageBytes: mockTxBytes,
+        signatures: {},
+        lifetimeConstraint: mockLifetimeConstraint,
+      }));
+
+    const sig = await connection.sendTransaction(txMessage, mockSigners);
+
+    expect(sig).toBe(mockSignature);
+    expect(prepareSpy).toHaveBeenCalledWith(txMessage);
+    expect(solanaKit.compileTransaction).toHaveBeenCalled();
+    expect(solanaKit.partiallySignTransaction).toHaveBeenCalled();
+  });
+
   it("should confirmTransaction without errors", async () => {
     const connection = await Connection.create("http://localhost");
     await expect(
@@ -189,11 +266,12 @@ describe("Connection", () => {
 
   it("should partiallySignTransaction", async () => {
     const connection = await Connection.create("http://localhost");
-    const txMessage = {
-      feePayer: "payer",
-      lifetimeConstraint: { blockhash: "bh" },
-    } as unknown as solanaKit.TransactionMessage &
-      solanaKit.TransactionMessageWithFeePayer<string>;
+    const txMessage: solanaKit.Transaction & solanaKit.TransactionWithLifetime =
+      {
+        messageBytes: mockTxBytes,
+        signatures: {},
+        lifetimeConstraint: mockLifetimeConstraint,
+      };
     const partiallySigned = await connection.partiallySignTransaction(
       mockSigners,
       txMessage,
