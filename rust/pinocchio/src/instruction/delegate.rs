@@ -9,6 +9,8 @@ use crate::{
     types::DelegateConfig,
     utils::close_pda_acc,
 };
+use crate::consts::DELEGATION_PROGRAM_ID;
+use crate::types::DelegateAccountArgs;
 
 // Helper: convert u64 to decimal string without heap allocation
 fn dec_str_from_u64<'a>(mut n: u64, buf: &'a mut [u8; 21]) -> &'a str {
@@ -30,6 +32,8 @@ fn dec_str_from_u64<'a>(mut n: u64, buf: &'a mut [u8; 21]) -> &'a str {
 #[allow(clippy::cloned_ref_to_slice_refs)]
 pub fn delegate_account(
     accounts: &[&AccountInfo],
+    seeds: &[&[u8]],
+    bump: u8,
     pda_seeds: Signer,
     config: DelegateConfig,
 ) -> ProgramResult {
@@ -157,7 +161,7 @@ pub fn delegate_account(
             account: pda_acc,
             owner: system_program.key(),
         }
-        .invoke_signed(&[delegate_signer_seeds])?;
+        .invoke_signed(&[delegate_signer_seeds.clone()])?;
     }
     // let current_owner = unsafe { pda_acc.owner() };
     // if current_owner != &DELEGATION_PROGRAM_ID {
@@ -169,8 +173,13 @@ pub fn delegate_account(
     // }
 
     msg!("Delegating account via CPI");
+    // let seeds = delegate_signer_seeds
+    //     .bytes
+    //     .get(..delegate_signer_seeds.bytes.len().saturating_sub(1))
+    //     .unwrap_or(&[]);
+
     //
-    // // Delegate
+    // Delegate
     // let delegate_args = DelegateAccountArgs {
     //     commit_frequency_ms: config.commit_frequency_ms,
     //     seeds: pda_seeds,
@@ -196,4 +205,20 @@ pub fn delegate_account(
     close_pda_acc(payer, buffer_acc, system_program)?;
 
     Ok(())
+}
+
+fn signer_from_raw<'a, 'b, const N: usize>(seeds: [&'a [u8]; N], bump: u8) -> Signer<'a, 'b> {
+    let bump_slice = [bump];
+    // stack-allocated array of Seed
+    let mut seed_arr: [Option<Seed<'a>>; N + 1] = [const { None }; N + 1];
+    let mut i = 0;
+    while i < N {
+        seed_arr[i] = Some(Seed::from(seeds[i]));
+        i += 1;
+    }
+    seed_arr[N] = Some(Seed::from(&bump_slice));
+
+    // Flatten from [Option<Seed>] to [Seed]
+    let seed_ref: &[Seed] = unsafe { core::mem::transmute(&seed_arr) };
+    Signer::from(seed_ref)
 }

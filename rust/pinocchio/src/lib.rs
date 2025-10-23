@@ -1,5 +1,4 @@
 #![cfg_attr(not(feature = "std"), no_std)]
-// Please note that to use this package the "no_allocator" can't be turned on
 
 #[cfg(not(feature = "std"))]
 extern crate alloc;
