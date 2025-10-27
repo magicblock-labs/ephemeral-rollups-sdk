@@ -113,7 +113,7 @@ jobs:
           solana --version
           cargo build-sbf --features unit_test_config
 
-      - name: Run Anchor build
+      - name: Run Anchor build & test
         working-directory: delegation-program/tests/integration
         env:
           RUSTUP_TOOLCHAIN: ${{ env.rust_version }}
@@ -135,3 +135,4 @@ jobs:
           solana --version
           cargo build
           anchor build --no-idl
+          anchor test
