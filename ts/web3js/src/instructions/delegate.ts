@@ -27,7 +27,6 @@ export const delegateInstructionDiscriminator = [0, 0, 0, 0, 0, 0, 0, 0];
 interface DelegateAccountArgs {
   commit_frequency_ms: number;
   seeds: Uint8Array[][];
-  validator?: web3.PublicKey;
 }
 // Function to create a delegate instruction
 export function createDelegateInstruction(
@@ -38,6 +37,7 @@ export function createDelegateInstruction(
     delegationRecord?: web3.PublicKey;
     delegationMetadata?: web3.PublicKey;
     systemProgram?: web3.PublicKey;
+    validator?: web3.PublicKey;
   },
   args?: DelegateAccountArgs,
   programId = DELEGATION_PROGRAM_ID,
@@ -58,7 +58,6 @@ export function createDelegateInstruction(
   args = args ?? {
     commit_frequency_ms: 4294967295, // 2 ** 4 - 1,
     seeds: [],
-    validator: undefined,
   };
 
   const keys: web3.AccountMeta[] = [
@@ -85,13 +84,22 @@ export function createDelegateInstruction(
       isWritable: false,
       isSigner: false,
     },
+    // Only add validator if it exists
+    ...(accounts.validator
+      ? [
+          {
+            pubkey: accounts.validator,
+            isWritable: false,
+            isSigner: false,
+          },
+        ]
+      : []),
   ];
 
   const [data] = delegateStruct.serialize({
     instructionDiscriminator: delegateInstructionDiscriminator,
     commit_frequency_ms: args.commit_frequency_ms,
     seeds: args.seeds.map((seed) => seed.map(Number)),
-    validator: args.validator ? args.validator.toBytes() : undefined,
   });
 
   return new web3.TransactionInstruction({
