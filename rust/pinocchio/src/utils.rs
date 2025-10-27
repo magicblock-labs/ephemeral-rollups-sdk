@@ -1,33 +1,10 @@
 use core::mem::MaybeUninit;
-use pinocchio::{
-    account_info::AccountInfo,
-    cpi::{invoke_signed, MAX_CPI_ACCOUNTS},
-    instruction::{AccountMeta, Instruction, Seed, Signer},
-    msg,
-    program_error::ProgramError,
-};
-
+use pinocchio::{account_info::AccountInfo, cpi::{invoke_signed, MAX_CPI_ACCOUNTS}, instruction::{AccountMeta, Instruction, Seed, Signer}, program_error::ProgramError};
+use pinocchio::pubkey::MAX_SEEDS;
 use crate::{
     consts::DELEGATION_PROGRAM_ID,
     types::{DelegateAccountArgs, MAX_DELEGATE_ACCOUNT_ARGS_SIZE},
 };
-
-// Helper: convert u64 to decimal string without heap allocation (no_std-friendly)
-fn dec_str_from_u64<'a>(mut n: u64, buf: &'a mut [u8; 21]) -> &'a str {
-    if n == 0 {
-        buf[20] = b'0';
-        // SAFETY: writing only ASCII digits
-        return unsafe { core::str::from_utf8_unchecked(&buf[20..21]) };
-    }
-    let mut i = 21usize;
-    while n > 0 {
-        i -= 1;
-        buf[i] = b'0' + (n % 10) as u8;
-        n /= 10;
-    }
-    // SAFETY: buffer contains only ASCII digits
-    unsafe { core::str::from_utf8_unchecked(&buf[i..21]) }
-}
 
 #[inline(always)]
 pub fn get_seeds<'a>(seeds_slice: &[&'a [u8]]) -> Result<&'a [Seed<'a>], ProgramError> {
@@ -64,54 +41,22 @@ pub fn get_seeds<'a>(seeds_slice: &[&'a [u8]]) -> Result<&'a [Seed<'a>], Program
 }
 
 #[inline(always)]
-pub fn get_signer_seeds<'a, 'b>(
-    seeds_slice: &[&'a [u8]],
-    bump: u8,
-) -> Result<Signer<'a, 'b>, ProgramError> {
-    let num_seeds = seeds_slice.len();
-    if num_seeds + 1 > MAX_CPI_ACCOUNTS {
-        return Err(ProgramError::InvalidArgument);
+pub fn empty_seed<'a>() -> Seed<'a> {
+    Seed::from(&[])
+}
+
+#[inline(always)]
+pub fn make_seed_buf<'a>() -> [Seed<'a>; MAX_SEEDS] {
+    let mut buf: [MaybeUninit<Seed<'a>>; MAX_SEEDS] =
+        unsafe { MaybeUninit::uninit().assume_init() };
+
+    let mut i = 0;
+    while i < MAX_SEEDS {
+        buf[i].write(empty_seed());
+        i += 1;
     }
 
-    let mut tmp: [MaybeUninit<Seed>; MAX_CPI_ACCOUNTS] =
-        [const { MaybeUninit::<Seed>::uninit() }; MAX_CPI_ACCOUNTS];
-
-    unsafe {
-        for i in 0..num_seeds {
-            let seed_bytes = seeds_slice.get_unchecked(i);
-            tmp.get_unchecked_mut(i).write(Seed::from(*seed_bytes));
-        }
-
-        let bump_slice: &[u8] = &[bump];
-        tmp.get_unchecked_mut(num_seeds)
-            .write(Seed::from(bump_slice));
-
-        let all_seeds = core::slice::from_raw_parts(tmp.as_ptr() as *const Seed, num_seeds + 1);
-
-        // Debug: print all_seeds before creating the Signer
-        // msg!("all_seeds:");
-        // let mut num_buf = [0u8; 21];
-        // msg!("count:");
-        // let count_str = dec_str_from_u64((num_seeds as u64) + 1, &mut num_buf);
-        // msg!(count_str);
-        // for i in 0..(num_seeds + 1) {
-        //     msg!("seed_index:");
-        //     let idx_str = dec_str_from_u64(i as u64, &mut num_buf);
-        //     msg!(idx_str);
-        //     let seed_ref = all_seeds.get_unchecked(i);
-        //     let seed_bytes: &[u8] = &*seed_ref;
-        //     msg!("seed_len:");
-        //     let len_str = dec_str_from_u64(seed_bytes.len() as u64, &mut num_buf);
-        //     msg!(len_str);
-        //     msg!("seed_bytes:");
-        //     for b in seed_bytes.iter() {
-        //         let b_str = dec_str_from_u64(*b as u64, &mut num_buf);
-        //         msg!(b_str);
-        //     }
-        // }
-
-        Ok(Signer::from(all_seeds))
-    }
+    unsafe { core::mem::transmute_copy::<_, [Seed<'a>; MAX_SEEDS]>(&buf) }
 }
 
 pub fn close_pda_acc(
@@ -156,13 +101,13 @@ pub fn cpi_delegate(
             .write(AccountMeta::new(payer.key(), true, true));
         account_metas
             .get_unchecked_mut(1)
-            .write(AccountMeta::new(pda_acc.key(), true, false));
+            .write(AccountMeta::new(pda_acc.key(), true, true));
         account_metas
             .get_unchecked_mut(2)
             .write(AccountMeta::readonly(owner_program.key()));
         account_metas
             .get_unchecked_mut(3)
-            .write(AccountMeta::new(buffer_acc.key(), false, false));
+            .write(AccountMeta::new(buffer_acc.key(), true, false));
         account_metas.get_unchecked_mut(4).write(AccountMeta::new(
             delegation_record.key(),
             true,
@@ -170,22 +115,26 @@ pub fn cpi_delegate(
         ));
         account_metas
             .get_unchecked_mut(5)
-            .write(AccountMeta::readonly(delegation_metadata.key()));
+            .write(AccountMeta::new(delegation_metadata.key(), true, false));
         account_metas
             .get_unchecked_mut(6)
             .write(AccountMeta::readonly(system_program.key()));
     }
 
-    let mut data = [0u8; MAX_DELEGATE_ACCOUNT_ARGS_SIZE];
+    // Prepare instruction data with 8-byte discriminator prefix followed by serialized args
+    let mut data = [0u8; 8 + MAX_DELEGATE_ACCOUNT_ARGS_SIZE];
 
-    let serialized_data = delegate_args.try_to_slice(&mut data)?;
+    // Serialize args into the slice after the discriminator
+    let args_slice = delegate_args.try_to_slice(&mut data[8..])?;
+    let total_len = 8 + args_slice.len();
+    let data_slice = &data[..total_len];
 
     let instruction = Instruction {
         program_id: &DELEGATION_PROGRAM_ID,
         accounts: unsafe {
             core::slice::from_raw_parts(account_metas.as_ptr() as *const AccountMeta, num_accounts)
         },
-        data: serialized_data,
+        data: data_slice,
     };
 
     let acc_infos = [
@@ -197,7 +146,7 @@ pub fn cpi_delegate(
         delegation_metadata,
         system_program,
     ];
-
+    
     invoke_signed(&instruction, &acc_infos, &[signer_seeds])?;
     Ok(())
 }

@@ -1,40 +1,20 @@
-use pinocchio::{account_info::AccountInfo, instruction::{Seed, Signer}, msg, program_error::ProgramError, pubkey, pubkey::find_program_address, sysvars::{rent::Rent, Sysvar}, ProgramResult};
-use pinocchio::pubkey::Pubkey;
-use pinocchio_pubkey::pubkey;
+use pinocchio::{account_info::AccountInfo, instruction::{Seed, Signer}, program_error::ProgramError, pubkey::find_program_address, ProgramResult};
 use pinocchio_system::instructions::{Assign, CreateAccount};
 
-use crate::utils::get_signer_seeds;
+use crate::consts::DELEGATION_PROGRAM_ID;
+use crate::types::DelegateAccountArgs;
+use crate::utils::{cpi_delegate, make_seed_buf};
 use crate::{
     consts::BUFFER,
     types::DelegateConfig,
     utils::close_pda_acc,
 };
-use crate::consts::DELEGATION_PROGRAM_ID;
-use crate::types::DelegateAccountArgs;
-
-// Helper: convert u64 to decimal string without heap allocation
-fn dec_str_from_u64<'a>(mut n: u64, buf: &'a mut [u8; 21]) -> &'a str {
-    if n == 0 {
-        buf[20] = b'0';
-        // SAFETY: writing only ASCII digits
-        return unsafe { core::str::from_utf8_unchecked(&buf[20..21]) };
-    }
-    let mut i = 21usize;
-    while n > 0 {
-        i -= 1;
-        buf[i] = b'0' + (n % 10) as u8;
-        n /= 10;
-    }
-    // SAFETY: buffer contains only ASCII digits
-    unsafe { core::str::from_utf8_unchecked(&buf[i..21]) }
-}
 
 #[allow(clippy::cloned_ref_to_slice_refs)]
 pub fn delegate_account(
     accounts: &[&AccountInfo],
     seeds: &[&[u8]],
     bump: u8,
-    pda_seeds: Signer,
     config: DelegateConfig,
 ) -> ProgramResult {
     let [payer, pda_acc, owner_program, buffer_acc, delegation_record, delegation_metadata, system_program] =
@@ -47,35 +27,11 @@ pub fn delegate_account(
         return Err(ProgramError::MissingRequiredSignature);
     }
 
-    // Debug: print incoming PDA seeds without using formatting
-    // msg!("PDA seeds:");
-    // let mut num_buf = [0u8; 21];
-    // let count_str = dec_str_from_u64(pda_seeds.len() as u64, &mut num_buf);
-    // msg!("count:");
-    // msg!(count_str);
-    // for (i, seed) in pda_seeds.iter().enumerate() {
-    //     msg!("seed_index:");
-    //     let idx_str = dec_str_from_u64(i as u64, &mut num_buf);
-    //     msg!(idx_str);
-    //     msg!("seed_len:");
-    //     let len_str = dec_str_from_u64(seed.len() as u64, &mut num_buf);
-    //     msg!(len_str);
-    //     msg!("seed_bytes:");
-    //     for b in (*seed).iter() {
-    //         let b_str = dec_str_from_u64(*b as u64, &mut num_buf);
-    //         msg!(b_str);
-    //     }
-    // }
-
     // Buffer PDA seeds
     let buffer_seeds: &[&[u8]] = &[BUFFER, pda_acc.key().as_ref()];
 
     // Bumps
-    // let (_, delegate_account_bump) = find_program_address(pda_seeds, owner_program.key());
     let (_, buffer_pda_bump) = find_program_address(buffer_seeds, owner_program.key());
-
-    // Delegate signer seeds
-    // let delegate_signer_seeds = get_signer_seeds(pda_seeds, delegate_account_bump)?;
 
     // Buffer signer seeds
     let buffer_bump_slice = [buffer_pda_bump];
@@ -88,21 +44,16 @@ pub fn delegate_account(
 
     // Single data_len and rent lookup
     let data_len = pda_acc.data_len();
-    let rent_lamports = Rent::get()?.minimum_balance(data_len);
-
-    msg!("Creating buffer PDA account");
 
     // Create Buffer PDA
     CreateAccount {
         from: payer,
         to: buffer_acc,
-        lamports: rent_lamports,
+        lamports: 0,
         space: data_len as u64,
         owner: owner_program.key(),
     }
     .invoke_signed(&[buffer_signer_seeds])?;
-
-    msg!("Buffer Created");
 
     // Copy delegated PDA -> buffer, then zero delegated PDA
     {
@@ -117,108 +68,64 @@ pub fn delegate_account(
         }
     }
 
-    msg!("Assigning owner");
-
     // Assign delegated PDA to system if needed, then to delegation program
-
-    // let (address_match, address_bump) = find_program_address(pda_seeds, owner_program.key());
-    // if address_match.eq(pda_acc.key()) {
-    //     msg!("address match");
-    //     pubkey::log(&address_match);
-    // }else {
-    //     msg!("Address mismatch");
-    //     pubkey::log(&address_match);
-    //     pubkey::log(&pda_acc.key());
-    //     if owner_program.key().eq(&pubkey!("5iC4wKZizyxrKh271Xzx3W4Vn2xUyYvSGHeoB2mdw5HA")) {
-    //         msg!("Owner program key matches expected delegation program ID");
-    //     }
-    // }
-    //
-    let mint_key = pubkey!("4j7YNpHU8LsNrPKW231eUk3QWasjpZ4FMfT1oL7Zpr7z");
-    let (address_match, address_bump) = find_program_address(&[payer.key().as_slice(), mint_key.as_slice()], owner_program.key());
-    let bump_slice = [address_bump];
-    let seeds = [
-        Seed::from(payer.key().as_slice()),
-        Seed::from(mint_key.as_slice()),
-        // Mint: 4j7YNpHU8LsNrPKW231eUk3QWasjpZ4FMfT1oL7Zpr7z
-        Seed::from(&bump_slice),
-    ];
-    let pda_signer_seeds = Signer::from(&seeds);
-
-    if address_match.eq(pda_acc.key()) {
-        msg!("address match");
-        pubkey::log(&address_match);
-    }
-    pubkey::log(&payer.key());
-    pubkey::log(&mint_key);
-
-    // let delegate_signer_seeds = pda_seeds;
-    let delegate_signer_seeds = pda_signer_seeds;
+    let mut seed_buf = make_seed_buf();
+    let filled = fill_seeds(&mut seed_buf, seeds, &bump);
+    let delegate_signer_seeds = Signer::from(filled);
 
     let current_owner = unsafe { pda_acc.owner() };
     if current_owner != system_program.key() {
+        unsafe { pda_acc.assign(system_program.key()) };
+    }
+    let current_owner = unsafe { pda_acc.owner() };
+    if current_owner != &DELEGATION_PROGRAM_ID {
         Assign {
             account: pda_acc,
-            owner: system_program.key(),
+            owner: &DELEGATION_PROGRAM_ID,
         }
         .invoke_signed(&[delegate_signer_seeds.clone()])?;
     }
-    // let current_owner = unsafe { pda_acc.owner() };
-    // if current_owner != &DELEGATION_PROGRAM_ID {
-    //     Assign {
-    //         account: pda_acc,
-    //         owner: &DELEGATION_PROGRAM_ID,
-    //     }
-    //     .invoke_signed(&[delegate_signer_seeds.clone()])?;
-    // }
 
-    msg!("Delegating account via CPI");
-    // let seeds = delegate_signer_seeds
-    //     .bytes
-    //     .get(..delegate_signer_seeds.bytes.len().saturating_sub(1))
-    //     .unwrap_or(&[]);
-
-    //
     // Delegate
-    // let delegate_args = DelegateAccountArgs {
-    //     commit_frequency_ms: config.commit_frequency_ms,
-    //     seeds: pda_seeds,
-    //     validator: config.validator,
-    // };
+    let delegate_args = DelegateAccountArgs {
+        commit_frequency_ms: config.commit_frequency_ms,
+        seeds,
+        validator: config.validator,
+    };
 
-    // cpi_delegate(
-    //     payer,
-    //     pda_acc,
-    //     owner_program,
-    //     buffer_acc,
-    //     delegation_record,
-    //     delegation_metadata,
-    //     system_program,
-    //     delegate_args,
-    //     delegate_signer_seeds,
-    // )?;
+    cpi_delegate(
+        payer,
+        pda_acc,
+        owner_program,
+        buffer_acc,
+        delegation_record,
+        delegation_metadata,
+        system_program,
+        delegate_args,
+        delegate_signer_seeds,
+    )?;
 
     // Close buffer PDA back to payer to reclaim lamports
-
-    msg!("Closing buffer PDA account");
-
     close_pda_acc(payer, buffer_acc, system_program)?;
 
     Ok(())
 }
 
-fn signer_from_raw<'a, 'b, const N: usize>(seeds: [&'a [u8]; N], bump: u8) -> Signer<'a, 'b> {
-    let bump_slice = [bump];
-    // stack-allocated array of Seed
-    let mut seed_arr: [Option<Seed<'a>>; N + 1] = [const { None }; N + 1];
+pub fn fill_seeds<'a>(
+    out: &'a mut [Seed<'a>; 16],
+    seeds: &[&'a [u8]],
+    bump_ref: &'a u8,
+) -> &'a [Seed<'a>] {
+    assert!(seeds.len() <= 15, "too many seeds (max 15 + bump = 16)");
+
+    let bump_slice: &[u8] = core::slice::from_ref(bump_ref);
+
     let mut i = 0;
-    while i < N {
-        seed_arr[i] = Some(Seed::from(seeds[i]));
+    while i < seeds.len() {
+        out[i] = Seed::from(seeds[i]);
         i += 1;
     }
-    seed_arr[N] = Some(Seed::from(&bump_slice));
+    out[i] = Seed::from(bump_slice);
 
-    // Flatten from [Option<Seed>] to [Seed]
-    let seed_ref: &[Seed] = unsafe { core::mem::transmute(&seed_arr) };
-    Signer::from(seed_ref)
+    &out[..=i]
 }
