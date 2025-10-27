@@ -1,14 +1,16 @@
-use pinocchio::{account_info::AccountInfo, instruction::{Seed, Signer}, program_error::ProgramError, pubkey::find_program_address, ProgramResult};
+use pinocchio::{
+    account_info::AccountInfo,
+    instruction::{Seed, Signer},
+    program_error::ProgramError,
+    pubkey::find_program_address,
+    ProgramResult,
+};
 use pinocchio_system::instructions::{Assign, CreateAccount};
 
 use crate::consts::DELEGATION_PROGRAM_ID;
 use crate::types::DelegateAccountArgs;
 use crate::utils::{cpi_delegate, make_seed_buf};
-use crate::{
-    consts::BUFFER,
-    types::DelegateConfig,
-    utils::close_pda_acc,
-};
+use crate::{consts::BUFFER, types::DelegateConfig, utils::close_pda_acc};
 
 #[allow(clippy::cloned_ref_to_slice_refs)]
 pub fn delegate_account(

@@ -1,9 +1,14 @@
-use core::mem::MaybeUninit;
-use pinocchio::{account_info::AccountInfo, cpi::{invoke_signed, MAX_CPI_ACCOUNTS}, instruction::{AccountMeta, Instruction, Seed, Signer}, program_error::ProgramError};
-use pinocchio::pubkey::MAX_SEEDS;
 use crate::{
     consts::DELEGATION_PROGRAM_ID,
     types::{DelegateAccountArgs, MAX_DELEGATE_ACCOUNT_ARGS_SIZE},
+};
+use core::mem::MaybeUninit;
+use pinocchio::pubkey::MAX_SEEDS;
+use pinocchio::{
+    account_info::AccountInfo,
+    cpi::{invoke_signed, MAX_CPI_ACCOUNTS},
+    instruction::{AccountMeta, Instruction, Seed, Signer},
+    program_error::ProgramError,
 };
 
 #[inline(always)]
@@ -113,9 +118,11 @@ pub fn cpi_delegate(
             true,
             false,
         ));
-        account_metas
-            .get_unchecked_mut(5)
-            .write(AccountMeta::new(delegation_metadata.key(), true, false));
+        account_metas.get_unchecked_mut(5).write(AccountMeta::new(
+            delegation_metadata.key(),
+            true,
+            false,
+        ));
         account_metas
             .get_unchecked_mut(6)
             .write(AccountMeta::readonly(system_program.key()));
@@ -146,7 +153,7 @@ pub fn cpi_delegate(
         delegation_metadata,
         system_program,
     ];
-    
+
     invoke_signed(&instruction, &acc_infos, &[signer_seeds])?;
     Ok(())
 }
