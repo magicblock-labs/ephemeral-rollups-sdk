@@ -19,7 +19,7 @@ pub fn delegate_account(
     bump: u8,
     config: DelegateConfig,
 ) -> ProgramResult {
-    let [payer, pda_acc, owner_program, buffer_acc, delegation_record, delegation_metadata, system_program] =
+    let [payer, pda_acc, owner_program, buffer_acc, delegation_record, delegation_metadata] =
         accounts
     else {
         return Err(ProgramError::NotEnoughAccountKeys);
@@ -76,8 +76,8 @@ pub fn delegate_account(
     let delegate_signer_seeds = Signer::from(filled);
 
     let current_owner = unsafe { pda_acc.owner() };
-    if current_owner != system_program.key() {
-        unsafe { pda_acc.assign(system_program.key()) };
+    if current_owner != &pinocchio_system::id() {
+        unsafe { pda_acc.assign(&pinocchio_system::id()) };
     }
     let current_owner = unsafe { pda_acc.owner() };
     if current_owner != &DELEGATION_PROGRAM_ID {
@@ -102,13 +102,12 @@ pub fn delegate_account(
         buffer_acc,
         delegation_record,
         delegation_metadata,
-        system_program,
         delegate_args,
         delegate_signer_seeds,
     )?;
 
     // Close buffer PDA back to payer to reclaim lamports
-    close_pda_acc(payer, buffer_acc, system_program)?;
+    close_pda_acc(payer, buffer_acc)?;
 
     Ok(())
 }

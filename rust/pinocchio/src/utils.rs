@@ -64,11 +64,7 @@ pub fn make_seed_buf<'a>() -> [Seed<'a>; MAX_SEEDS] {
     unsafe { core::mem::transmute_copy::<_, [Seed<'a>; MAX_SEEDS]>(&buf) }
 }
 
-pub fn close_pda_acc(
-    payer: &AccountInfo,
-    pda_acc: &AccountInfo,
-    system_program: &AccountInfo,
-) -> Result<(), ProgramError> {
+pub fn close_pda_acc(payer: &AccountInfo, pda_acc: &AccountInfo) -> Result<(), ProgramError> {
     unsafe {
         *payer.borrow_mut_lamports_unchecked() += *pda_acc.borrow_lamports_unchecked();
         *pda_acc.borrow_mut_lamports_unchecked() = 0;
@@ -77,7 +73,7 @@ pub fn close_pda_acc(
     pda_acc
         .realloc(0, false)
         .map_err(|_| ProgramError::AccountDataTooSmall)?;
-    unsafe { pda_acc.assign(system_program.key()) };
+    unsafe { pda_acc.assign(&pinocchio_system::ID) };
 
     Ok(())
 }
@@ -90,7 +86,6 @@ pub fn cpi_delegate(
     buffer_acc: &AccountInfo,
     delegation_record: &AccountInfo,
     delegation_metadata: &AccountInfo,
-    system_program: &AccountInfo,
     delegate_args: DelegateAccountArgs,
     signer_seeds: Signer<'_, '_>,
 ) -> Result<(), ProgramError> {
@@ -125,7 +120,7 @@ pub fn cpi_delegate(
         ));
         account_metas
             .get_unchecked_mut(6)
-            .write(AccountMeta::readonly(system_program.key()));
+            .write(AccountMeta::readonly(&pinocchio_system::ID));
     }
 
     // Prepare instruction data with 8-byte discriminator prefix followed by serialized args
@@ -151,7 +146,6 @@ pub fn cpi_delegate(
         buffer_acc,
         delegation_record,
         delegation_metadata,
-        system_program,
     ];
 
     invoke_signed(&instruction, &acc_infos, &[signer_seeds])?;
@@ -162,8 +156,9 @@ pub fn create_schedule_commit_ix<'a>(
     payer: &'a AccountInfo,
     account_infos: &'a [AccountInfo],
     magic_context: &'a AccountInfo,
+    magic_program: &'a AccountInfo,
     allow_undelegation: bool,
-) -> Result<(&'a [u8], &'a [AccountMeta<'a>]), ProgramError> {
+) -> Result<Instruction<'a, 'a, 'a, 'a>, ProgramError> {
     let num_accounts = 2 + account_infos.len();
 
     if num_accounts > MAX_CPI_ACCOUNTS {
@@ -201,7 +196,13 @@ pub fn create_schedule_commit_ix<'a>(
         }
     }
 
-    Ok((instruction_data, unsafe {
-        core::slice::from_raw_parts(account_metas.as_ptr() as *const AccountMeta, num_accounts)
-    }))
+    let ix = Instruction {
+        program_id: magic_program.key(),
+        accounts: unsafe {
+            core::slice::from_raw_parts(account_metas.as_ptr() as *const AccountMeta, num_accounts)
+        },
+        data: instruction_data,
+    };
+
+    Ok(ix)
 }
