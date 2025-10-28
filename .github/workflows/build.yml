@@ -6,6 +6,9 @@ on:
   pull_request:
     branches:
       - "main"
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 env:
   rust_version: 1.89.0
   node_version: 23
@@ -135,3 +138,4 @@ jobs:
           solana --version
           cargo build
           anchor build --no-idl
+#          anchor test

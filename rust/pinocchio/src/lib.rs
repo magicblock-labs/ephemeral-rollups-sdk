@@ -1,4 +1,7 @@
-//Please note that to use this package the "no_allocator" can't be turned on
+#![cfg_attr(not(feature = "std"), no_std)]
+
+#[cfg(not(feature = "std"))]
+extern crate alloc;
 
 pub mod consts;
 pub mod instruction;

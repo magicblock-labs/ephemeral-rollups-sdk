@@ -1,28 +1,25 @@
-use core::mem::MaybeUninit;
 use pinocchio::{
     account_info::AccountInfo,
-    cpi::MAX_CPI_ACCOUNTS,
     instruction::{Seed, Signer},
     program_error::ProgramError,
     pubkey::find_program_address,
-    sysvars::{rent::Rent, Sysvar},
     ProgramResult,
 };
-use pinocchio_system::instructions::CreateAccount;
+use pinocchio_system::instructions::{Assign, CreateAccount};
 
-use crate::{
-    consts::{BUFFER, DELEGATION_PROGRAM_ID},
-    types::{DelegateAccountArgs, DelegateConfig},
-    utils::{close_pda_acc, cpi_delegate, get_seeds},
-};
+use crate::consts::DELEGATION_PROGRAM_ID;
+use crate::types::DelegateAccountArgs;
+use crate::utils::{cpi_delegate, make_seed_buf};
+use crate::{consts::BUFFER, types::DelegateConfig, utils::close_pda_acc};
 
 #[allow(clippy::cloned_ref_to_slice_refs)]
 pub fn delegate_account(
-    accounts: &[AccountInfo],
-    pda_seeds: &[&[u8]],
+    accounts: &[&AccountInfo],
+    seeds: &[&[u8]],
+    bump: u8,
     config: DelegateConfig,
 ) -> ProgramResult {
-    let [payer, pda_acc, owner_program, buffer_acc, delegation_record, delegation_metadata, system_program] =
+    let [payer, pda_acc, owner_program, buffer_acc, delegation_record, delegation_metadata] =
         accounts
     else {
         return Err(ProgramError::NotEnoughAccountKeys);
@@ -32,87 +29,69 @@ pub fn delegate_account(
         return Err(ProgramError::MissingRequiredSignature);
     }
 
-    //Get buffer seeds
+    // Buffer PDA seeds
     let buffer_seeds: &[&[u8]] = &[BUFFER, pda_acc.key().as_ref()];
 
-    //Find PDAs
-    let (_, delegate_account_bump) = find_program_address(pda_seeds, owner_program.key());
+    // Bumps
     let (_, buffer_pda_bump) = find_program_address(buffer_seeds, owner_program.key());
 
-    //Get Delegated Pda Signer Seeds
-    let binding = &[delegate_account_bump];
-    let delegate_bump = Seed::from(binding);
-    let delegate_seeds = get_seeds(pda_seeds)?;
-
-    let num_seeds = delegate_seeds.len() + 1;
-    if num_seeds > MAX_CPI_ACCOUNTS {
-        return Err(ProgramError::InvalidArgument);
-    }
-
-    const UNINIT_SEED: MaybeUninit<Seed> = MaybeUninit::<Seed>::uninit();
-    let mut combined_seeds = [UNINIT_SEED; MAX_CPI_ACCOUNTS];
-
-    unsafe {
-        for i in 0..num_seeds - 1 {
-            let seed = delegate_seeds.get_unchecked(i);
-            combined_seeds
-                .get_unchecked_mut(i)
-                .write(Seed::from(seed.as_ref()));
-        }
-
-        combined_seeds
-            .get_unchecked_mut(num_seeds - 1)
-            .write(delegate_bump);
-    }
-
-    let all_delegate_seeds =
-        unsafe { core::slice::from_raw_parts(combined_seeds.as_ptr() as *const Seed, num_seeds) };
-
-    let delegate_signer_seeds = Signer::from(all_delegate_seeds);
-
-    //Get Buffer signer seeds
-    let bump = [buffer_pda_bump];
-    let seed_b = [
-        Seed::from(b"buffer"),
+    // Buffer signer seeds
+    let buffer_bump_slice = [buffer_pda_bump];
+    let buffer_seed_binding = [
+        Seed::from(BUFFER),
         Seed::from(pda_acc.key().as_ref()),
-        Seed::from(&bump),
+        Seed::from(&buffer_bump_slice),
     ];
+    let buffer_signer_seeds = Signer::from(&buffer_seed_binding);
 
-    let buffer_signer_seeds = Signer::from(&seed_b);
+    // Single data_len and rent lookup
+    let data_len = pda_acc.data_len();
 
-    //Create Buffer PDA account
+    // Create Buffer PDA
     CreateAccount {
         from: payer,
         to: buffer_acc,
-        lamports: Rent::get()?.minimum_balance(pda_acc.data_len()),
-        space: pda_acc.data_len() as u64, //PDA acc length
+        lamports: 0,
+        space: data_len as u64,
         owner: owner_program.key(),
     }
     .invoke_signed(&[buffer_signer_seeds])?;
 
-    // Copy the data to the buffer PDA
-    let mut buffer_data = buffer_acc.try_borrow_mut_data()?;
-    let new_data = pda_acc.try_borrow_data()?;
-    buffer_data.copy_from_slice(&new_data);
-    drop(buffer_data);
-
-    //Close Delegate PDA in preparation for CPI Delegate
-    close_pda_acc(payer, pda_acc, system_program)?;
-
-    //Create account with Delegation Account
-    CreateAccount {
-        from: payer,
-        to: pda_acc,
-        lamports: Rent::get()?.minimum_balance(buffer_acc.data_len()),
-        space: buffer_acc.data_len() as u64, //PDA acc length
-        owner: &DELEGATION_PROGRAM_ID,
+    // Copy delegated PDA -> buffer, then zero delegated PDA
+    {
+        let pda_ro = pda_acc.try_borrow_data()?;
+        let mut buf_data = buffer_acc.try_borrow_mut_data()?;
+        buf_data.copy_from_slice(&pda_ro);
     }
-    .invoke_signed(&[delegate_signer_seeds.clone()])?;
+    {
+        let mut pda_mut = pda_acc.try_borrow_mut_data()?;
+        for b in pda_mut.iter_mut().take(data_len) {
+            *b = 0;
+        }
+    }
 
-    //Prepare delegate args
+    // Assign delegated PDA to system if needed, then to delegation program
+    let mut seed_buf = make_seed_buf();
+    let filled = fill_seeds(&mut seed_buf, seeds, &bump);
+    let delegate_signer_seeds = Signer::from(filled);
+
+    let current_owner = unsafe { pda_acc.owner() };
+    if current_owner != &pinocchio_system::id() {
+        unsafe { pda_acc.assign(&pinocchio_system::id()) };
+    }
+    let current_owner = unsafe { pda_acc.owner() };
+    if current_owner != &DELEGATION_PROGRAM_ID {
+        Assign {
+            account: pda_acc,
+            owner: &DELEGATION_PROGRAM_ID,
+        }
+        .invoke_signed(&[delegate_signer_seeds.clone()])?;
+    }
+
+    // Delegate
     let delegate_args = DelegateAccountArgs {
         commit_frequency_ms: config.commit_frequency_ms,
-        seeds: pda_seeds,
+        seeds,
         validator: config.validator,
     };
 
@@ -123,12 +102,31 @@ pub fn delegate_account(
         buffer_acc,
         delegation_record,
         delegation_metadata,
-        system_program,
         delegate_args,
         delegate_signer_seeds,
     )?;
 
-    close_pda_acc(payer, buffer_acc, system_program)?;
+    // Close buffer PDA back to payer to reclaim lamports
+    close_pda_acc(payer, buffer_acc)?;
 
     Ok(())
+}
+
+pub fn fill_seeds<'a>(
+    out: &'a mut [Seed<'a>; 16],
+    seeds: &[&'a [u8]],
+    bump_ref: &'a u8,
+) -> &'a [Seed<'a>] {
+    assert!(seeds.len() <= 15, "too many seeds (max 15 + bump = 16)");
+
+    let bump_slice: &[u8] = core::slice::from_ref(bump_ref);
+
+    let mut i = 0;
+    while i < seeds.len() {
+        out[i] = Seed::from(seeds[i]);
+        i += 1;
+    }
+    out[i] = Seed::from(bump_slice);
+
+    &out[..=i]
 }

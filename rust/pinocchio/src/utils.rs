@@ -1,4 +1,9 @@
+use crate::{
+    consts::DELEGATION_PROGRAM_ID,
+    types::{DelegateAccountArgs, MAX_DELEGATE_ACCOUNT_ARGS_SIZE},
+};
 use core::mem::MaybeUninit;
+use pinocchio::pubkey::MAX_SEEDS;
 use pinocchio::{
     account_info::AccountInfo,
     cpi::{invoke_signed, MAX_CPI_ACCOUNTS},
@@ -6,50 +11,26 @@ use pinocchio::{
     program_error::ProgramError,
 };
 
-use crate::{
-    consts::DELEGATION_PROGRAM_ID,
-    types::{DelegateAccountArgs, MAX_DELEGATE_ACCOUNT_ARGS_SIZE},
-};
-
 #[inline(always)]
-pub fn get_seeds<'a>(seeds_slice: &[&'a [u8]]) -> Result<&'a [Seed<'a>], ProgramError> {
-    let num_seeds = seeds_slice.len();
-
-    if num_seeds > MAX_CPI_ACCOUNTS {
-        return Err(ProgramError::InvalidArgument);
-    }
-
-    if num_seeds == 0 {
-        return Ok(&[]);
-    }
-
-    const UNINIT_SEED: MaybeUninit<Seed> = MaybeUninit::<Seed>::uninit();
-    let mut seeds = [UNINIT_SEED; MAX_CPI_ACCOUNTS];
-
-    for i in 0..num_seeds {
-        unsafe {
-            // SAFETY: i is less than len(seeds_slice) and num_seeds <= MAX_CPI_ACCOUNTS
-            let seed_bytes = seeds_slice.get_unchecked(i);
-
-            // SAFETY: i is less than MAX_CPI_ACCOUNTS
-            seeds.get_unchecked_mut(i).write(Seed::from(*seed_bytes));
-        }
-    }
-
-    unsafe {
-        // SAFETY: num_seeds <= MAX_CPI_ACCOUNTS and we've initialized the first num_seeds elements
-        Ok(core::slice::from_raw_parts(
-            seeds.as_ptr() as *const Seed,
-            num_seeds,
-        ))
-    }
+pub fn empty_seed<'a>() -> Seed<'a> {
+    Seed::from(&[])
 }
 
-pub fn close_pda_acc(
-    payer: &AccountInfo,
-    pda_acc: &AccountInfo,
-    system_program: &AccountInfo,
-) -> Result<(), ProgramError> {
+#[inline(always)]
+pub fn make_seed_buf<'a>() -> [Seed<'a>; MAX_SEEDS] {
+    let mut buf: [MaybeUninit<Seed<'a>>; MAX_SEEDS] =
+        unsafe { MaybeUninit::uninit().assume_init() };
+
+    let mut i = 0;
+    while i < MAX_SEEDS {
+        buf[i].write(empty_seed());
+        i += 1;
+    }
+
+    unsafe { core::mem::transmute_copy::<_, [Seed<'a>; MAX_SEEDS]>(&buf) }
+}
+
+pub fn close_pda_acc(payer: &AccountInfo, pda_acc: &AccountInfo) -> Result<(), ProgramError> {
     unsafe {
         *payer.borrow_mut_lamports_unchecked() += *pda_acc.borrow_lamports_unchecked();
         *pda_acc.borrow_mut_lamports_unchecked() = 0;
@@ -58,7 +39,7 @@ pub fn close_pda_acc(
     pda_acc
         .realloc(0, false)
         .map_err(|_| ProgramError::AccountDataTooSmall)?;
-    unsafe { pda_acc.assign(system_program.key()) };
+    unsafe { pda_acc.assign(&pinocchio_system::ID) };
 
     Ok(())
 }
@@ -71,7 +52,6 @@ pub fn cpi_delegate(
     buffer_acc: &AccountInfo,
     delegation_record: &AccountInfo,
     delegation_metadata: &AccountInfo,
-    system_program: &AccountInfo,
     delegate_args: DelegateAccountArgs,
     signer_seeds: Signer<'_, '_>,
 ) -> Result<(), ProgramError> {
@@ -87,36 +67,42 @@ pub fn cpi_delegate(
             .write(AccountMeta::new(payer.key(), true, true));
         account_metas
             .get_unchecked_mut(1)
-            .write(AccountMeta::new(pda_acc.key(), true, false));
+            .write(AccountMeta::new(pda_acc.key(), true, true));
         account_metas
             .get_unchecked_mut(2)
             .write(AccountMeta::readonly(owner_program.key()));
         account_metas
             .get_unchecked_mut(3)
-            .write(AccountMeta::new(buffer_acc.key(), false, false));
+            .write(AccountMeta::new(buffer_acc.key(), true, false));
         account_metas.get_unchecked_mut(4).write(AccountMeta::new(
             delegation_record.key(),
             true,
             false,
         ));
-        account_metas
-            .get_unchecked_mut(5)
-            .write(AccountMeta::readonly(delegation_metadata.key()));
+        account_metas.get_unchecked_mut(5).write(AccountMeta::new(
+            delegation_metadata.key(),
+            true,
+            false,
+        ));
         account_metas
             .get_unchecked_mut(6)
-            .write(AccountMeta::readonly(system_program.key()));
+            .write(AccountMeta::readonly(&pinocchio_system::ID));
     }
 
-    let mut data = [0u8; MAX_DELEGATE_ACCOUNT_ARGS_SIZE];
+    // Prepare instruction data with 8-byte discriminator prefix followed by serialized args
+    let mut data = [0u8; 8 + MAX_DELEGATE_ACCOUNT_ARGS_SIZE];
 
-    let serialized_data = delegate_args.try_to_slice(&mut data)?;
+    // Serialize args into the slice after the discriminator
+    let args_slice = delegate_args.try_to_slice(&mut data[8..])?;
+    let total_len = 8 + args_slice.len();
+    let data_slice = &data[..total_len];
 
     let instruction = Instruction {
         program_id: &DELEGATION_PROGRAM_ID,
         accounts: unsafe {
             core::slice::from_raw_parts(account_metas.as_ptr() as *const AccountMeta, num_accounts)
         },
-        data: serialized_data,
+        data: data_slice,
     };
 
     let acc_infos = [
@@ -126,7 +112,6 @@ pub fn cpi_delegate(
         buffer_acc,
         delegation_record,
         delegation_metadata,
-        system_program,
     ];
 
     invoke_signed(&instruction, &acc_infos, &[signer_seeds])?;
@@ -137,8 +122,9 @@ pub fn create_schedule_commit_ix<'a>(
     payer: &'a AccountInfo,
     account_infos: &'a [AccountInfo],
     magic_context: &'a AccountInfo,
+    magic_program: &'a AccountInfo,
     allow_undelegation: bool,
-) -> Result<(&'a [u8], &'a [AccountMeta<'a>]), ProgramError> {
+) -> Result<Instruction<'a, 'a, 'a, 'a>, ProgramError> {
     let num_accounts = 2 + account_infos.len();
 
     if num_accounts > MAX_CPI_ACCOUNTS {
@@ -176,7 +162,13 @@ pub fn create_schedule_commit_ix<'a>(
         }
     }
 
-    Ok((instruction_data, unsafe {
-        core::slice::from_raw_parts(account_metas.as_ptr() as *const AccountMeta, num_accounts)
-    }))
+    let ix = Instruction {
+        program_id: magic_program.key(),
+        accounts: unsafe {
+            core::slice::from_raw_parts(account_metas.as_ptr() as *const AccountMeta, num_accounts)
+        },
+        data: instruction_data,
+    };
+
+    Ok(ix)
 }
