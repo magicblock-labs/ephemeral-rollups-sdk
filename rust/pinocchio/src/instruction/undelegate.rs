@@ -1,8 +1,7 @@
 use core::mem::MaybeUninit;
-use pinocchio::pubkey::Pubkey;
+use pinocchio::pubkey::{Pubkey, MAX_SEEDS};
 use pinocchio::{
     account_info::AccountInfo,
-    cpi::MAX_CPI_ACCOUNTS,
     instruction::{Seed, Signer},
     program_error::ProgramError,
     pubkey::find_program_address,
@@ -61,9 +60,8 @@ pub fn undelegate(
     let (_, bump) = find_program_address(pda_seeds, owner_program);
 
     // collect seeds into static array (avoid dynamic alloc)
-    const MAX: usize = MAX_CPI_ACCOUNTS;
     const UNINIT: MaybeUninit<Seed> = MaybeUninit::<Seed>::uninit();
-    let mut combined: [MaybeUninit<Seed>; MAX] = [UNINIT; MAX];
+    let mut combined: [MaybeUninit<Seed>; MAX_SEEDS] = [UNINIT; MAX_SEEDS];
 
     let mut count = 0usize;
     for seed in pda_seeds.iter() {

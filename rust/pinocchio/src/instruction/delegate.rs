@@ -38,7 +38,7 @@ pub fn delegate_account(
     // Buffer signer seeds
     let buffer_bump_slice = [buffer_pda_bump];
     let buffer_seed_binding = [
-        Seed::from(b"buffer"),
+        Seed::from(BUFFER),
         Seed::from(pda_acc.key().as_ref()),
         Seed::from(&buffer_bump_slice),
     ];
