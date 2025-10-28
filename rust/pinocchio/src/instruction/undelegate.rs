@@ -5,16 +5,13 @@ use pinocchio::{
     cpi::MAX_CPI_ACCOUNTS,
     instruction::{Seed, Signer},
     program_error::ProgramError,
-    pubkey,
     pubkey::find_program_address,
     sysvars::{rent::Rent, Sysvar},
     ProgramResult,
 };
 use pinocchio_system::instructions::CreateAccount;
 
-use crate::utils::get_seeds;
-
-#[allow(clippy::cloned_ref_to_slice_refs)]
+#[inline(always)]
 pub fn undelegate(
     delegated_account: &AccountInfo,
     owner_program: &Pubkey,
@@ -28,86 +25,72 @@ pub fn undelegate(
 
     // Parse PDA seeds from instruction data: Borsh-serialized Vec<Vec<u8>>.
     // Format: u32 vec_len, then for each: u32 elem_len, then elem_len bytes.
-    let read_u32 = |bytes: &mut &[u8]| -> Result<u32, ProgramError> {
+
+    // fast u32 reader (inlined to avoid closure)
+    #[inline(always)]
+    fn read_u32(bytes: &mut &[u8]) -> Result<u32, ProgramError> {
         if bytes.len() < 4 {
             return Err(ProgramError::InvalidInstructionData);
         }
         let val = u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]);
         *bytes = &bytes[4..];
         Ok(val)
-    };
+    }
 
+    // parse seeds vector
     let seeds_len = read_u32(&mut callback_args)? as usize;
-    if seeds_len > 16 {
-        // Limit to 16 seeds (15 + bump typically). Adjust as necessary.
+    if seeds_len == 0 || seeds_len > 16 {
         return Err(ProgramError::InvalidInstructionData);
     }
 
-    // Collect slices into a fixed-size stack array, avoiding heap allocations.
     let mut seed_refs: [&[u8]; 16] = [&[]; 16];
-    let mut i = 0usize;
-    while i < seeds_len {
+    for seed_ref in seed_refs.iter_mut().take(seeds_len) {
         let elem_len = read_u32(&mut callback_args)? as usize;
         if callback_args.len() < elem_len {
             return Err(ProgramError::InvalidInstructionData);
         }
-        let (head, rest) = callback_args.split_at(elem_len);
-        seed_refs[i] = head;
-        callback_args = rest;
-        i += 1;
+        *seed_ref = &callback_args[..elem_len];
+        callback_args = &callback_args[elem_len..];
     }
 
-    // Any trailing bytes are invalid
     if !callback_args.is_empty() {
         return Err(ProgramError::InvalidInstructionData);
     }
-    let pda_seeds: &[&[u8]] = &seed_refs[..seeds_len];
 
-    // Find delegate
-    let (_, delegate_account_bump) = find_program_address(pda_seeds, owner_program);
+    let pda_seeds = &seed_refs[..seeds_len];
+    let (_, bump) = find_program_address(pda_seeds, owner_program);
 
-    // Get Delegated Pda Signer Seeds
-    let binding = &[delegate_account_bump];
-    let delegate_bump = Seed::from(binding);
-    let packed_pda_seeds = get_seeds(pda_seeds)?;
+    // collect seeds into static array (avoid dynamic alloc)
+    const MAX: usize = MAX_CPI_ACCOUNTS;
+    const UNINIT: MaybeUninit<Seed> = MaybeUninit::<Seed>::uninit();
+    let mut combined: [MaybeUninit<Seed>; MAX] = [UNINIT; MAX];
 
-    let num_seeds = packed_pda_seeds.len() + 1;
-    if num_seeds > MAX_CPI_ACCOUNTS {
-        return Err(ProgramError::InvalidArgument);
+    let mut count = 0usize;
+    for seed in pda_seeds.iter() {
+        combined[count].write(Seed::from(*seed));
+        count += 1;
     }
+    let bump_slice = [bump];
+    combined[count].write(Seed::from(&bump_slice));
+    count += 1;
 
-    const UNINIT_SEED: MaybeUninit<Seed> = MaybeUninit::<Seed>::uninit();
-    let mut combined_seeds = [UNINIT_SEED; MAX_CPI_ACCOUNTS];
+    // interpret written slice safely
+    let seeds_ptr = combined.as_ptr() as *const Seed;
+    let seeds = unsafe { core::slice::from_raw_parts(seeds_ptr, count) };
+    let signer = Signer::from(seeds);
 
-    unsafe {
-        for i in 0..num_seeds - 1 {
-            let seed = packed_pda_seeds.get_unchecked(i);
-            combined_seeds
-                .get_unchecked_mut(i)
-                .write(Seed::from(seed.as_ref()));
-        }
-
-        combined_seeds
-            .get_unchecked_mut(num_seeds - 1)
-            .write(delegate_bump);
-    }
-
-    let all_delegate_seeds =
-        unsafe { core::slice::from_raw_parts(combined_seeds.as_ptr() as *const Seed, num_seeds) };
-
-    let pda_signer_seeds = Signer::from(all_delegate_seeds);
-
-    // Create the original PDA Account Delegated
-    pubkey::log(delegated_account.key());
+    // create delegated account and copy buffer data
+    let space = buffer.data_len() as u64;
+    let lamports = Rent::get()?.minimum_balance(space as usize);
 
     CreateAccount {
         from: payer,
         to: delegated_account,
-        lamports: Rent::get()?.minimum_balance(buffer.data_len()),
-        space: buffer.data_len() as u64,
+        lamports,
+        space,
         owner: owner_program,
     }
-    .invoke_signed(&[pda_signer_seeds.clone()])?;
+    .invoke_signed(&[signer])?;
 
     let mut data = delegated_account.try_borrow_mut_data()?;
     let buffer_data = buffer.try_borrow_data()?;

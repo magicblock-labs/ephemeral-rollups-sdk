@@ -12,40 +12,6 @@ use pinocchio::{
 };
 
 #[inline(always)]
-pub fn get_seeds<'a>(seeds_slice: &[&'a [u8]]) -> Result<&'a [Seed<'a>], ProgramError> {
-    let num_seeds = seeds_slice.len();
-
-    if num_seeds > MAX_CPI_ACCOUNTS {
-        return Err(ProgramError::InvalidArgument);
-    }
-
-    if num_seeds == 0 {
-        return Ok(&[]);
-    }
-
-    const UNINIT_SEED: MaybeUninit<Seed> = MaybeUninit::<Seed>::uninit();
-    let mut seeds = [UNINIT_SEED; MAX_CPI_ACCOUNTS];
-
-    for i in 0..num_seeds {
-        unsafe {
-            // SAFETY: i is less than len(seeds_slice) and num_seeds <= MAX_CPI_ACCOUNTS
-            let seed_bytes = seeds_slice.get_unchecked(i);
-
-            // SAFETY: i is less than MAX_CPI_ACCOUNTS
-            seeds.get_unchecked_mut(i).write(Seed::from(*seed_bytes));
-        }
-    }
-
-    unsafe {
-        // SAFETY: num_seeds <= MAX_CPI_ACCOUNTS and we've initialized the first num_seeds elements
-        Ok(core::slice::from_raw_parts(
-            seeds.as_ptr() as *const Seed,
-            num_seeds,
-        ))
-    }
-}
-
-#[inline(always)]
 pub fn empty_seed<'a>() -> Seed<'a> {
     Seed::from(&[])
 }
