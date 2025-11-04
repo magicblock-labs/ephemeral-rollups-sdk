@@ -3,14 +3,18 @@ use crate::utils::{close_pda_with_system_transfer, create_pda, seeds_with_bump};
 use borsh::BorshSerialize;
 use dlp::consts::DELEGATION_PROGRAM_ID;
 use dlp::delegate_buffer_seeds_from_delegated_account;
-use solana_program::account_info::AccountInfo;
-use solana_program::entrypoint::ProgramResult;
-use solana_program::instruction::{AccountMeta, Instruction};
-use solana_program::program::invoke_signed;
-use solana_program::program_error::ProgramError;
-use solana_program::program_memory::sol_memset;
-use solana_program::pubkey::Pubkey;
-use solana_program::system_instruction;
+
+use crate::solana_compat::solana::{
+    AccountInfo,
+    ProgramResult,
+    AccountMeta,
+    Instruction,
+    invoke_signed,
+    ProgramError,
+    sol_memset,
+    Pubkey,
+    system_instruction,
+};
 
 pub struct DelegateAccounts<'a, 'info> {
     pub payer: &'a AccountInfo<'info>,
@@ -201,7 +205,7 @@ pub fn cpi_delegate<'a, 'info>(
         data,
     };
 
-    solana_program::program::invoke_signed(
+    invoke_signed(
         &delegation_instruction,
         &[
             payer.clone(),

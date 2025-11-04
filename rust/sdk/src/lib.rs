@@ -1,5 +1,3 @@
-use solana_program::pubkey::Pubkey;
-
 #[cfg(feature = "anchor")]
 pub mod anchor;
 pub mod consts;
@@ -8,6 +6,7 @@ pub mod delegate_args;
 pub mod ephem;
 pub mod types;
 pub mod utils;
+mod solana_compat;
 
 pub use dlp::args::CallHandlerArgs;
 pub use dlp::pda;
@@ -23,6 +22,6 @@ pub use magicblock_magic_program_api::args::{
     ShortAccountMeta, UndelegateTypeArgs,
 };
 
-pub const fn id() -> Pubkey {
+pub const fn id() -> solana_compat::solana::Pubkey {
     consts::DELEGATION_PROGRAM_ID
 }

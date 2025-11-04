@@ -7,13 +7,24 @@ repository = { workspace = true }
 documentation = { workspace = true }
 homepage = { workspace = true }
 keywords = { workspace = true }
-readme = "README.md"
 license = { workspace = true }
 edition = { workspace = true }
+readme = "README.md"
 
 [features]
-default = []
+default = ["solana-program"]
 anchor = ["anchor-lang"]
+modular-sdk = [
+    "solana-account-info",
+    "solana-instruction",
+    "solana-pubkey",
+    "solana-program-error",
+    "solana-program-memory",
+    "solana-program-runtime",
+    "solana-system-instruction",
+    "solana-system-program",
+    "solana-sysvar",
+]
 
 [dependencies]
 anchor-lang = { workspace = true, optional = true }
@@ -21,9 +32,22 @@ borsh = { workspace = true }
 ephemeral-rollups-sdk-attribute-delegate = { workspace = true }
 ephemeral-rollups-sdk-attribute-ephemeral = { workspace = true }
 ephemeral-rollups-sdk-attribute-commit = { workspace = true }
-solana-program = { workspace = true }
+solana-program = { workspace = true, optional = true }
+solana-account-info = { workspace = true, optional = true }
+solana-instruction = { workspace = true, optional = true }
+solana-pubkey = { workspace = true, optional = true }
+solana-program-error = { workspace = true, optional = true }
+solana-program-memory = { workspace = true, optional = true }
+solana-program-runtime = { workspace = true, optional = true }
+solana-system-instruction = { workspace = true, optional = true }
+solana-system-program = { workspace = true, optional = true }
+solana-sysvar = { workspace = true, optional = true }
 magicblock-magic-program-api = { workspace = true }
-magicblock-delegation-program  = { workspace = true, features = ["no-entrypoint"] }
+magicblock-delegation-program  = { workspace = true, features = ["no-entrypoint", "core"], default-features = false }
+
+# Fix for older toolchain
+base64ct = { workspace = true }
+getrandom = { version = "^0.2", features = ["custom"] }
 
 [dev-dependencies]
 bincode = "1.3.3"

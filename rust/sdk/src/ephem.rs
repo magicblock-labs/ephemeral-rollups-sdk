@@ -4,12 +4,15 @@ use magicblock_magic_program_api::args::{
     ShortAccountMeta, UndelegateTypeArgs,
 };
 use magicblock_magic_program_api::instruction::MagicBlockInstruction;
-use solana_program::account_info::AccountInfo;
-use solana_program::entrypoint::ProgramResult;
-use solana_program::instruction::{AccountMeta, Instruction};
-use solana_program::program::invoke;
-use solana_program::pubkey::Pubkey;
 use std::collections::HashMap;
+use crate::solana_compat::solana::{
+    AccountInfo,
+    ProgramResult,
+    AccountMeta,
+    Instruction,
+    invoke,
+    Pubkey,
+};
 
 const EXPECTED_KEY_MSG: &str = "Key expected to exist!";
 
@@ -305,8 +308,10 @@ pub fn create_schedule_commit_ix<'a, 'info>(
 
 mod utils {
     use crate::ephem::EXPECTED_KEY_MSG;
-    use solana_program::account_info::AccountInfo;
-    use solana_program::pubkey::Pubkey;
+    use crate::solana_compat::solana::{
+        AccountInfo,
+        Pubkey,
+    };
     use std::collections::hash_map::Entry;
     use std::collections::HashMap;
 

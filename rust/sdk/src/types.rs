@@ -1,5 +1,5 @@
 use borsh::{BorshDeserialize, BorshSerialize};
-use solana_program::pubkey::Pubkey;
+use crate::solana_compat::solana::Pubkey;
 
 #[derive(Debug, BorshSerialize, BorshDeserialize)]
 pub struct DelegateAccountArgs {

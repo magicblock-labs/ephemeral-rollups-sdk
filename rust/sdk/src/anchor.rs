@@ -8,7 +8,7 @@ pub use ephemeral_rollups_sdk_attribute_commit::commit;
 pub use ephemeral_rollups_sdk_attribute_delegate::delegate;
 
 #[cfg(feature = "anchor")]
-use solana_program::pubkey::Pubkey;
+use crate::solana_compat::solana::Pubkey;
 
 #[cfg(feature = "anchor")]
 extern crate anchor_lang;

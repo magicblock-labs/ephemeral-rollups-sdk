@@ -1,0 +1,31 @@
+#[cfg(not(feature = "modular-sdk"))]
+pub mod solana {
+    pub use solana_program::account_info::AccountInfo;
+    pub use solana_program::entrypoint::ProgramResult;
+    pub use solana_program::instruction::{AccountMeta, Instruction};
+    pub use solana_program::program::invoke_signed;
+    pub use solana_program::program::invoke;
+    pub use solana_program::program_error::ProgramError;
+    pub use solana_program::program_memory::sol_memset;
+    pub use solana_program::pubkey::Pubkey;
+    pub use solana_program::system_instruction;
+    pub use solana_program::system_program;
+    pub use solana_program::sysvar::rent::Rent;
+    pub use solana_program::sysvar::Sysvar;
+}
+
+#[cfg(feature = "modular-sdk")]
+pub mod solana {
+    pub use solana_account_info::AccountInfo;
+    pub use solana_instruction::{AccountMeta, Instruction};
+    pub use solana_pubkey::Pubkey;
+    pub use solana_program_error::ProgramError;
+    pub use solana_program_memory::sol_memset;
+    pub use solana_system_instruction as system_instruction;
+    pub use solana_program_runtime::invoke;
+    pub use solana_program_runtime::invoke_signed;
+    pub use solana_sysvar::rent::Rent;
+    pub use solana_message::VersionedMessage;
+    pub use solana_system_program as system_program;
+    pub type ProgramResult = Result<(), ProgramError>;
+}

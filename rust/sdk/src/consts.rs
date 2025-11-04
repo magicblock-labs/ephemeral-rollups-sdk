@@ -1,5 +1,4 @@
-// NOTE: this should go into a core package that both the sdk + the program can depend on
-use solana_program::pubkey::Pubkey;
+use crate::solana_compat::solana::Pubkey;
 
 pub use dlp::consts::*;
 use magicblock_magic_program_api::MAGIC_CONTEXT_PUBKEY;
