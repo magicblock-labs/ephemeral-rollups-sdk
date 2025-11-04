@@ -80,6 +80,7 @@ pub fn delegate_account<'a, 'info>(
     // Zero PDA (single RW borrow)
     {
         let mut pda_mut = accounts.pda.try_borrow_mut_data()?;
+        #[allow(unused_unsafe)]
         unsafe { sol_memset(&mut pda_mut, 0, data_len) };
     }
 

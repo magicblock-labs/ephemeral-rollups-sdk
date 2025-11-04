@@ -55,11 +55,11 @@ solana-program = { version = ">=1.16", default-features = false }
 solana-account = { version = ">=2" }
 solana-account-info = { version = ">=2 " }
 solana-cpi= { version = ">=2" }
-solana-instruction = { version = ">=2" }
 solana-pubkey = { version = ">=2" }
 solana-program-error = { version = ">=2" }
 solana-program-memory = { version = ">=2" }
-solana-system-interface = { version = ">=2", features = ["bincode"]}
+solana-system-interface = { version = ">=1", features = ["bincode"]}
+solana-instruction = { version = ">=1" }
 solana-sysvar = { version = ">=2"}
 sdk = { package = "solana-sdk", version = ">=1.16" }
 rpc = { package = "solana-rpc-client", version = ">=1.16" }

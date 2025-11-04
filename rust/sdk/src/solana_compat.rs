@@ -12,6 +12,11 @@ pub mod solana {
     pub use solana_program::sysvar::Sysvar;
     pub use solana_system_interface::instruction as system_instruction;
     pub use solana_system_interface::program as system_program;
+
+    #[inline(always)]
+    pub fn resize(target_account: &AccountInfo, new_len: usize) -> ProgramResult {
+        target_account.realloc(new_len, false)
+    }
 }
 
 #[cfg(feature = "modular-sdk")]
@@ -28,4 +33,9 @@ pub mod solana {
     pub use solana_sysvar::rent::Rent;
     pub use solana_sysvar::Sysvar;
     pub type ProgramResult = Result<(), ProgramError>;
+
+    #[inline(always)]
+    pub fn resize(target_account: &AccountInfo, new_len: usize) -> ProgramResult {
+        target_account.resize(new_len)
+    }
 }
