@@ -51,16 +51,16 @@ websocket = { package = "tokio-websockets", version = "0.10", features = [ "clie
 reqwest = { version = "0.12" }
 
 # solana
-solana-program = { version = ">=1.16" }
-solana-account-info = { version = ">=2.0.0" }
-solana-instruction = { version = ">=2.0.0" }
-solana-pubkey = { version = ">=2.0.0" }
-solana-program-error = { version = ">=2.0.0" }
-solana-program-memory = { version = ">=2.0.0" }
-solana-program-runtime = { version = ">=2.0.0" }
-solana-system-instruction = { version = "=0.0.1"}
-solana-system-program = { version = ">=2.0.0"}
-solana-sysvar = { version = ">=2.0.0"}
+solana-program = { version = ">=1.16", default-features = false }
+solana-account = { version = ">=2" }
+solana-account-info = { version = ">=2 " }
+solana-cpi= { version = ">=2" }
+solana-instruction = { version = ">=2" }
+solana-pubkey = { version = ">=2" }
+solana-program-error = { version = ">=2" }
+solana-program-memory = { version = ">=2" }
+solana-system-interface = { version = ">=2", features = ["bincode"]}
+solana-sysvar = { version = ">=2"}
 sdk = { package = "solana-sdk", version = ">=1.16" }
 rpc = { package = "solana-rpc-client", version = ">=1.16" }
 rpc-api = { package = "solana-rpc-client-api", version = ">=1.16" }

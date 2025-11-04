@@ -4,9 +4,9 @@ pub mod consts;
 pub mod cpi;
 pub mod delegate_args;
 pub mod ephem;
+mod solana_compat;
 pub mod types;
 pub mod utils;
-mod solana_compat;
 
 pub use dlp::args::CallHandlerArgs;
 pub use dlp::pda;

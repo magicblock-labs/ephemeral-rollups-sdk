@@ -1,12 +1,5 @@
 use crate::solana_compat::solana::{
-    AccountInfo,
-    ProgramResult,
-    Pubkey,
-    Rent,
-    Sysvar,
-    invoke,
-    invoke_signed,
-    system_instruction, 
+    invoke, invoke_signed, system_instruction, AccountInfo, ProgramResult, Pubkey, Rent, Sysvar,
 };
 
 /// Creates a new pda
@@ -104,7 +97,7 @@ pub fn close_pda<'a, 'info>(
     **target_account.lamports.borrow_mut() = 0;
 
     target_account.assign(&crate::solana_compat::solana::system_program::id());
-    target_account.realloc(0, false)
+    target_account.resize(0)
 }
 
 /// Close PDA with transfer
@@ -115,7 +108,7 @@ pub fn close_pda_with_system_transfer<'a, 'info>(
     destination: &'a AccountInfo<'info>,
     system_program: &'a AccountInfo<'info>,
 ) -> ProgramResult {
-    target_account.realloc(0, false)?;
+    target_account.resize(0)?;
     target_account.assign(&crate::solana_compat::solana::system_program::id());
     if target_account.lamports() > 0 {
         let transfer_instruction = system_instruction::transfer(

@@ -5,15 +5,8 @@ use dlp::consts::DELEGATION_PROGRAM_ID;
 use dlp::delegate_buffer_seeds_from_delegated_account;
 
 use crate::solana_compat::solana::{
-    AccountInfo,
-    ProgramResult,
-    AccountMeta,
-    Instruction,
-    invoke_signed,
-    ProgramError,
-    sol_memset,
-    Pubkey,
-    system_instruction,
+    invoke_signed, sol_memset, system_instruction, AccountInfo, AccountMeta, Instruction,
+    ProgramError, ProgramResult, Pubkey,
 };
 
 pub struct DelegateAccounts<'a, 'info> {
@@ -87,7 +80,7 @@ pub fn delegate_account<'a, 'info>(
     // Zero PDA (single RW borrow)
     {
         let mut pda_mut = accounts.pda.try_borrow_mut_data()?;
-        sol_memset(&mut pda_mut, 0, data_len);
+        unsafe { sol_memset(&mut pda_mut, 0, data_len) };
     }
 
     // Assign the PDA to the delegation program if not already assigned
@@ -205,7 +198,7 @@ pub fn cpi_delegate<'a, 'info>(
         data,
     };
 
-    invoke_signed(
+    solana_program::program::invoke_signed(
         &delegation_instruction,
         &[
             payer.clone(),
