@@ -1,16 +1,15 @@
 use crate::types::DelegateAccountArgs;
 use crate::utils::{close_pda_with_system_transfer, create_pda, seeds_with_bump};
 use borsh::BorshSerialize;
-use dlp::consts::DELEGATION_PROGRAM_ID;
 use dlp::delegate_buffer_seeds_from_delegated_account;
-use solana_program::account_info::AccountInfo;
-use solana_program::entrypoint::ProgramResult;
-use solana_program::instruction::{AccountMeta, Instruction};
-use solana_program::program::invoke_signed;
-use solana_program::program_error::ProgramError;
-use solana_program::program_memory::sol_memset;
-use solana_program::pubkey::Pubkey;
-use solana_program::system_instruction;
+
+use crate::solana_compat::solana::{
+    invoke_signed, sol_memset, system_instruction, AccountInfo, AccountMeta, Instruction,
+    ProgramError, ProgramResult, Pubkey,
+};
+
+pub const DELEGATION_PROGRAM_ID: Pubkey =
+    Pubkey::new_from_array(dlp::consts::DELEGATION_PROGRAM_ID.to_bytes());
 
 pub struct DelegateAccounts<'a, 'info> {
     pub payer: &'a AccountInfo<'info>,
@@ -83,7 +82,10 @@ pub fn delegate_account<'a, 'info>(
     // Zero PDA (single RW borrow)
     {
         let mut pda_mut = accounts.pda.try_borrow_mut_data()?;
-        sol_memset(&mut pda_mut, 0, data_len);
+        #[allow(unused_unsafe)]
+        unsafe {
+            sol_memset(&mut pda_mut, 0, data_len)
+        };
     }
 
     // Assign the PDA to the delegation program if not already assigned
@@ -188,20 +190,20 @@ pub fn cpi_delegate<'a, 'info>(
     args.serialize(&mut data)?;
 
     let delegation_instruction = Instruction {
-        program_id: crate::id(),
+        program_id: crate::id().to_bytes().into(),
         accounts: vec![
-            AccountMeta::new(*payer.key, true),
-            AccountMeta::new(*delegate_account.key, true),
-            AccountMeta::new_readonly(*owner_program.key, false),
-            AccountMeta::new(*buffer.key, false),
-            AccountMeta::new(*delegation_record.key, false),
-            AccountMeta::new(*delegation_metadata.key, false),
-            AccountMeta::new_readonly(*system_program.key, false),
+            AccountMeta::new(payer.key.to_bytes().into(), true),
+            AccountMeta::new(delegate_account.key.to_bytes().into(), true),
+            AccountMeta::new_readonly(owner_program.key.to_bytes().into(), false),
+            AccountMeta::new(buffer.key.to_bytes().into(), false),
+            AccountMeta::new(delegation_record.key.to_bytes().into(), false),
+            AccountMeta::new(delegation_metadata.key.to_bytes().into(), false),
+            AccountMeta::new_readonly(system_program.key.to_bytes().into(), false),
         ],
         data,
     };
 
-    solana_program::program::invoke_signed(
+    invoke_signed(
         &delegation_instruction,
         &[
             payer.clone(),

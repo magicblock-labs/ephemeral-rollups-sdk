@@ -1,14 +1,12 @@
 use crate::ephem::utils::accounts_to_indices;
+use crate::solana_compat::solana::{
+    invoke, AccountInfo, AccountMeta, Instruction, ProgramResult, Pubkey,
+};
 use magicblock_magic_program_api::args::{
     ActionArgs, BaseActionArgs, CommitAndUndelegateArgs, CommitTypeArgs, MagicBaseIntentArgs,
     ShortAccountMeta, UndelegateTypeArgs,
 };
 use magicblock_magic_program_api::instruction::MagicBlockInstruction;
-use solana_program::account_info::AccountInfo;
-use solana_program::entrypoint::ProgramResult;
-use solana_program::instruction::{AccountMeta, Instruction};
-use solana_program::program::invoke;
-use solana_program::pubkey::Pubkey;
 use std::collections::HashMap;
 
 const EXPECTED_KEY_MSG: &str = "Key expected to exist!";
@@ -236,7 +234,7 @@ impl<'info> CallHandler<'info> {
         BaseActionArgs {
             args: self.args,
             compute_units: self.compute_units,
-            destination_program: self.destination_program,
+            destination_program: self.destination_program.to_bytes().into(),
             escrow_authority: *escrow_authority_index,
             accounts: self.accounts,
         }
@@ -305,8 +303,7 @@ pub fn create_schedule_commit_ix<'a, 'info>(
 
 mod utils {
     use crate::ephem::EXPECTED_KEY_MSG;
-    use solana_program::account_info::AccountInfo;
-    use solana_program::pubkey::Pubkey;
+    use crate::solana_compat::solana::{AccountInfo, Pubkey};
     use std::collections::hash_map::Entry;
     use std::collections::HashMap;
 
