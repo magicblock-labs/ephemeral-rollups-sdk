@@ -15,7 +15,16 @@ pub mod solana {
 
     #[inline(always)]
     pub fn resize(target_account: &AccountInfo, new_len: usize) -> ProgramResult {
-        target_account.realloc(new_len, false)
+        #[cfg(feature = "disable-realloc")]
+        {
+            #[allow(deprecated)]
+            target_account.realloc(new_len, false)
+        }
+
+        #[cfg(not(feature = "disable-realloc"))]
+        {
+            target_account.resize(new_len)
+        }
     }
 }
 

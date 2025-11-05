@@ -14,6 +14,7 @@ readme = "README.md"
 [features]
 default = ["solana-program", "solana-system-interface"]
 anchor = ["anchor-lang"]
+disable-realloc = []
 modular-sdk = [
     "solana-account",
     "solana-account-info",
