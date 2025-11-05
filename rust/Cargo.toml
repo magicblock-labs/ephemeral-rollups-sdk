@@ -36,7 +36,7 @@ anchor-lang = { version = ">=0.28.0" }
 proc-macro2 = "1.0"
 syn = { version = "1.0.60", features = ["full"] }
 quote = "1.0"
-magic-domain-program = { version = "=0.0.1" }
+magic-domain-program = { version = "=0.0.3", features = ["disable-realloc", "modular-sdk"] }
 
 # runtime
 tokio = { version = "1.0", features = [ "rt", "sync", "macros" ] }
@@ -61,14 +61,16 @@ solana-program-memory = { version = ">=2" }
 solana-system-interface = { version = ">=1", features = ["bincode"]}
 solana-instruction = { version = ">=1" }
 solana-sysvar = { version = ">=2"}
-sdk = { package = "solana-sdk", version = ">=1.16" }
-rpc = { package = "solana-rpc-client", version = ">=1.16" }
-rpc-api = { package = "solana-rpc-client-api", version = ">=1.16" }
 pinocchio = { version = "0.8.1", default-features = false }
 pinocchio-log = { version = "0.4.0", default-features = false }
 pinocchio-pubkey = { version = "0.2.4", default-features = false }
 pinocchio-system = { version = "0.2.3", default-features = false }
 pinocchio-token = { version = "0.3.0", default-features = false }
+
+# solana alias
+sdk = { package = "solana-sdk", version = ">=1.16, <3" }
+rpc = { package = "solana-rpc-client", version = ">=1.16, <3" }
+rpc-api = { package = "solana-rpc-client-api", version = ">=1.16, <3" }
 
 # serialization/parsing
 serde = { version = "1.0", features = [ "derive" ] }
