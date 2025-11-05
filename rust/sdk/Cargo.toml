@@ -12,7 +12,7 @@ edition = { workspace = true }
 readme = "README.md"
 
 [features]
-default = ["solana-program", "solana-system-interface"]
+default = ["solana-program", "solana-system-interface", "disable-realloc"]
 anchor = ["anchor-lang"]
 disable-realloc = []
 modular-sdk = [
