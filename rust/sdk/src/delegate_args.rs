@@ -20,20 +20,21 @@ pub struct DelegateAccounts {
 impl DelegateAccounts {
     pub fn new(delegated_account: Pubkey, owner_program: Pubkey) -> Self {
         let delegate_buffer = delegate_buffer_pda_from_delegated_account_and_owner_program(
-            &delegated_account,
-            &owner_program,
+            &delegated_account.to_bytes().into(),
+            &owner_program.to_bytes().into(),
         );
-        let delegation_record = delegation_record_pda_from_delegated_account(&delegated_account);
+        let delegation_record =
+            delegation_record_pda_from_delegated_account(&delegated_account.to_bytes().into());
         let delegation_metadata =
-            delegation_metadata_pda_from_delegated_account(&delegated_account);
+            delegation_metadata_pda_from_delegated_account(&delegated_account.to_bytes().into());
         Self {
             delegated_account,
-            delegate_buffer,
-            delegation_record,
-            delegation_metadata,
+            delegate_buffer: delegate_buffer.to_bytes().into(),
+            delegation_record: delegation_record.to_bytes().into(),
+            delegation_metadata: delegation_metadata.to_bytes().into(),
             owner_program,
-            delegation_program: DELEGATION_PROGRAM_ID,
-            system_program: system_program::id(),
+            delegation_program: DELEGATION_PROGRAM_ID.to_bytes().into(),
+            system_program: system_program::ID.to_bytes().into(),
         }
     }
 }

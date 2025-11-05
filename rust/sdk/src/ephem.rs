@@ -234,7 +234,7 @@ impl<'info> CallHandler<'info> {
         BaseActionArgs {
             args: self.args,
             compute_units: self.compute_units,
-            destination_program: self.destination_program,
+            destination_program: self.destination_program.to_bytes().into(),
             escrow_authority: *escrow_authority_index,
             accounts: self.accounts,
         }

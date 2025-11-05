@@ -1,4 +1,7 @@
-use crate::solana_compat::solana::{invoke, invoke_signed, system_instruction, AccountInfo, ProgramResult, Pubkey, Rent, Sysvar, resize};
+use crate::solana_compat::solana::{
+    invoke, invoke_signed, resize, system_instruction, AccountInfo, ProgramResult, Pubkey, Rent,
+    Sysvar,
+};
 
 /// Creates a new pda
 #[inline(always)]

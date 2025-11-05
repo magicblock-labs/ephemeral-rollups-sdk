@@ -23,5 +23,5 @@ pub use magicblock_magic_program_api::args::{
 };
 
 pub const fn id() -> solana_compat::solana::Pubkey {
-    consts::DELEGATION_PROGRAM_ID
+    solana_compat::solana::Pubkey::new_from_array(consts::DELEGATION_PROGRAM_ID.to_bytes())
 }

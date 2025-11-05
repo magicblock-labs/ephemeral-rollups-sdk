@@ -29,7 +29,7 @@ ephemeral-rollups-sdk-attribute-commit = { path = "commit-attribute", version = 
 
 # Magicblock
 magicblock-delegation-program = { path = "/Users/gabrielepicco/Documents/validator/delegation-program", features = ["no-entrypoint", "core"], default-features = false }
-magicblock-magic-program-api = { path = "/Users/gabrielepicco/Documents/validator/magicblock-validator/magicblock-magic-program-api", default-features = false }
+magicblock-magic-program-api = { version = "0.2.3", default-features = false }
 
 ## External crates
 anchor-lang = { version = ">=0.28.0" }
