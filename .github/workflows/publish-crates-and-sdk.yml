@@ -1,10 +1,10 @@
 name: Publish Crates & SDKs
 on:
   release:
-    types: [ published ]
+    types: [published]
   push:
     branches:
-      - 'release/v*'
+      - "release/v*"
   workflow_dispatch:
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -71,7 +71,7 @@ jobs:
           if [ "${DRY_RUN}" = "true" ]; then
             DRY_RUN_FLAG="--dry-run"
           fi
-          
+
           if [ "${DRY_RUN}" = "true" ]; then
             NO_VERIFY_FLAG="--no-verify"
           fi      
@@ -79,7 +79,8 @@ jobs:
           cargo publish $DRY_RUN_FLAG --manifest-path=ephemeral/Cargo.toml --token $CRATES_TOKEN $NO_VERIFY_FLAG
           cargo publish $DRY_RUN_FLAG --manifest-path=delegate/Cargo.toml --token $CRATES_TOKEN $NO_VERIFY_FLAG
           cargo publish $DRY_RUN_FLAG --manifest-path=commit-attribute/Cargo.toml --token $CRATES_TOKEN $NO_VERIFY_FLAG
-          
+          cargo publish $DRY_RUN_FLAG --manifest-path=action-attribute/Cargo.toml --token $CRATES_TOKEN $NO_VERIFY_FLAG
+
           if [ "${DRY_RUN}" != "true" ]; then
             cargo publish $DRY_RUN_FLAG --manifest-path=sdk/Cargo.toml --token $CRATES_TOKEN $NO_VERIFY_FLAG
             cargo publish $DRY_RUN_FLAG --manifest-path=resolver/Cargo.toml --token $CRATES_TOKEN $NO_VERIFY_FLAG
