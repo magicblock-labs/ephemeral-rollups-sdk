@@ -30,7 +30,7 @@ pub fn action(_attr: TokenStream, item: TokenStream) -> TokenStream {
             new_fields.push(
                 Field::parse_named
                     .parse2(quote! {
-                        /// CHECK: the correct pda - this will be moved to the end in the future, meaning you can omit this unless needed
+                        /// CHECK: Escrow authority is an account used to derive `escrow` with `escrow_index`, it is used to verify that action is scheduled with expected authority
                         pub escrow_auth: UncheckedAccount<'info>
                     })
                     .unwrap(),
@@ -41,7 +41,7 @@ pub fn action(_attr: TokenStream, item: TokenStream) -> TokenStream {
             new_fields.push(
                 Field::parse_named
                     .parse2(quote! {
-                        /// CHECK: the correct pda - this will be moved to the end in the future, meaning you can omit this unless needed
+                        /// CHECK: Escrow account that is a `signer` in callback, it is derived from `escrow_auth` and `escrow_index` one specified in `action_args`
                         pub escrow: UncheckedAccount<'info>
                     })
                     .unwrap(),
