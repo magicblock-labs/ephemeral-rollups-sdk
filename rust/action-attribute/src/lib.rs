@@ -11,8 +11,8 @@ pub fn action(_attr: TokenStream, item: TokenStream) -> TokenStream {
     let name = &input.ident;
     let attrs = &input.attrs; // Capture all attributes
     let expanded = if let Fields::Named(fields_named) = &input.fields {
-        let mut escrow_auth = false;
-        let mut escrow = false;
+        let mut has_escrow_auth = false;
+        let mut has_escrow = false;
 
         for field in &fields_named.named {
             if let Some(ident) = &field.ident {
@@ -37,7 +37,7 @@ pub fn action(_attr: TokenStream, item: TokenStream) -> TokenStream {
             );
         }
 
-        if !has_has_escrow {
+        if !has_escrow {
             new_fields.push(
                 Field::parse_named
                     .parse2(quote! {

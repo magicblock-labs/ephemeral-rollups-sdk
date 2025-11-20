@@ -5,6 +5,9 @@ pub use ephemeral_rollups_sdk_attribute_ephemeral::ephemeral;
 pub use ephemeral_rollups_sdk_attribute_commit::commit;
 
 #[cfg(feature = "anchor")]
+pub use ephemeral_rollups_sdk_attribute_action::action;
+
+#[cfg(feature = "anchor")]
 pub use ephemeral_rollups_sdk_attribute_delegate::delegate;
 
 #[cfg(feature = "anchor")]
