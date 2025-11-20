@@ -1,0 +1,16 @@
+[package]
+name = "ephemeral-rollups-sdk-attribute-action"
+description = "ephemeral-rollups-sdk-attribute-action"
+version = { workspace = true }
+authors = { workspace = true }
+repository = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+edition = { workspace = true }
+
+[dependencies]
+syn = { workspace = true, features = ["full"] }
+quote = { workspace = true }
+
+[lib]
+proc-macro = true
