@@ -41,7 +41,7 @@ pub fn action(_attr: TokenStream, item: TokenStream) -> TokenStream {
             new_fields.push(
                 Field::parse_named
                     .parse2(quote! {
-                        /// CHECK: Escrow account that is a `signer` in callback, it is derived from `escrow_auth` and `escrow_index` one specified in `action_args`
+                        /// CHECK: Escrow account that is a `signer` in callback, it is derived from `escrow_auth` and `escrow_index` one specified in `ActionArgs`
                         pub escrow: UncheckedAccount<'info>
                     })
                     .unwrap(),
