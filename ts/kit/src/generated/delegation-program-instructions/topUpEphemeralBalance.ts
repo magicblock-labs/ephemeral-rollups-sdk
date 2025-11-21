@@ -7,27 +7,27 @@ import {
 import { DELEGATION_PROGRAM_ID } from "../../constants";
 
 /**
- * TopUpEphemeralBalance instruction arguments
+ * TopUpEscrow instruction arguments
  */
-export type TopUpEphemeralBalanceInstructionArgs = {
+export type TopUpEscrowInstructionArgs = {
   amount: bigint;
-  index: number;
+  index?: number; // defaults to 255
 };
 
 /**
- * Instruction: TopUpEphemeralBalance
+ * Instruction: TopUpEscrow
  * Discriminator: [9,0,0,0,0,0,0,0]
  */
-export function createTopUpEphemeralBalanceInstruction(
+export function createTopUpEscrowInstruction(
   accounts: {
     payer: Address;
     pubkey: Address;
     ephemeralBalanceAccount: Address;
     systemProgram: Address;
   },
-  args: TopUpEphemeralBalanceInstructionArgs
+  args: TopUpEscrowInstructionArgs
 ): Instruction {
-  const [data] = serializeTopUpEphemeralBalanceInstructionData(args);
+  const [data] = serializeTopUpEscrowInstructionData(args);
 
   const accounts_: AccountMeta[] = [
     {
@@ -55,8 +55,8 @@ export function createTopUpEphemeralBalanceInstruction(
   };
 }
 
-export function serializeTopUpEphemeralBalanceInstructionData(
-  args: TopUpEphemeralBalanceInstructionArgs
+export function serializeTopUpEscrowInstructionData(
+  args: TopUpEscrowInstructionArgs
 ): [Uint8Array] {
   const discriminator = [9, 0, 0, 0, 0, 0, 0, 0];
   const data = new Uint8Array(17);
@@ -73,7 +73,7 @@ export function serializeTopUpEphemeralBalanceInstructionData(
   offset += 8;
 
   // Write index as u8
-  data[offset] = args.index;
+  data[offset] = args.index ?? 255;
 
   return [data];
 }

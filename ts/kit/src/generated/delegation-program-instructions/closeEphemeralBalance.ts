@@ -7,25 +7,25 @@ import {
 import { DELEGATION_PROGRAM_ID } from "../../constants";
 
 /**
- * CloseEphemeralBalance instruction arguments
+ * CloseEscrow instruction arguments
  */
-export type CloseEphemeralBalanceInstructionArgs = {
-  index: number;
+export type CloseEscrowInstructionArgs = {
+  index?: number; // defaults to 255
 };
 
 /**
- * Instruction: CloseEphemeralBalance
+ * Instruction: CloseEscrow
  * Discriminator: [11,0,0,0,0,0,0,0]
  */
-export function createCloseEphemeralBalanceInstruction(
+export function createCloseEscrowInstruction(
   accounts: {
     payer: Address;
     ephemeralBalanceAccount: Address;
     systemProgram: Address;
   },
-  args: CloseEphemeralBalanceInstructionArgs
+  args?: CloseEscrowInstructionArgs
 ): Instruction {
-  const [data] = serializeCloseEphemeralBalanceInstructionData(args);
+  const [data] = serializeCloseEscrowInstructionData(args ?? {});
 
   const accounts_: AccountMeta[] = [
     {
@@ -49,8 +49,8 @@ export function createCloseEphemeralBalanceInstruction(
   };
 }
 
-export function serializeCloseEphemeralBalanceInstructionData(
-  args: CloseEphemeralBalanceInstructionArgs
+export function serializeCloseEscrowInstructionData(
+  args?: CloseEscrowInstructionArgs
 ): [Uint8Array] {
   const discriminator = [11, 0, 0, 0, 0, 0, 0, 0];
   const data = new Uint8Array(9);
@@ -62,7 +62,7 @@ export function serializeCloseEphemeralBalanceInstructionData(
   }
 
   // Write index as u8
-  data[offset] = args.index;
+  data[offset] = args.index ?? 255;
 
   return [data];
 }

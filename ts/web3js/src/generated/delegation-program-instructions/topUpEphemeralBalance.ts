@@ -2,25 +2,25 @@ import { PublicKey, TransactionInstruction, AccountMeta } from "@solana/web3.js"
 import { DELEGATION_PROGRAM_ID } from "../../constants";
 
 /**
- * TopUpEphemeralBalance instruction arguments
+ * TopUpEscrow instruction arguments
  */
-export type TopUpEphemeralBalanceInstructionArgs = {
+export type TopUpEscrowInstructionArgs = {
   amount: bigint;
-  index: number;
+  index?: number; // defaults to 255
 };
 
 /**
- * Instruction: TopUpEphemeralBalance
+ * Instruction: TopUpEscrow
  * Discriminator: [9,0,0,0,0,0,0,0]
  */
-export function createTopUpEphemeralBalanceInstruction(
+export function createTopUpEscrowInstruction(
   accounts: {
     payer: PublicKey;
     pubkey: PublicKey;
     ephemeralBalanceAccount: PublicKey;
     systemProgram: PublicKey;
   },
-  args: TopUpEphemeralBalanceInstructionArgs,
+  args: TopUpEscrowInstructionArgs,
   programId = DELEGATION_PROGRAM_ID
 ): TransactionInstruction {
   const keys: AccountMeta[] = [
@@ -34,7 +34,7 @@ export function createTopUpEphemeralBalanceInstruction(
     { pubkey: accounts.systemProgram, isWritable: false, isSigner: false },
   ];
 
-  const data = serializeTopUpEphemeralBalanceInstructionData(args);
+  const data = serializeTopUpEscrowInstructionData(args);
 
   return new TransactionInstruction({
     programId,
@@ -43,8 +43,8 @@ export function createTopUpEphemeralBalanceInstruction(
   });
 }
 
-export function serializeTopUpEphemeralBalanceInstructionData(
-  args: TopUpEphemeralBalanceInstructionArgs
+export function serializeTopUpEscrowInstructionData(
+  args: TopUpEscrowInstructionArgs
 ): Buffer {
   const discriminator = [9, 0, 0, 0, 0, 0, 0, 0];
   const buffer = Buffer.alloc(17);
@@ -60,7 +60,7 @@ export function serializeTopUpEphemeralBalanceInstructionData(
   offset += 8;
 
   // Write index (u8)
-  buffer[offset] = args.index;
+  buffer[offset] = args.index ?? 255;
 
   return buffer;
 }

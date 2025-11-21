@@ -2,23 +2,23 @@ import { PublicKey, TransactionInstruction, AccountMeta } from "@solana/web3.js"
 import { DELEGATION_PROGRAM_ID } from "../../constants";
 
 /**
- * CloseEphemeralBalance instruction arguments
+ * CloseEscrow instruction arguments
  */
-export type CloseEphemeralBalanceInstructionArgs = {
-  index: number;
+export type CloseEscrowInstructionArgs = {
+  index?: number; // defaults to 255
 };
 
 /**
- * Instruction: CloseEphemeralBalance
+ * Instruction: CloseEscrow
  * Discriminator: [11,0,0,0,0,0,0,0]
  */
-export function createCloseEphemeralBalanceInstruction(
+export function createCloseEscrowInstruction(
   accounts: {
     payer: PublicKey;
     ephemeralBalanceAccount: PublicKey;
     systemProgram: PublicKey;
   },
-  args: CloseEphemeralBalanceInstructionArgs,
+  args?: CloseEscrowInstructionArgs,
   programId = DELEGATION_PROGRAM_ID
 ): TransactionInstruction {
   const keys: AccountMeta[] = [
@@ -27,7 +27,7 @@ export function createCloseEphemeralBalanceInstruction(
     { pubkey: accounts.systemProgram, isWritable: false, isSigner: false },
   ];
 
-  const data = serializeCloseEphemeralBalanceInstructionData(args);
+  const data = serializeCloseEscrowInstructionData(args ?? {});
 
   return new TransactionInstruction({
     programId,
@@ -36,8 +36,8 @@ export function createCloseEphemeralBalanceInstruction(
   });
 }
 
-export function serializeCloseEphemeralBalanceInstructionData(
-  args: CloseEphemeralBalanceInstructionArgs
+export function serializeCloseEscrowInstructionData(
+  args?: CloseEscrowInstructionArgs
 ): Buffer {
   const discriminator = [11, 0, 0, 0, 0, 0, 0, 0];
   const buffer = Buffer.alloc(9);
@@ -49,7 +49,7 @@ export function serializeCloseEphemeralBalanceInstructionData(
   }
 
   // Write index (u8)
-  buffer[offset] = args.index;
+  buffer[offset] = args.index ?? 255;
 
   return buffer;
 }
