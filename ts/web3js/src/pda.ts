@@ -29,3 +29,16 @@ export function delegateBufferPdaFromDelegatedAccountAndOwnerProgram(
     ownerProgramId,
   )[0];
 }
+
+export function escrowPdaFromEscrowAuthority(
+  escrowAuthority: PublicKey,
+  index: number = 255,
+) {
+  if (index < 0 || index > 255) {
+    throw new Error("Index must be between 0 and 255");
+  }
+  return PublicKey.findProgramAddressSync(
+    [Buffer.from("balance"), escrowAuthority.toBytes(), Buffer.from([index])],
+    DELEGATION_PROGRAM_ID,
+  )[0];
+}

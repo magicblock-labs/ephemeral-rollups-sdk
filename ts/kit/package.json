@@ -41,7 +41,6 @@
     "vitest": "^3.2.4"
   },
   "dependencies": {
-    "@metaplex-foundation/beet": "^0.7.2",
     "@phala/dcap-qvl-web": "^0.2.7",
     "@solana-program/system": "^0.9.0",
     "@solana/kit": "^4.0.0",
