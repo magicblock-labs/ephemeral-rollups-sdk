@@ -3,10 +3,10 @@ import { PublicKey, SystemProgram } from "@solana/web3.js";
 import {
   createDelegateInstruction,
   serializeDelegateInstructionData,
-  createTopUpEphemeralBalanceInstruction,
-  serializeTopUpEphemeralBalanceInstructionData,
-  createCloseEphemeralBalanceInstruction,
-  serializeCloseEphemeralBalanceInstructionData,
+  createTopUpEscrowInstruction,
+  serializeTopUpEscrowInstructionData,
+  createCloseEscrowInstruction,
+  serializeCloseEscrowInstructionData,
 } from "../generated/delegation-program-instructions";
 
 describe("Generated Instructions (web3.js)", () => {
@@ -72,9 +72,9 @@ describe("Generated Instructions (web3.js)", () => {
     });
   });
 
-  describe("topUpEphemeralBalance instruction", () => {
-    it("should create a topUpEphemeralBalance instruction", () => {
-      const instruction = createTopUpEphemeralBalanceInstruction(
+  describe("topUpEscrow instruction", () => {
+    it("should create a topUpEscrow instruction", () => {
+      const instruction = createTopUpEscrowInstruction(
         {
           payer: mockPublicKey,
           pubkey: mockPublicKey,
@@ -83,7 +83,7 @@ describe("Generated Instructions (web3.js)", () => {
         },
         {
           amount: BigInt(1000000),
-          index: 0,
+          index: 255,
         }
       );
 
@@ -91,8 +91,8 @@ describe("Generated Instructions (web3.js)", () => {
       expect(instruction.data.length).toBe(17);
     });
 
-    it("should serialize topUpEphemeralBalance instruction data correctly", () => {
-      const data = serializeTopUpEphemeralBalanceInstructionData({
+    it("should serialize topUpEscrow instruction data correctly", () => {
+      const data = serializeTopUpEscrowInstructionData({
         amount: BigInt(5000000),
         index: 255,
       });
@@ -114,16 +114,16 @@ describe("Generated Instructions (web3.js)", () => {
     });
   });
 
-  describe("closeEphemeralBalance instruction", () => {
-    it("should create a closeEphemeralBalance instruction", () => {
-      const instruction = createCloseEphemeralBalanceInstruction(
+  describe("closeEscrow instruction", () => {
+    it("should create a closeEscrow instruction", () => {
+      const instruction = createCloseEscrowInstruction(
         {
           payer: mockPublicKey,
           ephemeralBalanceAccount: mockPublicKey,
           systemProgram: SystemProgram.programId,
         },
         {
-          index: 42,
+          index: 255,
         }
       );
 
@@ -131,9 +131,9 @@ describe("Generated Instructions (web3.js)", () => {
       expect(instruction.data.length).toBe(9);
     });
 
-    it("should serialize closeEphemeralBalance instruction data correctly", () => {
-      const data = serializeCloseEphemeralBalanceInstructionData({
-        index: 100,
+    it("should serialize closeEscrow instruction data correctly", () => {
+      const data = serializeCloseEscrowInstructionData({
+        index: 255,
       });
 
       expect(data.length).toBe(9);
@@ -145,7 +145,7 @@ describe("Generated Instructions (web3.js)", () => {
       }
 
       // Check index (u8 at offset 8)
-      expect(data[8]).toBe(100);
+      expect(data[8]).toBe(255);
     });
   });
 });

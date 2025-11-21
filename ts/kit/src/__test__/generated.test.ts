@@ -2,10 +2,10 @@ import { describe, it, expect } from "vitest";
 import {
   createDelegateInstruction,
   serializeDelegateInstructionData,
-  createTopUpEphemeralBalanceInstruction,
-  serializeTopUpEphemeralBalanceInstructionData,
-  createCloseEphemeralBalanceInstruction,
-  serializeCloseEphemeralBalanceInstructionData,
+  createTopUpEscrowInstruction,
+  serializeTopUpEscrowInstructionData,
+  createCloseEscrowInstruction,
+  serializeCloseEscrowInstructionData,
 } from "../generated/delegation-program-instructions";
 import { getAddressFromPublicKey } from "@solana/kit";
 
@@ -69,9 +69,9 @@ describe("Generated Instructions (@solana/kit)", () => {
     });
   });
 
-  describe("topUpEphemeralBalance instruction", () => {
-    it("should create a topUpEphemeralBalance instruction", () => {
-      const instruction = createTopUpEphemeralBalanceInstruction(
+  describe("topUpEscrow instruction", () => {
+    it("should create a topUpEscrow instruction", () => {
+      const instruction = createTopUpEscrowInstruction(
         {
           payer: mockAddress,
           pubkey: mockAddress,
@@ -80,7 +80,7 @@ describe("Generated Instructions (@solana/kit)", () => {
         },
         {
           amount: BigInt(1000000),
-          index: 0,
+          index: 255,
         }
       );
 
@@ -89,8 +89,8 @@ describe("Generated Instructions (@solana/kit)", () => {
       expect(instruction.data?.length).toBe(17);
     });
 
-    it("should serialize topUpEphemeralBalance instruction data correctly", () => {
-      const [data] = serializeTopUpEphemeralBalanceInstructionData({
+    it("should serialize topUpEscrow instruction data correctly", () => {
+      const [data] = serializeTopUpEscrowInstructionData({
         amount: BigInt(5000000),
         index: 255,
       });
@@ -112,16 +112,16 @@ describe("Generated Instructions (@solana/kit)", () => {
     });
   });
 
-  describe("closeEphemeralBalance instruction", () => {
-    it("should create a closeEphemeralBalance instruction", () => {
-      const instruction = createCloseEphemeralBalanceInstruction(
+  describe("closeEscrow instruction", () => {
+    it("should create a closeEscrow instruction", () => {
+      const instruction = createCloseEscrowInstruction(
         {
           payer: mockAddress,
           ephemeralBalanceAccount: mockAddress,
           systemProgram: mockAddress,
         },
         {
-          index: 42,
+          index: 255,
         }
       );
 
@@ -130,9 +130,9 @@ describe("Generated Instructions (@solana/kit)", () => {
       expect(instruction.data?.length).toBe(9);
     });
 
-    it("should serialize closeEphemeralBalance instruction data correctly", () => {
-      const [data] = serializeCloseEphemeralBalanceInstructionData({
-        index: 100,
+    it("should serialize closeEscrow instruction data correctly", () => {
+      const [data] = serializeCloseEscrowInstructionData({
+        index: 255,
       });
 
       expect(data.length).toBe(9);
@@ -144,7 +144,7 @@ describe("Generated Instructions (@solana/kit)", () => {
       }
 
       // Check index (u8 at offset 8)
-      expect(data[8]).toBe(100);
+      expect(data[8]).toBe(255);
     });
   });
 });

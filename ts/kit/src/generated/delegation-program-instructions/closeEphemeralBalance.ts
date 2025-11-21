@@ -62,7 +62,7 @@ export function serializeCloseEscrowInstructionData(
   }
 
   // Write index as u8
-  data[offset] = args.index ?? 255;
+  data[offset] = args?.index ?? 255;
 
   return [data];
 }
