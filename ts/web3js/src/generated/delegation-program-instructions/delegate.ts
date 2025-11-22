@@ -1,8 +1,4 @@
-<<<<<<< HEAD
-import { PublicKey, TransactionInstruction, AccountMeta } from "@solana/web3.js";
-=======
 import { PublicKey, TransactionInstruction, AccountMeta, SystemProgram } from "@solana/web3.js";
->>>>>>> jonasXchen/action-escrow
 import { DELEGATION_PROGRAM_ID } from "../../constants";
 
 /**
@@ -37,15 +33,7 @@ export function createDelegateInstruction(
     { pubkey: accounts.ownerProgram, isWritable: false, isSigner: false },
     { pubkey: accounts.delegateBuffer, isWritable: true, isSigner: false },
     { pubkey: accounts.delegationRecord, isWritable: true, isSigner: false },
-<<<<<<< HEAD
-    {
-      pubkey: accounts.delegationMetadata,
-      isWritable: true,
-      isSigner: false,
-    },
-=======
     { pubkey: accounts.delegationMetadata, isWritable: true, isSigner: false },
->>>>>>> jonasXchen/action-escrow
     { pubkey: accounts.systemProgram, isWritable: false, isSigner: false },
   ];
 
@@ -62,10 +50,6 @@ export function serializeDelegateInstructionData(
   args: DelegateInstructionArgs
 ): Buffer {
   const discriminator = [0, 0, 0, 0, 0, 0, 0, 0];
-<<<<<<< HEAD
-  let offset = 0;
-  const buffer = Buffer.alloc(1024);
-=======
   
   // Calculate buffer size
   let bufferSize = 8; // discriminator
@@ -82,7 +66,6 @@ export function serializeDelegateInstructionData(
 
   const buffer = Buffer.alloc(bufferSize);
   let offset = 0;
->>>>>>> jonasXchen/action-escrow
 
   // Write discriminator
   for (let i = 0; i < 8; i++) {
@@ -93,35 +76,13 @@ export function serializeDelegateInstructionData(
   buffer.writeUInt32LE(args.commitFrequencyMs, offset);
   offset += 4;
 
-<<<<<<< HEAD
-  // Write seeds (vec<vec<u8>>)
-=======
   // Write seeds (vec)
->>>>>>> jonasXchen/action-escrow
   buffer.writeUInt32LE(args.seeds.length, offset);
   offset += 4;
 
   for (const seed of args.seeds) {
     buffer.writeUInt32LE(seed.length, offset);
     offset += 4;
-<<<<<<< HEAD
-    Buffer.from(seed).copy(buffer, offset);
-    offset += seed.length;
-  }
-
-  // Write validator (option<pubkey>)
-  if (args.validator !== null) {
-    buffer[offset] = 1; // Some discriminant
-    offset += 1;
-    args.validator.toBuffer().copy(buffer, offset);
-    offset += 32;
-  } else {
-    buffer[offset] = 0; // None discriminant
-    offset += 1;
-  }
-
-  return buffer.slice(0, offset);
-=======
     buffer.set(seed, offset);
     offset += seed.length;
   }
@@ -138,5 +99,4 @@ export function serializeDelegateInstructionData(
   }
 
   return buffer;
->>>>>>> jonasXchen/action-escrow
 }
