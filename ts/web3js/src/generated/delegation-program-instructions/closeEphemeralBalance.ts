@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 import { PublicKey, TransactionInstruction, AccountMeta } from "@solana/web3.js";
 import { DELEGATION_PROGRAM_ID } from "../../constants";
 
@@ -19,15 +20,44 @@ export function createCloseEscrowInstruction(
     systemProgram: PublicKey;
   },
   args?: CloseEscrowInstructionArgs,
+=======
+import { PublicKey, TransactionInstruction, AccountMeta, SystemProgram } from "@solana/web3.js";
+import { DELEGATION_PROGRAM_ID } from "../../constants";
+
+/**
+ * CloseEphemeralBalance instruction arguments
+ */
+export type CloseEphemeralBalanceInstructionArgs = {
+  index: number;
+};
+
+/**
+ * Instruction: CloseEphemeralBalance
+ * Discriminator: [11,0,0,0,0,0,0,0]
+ */
+export function createCloseEphemeralBalanceInstruction(
+  accounts: {
+    payer: PublicKey;
+    ephemeralBalanceAccount: PublicKey;
+  },
+  args: CloseEphemeralBalanceInstructionArgs,
+>>>>>>> jonasXchen/action-escrow
   programId = DELEGATION_PROGRAM_ID
 ): TransactionInstruction {
   const keys: AccountMeta[] = [
     { pubkey: accounts.payer, isWritable: false, isSigner: true },
     { pubkey: accounts.ephemeralBalanceAccount, isWritable: true, isSigner: false },
+<<<<<<< HEAD
     { pubkey: accounts.systemProgram, isWritable: false, isSigner: false },
   ];
 
   const data = serializeCloseEscrowInstructionData(args ?? {});
+=======
+    { pubkey: SystemProgram.programId, isWritable: false, isSigner: false },
+  ];
+
+  const data = serializeCloseEphemeralBalanceInstructionData(args);
+>>>>>>> jonasXchen/action-escrow
 
   return new TransactionInstruction({
     programId,
@@ -36,8 +66,13 @@ export function createCloseEscrowInstruction(
   });
 }
 
+<<<<<<< HEAD
 export function serializeCloseEscrowInstructionData(
   args?: CloseEscrowInstructionArgs
+=======
+export function serializeCloseEphemeralBalanceInstructionData(
+  args: CloseEphemeralBalanceInstructionArgs
+>>>>>>> jonasXchen/action-escrow
 ): Buffer {
   const discriminator = [11, 0, 0, 0, 0, 0, 0, 0];
   const buffer = Buffer.alloc(9);
@@ -49,7 +84,11 @@ export function serializeCloseEscrowInstructionData(
   }
 
   // Write index (u8)
+<<<<<<< HEAD
   buffer[offset] = args?.index ?? 255;
+=======
+  buffer[offset] = args.index;
+>>>>>>> jonasXchen/action-escrow
 
   return buffer;
 }
