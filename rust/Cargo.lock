@@ -15,17 +15,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "81071c030078429f000741da9ea84e34c432614f1b64dba741e1a572beeece3b"
 dependencies = [
  "ahash",
-<<<<<<< HEAD
- "solana-epoch-schedule",
- "solana-hash",
- "solana-pubkey",
- "solana-sha256-hasher",
-=======
  "solana-epoch-schedule 2.2.1",
  "solana-hash 2.3.0",
  "solana-pubkey 2.3.0",
  "solana-sha256-hasher 2.3.0",
->>>>>>> jonasXchen/action-escrow
 ]
 
 [[package]]
@@ -1143,14 +1136,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "ephemeral-rollups-sdk-attribute-action"
-version = "0.4.1"
-dependencies = [
- "quote",
- "syn 1.0.109",
-]
-
-[[package]]
 name = "ephemeral-rollups-sdk-attribute-commit"
 version = "0.4.1"
 dependencies = [
@@ -1471,8 +1456,6 @@ dependencies = [
 ]
 
 [[package]]
-<<<<<<< HEAD
-=======
 name = "group"
 version = "0.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1484,7 +1467,6 @@ dependencies = [
 ]
 
 [[package]]
->>>>>>> jonasXchen/action-escrow
 name = "h2"
 version = "0.3.27"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1673,33 +1655,6 @@ checksum = "135b12329e5e3ce057a9f972339ea52bc954fe1e9358ef27f95e89716fbc5424"
 [[package]]
 name = "hyper"
 version = "0.14.32"
-<<<<<<< HEAD
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "41dfc780fdec9373c01bae43289ea34c972e40ee3c9f6b3c8801a35f35586ce7"
-dependencies = [
- "bytes",
- "futures-channel",
- "futures-core",
- "futures-util",
- "h2 0.3.27",
- "http 0.2.12",
- "http-body 0.4.6",
- "httparse",
- "httpdate",
- "itoa",
- "pin-project-lite",
- "socket2 0.5.10",
- "tokio",
- "tower-service",
- "tracing",
- "want",
-]
-
-[[package]]
-name = "hyper"
-version = "1.7.0"
-=======
->>>>>>> jonasXchen/action-escrow
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "41dfc780fdec9373c01bae43289ea34c972e40ee3c9f6b3c8801a35f35586ce7"
 dependencies = [
@@ -1764,15 +1719,9 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e3c93eb611681b207e1fe55d5a71ecf91572ec8a6705cdb6857f7d8d5242cf58"
 dependencies = [
  "http 1.3.1",
-<<<<<<< HEAD
- "hyper 1.7.0",
- "hyper-util",
- "rustls 0.23.34",
-=======
  "hyper 1.8.1",
  "hyper-util",
  "rustls 0.23.35",
->>>>>>> jonasXchen/action-escrow
  "rustls-pki-types",
  "tokio",
  "tokio-rustls 0.26.4",
@@ -1787,11 +1736,7 @@ checksum = "70206fc6890eaca9fde8a0bf71caa2ddfc9fe045ac9e5c70df101a7dbde866e0"
 dependencies = [
  "bytes",
  "http-body-util",
-<<<<<<< HEAD
- "hyper 1.7.0",
-=======
  "hyper 1.8.1",
->>>>>>> jonasXchen/action-escrow
  "hyper-util",
  "native-tls",
  "tokio",
@@ -1812,11 +1757,7 @@ dependencies = [
  "futures-util",
  "http 1.3.1",
  "http-body 1.0.1",
-<<<<<<< HEAD
- "hyper 1.7.0",
-=======
  "hyper 1.8.1",
->>>>>>> jonasXchen/action-escrow
  "ipnet",
  "libc",
  "percent-encoding",
@@ -2835,11 +2776,7 @@ dependencies = [
  "http 1.3.1",
  "http-body 1.0.1",
  "http-body-util",
-<<<<<<< HEAD
- "hyper 1.7.0",
-=======
  "hyper 1.8.1",
->>>>>>> jonasXchen/action-escrow
  "hyper-rustls 0.27.7",
  "hyper-tls",
  "hyper-util",
@@ -2878,8 +2815,6 @@ dependencies = [
  "serde",
  "task-local-extensions",
  "thiserror 1.0.69",
-<<<<<<< HEAD
-=======
 ]
 
 [[package]]
@@ -2890,7 +2825,6 @@ checksum = "f8dd2a808d456c4a54e300a23e9f5a67e122c3024119acbfd73e3bf664491cb2"
 dependencies = [
  "hmac 0.12.1",
  "subtle",
->>>>>>> jonasXchen/action-escrow
 ]
 
 [[package]]
@@ -2961,21 +2895,6 @@ dependencies = [
 [[package]]
 name = "rustls"
 version = "0.21.12"
-<<<<<<< HEAD
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3f56a14d1f48b391359b22f731fd4bd7e43c97f3c50eee276f3aa09c94784d3e"
-dependencies = [
- "log",
- "ring",
- "rustls-webpki 0.101.7",
- "sct",
-]
-
-[[package]]
-name = "rustls"
-version = "0.23.34"
-=======
->>>>>>> jonasXchen/action-escrow
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3f56a14d1f48b391359b22f731fd4bd7e43c97f3c50eee276f3aa09c94784d3e"
 dependencies = [
@@ -4048,19 +3967,6 @@ dependencies = [
 [[package]]
 name = "solana-inline-spl"
 version = "2.2.20"
-<<<<<<< HEAD
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "14191c3b9de9f62e9ffb81ae53b3aecade34aebcb22d695e93fea70b1cec8cbe"
-dependencies = [
- "bytemuck",
- "solana-pubkey",
-]
-
-[[package]]
-name = "solana-instruction"
-version = "2.3.1"
-=======
->>>>>>> jonasXchen/action-escrow
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "14191c3b9de9f62e9ffb81ae53b3aecade34aebcb22d695e93fea70b1cec8cbe"
 dependencies = [
@@ -4119,16 +4025,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e0e85a6fad5c2d0c4f5b91d34b8ca47118fc593af706e523cdbedf846a954f57"
 dependencies = [
  "bitflags 2.10.0",
-<<<<<<< HEAD
- "solana-account-info",
- "solana-instruction",
- "solana-program-error",
- "solana-pubkey",
- "solana-sanitize",
- "solana-sdk-ids",
- "solana-serialize-utils",
- "solana-sysvar-id",
-=======
  "solana-account-info 2.3.0",
  "solana-instruction 2.3.3",
  "solana-program-error 2.2.2",
@@ -4155,7 +4051,6 @@ dependencies = [
  "solana-sdk-ids 3.1.0",
  "solana-serialize-utils 3.1.0",
  "solana-sysvar-id 3.1.0",
->>>>>>> jonasXchen/action-escrow
 ]
 
 [[package]]
@@ -4736,11 +4631,7 @@ dependencies = [
  "bytemuck",
  "bytemuck_derive",
  "curve25519-dalek 4.1.3",
-<<<<<<< HEAD
- "five8_const",
-=======
  "five8_const 0.1.4",
->>>>>>> jonasXchen/action-escrow
  "getrandom 0.2.16",
  "js-sys",
  "num-traits",
@@ -4918,15 +4809,9 @@ dependencies = [
  "solana-fee-calculator 2.2.1",
  "solana-inflation",
  "solana-inline-spl",
-<<<<<<< HEAD
- "solana-pubkey",
- "solana-signer",
- "solana-transaction-error",
-=======
  "solana-pubkey 2.3.0",
  "solana-signer",
  "solana-transaction-error 2.2.1",
->>>>>>> jonasXchen/action-escrow
  "solana-transaction-status-client-types",
  "solana-version",
  "thiserror 2.0.17",
@@ -5552,19 +5437,11 @@ dependencies = [
  "bincode",
  "serde",
  "serde_derive",
-<<<<<<< HEAD
- "solana-account",
- "solana-instruction",
- "solana-instructions-sysvar",
- "solana-pubkey",
- "solana-rent",
-=======
  "solana-account 2.2.1",
  "solana-instruction 2.3.3",
  "solana-instructions-sysvar 2.2.2",
  "solana-pubkey 2.3.0",
  "solana-rent 2.2.1",
->>>>>>> jonasXchen/action-escrow
 ]
 
 [[package]]
@@ -5695,8 +5572,6 @@ dependencies = [
 ]
 
 [[package]]
-<<<<<<< HEAD
-=======
 name = "spki"
 version = "0.7.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5707,7 +5582,6 @@ dependencies = [
 ]
 
 [[package]]
->>>>>>> jonasXchen/action-escrow
 name = "stable_deref_trait"
 version = "1.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5777,17 +5651,6 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.110",
-]
-
-[[package]]
-name = "system-configuration"
-version = "0.5.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ba3a3adc5c275d719af8cb4272ea1c4a6d668a777f37e115f6d11ddbc1c8e0e7"
-dependencies = [
- "bitflags 1.3.2",
- "core-foundation",
- "system-configuration-sys 0.5.0",
 ]
 
 [[package]]
@@ -5982,11 +5845,7 @@ version = "0.26.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1729aa945f29d91ba541258c8df89027d5792d85a8841fb65e8bf0f4ede4ef61"
 dependencies = [
-<<<<<<< HEAD
- "rustls 0.23.34",
-=======
  "rustls 0.23.35",
->>>>>>> jonasXchen/action-escrow
  "tokio",
 ]
 
@@ -6421,15 +6280,6 @@ dependencies = [
 
 [[package]]
 name = "windows-sys"
-version = "0.48.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "677d2418bec65e3338edb076e806bc1ec15693c5d0104683f2efe857f61056a9"
-dependencies = [
- "windows-targets 0.48.5",
-]
-
-[[package]]
-name = "windows-sys"
 version = "0.52.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "282be5f36a8ce781fad8c8ae18fa3f9beff57ec1b52cb3de0789201425d9a33d"
@@ -6462,21 +6312,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ae137229bcbd6cdf0f7b80a31df61766145077ddf49416a728b02cb3921ff3fc"
 dependencies = [
  "windows-link",
-]
-
-[[package]]
-name = "windows-targets"
-version = "0.48.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9a2fa6e2155d7247be68c096456083145c183cbbbc2764150dda45a87197940c"
-dependencies = [
- "windows_aarch64_gnullvm 0.48.5",
- "windows_aarch64_msvc 0.48.5",
- "windows_i686_gnu 0.48.5",
- "windows_i686_msvc 0.48.5",
- "windows_x86_64_gnu 0.48.5",
- "windows_x86_64_gnullvm 0.48.5",
- "windows_x86_64_msvc 0.48.5",
 ]
 
 [[package]]
