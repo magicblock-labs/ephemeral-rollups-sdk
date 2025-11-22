@@ -5,38 +5,16 @@ import {
   Instruction,
 } from "@solana/kit";
 import { DELEGATION_PROGRAM_ID } from "../../constants";
-<<<<<<< HEAD
-
-/**
- * CloseEscrow instruction arguments
- */
-export type CloseEscrowInstructionArgs = {
-=======
 import { SYSTEM_PROGRAM_ADDRESS } from "@solana-program/system";
 
 /**
  * CloseEphemeralBalance instruction arguments
  */
 export type CloseEphemeralBalanceInstructionArgs = {
->>>>>>> jonasXchen/action-escrow
   index?: number; // defaults to 255
 };
 
 /**
-<<<<<<< HEAD
- * Instruction: CloseEscrow
- * Discriminator: [11,0,0,0,0,0,0,0]
- */
-export function createCloseEscrowInstruction(
-  accounts: {
-    payer: Address;
-    ephemeralBalanceAccount: Address;
-    systemProgram: Address;
-  },
-  args?: CloseEscrowInstructionArgs
-): Instruction {
-  const [data] = serializeCloseEscrowInstructionData(args ?? {});
-=======
  * Instruction: CloseEphemeralBalance
  * Discriminator: [11,0,0,0,0,0,0,0]
  */
@@ -48,7 +26,6 @@ export function createCloseEphemeralBalanceInstruction(
   args?: CloseEphemeralBalanceInstructionArgs
 ): Instruction {
   const [data] = serializeCloseEphemeralBalanceInstructionData(args ?? {});
->>>>>>> jonasXchen/action-escrow
 
   const accounts_: AccountMeta[] = [
     {
@@ -60,11 +37,7 @@ export function createCloseEphemeralBalanceInstruction(
       role: AccountRole.WRITABLE,
     },
     {
-<<<<<<< HEAD
-      address: accounts.systemProgram,
-=======
       address: SYSTEM_PROGRAM_ADDRESS,
->>>>>>> jonasXchen/action-escrow
       role: AccountRole.READONLY,
     },
   ];
@@ -76,13 +49,8 @@ export function createCloseEphemeralBalanceInstruction(
   };
 }
 
-<<<<<<< HEAD
-export function serializeCloseEscrowInstructionData(
-  args?: CloseEscrowInstructionArgs
-=======
 export function serializeCloseEphemeralBalanceInstructionData(
   args?: CloseEphemeralBalanceInstructionArgs
->>>>>>> jonasXchen/action-escrow
 ): [Uint8Array] {
   const discriminator = [11, 0, 0, 0, 0, 0, 0, 0];
   const data = new Uint8Array(9);
