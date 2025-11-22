@@ -1,26 +1,25 @@
-import { PublicKey, TransactionInstruction, AccountMeta } from "@solana/web3.js";
+import { PublicKey, TransactionInstruction, AccountMeta, SystemProgram } from "@solana/web3.js";
 import { DELEGATION_PROGRAM_ID } from "../../constants";
 
 /**
- * TopUpEscrow instruction arguments
+ * TopUpEphemeralBalance instruction arguments
  */
-export type TopUpEscrowInstructionArgs = {
+export type TopUpEphemeralBalanceInstructionArgs = {
   amount: bigint;
-  index?: number; // defaults to 255
+  index: number;
 };
 
 /**
- * Instruction: TopUpEscrow
+ * Instruction: TopUpEphemeralBalance
  * Discriminator: [9,0,0,0,0,0,0,0]
  */
-export function createTopUpEscrowInstruction(
+export function createTopUpEphemeralBalanceInstruction(
   accounts: {
     payer: PublicKey;
     pubkey: PublicKey;
     ephemeralBalanceAccount: PublicKey;
-    systemProgram: PublicKey;
   },
-  args: TopUpEscrowInstructionArgs,
+  args: TopUpEphemeralBalanceInstructionArgs,
   programId = DELEGATION_PROGRAM_ID
 ): TransactionInstruction {
   const keys: AccountMeta[] = [
@@ -31,10 +30,10 @@ export function createTopUpEscrowInstruction(
       isWritable: true,
       isSigner: false,
     },
-    { pubkey: accounts.systemProgram, isWritable: false, isSigner: false },
+    { pubkey: SystemProgram.programId, isWritable: false, isSigner: false },
   ];
 
-  const data = serializeTopUpEscrowInstructionData(args);
+  const data = serializeTopUpEphemeralBalanceInstructionData(args);
 
   return new TransactionInstruction({
     programId,
@@ -43,8 +42,8 @@ export function createTopUpEscrowInstruction(
   });
 }
 
-export function serializeTopUpEscrowInstructionData(
-  args: TopUpEscrowInstructionArgs
+export function serializeTopUpEphemeralBalanceInstructionData(
+  args: TopUpEphemeralBalanceInstructionArgs
 ): Buffer {
   const discriminator = [9, 0, 0, 0, 0, 0, 0, 0];
   const buffer = Buffer.alloc(17);
@@ -60,7 +59,7 @@ export function serializeTopUpEscrowInstructionData(
   offset += 8;
 
   // Write index (u8)
-  buffer[offset] = args.index ?? 255;
+  buffer[offset] = args.index;
 
   return buffer;
 }

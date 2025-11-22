@@ -5,29 +5,29 @@ import {
   Instruction,
 } from "@solana/kit";
 import { DELEGATION_PROGRAM_ID } from "../../constants";
+import { SYSTEM_PROGRAM_ADDRESS } from "@solana-program/system";
 
 /**
- * TopUpEscrow instruction arguments
+ * TopUpEphemeralBalance instruction arguments
  */
-export type TopUpEscrowInstructionArgs = {
+export type TopUpEphemeralBalanceInstructionArgs = {
   amount: bigint;
   index?: number; // defaults to 255
 };
 
 /**
- * Instruction: TopUpEscrow
+ * Instruction: TopUpEphemeralBalance
  * Discriminator: [9,0,0,0,0,0,0,0]
  */
-export function createTopUpEscrowInstruction(
+export function createTopUpEphemeralBalanceInstruction(
   accounts: {
     payer: Address;
     pubkey: Address;
     ephemeralBalanceAccount: Address;
-    systemProgram: Address;
   },
-  args: TopUpEscrowInstructionArgs
+  args: TopUpEphemeralBalanceInstructionArgs
 ): Instruction {
-  const [data] = serializeTopUpEscrowInstructionData(args);
+  const [data] = serializeTopUpEphemeralBalanceInstructionData(args);
 
   const accounts_: AccountMeta[] = [
     {
@@ -43,7 +43,7 @@ export function createTopUpEscrowInstruction(
       role: AccountRole.WRITABLE,
     },
     {
-      address: accounts.systemProgram,
+      address: SYSTEM_PROGRAM_ADDRESS,
       role: AccountRole.READONLY,
     },
   ];
@@ -55,8 +55,8 @@ export function createTopUpEscrowInstruction(
   };
 }
 
-export function serializeTopUpEscrowInstructionData(
-  args: TopUpEscrowInstructionArgs
+export function serializeTopUpEphemeralBalanceInstructionData(
+  args: TopUpEphemeralBalanceInstructionArgs
 ): [Uint8Array] {
   const discriminator = [9, 0, 0, 0, 0, 0, 0, 0];
   const data = new Uint8Array(17);

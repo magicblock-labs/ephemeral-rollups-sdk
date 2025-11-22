@@ -1,33 +1,32 @@
-import { PublicKey, TransactionInstruction, AccountMeta } from "@solana/web3.js";
+import { PublicKey, TransactionInstruction, AccountMeta, SystemProgram } from "@solana/web3.js";
 import { DELEGATION_PROGRAM_ID } from "../../constants";
 
 /**
- * CloseEscrow instruction arguments
+ * CloseEphemeralBalance instruction arguments
  */
-export type CloseEscrowInstructionArgs = {
-  index?: number; // defaults to 255
+export type CloseEphemeralBalanceInstructionArgs = {
+  index: number;
 };
 
 /**
- * Instruction: CloseEscrow
+ * Instruction: CloseEphemeralBalance
  * Discriminator: [11,0,0,0,0,0,0,0]
  */
-export function createCloseEscrowInstruction(
+export function createCloseEphemeralBalanceInstruction(
   accounts: {
     payer: PublicKey;
     ephemeralBalanceAccount: PublicKey;
-    systemProgram: PublicKey;
   },
-  args?: CloseEscrowInstructionArgs,
+  args: CloseEphemeralBalanceInstructionArgs,
   programId = DELEGATION_PROGRAM_ID
 ): TransactionInstruction {
   const keys: AccountMeta[] = [
     { pubkey: accounts.payer, isWritable: false, isSigner: true },
     { pubkey: accounts.ephemeralBalanceAccount, isWritable: true, isSigner: false },
-    { pubkey: accounts.systemProgram, isWritable: false, isSigner: false },
+    { pubkey: SystemProgram.programId, isWritable: false, isSigner: false },
   ];
 
-  const data = serializeCloseEscrowInstructionData(args ?? {});
+  const data = serializeCloseEphemeralBalanceInstructionData(args);
 
   return new TransactionInstruction({
     programId,
@@ -36,8 +35,8 @@ export function createCloseEscrowInstruction(
   });
 }
 
-export function serializeCloseEscrowInstructionData(
-  args?: CloseEscrowInstructionArgs
+export function serializeCloseEphemeralBalanceInstructionData(
+  args: CloseEphemeralBalanceInstructionArgs
 ): Buffer {
   const discriminator = [11, 0, 0, 0, 0, 0, 0, 0];
   const buffer = Buffer.alloc(9);
@@ -49,7 +48,7 @@ export function serializeCloseEscrowInstructionData(
   }
 
   // Write index (u8)
-  buffer[offset] = args?.index ?? 255;
+  buffer[offset] = args.index;
 
   return buffer;
 }
