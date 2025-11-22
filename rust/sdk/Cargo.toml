@@ -45,7 +45,6 @@ solana-system-interface = { workspace = true, optional = true }
 solana-sysvar = { workspace = true, optional = true }
 magicblock-magic-program-api = { workspace = true }
 magicblock-delegation-program  = { workspace = true, features = ["no-entrypoint", "core"], default-features = false }
-# magicblock-delegation-program  = { workspace = true, features = ["no-entrypoint", "sdk"], default-features = false } // updating from "core" to "sdk"
 
 # Fix for older toolchain
 base64ct = { workspace = true }
