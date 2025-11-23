@@ -33,7 +33,7 @@ reqwest = { workspace = true }
 sdk = { workspace = true }
 rpc = { workspace = true }
 rpc-api = { workspace = true }
-solana-program = { version = "<3" }
+solana-program = { workspace = true }
 
 # serialization/parsing
 serde = { workspace = true }

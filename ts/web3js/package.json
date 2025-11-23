@@ -43,7 +43,6 @@
     "vitest": "^3.2.4"
   },
   "dependencies": {
-    "@metaplex-foundation/beet": "^0.7.2",
     "@phala/dcap-qvl-web": "^0.2.7",
     "@solana/web3.js": "^1.98.0",
     "bs58": "^6.0.0",
