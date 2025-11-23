@@ -134,7 +134,7 @@ dependencies = [
  "anchor-syn",
  "anyhow",
  "bs58",
- "heck 0.3.3",
+ "heck",
  "proc-macro2",
  "quote",
  "serde_json",
@@ -226,7 +226,7 @@ checksum = "32e8599d21995f68e296265aa5ab0c3cef582fd58afec014d01bd0bce18a4418"
 dependencies = [
  "anchor-lang-idl-spec",
  "anyhow",
- "heck 0.3.3",
+ "heck",
  "serde",
  "serde_json",
  "sha2 0.10.9",
@@ -250,7 +250,7 @@ checksum = "b93b69aa7d099b59378433f6d7e20e1008fc10c69e48b220270e5b3f2ec4c8be"
 dependencies = [
  "anyhow",
  "bs58",
- "heck 0.3.3",
+ "heck",
  "proc-macro2",
  "quote",
  "serde",
@@ -1404,12 +1404,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "heck"
-version = "0.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2304e00983f87ffb38b55b444b5e3b60a884b5d30c0fca7d82fe33449bbe55ea"
-
-[[package]]
 name = "hermit-abi"
 version = "0.1.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1920,22 +1914,21 @@ dependencies = [
 [[package]]
 name = "magicblock-delegation-program"
 version = "1.1.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d0e25f9e37194cc27c0f1d3dbc00e83795f7f4012f1a99c20bc557bdeb62e13e"
 dependencies = [
- "bincode",
  "borsh 1.5.7",
  "bytemuck",
  "num_enum",
  "solana-program",
  "static_assertions",
- "strum",
- "thiserror 2.0.17",
 ]
 
 [[package]]
 name = "magicblock-magic-program-api"
-version = "0.3.0"
+version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "20f61c03eaa5da742332359861a625c9d4a2487e7025e7d73cb6b166a3a54a32"
+checksum = "ce6ec80d63618a71bb4db324ec5fdca8f85552d0469a51aa063d290256d425f5"
 dependencies = [
  "bincode",
  "serde",
@@ -4691,27 +4684,6 @@ name = "strsim"
 version = "0.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7da8b5736845d9f2fcb837ea5d9e2628564b3b043a70948a3f0b778838c5fb4f"
-
-[[package]]
-name = "strum"
-version = "0.27.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "af23d6f6c1a224baef9d3f61e287d2761385a5b88fdab4eb4c6f11aeb54c4bcf"
-dependencies = [
- "strum_macros",
-]
-
-[[package]]
-name = "strum_macros"
-version = "0.27.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7695ce3845ea4b33927c055a39dc438a45b059f7c1b3d91d38d10355fb8cbca7"
-dependencies = [
- "heck 0.5.0",
- "proc-macro2",
- "quote",
- "syn 2.0.110",
-]
 
 [[package]]
 name = "subtle"
