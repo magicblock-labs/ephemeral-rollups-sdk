@@ -1,14 +1,18 @@
-import { PublicKey, TransactionInstruction, AccountMeta, SystemProgram } from "@solana/web3.js";
+import {
+  PublicKey,
+  TransactionInstruction,
+  AccountMeta,
+} from "@solana/web3.js";
 import { DELEGATION_PROGRAM_ID } from "../../constants";
 
 /**
  * Delegate instruction arguments
  */
-export type DelegateInstructionArgs = {
+export interface DelegateInstructionArgs {
   commitFrequencyMs: number;
   seeds: Uint8Array[];
   validator: PublicKey | null;
-};
+}
 
 /**
  * Instruction: Delegate
@@ -25,7 +29,7 @@ export function createDelegateInstruction(
     systemProgram: PublicKey;
   },
   args: DelegateInstructionArgs,
-  programId = DELEGATION_PROGRAM_ID
+  programId = DELEGATION_PROGRAM_ID,
 ): TransactionInstruction {
   const keys: AccountMeta[] = [
     { pubkey: accounts.payer, isWritable: true, isSigner: true },
@@ -47,10 +51,10 @@ export function createDelegateInstruction(
 }
 
 export function serializeDelegateInstructionData(
-  args: DelegateInstructionArgs
+  args: DelegateInstructionArgs,
 ): Buffer {
   const discriminator = [0, 0, 0, 0, 0, 0, 0, 0];
-  
+
   // Calculate buffer size
   let bufferSize = 8; // discriminator
   bufferSize += 4; // commit_frequency_ms

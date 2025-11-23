@@ -9,13 +9,9 @@ import {
 import { DELEGATION_PROGRAM_ID } from "../constants";
 
 describe("Exposed Instructions (web3.js)", () => {
-  const mockPublicKey = new PublicKey(
-    "11111111111111111111111111111111"
-  );
-  
-  const differentKey = new PublicKey(
-    "11111111111111111111111111111112"
-  );
+  const mockPublicKey = new PublicKey("11111111111111111111111111111111");
+
+  const differentKey = new PublicKey("11111111111111111111111111111112");
 
   describe("delegate instruction", () => {
     it("should create a delegate instruction with correct parameters", () => {
@@ -31,14 +27,14 @@ describe("Exposed Instructions (web3.js)", () => {
         mockPublicKey,
         mockPublicKey,
         mockPublicKey,
-        data
+        data,
       );
 
       expect(instruction.keys).toHaveLength(7);
       expect(instruction.data).toBeDefined();
       expect(instruction.data.length).toBeGreaterThan(0);
       expect(instruction.programId.toBase58()).toBe(
-        DELEGATION_PROGRAM_ID.toBase58()
+        DELEGATION_PROGRAM_ID.toBase58(),
       );
     });
 
@@ -54,7 +50,7 @@ describe("Exposed Instructions (web3.js)", () => {
         mockPublicKey,
         mockPublicKey,
         mockPublicKey,
-        data
+        data,
       );
 
       expect(instruction.keys).toHaveLength(7);
@@ -74,7 +70,7 @@ describe("Exposed Instructions (web3.js)", () => {
         mockPublicKey,
         mockPublicKey,
         mockPublicKey,
-        data
+        data,
       );
 
       const keyCount = instruction.keys.length;
@@ -101,7 +97,7 @@ describe("Exposed Instructions (web3.js)", () => {
         mockPublicKey,
         mockPublicKey,
         mockPublicKey,
-        data
+        data,
       );
 
       expect(instruction.keys).toHaveLength(7);
@@ -120,7 +116,7 @@ describe("Exposed Instructions (web3.js)", () => {
         mockPublicKey,
         mockPublicKey,
         mockPublicKey,
-        data
+        data,
       );
       const instruction2 = createDelegateInstruction(
         differentKey,
@@ -130,7 +126,7 @@ describe("Exposed Instructions (web3.js)", () => {
         mockPublicKey,
         mockPublicKey,
         mockPublicKey,
-        data
+        data,
       );
 
       // Both should be valid instructions but with different account references
@@ -153,7 +149,7 @@ describe("Exposed Instructions (web3.js)", () => {
           mockPublicKey,
           mockPublicKey,
           mockPublicKey,
-          data
+          data,
         );
 
         expect(instruction.data).toBeDefined();
@@ -176,7 +172,7 @@ describe("Exposed Instructions (web3.js)", () => {
         mockPublicKey,
         mockPublicKey,
         mockPublicKey,
-        data
+        data,
       );
 
       expect(instruction.data).toBeDefined();
@@ -194,7 +190,7 @@ describe("Exposed Instructions (web3.js)", () => {
         mockPublicKey,
         mockPublicKey,
         mockPublicKey,
-        data
+        data,
       );
 
       expect(instruction.data).toBeDefined();
@@ -208,14 +204,14 @@ describe("Exposed Instructions (web3.js)", () => {
         mockPublicKey,
         mockPublicKey,
         1000000,
-        255
+        255,
       );
 
       expect(instruction.keys).toHaveLength(4);
       expect(instruction.data).toBeDefined();
       expect(instruction.data.length).toBe(17);
       expect(instruction.programId.toBase58()).toBe(
-        DELEGATION_PROGRAM_ID.toBase58()
+        DELEGATION_PROGRAM_ID.toBase58(),
       );
     });
 
@@ -224,7 +220,7 @@ describe("Exposed Instructions (web3.js)", () => {
         mockPublicKey,
         mockPublicKey,
         mockPublicKey,
-        1000000
+        1000000,
       );
 
       expect(instruction.keys).toHaveLength(4);
@@ -250,7 +246,7 @@ describe("Exposed Instructions (web3.js)", () => {
         mockPublicKey,
         mockPublicKey,
         mockPublicKey,
-        1234567
+        1234567,
       );
 
       // Check amount is correctly serialized (u64 at offset 8)
@@ -267,7 +263,7 @@ describe("Exposed Instructions (web3.js)", () => {
           mockPublicKey,
           mockPublicKey,
           1000000,
-          index
+          index,
         );
 
         expect(instruction.data[16]).toBe(index);
@@ -279,7 +275,7 @@ describe("Exposed Instructions (web3.js)", () => {
         mockPublicKey,
         mockPublicKey,
         mockPublicKey,
-        0
+        0,
       );
 
       const amount = instruction.data.readBigUInt64LE(8);
@@ -293,7 +289,7 @@ describe("Exposed Instructions (web3.js)", () => {
         mockPublicKey,
         mockPublicKey,
         mockPublicKey,
-        largeAmount
+        largeAmount,
       );
 
       const amount = instruction.data.readBigUInt64LE(8);
@@ -305,7 +301,7 @@ describe("Exposed Instructions (web3.js)", () => {
         mockPublicKey,
         mockPublicKey,
         mockPublicKey,
-        1000000
+        1000000,
       );
 
       expect(instruction.keys.length).toBe(4);
@@ -321,13 +317,13 @@ describe("Exposed Instructions (web3.js)", () => {
         mockPublicKey,
         mockPublicKey,
         mockPublicKey,
-        1000000
+        1000000,
       );
       const instruction2 = createTopUpEscrowInstruction(
         mockPublicKey,
         mockPublicKey,
         mockPublicKey,
-        1000000
+        1000000,
       );
 
       expect(instruction1.data).toEqual(instruction2.data);
@@ -339,21 +335,21 @@ describe("Exposed Instructions (web3.js)", () => {
       const instruction = createCloseEscrowInstruction(
         mockPublicKey,
         mockPublicKey,
-        255
+        255,
       );
 
       expect(instruction.keys).toHaveLength(3);
       expect(instruction.data).toBeDefined();
       expect(instruction.data.length).toBe(9);
       expect(instruction.programId.toBase58()).toBe(
-        DELEGATION_PROGRAM_ID.toBase58()
+        DELEGATION_PROGRAM_ID.toBase58(),
       );
     });
 
     it("should create a closeEscrow instruction with default index", () => {
       const instruction = createCloseEscrowInstruction(
         mockPublicKey,
-        mockPublicKey
+        mockPublicKey,
       );
 
       expect(instruction.keys).toHaveLength(3);
@@ -377,7 +373,7 @@ describe("Exposed Instructions (web3.js)", () => {
         const instruction = createCloseEscrowInstruction(
           mockPublicKey,
           mockPublicKey,
-          index
+          index,
         );
 
         expect(instruction.data[8]).toBe(index);
@@ -387,7 +383,7 @@ describe("Exposed Instructions (web3.js)", () => {
     it("should include correct account keys", () => {
       const instruction = createCloseEscrowInstruction(
         mockPublicKey,
-        mockPublicKey
+        mockPublicKey,
       );
 
       expect(instruction.keys.length).toBe(3);
@@ -401,11 +397,11 @@ describe("Exposed Instructions (web3.js)", () => {
     it("should use consistent data format for the same params", () => {
       const instruction1 = createCloseEscrowInstruction(
         mockPublicKey,
-        mockPublicKey
+        mockPublicKey,
       );
       const instruction2 = createCloseEscrowInstruction(
         mockPublicKey,
-        mockPublicKey
+        mockPublicKey,
       );
 
       expect(instruction1.data).toEqual(instruction2.data);
@@ -414,7 +410,7 @@ describe("Exposed Instructions (web3.js)", () => {
     it("should have correct discriminator", () => {
       const instruction = createCloseEscrowInstruction(
         mockPublicKey,
-        mockPublicKey
+        mockPublicKey,
       );
 
       // Discriminator should be 11 for closeEphemeralBalance
@@ -435,19 +431,19 @@ describe("Exposed Instructions (web3.js)", () => {
         mockPublicKey,
         mockPublicKey,
         mockPublicKey,
-        delegateData
+        delegateData,
       );
 
       const topUpInstr = createTopUpEscrowInstruction(
         mockPublicKey,
         mockPublicKey,
         mockPublicKey,
-        1000000
+        1000000,
       );
 
       const closeInstr = createCloseEscrowInstruction(
         mockPublicKey,
-        mockPublicKey
+        mockPublicKey,
       );
 
       const programId = DELEGATION_PROGRAM_ID.toBase58();

@@ -1,8 +1,5 @@
 import { Address, Instruction } from "@solana/kit";
-import { DELEGATION_PROGRAM_ID } from "../../constants";
-import {
-  createTopUpEphemeralBalanceInstruction as _createTopUpEphemeralBalanceInstruction,
-} from "../../generated/delegation-program-instructions";
+import { createTopUpEphemeralBalanceInstruction as _createTopUpEphemeralBalanceInstruction } from "../../generated/delegation-program-instructions";
 
 /**
  * Creates a topUpEscrow instruction with simplified parameters.
@@ -20,7 +17,7 @@ export function createTopUpEscrowInstruction(
   escrowAuthority: Address,
   payer: Address,
   amount: number,
-  index?: number
+  index?: number,
 ): Instruction {
   return _createTopUpEphemeralBalanceInstruction(
     {
@@ -31,6 +28,6 @@ export function createTopUpEscrowInstruction(
     {
       amount: BigInt(amount),
       index: index ?? 255,
-    }
+    },
   );
 }

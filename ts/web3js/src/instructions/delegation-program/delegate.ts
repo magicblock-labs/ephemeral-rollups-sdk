@@ -1,8 +1,10 @@
-import { PublicKey, TransactionInstruction, SystemProgram } from "@solana/web3.js";
-import { DELEGATION_PROGRAM_ID } from "../../constants";
 import {
-  createDelegateInstruction as _createDelegateInstruction,
-} from "../../generated/delegation-program-instructions";
+  PublicKey,
+  TransactionInstruction,
+  SystemProgram,
+} from "@solana/web3.js";
+import { DELEGATION_PROGRAM_ID } from "../../constants";
+import { createDelegateInstruction as _createDelegateInstruction } from "../../generated/delegation-program-instructions";
 
 export interface DelegateInstructionData {
   commitFrequencyMs: number;
@@ -31,7 +33,7 @@ export function createDelegateInstruction(
   delegateBuffer: PublicKey,
   delegationRecord: PublicKey,
   delegationMetadata: PublicKey,
-  data: DelegateInstructionData
+  data: DelegateInstructionData,
 ): TransactionInstruction {
   return _createDelegateInstruction(
     {
@@ -48,6 +50,6 @@ export function createDelegateInstruction(
       seeds,
       validator: data.validator ?? null,
     },
-    DELEGATION_PROGRAM_ID
+    DELEGATION_PROGRAM_ID,
   );
 }

@@ -1,13 +1,18 @@
-import { PublicKey, TransactionInstruction, AccountMeta, SystemProgram } from "@solana/web3.js";
+import {
+  PublicKey,
+  TransactionInstruction,
+  AccountMeta,
+  SystemProgram,
+} from "@solana/web3.js";
 import { DELEGATION_PROGRAM_ID } from "../../constants";
 
 /**
  * TopUpEphemeralBalance instruction arguments
  */
-export type TopUpEphemeralBalanceInstructionArgs = {
+export interface TopUpEphemeralBalanceInstructionArgs {
   amount: bigint;
   index: number;
-};
+}
 
 /**
  * Instruction: TopUpEphemeralBalance
@@ -20,7 +25,7 @@ export function createTopUpEphemeralBalanceInstruction(
     ephemeralBalanceAccount: PublicKey;
   },
   args: TopUpEphemeralBalanceInstructionArgs,
-  programId = DELEGATION_PROGRAM_ID
+  programId = DELEGATION_PROGRAM_ID,
 ): TransactionInstruction {
   const keys: AccountMeta[] = [
     { pubkey: accounts.payer, isWritable: true, isSigner: true },
@@ -43,7 +48,7 @@ export function createTopUpEphemeralBalanceInstruction(
 }
 
 export function serializeTopUpEphemeralBalanceInstructionData(
-  args: TopUpEphemeralBalanceInstructionArgs
+  args: TopUpEphemeralBalanceInstructionArgs,
 ): Buffer {
   const discriminator = [9, 0, 0, 0, 0, 0, 0, 0];
   const buffer = Buffer.alloc(17);

@@ -1,19 +1,14 @@
-import {
-  AccountMeta,
-  Address,
-  AccountRole,
-  Instruction,
-} from "@solana/kit";
+import { AccountMeta, Address, AccountRole, Instruction } from "@solana/kit";
 import { DELEGATION_PROGRAM_ID } from "../../constants";
 import { SYSTEM_PROGRAM_ADDRESS } from "@solana-program/system";
 
 /**
  * TopUpEphemeralBalance instruction arguments
  */
-export type TopUpEphemeralBalanceInstructionArgs = {
+export interface TopUpEphemeralBalanceInstructionArgs {
   amount: bigint;
   index?: number; // defaults to 255
-};
+}
 
 /**
  * Instruction: TopUpEphemeralBalance
@@ -25,7 +20,7 @@ export function createTopUpEphemeralBalanceInstruction(
     pubkey: Address;
     ephemeralBalanceAccount: Address;
   },
-  args: TopUpEphemeralBalanceInstructionArgs
+  args: TopUpEphemeralBalanceInstructionArgs,
 ): Instruction {
   const [data] = serializeTopUpEphemeralBalanceInstructionData(args);
 
@@ -56,7 +51,7 @@ export function createTopUpEphemeralBalanceInstruction(
 }
 
 export function serializeTopUpEphemeralBalanceInstructionData(
-  args: TopUpEphemeralBalanceInstructionArgs
+  args: TopUpEphemeralBalanceInstructionArgs,
 ): [Uint8Array] {
   const discriminator = [9, 0, 0, 0, 0, 0, 0, 0];
   const data = new Uint8Array(17);

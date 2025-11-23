@@ -1,9 +1,6 @@
 import { Address, Instruction } from "@solana/kit";
-import { DELEGATION_PROGRAM_ID } from "../../constants";
 import { SYSTEM_PROGRAM_ADDRESS } from "@solana-program/system";
-import {
-  createDelegateInstruction as _createDelegateInstruction,
-} from "../../generated/delegation-program-instructions";
+import { createDelegateInstruction as _createDelegateInstruction } from "../../generated/delegation-program-instructions";
 
 export interface DelegateInstructionData {
   commitFrequencyMs: number;
@@ -32,7 +29,7 @@ export function createDelegateInstruction(
   delegateBuffer: Address,
   delegationRecord: Address,
   delegationMetadata: Address,
-  data: DelegateInstructionData
+  data: DelegateInstructionData,
 ): Instruction {
   return _createDelegateInstruction(
     {
@@ -48,6 +45,6 @@ export function createDelegateInstruction(
       commitFrequencyMs: data.commitFrequencyMs,
       seeds,
       validator: data.validator ?? null,
-    }
+    },
   );
 }

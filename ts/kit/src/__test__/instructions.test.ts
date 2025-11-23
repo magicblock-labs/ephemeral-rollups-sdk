@@ -5,10 +5,11 @@ import {
   createCloseEscrowInstruction,
   type DelegateInstructionData,
 } from "../instructions/delegation-program";
+import { type Address } from "@solana/kit";
 
 describe("Exposed Instructions (@solana/kit)", () => {
-  const mockAddress = "11111111111111111111111111111111" as any;
-  const differentAddress = "11111111111111111111111111111112" as any;
+  const mockAddress = "11111111111111111111111111111111" as Address;
+  const differentAddress = "11111111111111111111111111111112" as Address;
 
   describe("delegate instruction", () => {
     it("should create a delegate instruction with correct parameters", () => {
@@ -24,7 +25,7 @@ describe("Exposed Instructions (@solana/kit)", () => {
         mockAddress,
         mockAddress,
         mockAddress,
-        data
+        data,
       );
 
       expect(instruction.accounts).toHaveLength(7);
@@ -43,7 +44,7 @@ describe("Exposed Instructions (@solana/kit)", () => {
         mockAddress,
         mockAddress,
         mockAddress,
-        data
+        data,
       );
 
       expect(instruction.accounts).toHaveLength(7);
@@ -62,14 +63,14 @@ describe("Exposed Instructions (@solana/kit)", () => {
         mockAddress,
         mockAddress,
         mockAddress,
-        data
+        data,
       );
 
       expect(instruction.accounts).toBeDefined();
-      expect(instruction.accounts!.length).toBe(7);
+      expect(instruction.accounts).toHaveLength(7);
 
       // Verify all accounts have proper structure
-      instruction.accounts!.forEach((account) => {
+      instruction.accounts?.forEach((account) => {
         expect(account).toBeDefined();
         expect(account.address).toBeDefined();
       });
@@ -88,7 +89,7 @@ describe("Exposed Instructions (@solana/kit)", () => {
         mockAddress,
         mockAddress,
         mockAddress,
-        data
+        data,
       );
 
       expect(instruction.accounts).toHaveLength(7);
@@ -107,7 +108,7 @@ describe("Exposed Instructions (@solana/kit)", () => {
         mockAddress,
         mockAddress,
         mockAddress,
-        data
+        data,
       );
       const instruction2 = createDelegateInstruction(
         differentAddress,
@@ -117,7 +118,7 @@ describe("Exposed Instructions (@solana/kit)", () => {
         mockAddress,
         mockAddress,
         mockAddress,
-        data
+        data,
       );
 
       // Both should be valid instructions but with different account references
@@ -140,7 +141,7 @@ describe("Exposed Instructions (@solana/kit)", () => {
           mockAddress,
           mockAddress,
           mockAddress,
-          data
+          data,
         );
 
         expect(instruction.data).toBeDefined();
@@ -163,7 +164,7 @@ describe("Exposed Instructions (@solana/kit)", () => {
         mockAddress,
         mockAddress,
         mockAddress,
-        data
+        data,
       );
 
       expect(instruction.data).toBeDefined();
@@ -181,7 +182,7 @@ describe("Exposed Instructions (@solana/kit)", () => {
         mockAddress,
         mockAddress,
         mockAddress,
-        data
+        data,
       );
 
       expect(instruction.data).toBeDefined();
@@ -195,7 +196,7 @@ describe("Exposed Instructions (@solana/kit)", () => {
         mockAddress,
         mockAddress,
         1000000,
-        255
+        255,
       );
 
       expect(instruction.accounts).toHaveLength(4);
@@ -208,7 +209,7 @@ describe("Exposed Instructions (@solana/kit)", () => {
         mockAddress,
         mockAddress,
         mockAddress,
-        1000000
+        1000000,
       );
 
       expect(instruction.data).toBeDefined();
@@ -221,11 +222,10 @@ describe("Exposed Instructions (@solana/kit)", () => {
       }
 
       // Check amount (u64 at offset 8)
-      const amount = new DataView(
-        instruction.data?.buffer as ArrayBuffer,
-        8,
-        8
-      ).getBigUint64(0, true);
+      const buffer = instruction.data?.buffer as ArrayBuffer | undefined;
+      expect(buffer).toBeDefined();
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+      const amount = new DataView(buffer!, 8, 8).getBigUint64(0, true);
       expect(amount).toBe(BigInt(1000000));
 
       // Check index defaults to 255 (u8 at offset 16)
@@ -237,15 +237,14 @@ describe("Exposed Instructions (@solana/kit)", () => {
         mockAddress,
         mockAddress,
         mockAddress,
-        1234567
+        1234567,
       );
 
       // Check amount is correctly serialized (u64 at offset 8)
-      const amount = new DataView(
-        instruction.data?.buffer as ArrayBuffer,
-        8,
-        8
-      ).getBigUint64(0, true);
+      const buffer2 = instruction.data?.buffer as ArrayBuffer | undefined;
+      expect(buffer2).toBeDefined();
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+      const amount = new DataView(buffer2!, 8, 8).getBigUint64(0, true);
       expect(amount).toBe(BigInt(1234567));
     });
 
@@ -258,7 +257,7 @@ describe("Exposed Instructions (@solana/kit)", () => {
           mockAddress,
           mockAddress,
           1000000,
-          index
+          index,
         );
 
         expect(instruction.data?.[16]).toBe(index);
@@ -270,14 +269,13 @@ describe("Exposed Instructions (@solana/kit)", () => {
         mockAddress,
         mockAddress,
         mockAddress,
-        0
+        0,
       );
 
-      const amount = new DataView(
-        instruction.data?.buffer as ArrayBuffer,
-        8,
-        8
-      ).getBigUint64(0, true);
+      const buffer3 = instruction.data?.buffer as ArrayBuffer | undefined;
+      expect(buffer3).toBeDefined();
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+      const amount = new DataView(buffer3!, 8, 8).getBigUint64(0, true);
       expect(amount).toBe(BigInt(0));
     });
 
@@ -288,14 +286,13 @@ describe("Exposed Instructions (@solana/kit)", () => {
         mockAddress,
         mockAddress,
         mockAddress,
-        largeAmount
+        largeAmount,
       );
 
-      const amount = new DataView(
-        instruction.data?.buffer as ArrayBuffer,
-        8,
-        8
-      ).getBigUint64(0, true);
+      const buffer4 = instruction.data?.buffer as ArrayBuffer | undefined;
+      expect(buffer4).toBeDefined();
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+      const amount = new DataView(buffer4!, 8, 8).getBigUint64(0, true);
       expect(amount).toBe(BigInt(largeAmount));
     });
 
@@ -304,12 +301,12 @@ describe("Exposed Instructions (@solana/kit)", () => {
         mockAddress,
         mockAddress,
         mockAddress,
-        1000000
+        1000000,
       );
 
       expect(instruction.accounts).toBeDefined();
-      expect(instruction.accounts!.length).toBe(4);
-      instruction.accounts!.forEach((account) => {
+      expect(instruction.accounts).toHaveLength(4);
+      instruction.accounts?.forEach((account) => {
         expect(account).toBeDefined();
         expect(account.address).toBeDefined();
       });
@@ -320,13 +317,13 @@ describe("Exposed Instructions (@solana/kit)", () => {
         mockAddress,
         mockAddress,
         mockAddress,
-        1000000
+        1000000,
       );
       const instruction2 = createTopUpEscrowInstruction(
         mockAddress,
         mockAddress,
         mockAddress,
-        1000000
+        1000000,
       );
 
       expect(instruction1.data).toEqual(instruction2.data);
@@ -338,7 +335,7 @@ describe("Exposed Instructions (@solana/kit)", () => {
       const instruction = createCloseEscrowInstruction(
         mockAddress,
         mockAddress,
-        255
+        255,
       );
 
       expect(instruction.accounts).toHaveLength(3);
@@ -349,7 +346,7 @@ describe("Exposed Instructions (@solana/kit)", () => {
     it("should create a closeEscrow instruction with default index", () => {
       const instruction = createCloseEscrowInstruction(
         mockAddress,
-        mockAddress
+        mockAddress,
       );
 
       expect(instruction.data).toBeDefined();
@@ -372,7 +369,7 @@ describe("Exposed Instructions (@solana/kit)", () => {
         const instruction = createCloseEscrowInstruction(
           mockAddress,
           mockAddress,
-          index
+          index,
         );
 
         expect(instruction.data?.[8]).toBe(index);
@@ -382,12 +379,12 @@ describe("Exposed Instructions (@solana/kit)", () => {
     it("should include correct account keys", () => {
       const instruction = createCloseEscrowInstruction(
         mockAddress,
-        mockAddress
+        mockAddress,
       );
 
       expect(instruction.accounts).toBeDefined();
-      expect(instruction.accounts!.length).toBe(3);
-      instruction.accounts!.forEach((account) => {
+      expect(instruction.accounts).toHaveLength(3);
+      instruction.accounts?.forEach((account) => {
         expect(account).toBeDefined();
         expect(account.address).toBeDefined();
       });
@@ -396,11 +393,11 @@ describe("Exposed Instructions (@solana/kit)", () => {
     it("should use consistent data format for the same params", () => {
       const instruction1 = createCloseEscrowInstruction(
         mockAddress,
-        mockAddress
+        mockAddress,
       );
       const instruction2 = createCloseEscrowInstruction(
         mockAddress,
-        mockAddress
+        mockAddress,
       );
 
       expect(instruction1.data).toEqual(instruction2.data);
@@ -409,7 +406,7 @@ describe("Exposed Instructions (@solana/kit)", () => {
     it("should have correct discriminator", () => {
       const instruction = createCloseEscrowInstruction(
         mockAddress,
-        mockAddress
+        mockAddress,
       );
 
       // Discriminator should be 11 for closeEphemeralBalance
@@ -430,20 +427,17 @@ describe("Exposed Instructions (@solana/kit)", () => {
         mockAddress,
         mockAddress,
         mockAddress,
-        delegateData
+        delegateData,
       );
 
       const topUpInstr = createTopUpEscrowInstruction(
         mockAddress,
         mockAddress,
         mockAddress,
-        1000000
+        1000000,
       );
 
-      const closeInstr = createCloseEscrowInstruction(
-        mockAddress,
-        mockAddress
-      );
+      const closeInstr = createCloseEscrowInstruction(mockAddress, mockAddress);
 
       expect(delegateInstr.accounts).toBeDefined();
       expect(delegateInstr.data).toBeDefined();
