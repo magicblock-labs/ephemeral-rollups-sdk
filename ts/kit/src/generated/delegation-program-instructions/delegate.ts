@@ -1,19 +1,14 @@
-import {
-  AccountMeta,
-  Address,
-  AccountRole,
-  Instruction,
-} from "@solana/kit";
+import { AccountMeta, Address, AccountRole, Instruction } from "@solana/kit";
 import { DELEGATION_PROGRAM_ID } from "../../constants";
 
 /**
  * Delegate instruction arguments
  */
-export type DelegateInstructionArgs = {
+export interface DelegateInstructionArgs {
   commitFrequencyMs: number;
   seeds: Uint8Array[];
   validator: Address | null;
-};
+}
 
 /**
  * Instruction: Delegate
@@ -29,7 +24,7 @@ export function createDelegateInstruction(
     delegationMetadata: Address;
     systemProgram: Address;
   },
-  args: DelegateInstructionArgs
+  args: DelegateInstructionArgs,
 ): Instruction {
   const [data] = serializeDelegateInstructionData(args);
 
@@ -72,11 +67,11 @@ export function createDelegateInstruction(
 }
 
 export function serializeDelegateInstructionData(
-  args: DelegateInstructionArgs
+  args: DelegateInstructionArgs,
 ): [Uint8Array] {
   const discriminator = [0, 0, 0, 0, 0, 0, 0, 0];
   let offset = 0;
-  let buffer = new ArrayBuffer(1024); // Initial size, will adjust
+  const buffer = new ArrayBuffer(1024); // Initial size, will adjust
   const view = new DataView(buffer);
 
   // Write discriminator

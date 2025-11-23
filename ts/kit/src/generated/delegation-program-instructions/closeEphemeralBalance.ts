@@ -1,18 +1,13 @@
-import {
-  AccountMeta,
-  Address,
-  AccountRole,
-  Instruction,
-} from "@solana/kit";
+import { AccountMeta, Address, AccountRole, Instruction } from "@solana/kit";
 import { DELEGATION_PROGRAM_ID } from "../../constants";
 import { SYSTEM_PROGRAM_ADDRESS } from "@solana-program/system";
 
 /**
  * CloseEphemeralBalance instruction arguments
  */
-export type CloseEphemeralBalanceInstructionArgs = {
+export interface CloseEphemeralBalanceInstructionArgs {
   index?: number; // defaults to 255
-};
+}
 
 /**
  * Instruction: CloseEphemeralBalance
@@ -23,7 +18,7 @@ export function createCloseEphemeralBalanceInstruction(
     payer: Address;
     ephemeralBalanceAccount: Address;
   },
-  args?: CloseEphemeralBalanceInstructionArgs
+  args?: CloseEphemeralBalanceInstructionArgs,
 ): Instruction {
   const [data] = serializeCloseEphemeralBalanceInstructionData(args ?? {});
 
@@ -50,7 +45,7 @@ export function createCloseEphemeralBalanceInstruction(
 }
 
 export function serializeCloseEphemeralBalanceInstructionData(
-  args?: CloseEphemeralBalanceInstructionArgs
+  args?: CloseEphemeralBalanceInstructionArgs,
 ): [Uint8Array] {
   const discriminator = [11, 0, 0, 0, 0, 0, 0, 0];
   const data = new Uint8Array(9);

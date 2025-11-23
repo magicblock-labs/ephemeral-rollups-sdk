@@ -60,7 +60,11 @@ export async function escrowPdaFromEscrowAuthority(
   const addressEncoder = getAddressEncoder();
   const [escrowPda] = await getProgramDerivedAddress({
     programAddress: escrowAuthority,
-    seeds: [Buffer.from("balance"), addressEncoder.encode(escrowAuthority), Buffer.from([index])],
+    seeds: [
+      Buffer.from("balance"),
+      addressEncoder.encode(escrowAuthority),
+      Buffer.from([index]),
+    ],
   });
-  return escrowPda
+  return escrowPda;
 }

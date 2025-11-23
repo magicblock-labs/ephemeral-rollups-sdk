@@ -1,8 +1,5 @@
 import { Address, Instruction } from "@solana/kit";
-import { DELEGATION_PROGRAM_ID } from "../../constants";
-import {
-  createCloseEphemeralBalanceInstruction as _createCloseEphemeralBalanceInstruction,
-} from "../../generated/delegation-program-instructions";
+import { createCloseEphemeralBalanceInstruction as _createCloseEphemeralBalanceInstruction } from "../../generated/delegation-program-instructions";
 
 /**
  * Creates a closeEscrow instruction with simplified parameters.
@@ -16,7 +13,7 @@ import {
 export function createCloseEscrowInstruction(
   escrow: Address,
   escrowAuthority: Address,
-  index?: number
+  index?: number,
 ): Instruction {
   return _createCloseEphemeralBalanceInstruction(
     {
@@ -25,6 +22,6 @@ export function createCloseEscrowInstruction(
     },
     {
       index: index ?? 255,
-    }
+    },
   );
 }
