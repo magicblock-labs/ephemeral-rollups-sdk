@@ -224,7 +224,8 @@ describe("Exposed Instructions (@solana/kit)", () => {
       // Check amount (u64 at offset 8)
       const buffer = instruction.data?.buffer as ArrayBuffer | undefined;
       expect(buffer).toBeDefined();
-      const amount = new DataView(buffer, 8, 8).getBigUint64(0, true);
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+      const amount = new DataView(buffer!, 8, 8).getBigUint64(0, true);
       expect(amount).toBe(BigInt(1000000));
 
       // Check index defaults to 255 (u8 at offset 16)
@@ -242,7 +243,8 @@ describe("Exposed Instructions (@solana/kit)", () => {
       // Check amount is correctly serialized (u64 at offset 8)
       const buffer2 = instruction.data?.buffer as ArrayBuffer | undefined;
       expect(buffer2).toBeDefined();
-      const amount = new DataView(buffer2, 8, 8).getBigUint64(0, true);
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+      const amount = new DataView(buffer2!, 8, 8).getBigUint64(0, true);
       expect(amount).toBe(BigInt(1234567));
     });
 
@@ -272,7 +274,8 @@ describe("Exposed Instructions (@solana/kit)", () => {
 
       const buffer3 = instruction.data?.buffer as ArrayBuffer | undefined;
       expect(buffer3).toBeDefined();
-      const amount = new DataView(buffer3, 8, 8).getBigUint64(0, true);
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+      const amount = new DataView(buffer3!, 8, 8).getBigUint64(0, true);
       expect(amount).toBe(BigInt(0));
     });
 
@@ -288,7 +291,8 @@ describe("Exposed Instructions (@solana/kit)", () => {
 
       const buffer4 = instruction.data?.buffer as ArrayBuffer | undefined;
       expect(buffer4).toBeDefined();
-      const amount = new DataView(buffer4, 8, 8).getBigUint64(0, true);
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+      const amount = new DataView(buffer4!, 8, 8).getBigUint64(0, true);
       expect(amount).toBe(BigInt(largeAmount));
     });
 
