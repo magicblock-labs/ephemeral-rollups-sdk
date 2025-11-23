@@ -1,8 +1,6 @@
 import { PublicKey, TransactionInstruction } from "@solana/web3.js";
 import { DELEGATION_PROGRAM_ID } from "../../constants";
-import {
-  createCloseEphemeralBalanceInstruction as _createCloseEphemeralBalanceInstruction,
-} from "../../generated/delegation-program-instructions";
+import { createCloseEphemeralBalanceInstruction as _createCloseEphemeralBalanceInstruction } from "../../generated/delegation-program-instructions";
 
 /**
  * Creates a closeEscrow instruction with simplified parameters.
@@ -16,7 +14,7 @@ import {
 export function createCloseEscrowInstruction(
   escrow: PublicKey,
   escrowAuthority: PublicKey,
-  index?: number
+  index?: number,
 ): TransactionInstruction {
   return _createCloseEphemeralBalanceInstruction(
     {
@@ -26,6 +24,6 @@ export function createCloseEscrowInstruction(
     {
       index: index ?? 255,
     },
-    DELEGATION_PROGRAM_ID
+    DELEGATION_PROGRAM_ID,
   );
 }
