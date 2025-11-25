@@ -42,3 +42,44 @@ export function escrowPdaFromEscrowAuthority(
     DELEGATION_PROGRAM_ID,
   )[0];
 }
+
+export function commitStatePdaFromDelegatedAccount(
+  delegatedAccount: PublicKey,
+) {
+  return PublicKey.findProgramAddressSync(
+    [Buffer.from("state-diff"), delegatedAccount.toBytes()],
+    DELEGATION_PROGRAM_ID,
+  )[0];
+}
+
+export function commitRecordPdaFromDelegatedAccount(
+  delegatedAccount: PublicKey,
+) {
+  return PublicKey.findProgramAddressSync(
+    [Buffer.from("commit-state-record"), delegatedAccount.toBytes()],
+    DELEGATION_PROGRAM_ID,
+  )[0];
+}
+
+export function undelegateBufferPdaFromDelegatedAccount(
+  delegatedAccount: PublicKey,
+) {
+  return PublicKey.findProgramAddressSync(
+    [Buffer.from("undelegate-buffer"), delegatedAccount.toBytes()],
+    DELEGATION_PROGRAM_ID,
+  )[0];
+}
+
+export function feesVaultPda() {
+  return PublicKey.findProgramAddressSync(
+    [Buffer.from("fees-vault")],
+    DELEGATION_PROGRAM_ID,
+  )[0];
+}
+
+export function validatorFeesVaultPdaFromValidator(validator: PublicKey) {
+  return PublicKey.findProgramAddressSync(
+    [Buffer.from("v-fees-vault"), validator.toBytes()],
+    DELEGATION_PROGRAM_ID,
+  )[0];
+}

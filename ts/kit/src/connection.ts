@@ -21,6 +21,7 @@ import {
   Transaction,
   TransactionWithLifetime,
   assertIsTransactionWithBlockhashLifetime,
+  Address,
 } from "@solana/kit";
 
 import {
@@ -408,6 +409,34 @@ export class Connection {
       throw new Error("Unable to find Commitment signature");
     }
     return commitSignature;
+  }
+
+  /**
+   * Retrieves the balance of an account in lamports.
+   *
+   * @param address - The address of the account to check the balance for.
+   * @param options - Optional configuration for the RPC call.
+   * @param options.commitment - The desired commitment level (e.g., "confirmed", "finalized").
+   * @returns A `Promise<bigint>` that resolves with the balance in lamports.
+   *
+   * @throws {Error} If the account is not found or the RPC call fails.
+   *
+   * @example
+   * ```ts
+   * const balance = await connection.getBalance(address);
+   * console.log(`Balance: ${balance} lamports`);
+   * ```
+   */
+  public async getBalance(
+    address: Address,
+    options?: { commitment?: Commitment },
+  ): Promise<bigint> {
+    const result = await this.rpc
+      .getBalance(address, {
+        commitment: options?.commitment,
+      })
+      .send();
+    return BigInt(result.value);
   }
 }
 

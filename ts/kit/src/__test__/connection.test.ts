@@ -34,9 +34,11 @@ const mockRpc = {
       value: { blockhash: "blockhash", lastValidBlockHeight: 100n },
     })),
   })),
+  getBalance: vi.fn(() => ({
+    send: vi.fn(async () => ({ value: 5000000n })),
+  })),
   requestAirdrop: vi.fn(),
   getAccountInfo: vi.fn(),
-  getBalance: vi.fn(),
   getBlock: vi.fn(),
   getBlockHeight: vi.fn(),
   getMultipleAccounts: vi.fn(),
@@ -311,5 +313,26 @@ describe("Connection", () => {
     const connection = await Connection.create("http://localhost");
     const sig = await connection.getCommitmentSignature(mockSignature);
     expect(sig).toBe(mockSignature);
+  });
+
+  it("should getBalance", async () => {
+    const connection = await Connection.create("http://localhost");
+    const testAddress =
+      "11111111111111111111111111111111" as unknown as solanaKit.Address;
+    const balance = await connection.getBalance(testAddress);
+    expect(balance).toBe(5000000n);
+  });
+
+  it("should getBalance with commitment", async () => {
+    const connection = await Connection.create("http://localhost");
+    const testAddress =
+      "11111111111111111111111111111111" as unknown as solanaKit.Address;
+    const balance = await connection.getBalance(testAddress, {
+      commitment: "finalized",
+    });
+    expect(balance).toBe(5000000n);
+    expect(mockRpc.getBalance).toHaveBeenCalledWith(testAddress, {
+      commitment: "finalized",
+    });
   });
 });

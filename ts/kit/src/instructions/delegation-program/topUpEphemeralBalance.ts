@@ -1,16 +1,18 @@
-import { Address, Instruction } from "@solana/kit";
-import { createTopUpEphemeralBalanceInstruction as _createTopUpEphemeralBalanceInstruction } from "../../generated/delegation-program-instructions";
+import { Address, Instruction, AccountMeta, AccountRole } from "@solana/kit";
+import { SYSTEM_PROGRAM_ADDRESS } from "@solana-program/system";
+import { DELEGATION_PROGRAM_ID } from "../../constants";
 
 /**
- * Creates a topUpEscrow instruction with simplified parameters.
- * System program is automatically included.
- *
- * @param escrow - The escrow account
- * @param escrowAuthority - The escrowAuthority account
- * @param payer - The payer account
- * @param amount - The amount to top up
- * @param index - Optional index (defaults to 255)
- * @returns Instruction
+ * TopUpEphemeralBalance instruction arguments
+ */
+export interface TopUpEphemeralBalanceInstructionArgs {
+  amount: bigint;
+  index?: number; // defaults to 255
+}
+
+/**
+ * Instruction: TopUpEphemeralBalance
+ * Discriminator: [9,0,0,0,0,0,0,0]
  */
 export function createTopUpEscrowInstruction(
   escrow: Address,
@@ -19,15 +21,44 @@ export function createTopUpEscrowInstruction(
   amount: number,
   index?: number,
 ): Instruction {
-  return _createTopUpEphemeralBalanceInstruction(
-    {
-      payer,
-      pubkey: escrowAuthority,
-      ephemeralBalanceAccount: escrow,
-    },
-    {
-      amount: BigInt(amount),
-      index: index ?? 255,
-    },
-  );
+  const accounts: AccountMeta[] = [
+    { address: payer, role: AccountRole.WRITABLE_SIGNER },
+    { address: escrowAuthority, role: AccountRole.READONLY },
+    { address: escrow, role: AccountRole.WRITABLE },
+    { address: SYSTEM_PROGRAM_ADDRESS, role: AccountRole.READONLY },
+  ];
+
+  const [instructionData] = serializeTopUpEphemeralBalanceInstructionData({
+    amount: BigInt(amount),
+    index: index ?? 255,
+  });
+
+  return {
+    accounts,
+    data: instructionData,
+    programAddress: DELEGATION_PROGRAM_ID,
+  };
+}
+
+export function serializeTopUpEphemeralBalanceInstructionData(
+  args: TopUpEphemeralBalanceInstructionArgs,
+): [Uint8Array] {
+  const discriminator = [9, 0, 0, 0, 0, 0, 0, 0];
+  const buffer = new ArrayBuffer(17);
+  const view = new DataView(buffer);
+  let offset = 0;
+
+  // Write discriminator
+  for (let i = 0; i < 8; i++) {
+    view.setUint8(offset++, discriminator[i]);
+  }
+
+  // Write amount as u64 little-endian
+  view.setBigUint64(offset, args.amount, true);
+  offset += 8;
+
+  // Write index as u8
+  view.setUint8(offset, args.index ?? 255);
+
+  return [new Uint8Array(buffer, 0, 17)];
 }
