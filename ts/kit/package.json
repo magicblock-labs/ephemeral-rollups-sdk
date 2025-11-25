@@ -1,6 +1,6 @@
 {
   "name": "@magicblock-labs/ephemeral-rollups-kit",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "author": "MagicBlock Labs",
   "license": "MIT",
   "publishConfig": {
