@@ -1,29 +1,58 @@
-import { PublicKey, TransactionInstruction } from "@solana/web3.js";
+import {
+  PublicKey,
+  TransactionInstruction,
+  SystemProgram,
+  AccountMeta,
+} from "@solana/web3.js";
 import { DELEGATION_PROGRAM_ID } from "../../constants";
-import { createCloseEphemeralBalanceInstruction as _createCloseEphemeralBalanceInstruction } from "../../generated/delegation-program-instructions";
 
 /**
- * Creates a closeEscrow instruction with simplified parameters.
- * System program is automatically included.
- *
- * @param escrow - The escrow account
- * @param escrowAuthority - The escrowAuthority account
- * @param index - Optional index (defaults to 255)
- * @returns TransactionInstruction
+ * CloseEphemeralBalance instruction arguments
+ */
+export interface CloseEphemeralBalanceInstructionArgs {
+  index: number;
+}
+
+/**
+ * Instruction: CloseEphemeralBalance
+ * Discriminator: [11,0,0,0,0,0,0,0]
  */
 export function createCloseEscrowInstruction(
   escrow: PublicKey,
   escrowAuthority: PublicKey,
   index?: number,
 ): TransactionInstruction {
-  return _createCloseEphemeralBalanceInstruction(
-    {
-      payer: escrowAuthority,
-      ephemeralBalanceAccount: escrow,
-    },
-    {
-      index: index ?? 255,
-    },
-    DELEGATION_PROGRAM_ID,
-  );
+  const keys: AccountMeta[] = [
+    { pubkey: escrowAuthority, isWritable: false, isSigner: true },
+    { pubkey: escrow, isWritable: true, isSigner: false },
+    { pubkey: SystemProgram.programId, isWritable: false, isSigner: false },
+  ];
+
+  const instructionData = serializeCloseEphemeralBalanceInstructionData({
+    index: index ?? 255,
+  });
+
+  return new TransactionInstruction({
+    programId: DELEGATION_PROGRAM_ID,
+    keys,
+    data: instructionData,
+  });
+}
+
+export function serializeCloseEphemeralBalanceInstructionData(
+  args: CloseEphemeralBalanceInstructionArgs,
+): Buffer {
+  const discriminator = [11, 0, 0, 0, 0, 0, 0, 0];
+  const buffer = Buffer.alloc(9);
+  let offset = 0;
+
+  // Write discriminator
+  for (let i = 0; i < 8; i++) {
+    buffer[offset++] = discriminator[i];
+  }
+
+  // Write index (u8)
+  buffer[offset] = args.index;
+
+  return buffer;
 }

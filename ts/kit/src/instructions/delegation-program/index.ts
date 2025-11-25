@@ -1,6 +1,6 @@
 export {
   createDelegateInstruction,
-  type DelegateInstructionData,
+  type DelegateInstructionArgs,
 } from "./delegate";
 export { createTopUpEscrowInstruction } from "./topUpEphemeralBalance";
 export { createCloseEscrowInstruction } from "./closeEphemeralBalance";

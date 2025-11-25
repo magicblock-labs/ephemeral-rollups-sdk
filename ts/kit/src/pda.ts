@@ -68,3 +68,59 @@ export async function escrowPdaFromEscrowAuthority(
   });
   return escrowPda;
 }
+
+export async function commitStatePdaFromDelegatedAccount(
+  delegatedAccount: Address,
+) {
+  const addressEncoder = getAddressEncoder();
+  const [commitStatePda] = await getProgramDerivedAddress({
+    programAddress: DELEGATION_PROGRAM_ID,
+    seeds: [Buffer.from("state-diff"), addressEncoder.encode(delegatedAccount)],
+  });
+  return commitStatePda;
+}
+
+export async function commitRecordPdaFromDelegatedAccount(
+  delegatedAccount: Address,
+) {
+  const addressEncoder = getAddressEncoder();
+  const [commitRecordPda] = await getProgramDerivedAddress({
+    programAddress: DELEGATION_PROGRAM_ID,
+    seeds: [
+      Buffer.from("commit-state-record"),
+      addressEncoder.encode(delegatedAccount),
+    ],
+  });
+  return commitRecordPda;
+}
+
+export async function undelegateBufferPdaFromDelegatedAccount(
+  delegatedAccount: Address,
+) {
+  const addressEncoder = getAddressEncoder();
+  const [undelegateBufferPda] = await getProgramDerivedAddress({
+    programAddress: DELEGATION_PROGRAM_ID,
+    seeds: [
+      Buffer.from("undelegate-buffer"),
+      addressEncoder.encode(delegatedAccount),
+    ],
+  });
+  return undelegateBufferPda;
+}
+
+export async function feesVaultPda() {
+  const [feesVault] = await getProgramDerivedAddress({
+    programAddress: DELEGATION_PROGRAM_ID,
+    seeds: [Buffer.from("fees-vault")],
+  });
+  return feesVault;
+}
+
+export async function validatorFeesVaultPdaFromValidator(validator: Address) {
+  const addressEncoder = getAddressEncoder();
+  const [validatorFeesVault] = await getProgramDerivedAddress({
+    programAddress: DELEGATION_PROGRAM_ID,
+    seeds: [Buffer.from("v-fees-vault"), addressEncoder.encode(validator)],
+  });
+  return validatorFeesVault;
+}

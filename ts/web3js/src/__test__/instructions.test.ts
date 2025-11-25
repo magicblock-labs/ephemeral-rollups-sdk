@@ -4,9 +4,17 @@ import {
   createDelegateInstruction,
   createTopUpEscrowInstruction,
   createCloseEscrowInstruction,
-  type DelegateInstructionData,
+  type DelegateInstructionArgs,
 } from "../instructions/delegation-program";
-import { DELEGATION_PROGRAM_ID } from "../constants";
+import {
+  createCommitInstruction,
+  createCommitAndUndelegateInstruction,
+} from "../instructions/magic-program";
+import {
+  DELEGATION_PROGRAM_ID,
+  MAGIC_PROGRAM_ID,
+  MAGIC_CONTEXT_ID,
+} from "../constants";
 
 describe("Exposed Instructions (web3.js)", () => {
   const mockPublicKey = new PublicKey("11111111111111111111111111111111");
@@ -15,19 +23,17 @@ describe("Exposed Instructions (web3.js)", () => {
 
   describe("delegate instruction", () => {
     it("should create a delegate instruction with correct parameters", () => {
-      const data: DelegateInstructionData = {
+      const args: DelegateInstructionArgs = {
         commitFrequencyMs: 1000,
-        validator: mockPublicKey,
+        seeds: [],
       };
       const instruction = createDelegateInstruction(
-        mockPublicKey,
-        [new Uint8Array([1, 2, 3])],
-        mockPublicKey,
-        mockPublicKey,
-        mockPublicKey,
-        mockPublicKey,
-        mockPublicKey,
-        data,
+        {
+          payer: mockPublicKey,
+          delegatedAccount: mockPublicKey,
+          ownerProgram: mockPublicKey,
+        },
+        args,
       );
 
       expect(instruction.keys).toHaveLength(7);
@@ -39,18 +45,17 @@ describe("Exposed Instructions (web3.js)", () => {
     });
 
     it("should create a delegate instruction without validator", () => {
-      const data: DelegateInstructionData = {
+      const args: DelegateInstructionArgs = {
         commitFrequencyMs: 1000,
+        seeds: [],
       };
       const instruction = createDelegateInstruction(
-        mockPublicKey,
-        [new Uint8Array([1, 2, 3])],
-        mockPublicKey,
-        mockPublicKey,
-        mockPublicKey,
-        mockPublicKey,
-        mockPublicKey,
-        data,
+        {
+          payer: mockPublicKey,
+          delegatedAccount: mockPublicKey,
+          ownerProgram: mockPublicKey,
+        },
+        args,
       );
 
       expect(instruction.keys).toHaveLength(7);
@@ -59,18 +64,17 @@ describe("Exposed Instructions (web3.js)", () => {
     });
 
     it("should include all required account keys", () => {
-      const data: DelegateInstructionData = {
+      const args: DelegateInstructionArgs = {
         commitFrequencyMs: 1000,
+        seeds: [],
       };
       const instruction = createDelegateInstruction(
-        mockPublicKey,
-        [new Uint8Array([1, 2, 3])],
-        mockPublicKey,
-        mockPublicKey,
-        mockPublicKey,
-        mockPublicKey,
-        mockPublicKey,
-        data,
+        {
+          payer: mockPublicKey,
+          delegatedAccount: mockPublicKey,
+          ownerProgram: mockPublicKey,
+        },
+        args,
       );
 
       const keyCount = instruction.keys.length;
@@ -84,49 +88,72 @@ describe("Exposed Instructions (web3.js)", () => {
       });
     });
 
-    it("should handle null validator parameter", () => {
-      const data: DelegateInstructionData = {
+    it("should serialize validator in args when provided in accounts", () => {
+      const args: DelegateInstructionArgs = {
         commitFrequencyMs: 1000,
-        validator: null,
+        seeds: [],
       };
       const instruction = createDelegateInstruction(
-        mockPublicKey,
-        [new Uint8Array([1, 2, 3])],
-        mockPublicKey,
-        mockPublicKey,
-        mockPublicKey,
-        mockPublicKey,
-        mockPublicKey,
-        data,
+        {
+          payer: mockPublicKey,
+          delegatedAccount: mockPublicKey,
+          ownerProgram: mockPublicKey,
+          validator: mockPublicKey,
+        },
+        args,
       );
 
       expect(instruction.keys).toHaveLength(7);
       expect(instruction.data).toBeDefined();
+      // Validator should be serialized in args (1 byte discriminant + 32 bytes pubkey at the end)
+      expect(instruction.data.length).toBeGreaterThanOrEqual(
+        8 + 4 + 4 + 1 + 32,
+      );
+    });
+
+    it("should allow validator override via args", () => {
+      const validatorFromArgs = new PublicKey(
+        "11111111111111111111111111111112",
+      );
+      const instruction = createDelegateInstruction(
+        {
+          payer: mockPublicKey,
+          delegatedAccount: mockPublicKey,
+          ownerProgram: mockPublicKey,
+          validator: mockPublicKey,
+        },
+        {
+          commitFrequencyMs: 1000,
+          seeds: [],
+          validator: validatorFromArgs,
+        },
+      );
+
+      expect(instruction.keys).toHaveLength(7);
+      // Args validator should override accounts validator
+      expect(instruction.data).toBeDefined();
     });
 
     it("should support different account addresses", () => {
-      const data: DelegateInstructionData = {
+      const args: DelegateInstructionArgs = {
         commitFrequencyMs: 1000,
+        seeds: [],
       };
       const instruction1 = createDelegateInstruction(
-        mockPublicKey,
-        [new Uint8Array([1, 2, 3])],
-        mockPublicKey,
-        mockPublicKey,
-        mockPublicKey,
-        mockPublicKey,
-        mockPublicKey,
-        data,
+        {
+          payer: mockPublicKey,
+          delegatedAccount: mockPublicKey,
+          ownerProgram: mockPublicKey,
+        },
+        args,
       );
       const instruction2 = createDelegateInstruction(
-        differentKey,
-        [new Uint8Array([1, 2, 3])],
-        mockPublicKey,
-        mockPublicKey,
-        mockPublicKey,
-        mockPublicKey,
-        mockPublicKey,
-        data,
+        {
+          payer: mockPublicKey,
+          delegatedAccount: differentKey,
+          ownerProgram: mockPublicKey,
+        },
+        args,
       );
 
       // Both should be valid instructions but with different account references
@@ -138,62 +165,106 @@ describe("Exposed Instructions (web3.js)", () => {
       const frequencies = [0, 1000, 5000, 60000];
 
       frequencies.forEach((freq) => {
-        const data: DelegateInstructionData = {
+        const args: DelegateInstructionArgs = {
           commitFrequencyMs: freq,
+          seeds: [],
         };
         const instruction = createDelegateInstruction(
-          mockPublicKey,
-          [new Uint8Array([1, 2, 3])],
-          mockPublicKey,
-          mockPublicKey,
-          mockPublicKey,
-          mockPublicKey,
-          mockPublicKey,
-          data,
+          {
+            payer: mockPublicKey,
+            delegatedAccount: mockPublicKey,
+            ownerProgram: mockPublicKey,
+          },
+          args,
         );
 
         expect(instruction.data).toBeDefined();
       });
     });
 
+    it("should use default commitFrequencyMs when args not provided", () => {
+      const instruction = createDelegateInstruction({
+        payer: mockPublicKey,
+        delegatedAccount: mockPublicKey,
+        ownerProgram: mockPublicKey,
+      });
+
+      expect(instruction.data).toBeDefined();
+      expect(instruction.keys).toHaveLength(7);
+      expect(instruction.programId.toBase58()).toBe(
+        DELEGATION_PROGRAM_ID.toBase58(),
+      );
+    });
+
     it("should handle multiple seeds", () => {
-      const data: DelegateInstructionData = {
+      const args: DelegateInstructionArgs = {
         commitFrequencyMs: 1000,
+        seeds: [new Uint8Array([1, 2, 3]), new Uint8Array([4, 5, 6])],
       };
       const instruction = createDelegateInstruction(
-        mockPublicKey,
-        [
-          new Uint8Array([1, 2, 3]),
-          new Uint8Array([4, 5, 6]),
-          new Uint8Array([7, 8, 9]),
-        ],
-        mockPublicKey,
-        mockPublicKey,
-        mockPublicKey,
-        mockPublicKey,
-        mockPublicKey,
-        data,
+        {
+          payer: mockPublicKey,
+          delegatedAccount: mockPublicKey,
+          ownerProgram: mockPublicKey,
+        },
+        args,
       );
 
       expect(instruction.data).toBeDefined();
     });
 
-    it("should handle empty seeds array", () => {
-      const data: DelegateInstructionData = {
+    it("should serialize commitFrequencyMs as u32", () => {
+      const args: DelegateInstructionArgs = {
         commitFrequencyMs: 1000,
+        seeds: [],
       };
       const instruction = createDelegateInstruction(
-        mockPublicKey,
-        [],
-        mockPublicKey,
-        mockPublicKey,
-        mockPublicKey,
-        mockPublicKey,
-        mockPublicKey,
-        data,
+        {
+          payer: mockPublicKey,
+          delegatedAccount: mockPublicKey,
+          ownerProgram: mockPublicKey,
+        },
+        args,
       );
 
       expect(instruction.data).toBeDefined();
+      // Discriminator: 8 bytes, commitFrequencyMs: 4 bytes (u32), seeds length: 4 bytes
+      const minSize = 8 + 4 + 4;
+      expect(instruction.data.length).toBeGreaterThanOrEqual(minSize);
+
+      // Check commitFrequencyMs value at offset 8
+      expect(instruction.data.readUInt32LE(8)).toBe(1000);
+    });
+
+    it("should serialize with default commitFrequencyMs as max u32", () => {
+      const instruction = createDelegateInstruction({
+        payer: mockPublicKey,
+        delegatedAccount: mockPublicKey,
+        ownerProgram: mockPublicKey,
+      });
+
+      expect(instruction.data).toBeDefined();
+      // Check default commitFrequencyMs (0xffffffff) at offset 8
+      expect(instruction.data.readUInt32LE(8)).toBe(0xffffffff);
+    });
+
+    it("should serialize seeds array correctly", () => {
+      const args: DelegateInstructionArgs = {
+        commitFrequencyMs: 1000,
+        seeds: [new Uint8Array([1, 2, 3]), new Uint8Array([4, 5, 6])],
+      };
+      const instruction = createDelegateInstruction(
+        {
+          payer: mockPublicKey,
+          delegatedAccount: mockPublicKey,
+          ownerProgram: mockPublicKey,
+        },
+        args,
+      );
+
+      expect(instruction.data).toBeDefined();
+      // Offset 12 should have seeds array length = 2
+      expect(instruction.data.readUInt32LE(12)).toBe(2);
     });
   });
 
@@ -420,18 +491,17 @@ describe("Exposed Instructions (web3.js)", () => {
 
   describe("Cross-instruction consistency", () => {
     it("should all target the same delegation program", () => {
-      const delegateData: DelegateInstructionData = {
+      const delegateArgs: DelegateInstructionArgs = {
         commitFrequencyMs: 1000,
+        seeds: [],
       };
       const delegateInstr = createDelegateInstruction(
-        mockPublicKey,
-        [],
-        mockPublicKey,
-        mockPublicKey,
-        mockPublicKey,
-        mockPublicKey,
-        mockPublicKey,
-        delegateData,
+        {
+          payer: mockPublicKey,
+          delegatedAccount: mockPublicKey,
+          ownerProgram: mockPublicKey,
+        },
+        delegateArgs,
       );
 
       const topUpInstr = createTopUpEscrowInstruction(
@@ -450,6 +520,201 @@ describe("Exposed Instructions (web3.js)", () => {
       expect(delegateInstr.programId.toBase58()).toBe(programId);
       expect(topUpInstr.programId.toBase58()).toBe(programId);
       expect(closeInstr.programId.toBase58()).toBe(programId);
+    });
+  });
+
+  describe("scheduleCommit instruction (Magic Program)", () => {
+    it("should create a scheduleCommit instruction with required parameters", () => {
+      const instruction = createCommitInstruction(mockPublicKey, [
+        mockPublicKey,
+      ]);
+
+      expect(instruction.keys).toHaveLength(3);
+      expect(instruction.data).toBeDefined();
+      expect(instruction.data.length).toBe(4);
+      expect(instruction.programId.toBase58()).toBe(
+        MAGIC_PROGRAM_ID.toBase58(),
+      );
+    });
+
+    it("should have correct discriminator", () => {
+      const instruction = createCommitInstruction(mockPublicKey, [
+        mockPublicKey,
+      ]);
+
+      // Discriminator should be [1,0,0,0] for scheduleCommit
+      expect(instruction.data.readUInt32LE(0)).toBe(1);
+    });
+
+    it("should include payer as signer and writable", () => {
+      const instruction = createCommitInstruction(mockPublicKey, [
+        mockPublicKey,
+      ]);
+
+      expect(instruction.keys[0].pubkey.toBase58()).toBe(
+        mockPublicKey.toBase58(),
+      );
+      expect(instruction.keys[0].isSigner).toBe(true);
+      expect(instruction.keys[0].isWritable).toBe(true);
+    });
+
+    it("should include magic context as writable", () => {
+      const instruction = createCommitInstruction(mockPublicKey, [
+        mockPublicKey,
+      ]);
+
+      expect(instruction.keys[1].pubkey.toBase58()).toBe(
+        MAGIC_CONTEXT_ID.toBase58(),
+      );
+      expect(instruction.keys[1].isSigner).toBe(false);
+      expect(instruction.keys[1].isWritable).toBe(true);
+    });
+
+    it("should include accounts to commit as readonly", () => {
+      const accountsToCommit = [
+        new PublicKey("11111111111111111111111111111113"),
+        new PublicKey("11111111111111111111111111111114"),
+      ];
+      const instruction = createCommitInstruction(
+        mockPublicKey,
+        accountsToCommit,
+      );
+
+      expect(instruction.keys).toHaveLength(4);
+      expect(instruction.keys[2].pubkey.toBase58()).toBe(
+        accountsToCommit[0].toBase58(),
+      );
+      expect(instruction.keys[2].isSigner).toBe(false);
+      expect(instruction.keys[2].isWritable).toBe(false);
+      expect(instruction.keys[3].pubkey.toBase58()).toBe(
+        accountsToCommit[1].toBase58(),
+      );
+    });
+
+    it("should handle single account to commit", () => {
+      const instruction = createCommitInstruction(mockPublicKey, [
+        differentKey,
+      ]);
+
+      expect(instruction.keys).toHaveLength(3);
+      expect(instruction.keys[2].pubkey.toBase58()).toBe(
+        differentKey.toBase58(),
+      );
+    });
+
+    it("should handle multiple accounts to commit", () => {
+      const accounts = [
+        new PublicKey("11111111111111111111111111111113"),
+        new PublicKey("11111111111111111111111111111114"),
+        new PublicKey("11111111111111111111111111111115"),
+      ];
+      const instruction = createCommitInstruction(mockPublicKey, accounts);
+
+      expect(instruction.keys).toHaveLength(5);
+      accounts.forEach((account, index) => {
+        expect(instruction.keys[2 + index].pubkey.toBase58()).toBe(
+          account.toBase58(),
+        );
+      });
+    });
+  });
+
+  describe("scheduleCommitAndUndelegate instruction (Magic Program)", () => {
+    it("should create a scheduleCommitAndUndelegate instruction with required parameters", () => {
+      const instruction = createCommitAndUndelegateInstruction(mockPublicKey, [
+        mockPublicKey,
+      ]);
+
+      expect(instruction.keys).toHaveLength(3);
+      expect(instruction.data).toBeDefined();
+      expect(instruction.data.length).toBe(4);
+      expect(instruction.programId.toBase58()).toBe(
+        MAGIC_PROGRAM_ID.toBase58(),
+      );
+    });
+
+    it("should have correct discriminator", () => {
+      const instruction = createCommitAndUndelegateInstruction(mockPublicKey, [
+        mockPublicKey,
+      ]);
+
+      // Discriminator should be [2,0,0,0] for scheduleCommitAndUndelegate
+      expect(instruction.data.readUInt32LE(0)).toBe(2);
+    });
+
+    it("should include payer as signer and writable", () => {
+      const instruction = createCommitAndUndelegateInstruction(mockPublicKey, [
+        mockPublicKey,
+      ]);
+
+      expect(instruction.keys[0].pubkey.toBase58()).toBe(
+        mockPublicKey.toBase58(),
+      );
+      expect(instruction.keys[0].isSigner).toBe(true);
+      expect(instruction.keys[0].isWritable).toBe(true);
+    });
+
+    it("should include magic context as writable", () => {
+      const instruction = createCommitAndUndelegateInstruction(mockPublicKey, [
+        mockPublicKey,
+      ]);
+
+      expect(instruction.keys[1].pubkey.toBase58()).toBe(
+        MAGIC_CONTEXT_ID.toBase58(),
+      );
+      expect(instruction.keys[1].isSigner).toBe(false);
+      expect(instruction.keys[1].isWritable).toBe(true);
+    });
+
+    it("should include accounts to commit and undelegate as readonly", () => {
+      const accountsToCommitAndUndelegate = [
+        new PublicKey("11111111111111111111111111111113"),
+        new PublicKey("11111111111111111111111111111114"),
+      ];
+      const instruction = createCommitAndUndelegateInstruction(
+        mockPublicKey,
+        accountsToCommitAndUndelegate,
+      );
+
+      expect(instruction.keys).toHaveLength(4);
+      expect(instruction.keys[2].pubkey.toBase58()).toBe(
+        accountsToCommitAndUndelegate[0].toBase58(),
+      );
+      expect(instruction.keys[2].isSigner).toBe(false);
+      expect(instruction.keys[2].isWritable).toBe(false);
+      expect(instruction.keys[3].pubkey.toBase58()).toBe(
+        accountsToCommitAndUndelegate[1].toBase58(),
+      );
+    });
+
+    it("should handle single account to commit and undelegate", () => {
+      const instruction = createCommitAndUndelegateInstruction(mockPublicKey, [
+        differentKey,
+      ]);
+
+      expect(instruction.keys).toHaveLength(3);
+      expect(instruction.keys[2].pubkey.toBase58()).toBe(
+        differentKey.toBase58(),
+      );
+    });
+
+    it("should handle multiple accounts to commit and undelegate", () => {
+      const accounts = [
+        new PublicKey("11111111111111111111111111111113"),
+        new PublicKey("11111111111111111111111111111114"),
+        new PublicKey("11111111111111111111111111111115"),
+      ];
+      const instruction = createCommitAndUndelegateInstruction(
+        mockPublicKey,
+        accounts,
+      );
+
+      expect(instruction.keys).toHaveLength(5);
+      accounts.forEach((account, index) => {
+        expect(instruction.keys[2 + index].pubkey.toBase58()).toBe(
+          account.toBase58(),
+        );
+      });
     });
   });
 });
