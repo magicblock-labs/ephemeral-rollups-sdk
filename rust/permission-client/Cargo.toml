@@ -1,0 +1,31 @@
+[package]
+name = "magicblock-permission-client"
+description = "A Rust client for the MagicBlock Permission Program"
+version = { workspace = true }
+authors = { workspace = true }
+repository = { workspace = true }
+documentation = { workspace = true }
+homepage = { workspace = true }
+keywords = { workspace = true }
+readme = "README.md"
+license = { workspace = true }
+edition = { workspace = true }
+
+[lib]
+crate-type = ["lib"]
+
+[features]
+serde = ["dep:serde", "dep:serde_with"]
+anchor = []
+
+[dependencies]
+borsh = { workspace = true }
+num-derive = { workspace = true }
+num-traits = { workspace = true }
+serde = { workspace = true, features = ["derive"], optional = true }
+serde_with = { workspace = true, optional = true }
+solana-program = { workspace = true }
+thiserror = { workspace = true }
+
+[lints.rust.non_local_definitions]
+level = "allow"
