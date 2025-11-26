@@ -1,6 +1,6 @@
 import { Address } from "@solana/kit";
 
-interface PermissionStatusResponse {
+export interface PermissionStatusResponse {
   authorizedUsers?: string[];
 }
 

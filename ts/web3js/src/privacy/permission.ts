@@ -1,6 +1,6 @@
 import { PublicKey } from "@solana/web3.js";
 
-interface PermissionStatusResponse {
+export interface PermissionStatusResponse {
   authorizedUsers?: string[];
 }
 
