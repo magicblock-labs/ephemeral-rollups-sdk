@@ -3,8 +3,8 @@
 A Rust client SDK for interacting with the MagicBlock Permission Program on Solana. This crate provides type-safe bindings for permission management, including creating and managing permission groups and individual permissions.
 
 - **Crate**: `magicblock-permission-client`
-- **Docs**: [https://docs.magicblock.gg/](https://docs.magicblock.gg/)
-- **Repository**: https://github.com/magicblock-labs/magicblock-permission-program
+- **Docs**: <https://docs.magicblock.gg/pages/private-ephemeral-rollups-pers/how-to-guide/quickstart>
+- **Repository**: <https://github.com/magicblock-labs/magicblock-permission-program>
 
 ## Features
 
