@@ -40,14 +40,15 @@ export async function getPermissionStatus(
 export async function waitUntilPermissionGranted(
   rpcUrl: string,
   publicKey: Address,
-  timeout: number = 5000
-): Promise<void> {
+  timeout?: number
+): Promise<boolean> {
   const startTime = Date.now();
-  while (Date.now() - startTime < timeout) {
+  while (Date.now() - startTime < (timeout || 30000)) {
     const { authorizedUsers } = await getPermissionStatus(rpcUrl, publicKey);
     if (!!authorizedUsers) {
-      return;
+      return true;
     }
     await new Promise((resolve) => setTimeout(resolve, 400));
   }
+  return false;
 }
