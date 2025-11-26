@@ -11,9 +11,6 @@ readme = "README.md"
 license = { workspace = true }
 edition = { workspace = true }
 
-[lib]
-crate-type = ["lib"]
-
 [features]
 serde = ["dep:serde", "dep:serde_with"]
 anchor = []
