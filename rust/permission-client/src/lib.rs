@@ -12,7 +12,7 @@ use crate::generated::instructions::{
 };
 
 impl Group {
-    pub const LEN: usize = 1 + 1 + 32 + 32 * 32;
+    pub const LEN: usize = 1 + 1 + 4 + 32 * 32;
     pub const DISCRIMINATOR: u8 = 1;
 }
 
