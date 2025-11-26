@@ -61,7 +61,7 @@ export async function waitUntilPermissionGranted(
         return true;
       }
     } catch (error) {
-      return false;
+      console.error(error);
     }
     await new Promise((resolve) => setTimeout(resolve, 400));
   }
