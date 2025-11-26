@@ -55,9 +55,13 @@ export async function waitUntilPermissionGranted(
 ): Promise<boolean> {
   const startTime = Date.now();
   while (Date.now() - startTime < (timeout || 30000)) {
-    const { authorizedUsers } = await getPermissionStatus(rpcUrl, publicKey);
-    if (!!authorizedUsers) {
-      return true;
+    try {
+      const { authorizedUsers } = await getPermissionStatus(rpcUrl, publicKey);
+      if (!!authorizedUsers) {
+        return true;
+      }
+    } catch (error) {
+      return false;
     }
     await new Promise((resolve) => setTimeout(resolve, 400));
   }
