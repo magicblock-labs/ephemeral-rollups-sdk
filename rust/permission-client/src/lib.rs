@@ -7,7 +7,7 @@ use generated::instructions::CreateGroupInstructionArgs;
 pub use generated::programs::MAGICBLOCK_PERMISSION_PROGRAM_ID as ID;
 pub use generated::*;
 
-use crate::generated::instructions::{
+use generated::instructions::{
     CreateGroupInstructionData, CreatePermissionInstructionData, UpdatePermissionInstructionData,
 };
 
