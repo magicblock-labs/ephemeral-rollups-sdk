@@ -23,11 +23,22 @@ export async function getPermissionStatus(
   } else {
     url = `${baseUrl}/permission?pubkey=${publicKey.toString()}`;
   }
-  const permissionStatusResponse = await fetch(url);
-  const response: PermissionStatusResponse =
-    await permissionStatusResponse.json();
 
-  return response;
+  try {
+    const permissionStatusResponse = await fetch(url);
+    if (!permissionStatusResponse.ok) {
+      throw new Error(
+        `Permission status request failed: ${permissionStatusResponse.statusText}`
+      );
+    }
+    const response: PermissionStatusResponse =
+      await permissionStatusResponse.json();
+    return response;
+  } catch (error) {
+    throw new Error(
+      `Failed to get permission status: ${error instanceof Error ? error.message : String(error)}`
+    );
+  }
 }
 
 /**
