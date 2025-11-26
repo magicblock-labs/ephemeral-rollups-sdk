@@ -8,7 +8,7 @@ interface PermissionStatusResponse {
  * Get the auth token for a given public key
  * @param rpcUrl - The URL of the RPC server
  * @param publicKey - The public key of the user
- * @returns The auth token
+ * @returns The permission status response
  */
 export async function getPermissionStatus(
   rpcUrl: string,
