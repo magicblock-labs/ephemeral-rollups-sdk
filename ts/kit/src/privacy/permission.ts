@@ -14,10 +14,16 @@ export async function getPermissionStatus(
   rpcUrl: string,
   publicKey: Address
 ): Promise<PermissionStatusResponse> {
-  // Getting the challenge from the RPC
-  const permissionStatusResponse = await fetch(
-    `${rpcUrl}/permission?pubkey=${publicKey.toString()}`
-  );
+  // Build the route from the provided RPC URL
+  // Handle the provided token
+  let [baseUrl, token] = rpcUrl.replace("/?", "?").split("?");
+  let url;
+  if (token) {
+    url = `${baseUrl}/permission?${token}&pubkey=${publicKey.toString()}`;
+  } else {
+    url = `${baseUrl}/permission?pubkey=${publicKey.toString()}`;
+  }
+  const permissionStatusResponse = await fetch(url);
   const response: PermissionStatusResponse =
     await permissionStatusResponse.json();
 
@@ -39,6 +45,7 @@ export async function waitUntilPermissionGranted(
   const startTime = Date.now();
   while (Date.now() - startTime < timeout) {
     const { authorizedUsers } = await getPermissionStatus(rpcUrl, publicKey);
+    console.log("authorizedUsers", authorizedUsers);
     if (!!authorizedUsers) {
       return;
     }
