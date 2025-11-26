@@ -45,7 +45,6 @@ export async function waitUntilPermissionGranted(
   const startTime = Date.now();
   while (Date.now() - startTime < timeout) {
     const { authorizedUsers } = await getPermissionStatus(rpcUrl, publicKey);
-    console.log("authorizedUsers", authorizedUsers);
     if (!!authorizedUsers) {
       return;
     }
