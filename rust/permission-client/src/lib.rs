@@ -1,4 +1,4 @@
-#[allow(deprecated)]
+#[allow(deprecated, clippy::all)]
 mod generated;
 
 use borsh::{BorshDeserialize, BorshSerialize};
