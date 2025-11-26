@@ -30,7 +30,7 @@ Or from crates.io (when published):
 
 ```toml
 [dependencies]
-magicblock-permission-client = "0.1.0"
+magicblock-permission-client = "0.6.0"
 ```
 
 ## Usage
