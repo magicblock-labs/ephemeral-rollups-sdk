@@ -42,13 +42,13 @@ export async function getPermissionStatus(
 }
 
 /**
- * Wait until the permission is granted for a given public key
+ * Wait until the permission is active for a given public key
  * @param rpcUrl - The URL of the RPC server
  * @param publicKey - The public key of the user
  * @param timeout - The timeout in milliseconds
- * @returns True if the permission is granted, false otherwise
+ * @returns True if the permission is active, false otherwise
  */
-export async function waitUntilPermissionGranted(
+export async function waitUntilPermissionActive(
   rpcUrl: string,
   publicKey: PublicKey,
   timeout?: number,
