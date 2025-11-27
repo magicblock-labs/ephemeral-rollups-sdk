@@ -12,7 +12,7 @@ use crate::types::DelegateAccountArgs;
 use crate::utils::{cpi_delegate, make_seed_buf};
 use crate::{consts::BUFFER, types::DelegateConfig, utils::close_pda_acc};
 
-#[allow(clippy::cloned_ref_to_slice_refs)]
+#[allow(unknown_lints, clippy::cloned_ref_to_slice_refs)]
 pub fn delegate_account(
     accounts: &[&AccountInfo],
     seeds: &[&[u8]],
