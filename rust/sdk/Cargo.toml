@@ -14,6 +14,7 @@ readme = "README.md"
 [features]
 default = ["solana-program", "solana-system-interface"]
 anchor = ["anchor-lang"]
+access-control = ["magicblock-permission-client"]
 disable-realloc = []
 modular-sdk = [
     "solana-account",
@@ -45,6 +46,7 @@ solana-system-interface = { workspace = true, optional = true }
 solana-sysvar = { workspace = true, optional = true }
 magicblock-magic-program-api = { workspace = true }
 magicblock-delegation-program  = { workspace = true, features = ["no-entrypoint", "core"], default-features = false }
+magicblock-permission-client = { workspace = true, optional = true }
 
 # Fix for older toolchain
 base64ct = { workspace = true }

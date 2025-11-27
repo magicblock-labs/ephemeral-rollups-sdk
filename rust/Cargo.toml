@@ -7,7 +7,7 @@ members = [
 	"action-attribute",
 	"resolver",
 	"pinocchio",
-	"permission-client",
+	"access-control",
 ]
 
 resolver = "2"
@@ -29,6 +29,7 @@ ephemeral-rollups-sdk-attribute-ephemeral = { path = "ephemeral", version = "=0.
 ephemeral-rollups-sdk-attribute-delegate = { path = "delegate", version = "=0.6.0" }
 ephemeral-rollups-sdk-attribute-commit = { path = "commit-attribute", version = "=0.6.0" }
 ephemeral-rollups-sdk-attribute-action = { path = "action-attribute", version = "=0.6.0" }
+magicblock-permission-client = { path = "access-control", version = "=0.6.0" }
 
 # Magicblock
 magicblock-delegation-program = { version = "1.1.3", features = [

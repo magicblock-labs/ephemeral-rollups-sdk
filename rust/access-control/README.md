@@ -23,7 +23,7 @@ Add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-magicblock-permission-client = { path = "../permission-client" }
+magicblock-permission-client = { path = "../access-control" }
 ```
 
 Or from crates.io (when published):
