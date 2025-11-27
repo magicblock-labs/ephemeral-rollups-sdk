@@ -9,6 +9,7 @@ import { PERMISSION_PROGRAM_ID } from "../../constants";
 /**
  * CreatePermission instruction arguments
  */
+// eslint-disable-next-line @typescript-eslint/no-empty-interface
 export interface CreatePermissionInstructionArgs {}
 
 /**

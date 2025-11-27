@@ -12,11 +12,11 @@ export interface PermissionStatusResponse {
  */
 export async function getPermissionStatus(
   rpcUrl: string,
-  publicKey: PublicKey
+  publicKey: PublicKey,
 ): Promise<PermissionStatusResponse> {
   // Build the route from the provided RPC URL
   // Handle the provided token
-  let [baseUrl, token] = rpcUrl.replace("/?", "?").split("?");
+  const [baseUrl, token] = rpcUrl.replace("/?", "?").split("?");
   let url;
   if (token) {
     url = `${baseUrl}/permission?${token}&pubkey=${publicKey.toString()}`;
@@ -28,7 +28,7 @@ export async function getPermissionStatus(
     const permissionStatusResponse = await fetch(url);
     if (!permissionStatusResponse.ok) {
       throw new Error(
-        `Permission status request failed: ${permissionStatusResponse.statusText}`
+        `Permission status request failed: ${permissionStatusResponse.statusText}`,
       );
     }
     const response: PermissionStatusResponse =
@@ -36,7 +36,7 @@ export async function getPermissionStatus(
     return response;
   } catch (error) {
     throw new Error(
-      `Failed to get permission status: ${error instanceof Error ? error.message : String(error)}`
+      `Failed to get permission status: ${error instanceof Error ? error.message : String(error)}`,
     );
   }
 }
@@ -51,19 +51,22 @@ export async function getPermissionStatus(
 export async function waitUntilPermissionGranted(
   rpcUrl: string,
   publicKey: PublicKey,
-  timeout?: number
+  timeout?: number,
 ): Promise<boolean> {
   const startTime = Date.now();
-  while (Date.now() - startTime < (timeout || 30000)) {
+  const timeoutMs = timeout ?? 30000;
+  while (Date.now() - startTime < timeoutMs) {
     try {
       const { authorizedUsers } = await getPermissionStatus(rpcUrl, publicKey);
-      if (!!authorizedUsers) {
+      if (authorizedUsers && authorizedUsers.length > 0) {
         return true;
       }
     } catch (error) {
       console.error(error);
     }
-    await new Promise((resolve) => setTimeout(resolve, 400));
+    await new Promise((resolve) => {
+      setTimeout(resolve, 400);
+    });
   }
   return false;
 }

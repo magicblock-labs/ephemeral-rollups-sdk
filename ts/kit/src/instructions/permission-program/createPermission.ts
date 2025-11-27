@@ -1,15 +1,11 @@
-import {
-  Address,
-  Instruction,
-  AccountMeta,
-  AccountRole,
-} from "@solana/kit";
+import { Address, Instruction, AccountMeta, AccountRole } from "@solana/kit";
 import { SYSTEM_PROGRAM_ADDRESS } from "@solana-program/system";
 import { PERMISSION_PROGRAM_ID } from "../../constants";
 
 /**
  * CreatePermission instruction arguments
  */
+// eslint-disable-next-line @typescript-eslint/no-empty-interface
 export interface CreatePermissionInstructionArgs {}
 
 /**
