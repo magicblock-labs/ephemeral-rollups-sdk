@@ -10,3 +10,7 @@ export const MAGIC_PROGRAM_ID = address(
 export const MAGIC_CONTEXT_ID = address(
   "MagicContext1111111111111111111111111111111",
 );
+
+export const PERMISSION_PROGRAM_ID = address(
+  "BTWAqWNBmF2TboMh3fxMJfgR16xGHYD7Kgr2dPwbRPBi",
+);

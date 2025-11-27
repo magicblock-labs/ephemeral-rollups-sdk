@@ -8,6 +8,8 @@ mod solana_compat;
 pub mod types;
 pub mod utils;
 
+pub mod access_control;
+
 pub use dlp::args::CallHandlerArgs;
 pub use dlp::pda;
 pub use dlp::{

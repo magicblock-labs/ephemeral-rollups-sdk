@@ -85,6 +85,7 @@ jobs:
             cargo publish $DRY_RUN_FLAG --manifest-path=sdk/Cargo.toml --token $CRATES_TOKEN $NO_VERIFY_FLAG
             cargo publish $DRY_RUN_FLAG --manifest-path=resolver/Cargo.toml --token $CRATES_TOKEN $NO_VERIFY_FLAG
             cargo publish $DRY_RUN_FLAG --manifest-path=pinocchio/Cargo.toml --token $CRATES_TOKEN $NO_VERIFY_FLAG
+            cargo publish $DRY_RUN_FLAG --manifest-path=access-control/Cargo.toml --token $CRATES_TOKEN $NO_VERIFY_FLAG
           fi
         env:
           CRATES_TOKEN: ${{ secrets.CRATES_TOKEN }}

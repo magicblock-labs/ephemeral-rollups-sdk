@@ -3,8 +3,17 @@ import {
   getAddressEncoder,
   getProgramDerivedAddress,
 } from "@solana/kit";
-import { DELEGATION_PROGRAM_ID } from "./constants";
+import { DELEGATION_PROGRAM_ID, PERMISSION_PROGRAM_ID } from "./constants";
 
+// ============================================================================
+// Delegation Program PDAs
+// ============================================================================
+
+/**
+ * Derives the delegation record PDA for a given delegated account
+ * @param delegatedAccount - The delegated account address
+ * @returns The delegation record PDA
+ */
 export async function delegationRecordPdaFromDelegatedAccount(
   delegatedAccount: Address,
 ) {
@@ -16,6 +25,11 @@ export async function delegationRecordPdaFromDelegatedAccount(
   return delegationRecordPda;
 }
 
+/**
+ * Derives the delegation metadata PDA for a given delegated account
+ * @param delegatedAccount - The delegated account address
+ * @returns The delegation metadata PDA
+ */
 export async function delegationMetadataPdaFromDelegatedAccount(
   delegatedAccount: Address,
 ) {
@@ -31,6 +45,12 @@ export async function delegationMetadataPdaFromDelegatedAccount(
   return delegationMetadataPda;
 }
 
+/**
+ * Derives the delegate buffer PDA for a given delegated account and owner program
+ * @param delegatedAccount - The delegated account address
+ * @param ownerProgramId - The owner program ID
+ * @returns The delegate buffer PDA
+ */
 export async function delegateBufferPdaFromDelegatedAccountAndOwnerProgram(
   delegatedAccount: Address,
   ownerProgramId: Address,
@@ -44,11 +64,10 @@ export async function delegateBufferPdaFromDelegatedAccountAndOwnerProgram(
 }
 
 /**
- * Derives the escrow PDA from a payer address
- * @param payer The payer address
- * @param index The index of the ephemeral balance account
- * @param programId The delegation program ID
- * @returns The derived ephemeral balance PDA
+ * Derives the escrow PDA from an escrow authority address
+ * @param escrowAuthority - The escrow authority address
+ * @param index - The index of the ephemeral balance account (0-255)
+ * @returns The escrow PDA
  */
 export async function escrowPdaFromEscrowAuthority(
   escrowAuthority: Address,
@@ -69,31 +88,11 @@ export async function escrowPdaFromEscrowAuthority(
   return escrowPda;
 }
 
-export async function commitStatePdaFromDelegatedAccount(
-  delegatedAccount: Address,
-) {
-  const addressEncoder = getAddressEncoder();
-  const [commitStatePda] = await getProgramDerivedAddress({
-    programAddress: DELEGATION_PROGRAM_ID,
-    seeds: [Buffer.from("state-diff"), addressEncoder.encode(delegatedAccount)],
-  });
-  return commitStatePda;
-}
-
-export async function commitRecordPdaFromDelegatedAccount(
-  delegatedAccount: Address,
-) {
-  const addressEncoder = getAddressEncoder();
-  const [commitRecordPda] = await getProgramDerivedAddress({
-    programAddress: DELEGATION_PROGRAM_ID,
-    seeds: [
-      Buffer.from("commit-state-record"),
-      addressEncoder.encode(delegatedAccount),
-    ],
-  });
-  return commitRecordPda;
-}
-
+/**
+ * Derives the undelegate buffer PDA for a given delegated account
+ * @param delegatedAccount - The delegated account address
+ * @returns The undelegate buffer PDA
+ */
 export async function undelegateBufferPdaFromDelegatedAccount(
   delegatedAccount: Address,
 ) {
@@ -108,6 +107,10 @@ export async function undelegateBufferPdaFromDelegatedAccount(
   return undelegateBufferPda;
 }
 
+/**
+ * Derives the fees vault PDA
+ * @returns The fees vault PDA
+ */
 export async function feesVaultPda() {
   const [feesVault] = await getProgramDerivedAddress({
     programAddress: DELEGATION_PROGRAM_ID,
@@ -116,6 +119,11 @@ export async function feesVaultPda() {
   return feesVault;
 }
 
+/**
+ * Derives the validator fees vault PDA for a given validator
+ * @param validator - The validator address
+ * @returns The validator fees vault PDA
+ */
 export async function validatorFeesVaultPdaFromValidator(validator: Address) {
   const addressEncoder = getAddressEncoder();
   const [validatorFeesVault] = await getProgramDerivedAddress({
@@ -123,4 +131,74 @@ export async function validatorFeesVaultPdaFromValidator(validator: Address) {
     seeds: [Buffer.from("v-fees-vault"), addressEncoder.encode(validator)],
   });
   return validatorFeesVault;
+}
+
+/**
+ * Derives the commit state PDA for a given delegated account
+ * @param delegatedAccount - The delegated account address
+ * @returns The commit state PDA
+ */
+export async function commitStatePdaFromDelegatedAccount(
+  delegatedAccount: Address,
+) {
+  const addressEncoder = getAddressEncoder();
+  const [commitStatePda] = await getProgramDerivedAddress({
+    programAddress: DELEGATION_PROGRAM_ID,
+    seeds: [Buffer.from("state-diff"), addressEncoder.encode(delegatedAccount)],
+  });
+  return commitStatePda;
+}
+
+/**
+ * Derives the commit record PDA for a given delegated account
+ * @param delegatedAccount - The delegated account address
+ * @returns The commit record PDA
+ */
+export async function commitRecordPdaFromDelegatedAccount(
+  delegatedAccount: Address,
+) {
+  const addressEncoder = getAddressEncoder();
+  const [commitRecordPda] = await getProgramDerivedAddress({
+    programAddress: DELEGATION_PROGRAM_ID,
+    seeds: [
+      Buffer.from("commit-state-record"),
+      addressEncoder.encode(delegatedAccount),
+    ],
+  });
+  return commitRecordPda;
+}
+
+// ============================================================================
+// Permission Program PDAs
+// ============================================================================
+
+const PERMISSION_SEED = Buffer.from("permission:");
+const GROUP_SEED = Buffer.from("group:");
+
+/**
+ * Derives the permission PDA for a given account
+ * @param account - The account address
+ * @returns The permission PDA
+ */
+export async function permissionPdaFromAccount(account: Address) {
+  const addressEncoder = getAddressEncoder();
+  const [permissionPda] = await getProgramDerivedAddress({
+    programAddress: PERMISSION_PROGRAM_ID,
+    seeds: [PERMISSION_SEED, addressEncoder.encode(account)],
+  });
+  return permissionPda;
+}
+
+/**
+ * Derives the group PDA for a given group ID
+ * @param id - The group ID
+ * @returns The group PDA
+ */
+export async function groupPdaFromId(id: Address) {
+  const addressEncoder = getAddressEncoder();
+  const [groupPda] = await getProgramDerivedAddress({
+    programAddress: PERMISSION_PROGRAM_ID,
+    seeds: [GROUP_SEED, addressEncoder.encode(id)],
+  });
+  return groupPda;
 }

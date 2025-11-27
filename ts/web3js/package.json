@@ -9,8 +9,7 @@
   },
   "main": "lib/index.js",
   "exports": {
-    ".": "./lib/index.js",
-    "./privacy": "./lib/privacy/index.js"
+    ".": "./lib/index.js"
   },
   "scripts": {
     "clean": "rimraf lib",
