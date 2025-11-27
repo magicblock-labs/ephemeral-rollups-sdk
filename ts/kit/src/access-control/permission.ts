@@ -89,8 +89,10 @@ export async function waitUntilPermissionActive(
   publicKey: Address,
   timeout?: number,
 ): Promise<boolean> {
-  const startTime = Date.now();
-  const timeoutMs = timeout ?? 30000;
+  const timeoutMs = timeout ?? 5000;
+
+  // First, try getPermissionStatus with retries for the initial timeout
+  let startTime = Date.now();
   while (Date.now() - startTime < timeoutMs) {
     try {
       const { authorizedUsers } = await getPermissionStatus(rpcUrl, publicKey);
@@ -101,10 +103,17 @@ export async function waitUntilPermissionActive(
       console.error(error);
     }
 
-    // Fallback: try to force permission update
-    const forceUpdateSuccess = await forcePermissionUpdate(rpcUrl, publicKey);
-    if (forceUpdateSuccess) {
-      // Retry permission status after force update
+    await new Promise((resolve) => {
+      setTimeout(resolve, 400);
+    });
+  }
+
+  // If timeout reached, try force permission update as fallback
+  const forceUpdateSuccess = await forcePermissionUpdate(rpcUrl, publicKey);
+  if (forceUpdateSuccess) {
+    // Retry permission status for another 5 seconds after force update
+    startTime = Date.now();
+    while (Date.now() - startTime < timeoutMs) {
       try {
         const { authorizedUsers } = await getPermissionStatus(
           rpcUrl,
@@ -116,11 +125,12 @@ export async function waitUntilPermissionActive(
       } catch (error) {
         console.error(error);
       }
-    }
 
-    await new Promise((resolve) => {
-      setTimeout(resolve, 400);
-    });
+      await new Promise((resolve) => {
+        setTimeout(resolve, 400);
+      });
+    }
   }
+
   return false;
 }
