@@ -46,7 +46,7 @@ solana-system-interface = { workspace = true, optional = true }
 solana-sysvar = { workspace = true, optional = true }
 magicblock-magic-program-api = { workspace = true }
 magicblock-delegation-program  = { workspace = true, features = ["no-entrypoint", "core"], default-features = false }
-magicblock-permission-client = { workspace = true, optional = true }
+magicblock-permission-client = { path = "../access-control", optional = true }
 
 # Fix for older toolchain
 base64ct = { workspace = true }
