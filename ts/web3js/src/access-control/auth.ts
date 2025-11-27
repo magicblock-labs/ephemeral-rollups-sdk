@@ -1,11 +1,14 @@
 import { PublicKey } from "@solana/web3.js";
 
+const SESSION_DURATION = 1000 * 60 * 60 * 24 * 30; // 30 days
+
 interface AuthChallengeResponse {
   challenge: string;
 }
 
 interface AuthLoginResponse {
   token: string;
+  expiresAt?: number;
   error?: string;
 }
 
@@ -14,13 +17,13 @@ interface AuthLoginResponse {
  * @param rpcUrl - The URL of the RPC server
  * @param publicKey - The public key of the user
  * @param signMessage - The function to sign a message
- * @returns The auth token
+ * @returns The auth token and its expiration time
  */
 export async function getAuthToken(
   rpcUrl: string,
   publicKey: PublicKey,
   signMessage: (message: Uint8Array) => Promise<Uint8Array>,
-) {
+): Promise<{ token: string; expiresAt: number }> {
   // Import this way because bs58 is an ECMAScript module
   const bs58 = (await import("bs58")).default;
 
@@ -52,5 +55,6 @@ export async function getAuthToken(
     throw new Error(`Failed to authenticate: ${authJson.error}`);
   }
 
-  return authJson.token;
+  const expiresAt = authJson.expiresAt ?? Date.now() + SESSION_DURATION;
+  return { token: authJson.token, expiresAt };
 }
