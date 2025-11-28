@@ -1,6 +1,6 @@
 import { Address } from "@solana/kit";
 
-const SESSION_DURATION = 1000 * 60 * 60 * 24 * 30; // 30 days
+export const SESSION_DURATION = 1000 * 60 * 60 * 24 * 30; // 30 days
 
 interface AuthChallengeResponse {
   challenge: string;
