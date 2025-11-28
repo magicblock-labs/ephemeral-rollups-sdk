@@ -1,10 +1,11 @@
 #[allow(deprecated, clippy::all)]
-mod generated;
+pub mod generated;
 
-use borsh::{BorshDeserialize, BorshSerialize};
+pub use generated::BorshCompatibility;
+
 use generated::accounts::{Group, Permission};
 use generated::instructions::CreateGroupInstructionArgs;
-pub use generated::programs::MAGICBLOCK_PERMISSION_PROGRAM_ID as ID;
+pub use generated::programs::MAGICBLOCK_PERMISSION_PROGRAM_ID;
 pub use generated::*;
 
 use generated::instructions::{
@@ -18,18 +19,6 @@ impl Group {
 
 impl Permission {
     pub const DISCRIMINATOR: u8 = 0;
-}
-
-/// Helper trait to make the generated code compatible with borsh 1.5
-trait BorshCompatibility
-where
-    Self: BorshDeserialize + BorshSerialize,
-{
-    fn try_to_vec(&self) -> Result<Vec<u8>, std::io::Error> {
-        let mut data = Vec::new();
-        self.serialize(&mut data)?;
-        Ok(data)
-    }
 }
 
 impl BorshCompatibility for Group {}

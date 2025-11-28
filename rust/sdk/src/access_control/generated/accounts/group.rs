@@ -45,14 +45,14 @@ impl Group {
     ) -> Result<solana_program::pubkey::Pubkey, solana_program::pubkey::PubkeyError> {
         solana_program::pubkey::Pubkey::create_program_address(
             &["group:".as_bytes(), id.as_ref(), &[bump]],
-            &crate::MAGICBLOCK_PERMISSION_PROGRAM_ID,
+            &super::MAGICBLOCK_PERMISSION_PROGRAM_ID,
         )
     }
 
     pub fn find_pda(id: &Pubkey) -> (solana_program::pubkey::Pubkey, u8) {
         solana_program::pubkey::Pubkey::find_program_address(
             &["group:".as_bytes(), id.as_ref()],
-            &crate::MAGICBLOCK_PERMISSION_PROGRAM_ID,
+            &super::MAGICBLOCK_PERMISSION_PROGRAM_ID,
         )
     }
 

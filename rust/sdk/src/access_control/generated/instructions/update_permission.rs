@@ -10,7 +10,7 @@ use anchor_lang::prelude::{AnchorDeserialize, AnchorSerialize};
 #[cfg(not(feature = "anchor"))]
 use borsh::{BorshDeserialize, BorshSerialize};
 
-use crate::BorshCompatibility;
+use super::BorshCompatibility;
 
 /// Accounts.
 pub struct UpdatePermission {
@@ -47,7 +47,7 @@ impl UpdatePermission {
         let data = UpdatePermissionInstructionData::new().try_to_vec().unwrap();
 
         solana_program::instruction::Instruction {
-            program_id: crate::MAGICBLOCK_PERMISSION_PROGRAM_ID,
+            program_id: super::MAGICBLOCK_PERMISSION_PROGRAM_ID,
             accounts,
             data,
         }
@@ -228,7 +228,7 @@ impl<'a, 'b> UpdatePermissionCpi<'a, 'b> {
         let data = UpdatePermissionInstructionData::new().try_to_vec().unwrap();
 
         let instruction = solana_program::instruction::Instruction {
-            program_id: crate::MAGICBLOCK_PERMISSION_PROGRAM_ID,
+            program_id: super::MAGICBLOCK_PERMISSION_PROGRAM_ID,
             accounts,
             data,
         };

@@ -12,3 +12,4 @@ pub(crate) mod r#update_permission;
 pub use self::r#create_group::*;
 pub use self::r#create_permission::*;
 pub use self::r#update_permission::*;
+pub use super::{BorshCompatibility, MAGICBLOCK_PERMISSION_PROGRAM_ID};

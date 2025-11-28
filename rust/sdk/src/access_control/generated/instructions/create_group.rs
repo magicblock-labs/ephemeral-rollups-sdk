@@ -11,7 +11,7 @@ use anchor_lang::prelude::{AnchorDeserialize, AnchorSerialize};
 use borsh::{BorshDeserialize, BorshSerialize};
 use solana_program::pubkey::Pubkey;
 
-use crate::BorshCompatibility;
+use super::BorshCompatibility;
 
 /// Accounts.
 pub struct CreateGroup {
@@ -53,7 +53,7 @@ impl CreateGroup {
         data.append(&mut args);
 
         solana_program::instruction::Instruction {
-            program_id: crate::MAGICBLOCK_PERMISSION_PROGRAM_ID,
+            program_id: super::MAGICBLOCK_PERMISSION_PROGRAM_ID,
             accounts,
             data,
         }
@@ -263,7 +263,7 @@ impl<'a, 'b> CreateGroupCpi<'a, 'b> {
         data.append(&mut args);
 
         let instruction = solana_program::instruction::Instruction {
-            program_id: crate::MAGICBLOCK_PERMISSION_PROGRAM_ID,
+            program_id: super::MAGICBLOCK_PERMISSION_PROGRAM_ID,
             accounts,
             data,
         };

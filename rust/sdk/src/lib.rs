@@ -8,6 +8,7 @@ mod solana_compat;
 pub mod types;
 pub mod utils;
 
+#[cfg(feature = "access-control")]
 pub mod access_control;
 
 pub use dlp::args::CallHandlerArgs;
