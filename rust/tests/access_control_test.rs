@@ -6,7 +6,6 @@ mod tests {
     #[test]
     fn test_access_control_module_exists() {
         // This test verifies that access-control module is properly compiled
-        assert!(true);
     }
 
     #[test]
@@ -34,7 +33,6 @@ mod tests {
     fn test_borsh_serialization_compatibility() {
         // Verify that Borsh compatibility trait is properly implemented
         // This ensures accounts can be serialized/deserialized
-        assert!(true);
     }
 
     #[test]
