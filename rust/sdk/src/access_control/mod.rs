@@ -1,16 +1,19 @@
 #[allow(deprecated, clippy::all)]
 pub mod generated;
 
-pub use generated::BorshCompatibility;
-
-use generated::accounts::{Group, Permission};
-use generated::instructions::CreateGroupInstructionArgs;
-pub use generated::programs::MAGICBLOCK_PERMISSION_PROGRAM_ID;
-pub use generated::*;
-
-use generated::instructions::{
-    CreateGroupInstructionData, CreatePermissionInstructionData, UpdatePermissionInstructionData,
+// Re-export the commonly used types
+pub use generated::accounts::{Group, Permission};
+pub use generated::errors;
+pub use generated::instructions::{
+    CreateGroup, CreateGroupBuilder, CreateGroupCpi, CreateGroupCpiAccounts, CreateGroupCpiBuilder,
+    CreateGroupInstructionArgs, CreateGroupInstructionData, CreatePermission,
+    CreatePermissionBuilder, CreatePermissionCpi, CreatePermissionCpiAccounts,
+    CreatePermissionCpiBuilder, CreatePermissionInstructionData, UpdatePermission,
+    UpdatePermissionBuilder, UpdatePermissionCpi, UpdatePermissionCpiAccounts,
+    UpdatePermissionCpiBuilder, UpdatePermissionInstructionData,
 };
+pub use generated::programs::MAGICBLOCK_PERMISSION_PROGRAM_ID;
+pub use generated::BorshCompatibility;
 
 impl Group {
     pub const LEN: usize = 1 + 1 + 4 + 32 * 32;

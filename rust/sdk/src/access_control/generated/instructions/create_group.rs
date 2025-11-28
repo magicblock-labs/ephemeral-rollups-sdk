@@ -5,9 +5,6 @@
 //! [https://github.com/metaplex-foundation/kinobi]
 //!
 
-#[cfg(feature = "anchor")]
-use anchor_lang::prelude::{AnchorDeserialize, AnchorSerialize};
-#[cfg(not(feature = "anchor"))]
 use borsh::{BorshDeserialize, BorshSerialize};
 use solana_program::pubkey::Pubkey;
 
@@ -60,8 +57,7 @@ impl CreateGroup {
     }
 }
 
-#[cfg_attr(not(feature = "anchor"), derive(BorshSerialize, BorshDeserialize))]
-#[cfg_attr(feature = "anchor", derive(AnchorSerialize, AnchorDeserialize))]
+#[derive(BorshSerialize, BorshDeserialize)]
 pub struct CreateGroupInstructionData {
     discriminator: u8,
 }
@@ -72,10 +68,8 @@ impl CreateGroupInstructionData {
     }
 }
 
-#[cfg_attr(not(feature = "anchor"), derive(BorshSerialize, BorshDeserialize))]
-#[cfg_attr(feature = "anchor", derive(AnchorSerialize, AnchorDeserialize))]
+#[derive(BorshSerialize, BorshDeserialize, Clone, Debug, Eq, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CreateGroupInstructionArgs {
     pub id: Pubkey,
     pub members: Vec<Pubkey>,
