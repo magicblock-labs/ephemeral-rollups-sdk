@@ -5,9 +5,6 @@
 //! [https://github.com/metaplex-foundation/kinobi]
 //!
 
-#[cfg(feature = "anchor")]
-use anchor_lang::prelude::{AnchorDeserialize, AnchorSerialize};
-#[cfg(not(feature = "anchor"))]
 use borsh::{BorshDeserialize, BorshSerialize};
 
 use super::BorshCompatibility;
@@ -54,8 +51,7 @@ impl UpdatePermission {
     }
 }
 
-#[cfg_attr(not(feature = "anchor"), derive(BorshSerialize, BorshDeserialize))]
-#[cfg_attr(feature = "anchor", derive(AnchorSerialize, AnchorDeserialize))]
+#[derive(BorshSerialize, BorshDeserialize)]
 pub struct UpdatePermissionInstructionData {
     discriminator: u8,
 }
