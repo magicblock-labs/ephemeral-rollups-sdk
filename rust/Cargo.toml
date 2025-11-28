@@ -7,7 +7,6 @@ members = [
 	"action-attribute",
 	"resolver",
 	"pinocchio",
-	"access-control",
 ]
 
 resolver = "2"

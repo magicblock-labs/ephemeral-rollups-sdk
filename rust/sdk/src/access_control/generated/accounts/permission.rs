@@ -51,14 +51,14 @@ impl Permission {
                 delegated_account.as_ref(),
                 &[bump],
             ],
-            &crate::MAGICBLOCK_PERMISSION_PROGRAM_ID,
+            &super::MAGICBLOCK_PERMISSION_PROGRAM_ID,
         )
     }
 
     pub fn find_pda(delegated_account: &Pubkey) -> (solana_program::pubkey::Pubkey, u8) {
         solana_program::pubkey::Pubkey::find_program_address(
             &["permission:".as_bytes(), delegated_account.as_ref()],
-            &crate::MAGICBLOCK_PERMISSION_PROGRAM_ID,
+            &super::MAGICBLOCK_PERMISSION_PROGRAM_ID,
         )
     }
 
