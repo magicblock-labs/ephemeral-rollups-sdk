@@ -26,6 +26,10 @@ modular-sdk = [
     "solana-program-memory",
     "solana-sysvar",
 ]
+custom-heap = []
+custom-panic = []
+anchor-debug = []
+
 
 [dependencies]
 anchor-lang = { workspace = true, optional = true }
