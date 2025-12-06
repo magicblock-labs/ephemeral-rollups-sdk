@@ -22,6 +22,7 @@ export function createCreateGroupInstruction(
   accounts: {
     group: PublicKey;
     payer: PublicKey;
+    permissionProgram?: PublicKey;
   },
   args: CreateGroupInstructionArgs,
 ): TransactionInstruction {
@@ -34,7 +35,7 @@ export function createCreateGroupInstruction(
   const instructionData = serializeCreateGroupInstructionData(args);
 
   return new TransactionInstruction({
-    programId: PERMISSION_PROGRAM_ID,
+    programId: accounts.permissionProgram ?? PERMISSION_PROGRAM_ID,
     keys,
     data: instructionData,
   });

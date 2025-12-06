@@ -24,9 +24,11 @@ export function createCreateGroupInstruction(
   accounts: {
     group: Address;
     payer: Address;
+    permissionProgram?: Address;
   },
   args: CreateGroupInstructionArgs,
 ): Instruction {
+  
   const accountsMeta: AccountMeta[] = [
     { address: accounts.group, role: AccountRole.WRITABLE },
     { address: accounts.payer, role: AccountRole.WRITABLE_SIGNER },
@@ -38,7 +40,7 @@ export function createCreateGroupInstruction(
   return {
     accounts: accountsMeta,
     data: instructionData,
-    programAddress: PERMISSION_PROGRAM_ID,
+    programAddress: accounts.permissionProgram ?? PERMISSION_PROGRAM_ID,
   };
 }
 

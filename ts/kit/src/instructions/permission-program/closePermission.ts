@@ -1,32 +1,36 @@
-import { Address, Instruction, AccountMeta, AccountRole } from "@solana/kit";
+import {
+  Address,
+  Instruction,
+  AccountMeta,
+  AccountRole,
+} from "@solana/kit";
 import { PERMISSION_PROGRAM_ID } from "../../constants";
 
 /**
- * UpdatePermission instruction arguments
+ * ClosePermission instruction arguments
  */
 // eslint-disable-next-line @typescript-eslint/no-empty-interface
-export interface UpdatePermissionInstructionArgs {}
+export interface ClosePermissionInstructionArgs {}
 
 /**
- * Instruction: UpdatePermission
- * Discriminator: 2
+ * Instruction: ClosePermission
+ * Discriminator: 3
  */
-export function createUpdatePermissionInstruction(
+export function createClosePermissionInstruction(
   accounts: {
     permission: Address;
     delegatedAccount: Address;
-    group: Address;
     permissionProgram?: Address;
   },
-  args?: UpdatePermissionInstructionArgs,
+  args?: ClosePermissionInstructionArgs,
 ): Instruction {
+  
   const accountsMeta: AccountMeta[] = [
     { address: accounts.permission, role: AccountRole.WRITABLE },
-    { address: accounts.delegatedAccount, role: AccountRole.READONLY_SIGNER },
-    { address: accounts.group, role: AccountRole.READONLY },
+    { address: accounts.delegatedAccount, role: AccountRole.WRITABLE_SIGNER },
   ];
 
-  const [instructionData] = serializeUpdatePermissionInstructionData(args);
+  const [instructionData] = serializeClosePermissionInstructionData(args);
 
   return {
     accounts: accountsMeta,
@@ -35,13 +39,13 @@ export function createUpdatePermissionInstruction(
   };
 }
 
-export function serializeUpdatePermissionInstructionData(
-  args?: UpdatePermissionInstructionArgs,
+export function serializeClosePermissionInstructionData(
+  args?: ClosePermissionInstructionArgs,
 ): [Uint8Array] {
-  const discriminator = 2;
-  let offset = 0;
+  const discriminator = 3;
   const buffer = new ArrayBuffer(1);
   const view = new DataView(buffer);
+  let offset = 0;
 
   // Write discriminator (u8)
   view.setUint8(offset++, discriminator);

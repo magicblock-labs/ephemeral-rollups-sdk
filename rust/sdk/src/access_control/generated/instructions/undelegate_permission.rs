@@ -7,44 +7,53 @@
 
 use super::BorshCompatibility;
 use borsh::{BorshDeserialize, BorshSerialize};
-use solana_program::pubkey::Pubkey;
 
 /// Accounts.
-pub struct CreateGroup {
-    /// The address of the new group
-    pub group: solana_program::pubkey::Pubkey,
-    /// The account paying for the rent
-    pub payer: solana_program::pubkey::Pubkey,
+pub struct UndelegatePermission {
+    /// The delegated permission account
+    pub delegated_permission: solana_program::pubkey::Pubkey,
+    /// The delegation buffer
+    pub delegation_buffer: solana_program::pubkey::Pubkey,
+    /// The ER validator
+    pub validator: solana_program::pubkey::Pubkey,
     /// The system program
     pub system_program: solana_program::pubkey::Pubkey,
 }
 
-impl CreateGroup {
+impl UndelegatePermission {
     pub fn instruction(
         &self,
-        args: CreateGroupInstructionArgs,
+        args: UndelegatePermissionInstructionArgs,
     ) -> solana_program::instruction::Instruction {
         self.instruction_with_remaining_accounts(args, &[])
     }
     #[allow(clippy::vec_init_then_push)]
     pub fn instruction_with_remaining_accounts(
         &self,
-        args: CreateGroupInstructionArgs,
+        args: UndelegatePermissionInstructionArgs,
         remaining_accounts: &[solana_program::instruction::AccountMeta],
     ) -> solana_program::instruction::Instruction {
-        let mut accounts = Vec::with_capacity(3 + remaining_accounts.len());
+        let mut accounts = Vec::with_capacity(4 + remaining_accounts.len());
         accounts.push(solana_program::instruction::AccountMeta::new(
-            self.group, false,
+            self.delegated_permission,
+            false,
         ));
         accounts.push(solana_program::instruction::AccountMeta::new(
-            self.payer, true,
+            self.delegation_buffer,
+            false,
+        ));
+        accounts.push(solana_program::instruction::AccountMeta::new(
+            self.validator,
+            true,
         ));
         accounts.push(solana_program::instruction::AccountMeta::new_readonly(
             self.system_program,
             false,
         ));
         accounts.extend_from_slice(remaining_accounts);
-        let mut data = CreateGroupInstructionData::new().try_to_vec().unwrap();
+        let mut data = UndelegatePermissionInstructionData::new()
+            .try_to_vec()
+            .unwrap();
         let mut args = args.try_to_vec().unwrap();
         data.append(&mut args);
 
@@ -57,54 +66,66 @@ impl CreateGroup {
 }
 
 #[derive(BorshSerialize, BorshDeserialize)]
-pub struct CreateGroupInstructionData {
+pub struct UndelegatePermissionInstructionData {
     discriminator: u8,
 }
 
-impl CreateGroupInstructionData {
+impl UndelegatePermissionInstructionData {
     pub fn new() -> Self {
-        Self { discriminator: 0 }
+        Self { discriminator: 7 }
     }
 }
 
 #[derive(BorshSerialize, BorshDeserialize, Clone, Debug, Eq, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct CreateGroupInstructionArgs {
-    pub id: Pubkey,
-    pub members: Vec<Pubkey>,
+pub struct UndelegatePermissionInstructionArgs {
+    pub pda_seeds: Vec<Vec<u8>>,
 }
 
-/// Instruction builder for `CreateGroup`.
+/// Instruction builder for `UndelegatePermission`.
 ///
 /// ### Accounts:
 ///
-///   0. `[writable]` group
-///   1. `[writable, signer]` payer
-///   2. `[optional]` system_program (default to `11111111111111111111111111111111`)
+///   0. `[writable]` delegated_permission
+///   1. `[writable]` delegation_buffer
+///   2. `[writable, signer]` validator
+///   3. `[optional]` system_program (default to `11111111111111111111111111111111`)
 #[derive(Default)]
-pub struct CreateGroupBuilder {
-    group: Option<solana_program::pubkey::Pubkey>,
-    payer: Option<solana_program::pubkey::Pubkey>,
+pub struct UndelegatePermissionBuilder {
+    delegated_permission: Option<solana_program::pubkey::Pubkey>,
+    delegation_buffer: Option<solana_program::pubkey::Pubkey>,
+    validator: Option<solana_program::pubkey::Pubkey>,
     system_program: Option<solana_program::pubkey::Pubkey>,
-    id: Option<Pubkey>,
-    members: Option<Vec<Pubkey>>,
+    pda_seeds: Option<Vec<Vec<u8>>>,
     __remaining_accounts: Vec<solana_program::instruction::AccountMeta>,
 }
 
-impl CreateGroupBuilder {
+impl UndelegatePermissionBuilder {
     pub fn new() -> Self {
         Self::default()
     }
-    /// The address of the new group
+    /// The delegated permission account
     #[inline(always)]
-    pub fn group(&mut self, group: solana_program::pubkey::Pubkey) -> &mut Self {
-        self.group = Some(group);
+    pub fn delegated_permission(
+        &mut self,
+        delegated_permission: solana_program::pubkey::Pubkey,
+    ) -> &mut Self {
+        self.delegated_permission = Some(delegated_permission);
         self
     }
-    /// The account paying for the rent
+    /// The delegation buffer
     #[inline(always)]
-    pub fn payer(&mut self, payer: solana_program::pubkey::Pubkey) -> &mut Self {
-        self.payer = Some(payer);
+    pub fn delegation_buffer(
+        &mut self,
+        delegation_buffer: solana_program::pubkey::Pubkey,
+    ) -> &mut Self {
+        self.delegation_buffer = Some(delegation_buffer);
+        self
+    }
+    /// The ER validator
+    #[inline(always)]
+    pub fn validator(&mut self, validator: solana_program::pubkey::Pubkey) -> &mut Self {
+        self.validator = Some(validator);
         self
     }
     /// `[optional account, default to '11111111111111111111111111111111']`
@@ -115,13 +136,8 @@ impl CreateGroupBuilder {
         self
     }
     #[inline(always)]
-    pub fn id(&mut self, id: Pubkey) -> &mut Self {
-        self.id = Some(id);
-        self
-    }
-    #[inline(always)]
-    pub fn members(&mut self, members: Vec<Pubkey>) -> &mut Self {
-        self.members = Some(members);
+    pub fn pda_seeds(&mut self, pda_seeds: Vec<Vec<u8>>) -> &mut Self {
+        self.pda_seeds = Some(pda_seeds);
         self
     }
     /// Add an aditional account to the instruction.
@@ -144,56 +160,65 @@ impl CreateGroupBuilder {
     }
     #[allow(clippy::clone_on_copy)]
     pub fn instruction(&self) -> solana_program::instruction::Instruction {
-        let accounts = CreateGroup {
-            group: self.group.expect("group is not set"),
-            payer: self.payer.expect("payer is not set"),
+        let accounts = UndelegatePermission {
+            delegated_permission: self
+                .delegated_permission
+                .expect("delegated_permission is not set"),
+            delegation_buffer: self
+                .delegation_buffer
+                .expect("delegation_buffer is not set"),
+            validator: self.validator.expect("validator is not set"),
             system_program: self
                 .system_program
                 .unwrap_or(solana_program::pubkey!("11111111111111111111111111111111")),
         };
-        let args = CreateGroupInstructionArgs {
-            id: self.id.clone().expect("id is not set"),
-            members: self.members.clone().expect("members is not set"),
+        let args = UndelegatePermissionInstructionArgs {
+            pda_seeds: self.pda_seeds.clone().expect("pda_seeds is not set"),
         };
 
         accounts.instruction_with_remaining_accounts(args, &self.__remaining_accounts)
     }
 }
 
-/// `create_group` CPI accounts.
-pub struct CreateGroupCpiAccounts<'a, 'b> {
-    /// The address of the new group
-    pub group: &'b solana_program::account_info::AccountInfo<'a>,
-    /// The account paying for the rent
-    pub payer: &'b solana_program::account_info::AccountInfo<'a>,
+/// `undelegate_permission` CPI accounts.
+pub struct UndelegatePermissionCpiAccounts<'a, 'b> {
+    /// The delegated permission account
+    pub delegated_permission: &'b solana_program::account_info::AccountInfo<'a>,
+    /// The delegation buffer
+    pub delegation_buffer: &'b solana_program::account_info::AccountInfo<'a>,
+    /// The ER validator
+    pub validator: &'b solana_program::account_info::AccountInfo<'a>,
     /// The system program
     pub system_program: &'b solana_program::account_info::AccountInfo<'a>,
 }
 
-/// `create_group` CPI instruction.
-pub struct CreateGroupCpi<'a, 'b> {
+/// `undelegate_permission` CPI instruction.
+pub struct UndelegatePermissionCpi<'a, 'b> {
     /// The program to invoke.
     pub __program: &'b solana_program::account_info::AccountInfo<'a>,
-    /// The address of the new group
-    pub group: &'b solana_program::account_info::AccountInfo<'a>,
-    /// The account paying for the rent
-    pub payer: &'b solana_program::account_info::AccountInfo<'a>,
+    /// The delegated permission account
+    pub delegated_permission: &'b solana_program::account_info::AccountInfo<'a>,
+    /// The delegation buffer
+    pub delegation_buffer: &'b solana_program::account_info::AccountInfo<'a>,
+    /// The ER validator
+    pub validator: &'b solana_program::account_info::AccountInfo<'a>,
     /// The system program
     pub system_program: &'b solana_program::account_info::AccountInfo<'a>,
     /// The arguments for the instruction.
-    pub __args: CreateGroupInstructionArgs,
+    pub __args: UndelegatePermissionInstructionArgs,
 }
 
-impl<'a, 'b> CreateGroupCpi<'a, 'b> {
+impl<'a, 'b> UndelegatePermissionCpi<'a, 'b> {
     pub fn new(
         program: &'b solana_program::account_info::AccountInfo<'a>,
-        accounts: CreateGroupCpiAccounts<'a, 'b>,
-        args: CreateGroupInstructionArgs,
+        accounts: UndelegatePermissionCpiAccounts<'a, 'b>,
+        args: UndelegatePermissionInstructionArgs,
     ) -> Self {
         Self {
             __program: program,
-            group: accounts.group,
-            payer: accounts.payer,
+            delegated_permission: accounts.delegated_permission,
+            delegation_buffer: accounts.delegation_buffer,
+            validator: accounts.validator,
             system_program: accounts.system_program,
             __args: args,
         }
@@ -231,13 +256,17 @@ impl<'a, 'b> CreateGroupCpi<'a, 'b> {
             bool,
         )],
     ) -> solana_program::entrypoint::ProgramResult {
-        let mut accounts = Vec::with_capacity(3 + remaining_accounts.len());
+        let mut accounts = Vec::with_capacity(4 + remaining_accounts.len());
         accounts.push(solana_program::instruction::AccountMeta::new(
-            *self.group.key,
+            *self.delegated_permission.key,
             false,
         ));
         accounts.push(solana_program::instruction::AccountMeta::new(
-            *self.payer.key,
+            *self.delegation_buffer.key,
+            false,
+        ));
+        accounts.push(solana_program::instruction::AccountMeta::new(
+            *self.validator.key,
             true,
         ));
         accounts.push(solana_program::instruction::AccountMeta::new_readonly(
@@ -251,7 +280,9 @@ impl<'a, 'b> CreateGroupCpi<'a, 'b> {
                 is_writable: remaining_account.2,
             })
         });
-        let mut data = CreateGroupInstructionData::new().try_to_vec().unwrap();
+        let mut data = UndelegatePermissionInstructionData::new()
+            .try_to_vec()
+            .unwrap();
         let mut args = self.__args.try_to_vec().unwrap();
         data.append(&mut args);
 
@@ -260,10 +291,11 @@ impl<'a, 'b> CreateGroupCpi<'a, 'b> {
             accounts,
             data,
         };
-        let mut account_infos = Vec::with_capacity(3 + 1 + remaining_accounts.len());
+        let mut account_infos = Vec::with_capacity(4 + 1 + remaining_accounts.len());
         account_infos.push(self.__program.clone());
-        account_infos.push(self.group.clone());
-        account_infos.push(self.payer.clone());
+        account_infos.push(self.delegated_permission.clone());
+        account_infos.push(self.delegation_buffer.clone());
+        account_infos.push(self.validator.clone());
         account_infos.push(self.system_program.clone());
         remaining_accounts
             .iter()
@@ -277,40 +309,56 @@ impl<'a, 'b> CreateGroupCpi<'a, 'b> {
     }
 }
 
-/// Instruction builder for `CreateGroup` via CPI.
+/// Instruction builder for `UndelegatePermission` via CPI.
 ///
 /// ### Accounts:
 ///
-///   0. `[writable]` group
-///   1. `[writable, signer]` payer
-///   2. `[]` system_program
-pub struct CreateGroupCpiBuilder<'a, 'b> {
-    instruction: Box<CreateGroupCpiBuilderInstruction<'a, 'b>>,
+///   0. `[writable]` delegated_permission
+///   1. `[writable]` delegation_buffer
+///   2. `[writable, signer]` validator
+///   3. `[]` system_program
+pub struct UndelegatePermissionCpiBuilder<'a, 'b> {
+    instruction: Box<UndelegatePermissionCpiBuilderInstruction<'a, 'b>>,
 }
 
-impl<'a, 'b> CreateGroupCpiBuilder<'a, 'b> {
+impl<'a, 'b> UndelegatePermissionCpiBuilder<'a, 'b> {
     pub fn new(program: &'b solana_program::account_info::AccountInfo<'a>) -> Self {
-        let instruction = Box::new(CreateGroupCpiBuilderInstruction {
+        let instruction = Box::new(UndelegatePermissionCpiBuilderInstruction {
             __program: program,
-            group: None,
-            payer: None,
+            delegated_permission: None,
+            delegation_buffer: None,
+            validator: None,
             system_program: None,
-            id: None,
-            members: None,
+            pda_seeds: None,
             __remaining_accounts: Vec::new(),
         });
         Self { instruction }
     }
-    /// The address of the new group
+    /// The delegated permission account
     #[inline(always)]
-    pub fn group(&mut self, group: &'b solana_program::account_info::AccountInfo<'a>) -> &mut Self {
-        self.instruction.group = Some(group);
+    pub fn delegated_permission(
+        &mut self,
+        delegated_permission: &'b solana_program::account_info::AccountInfo<'a>,
+    ) -> &mut Self {
+        self.instruction.delegated_permission = Some(delegated_permission);
         self
     }
-    /// The account paying for the rent
+    /// The delegation buffer
     #[inline(always)]
-    pub fn payer(&mut self, payer: &'b solana_program::account_info::AccountInfo<'a>) -> &mut Self {
-        self.instruction.payer = Some(payer);
+    pub fn delegation_buffer(
+        &mut self,
+        delegation_buffer: &'b solana_program::account_info::AccountInfo<'a>,
+    ) -> &mut Self {
+        self.instruction.delegation_buffer = Some(delegation_buffer);
+        self
+    }
+    /// The ER validator
+    #[inline(always)]
+    pub fn validator(
+        &mut self,
+        validator: &'b solana_program::account_info::AccountInfo<'a>,
+    ) -> &mut Self {
+        self.instruction.validator = Some(validator);
         self
     }
     /// The system program
@@ -323,13 +371,8 @@ impl<'a, 'b> CreateGroupCpiBuilder<'a, 'b> {
         self
     }
     #[inline(always)]
-    pub fn id(&mut self, id: Pubkey) -> &mut Self {
-        self.instruction.id = Some(id);
-        self
-    }
-    #[inline(always)]
-    pub fn members(&mut self, members: Vec<Pubkey>) -> &mut Self {
-        self.instruction.members = Some(members);
+    pub fn pda_seeds(&mut self, pda_seeds: Vec<Vec<u8>>) -> &mut Self {
+        self.instruction.pda_seeds = Some(pda_seeds);
         self
     }
     /// Add an additional account to the instruction.
@@ -373,20 +416,27 @@ impl<'a, 'b> CreateGroupCpiBuilder<'a, 'b> {
         &self,
         signers_seeds: &[&[&[u8]]],
     ) -> solana_program::entrypoint::ProgramResult {
-        let args = CreateGroupInstructionArgs {
-            id: self.instruction.id.clone().expect("id is not set"),
-            members: self
+        let args = UndelegatePermissionInstructionArgs {
+            pda_seeds: self
                 .instruction
-                .members
+                .pda_seeds
                 .clone()
-                .expect("members is not set"),
+                .expect("pda_seeds is not set"),
         };
-        let instruction = CreateGroupCpi {
+        let instruction = UndelegatePermissionCpi {
             __program: self.instruction.__program,
 
-            group: self.instruction.group.expect("group is not set"),
+            delegated_permission: self
+                .instruction
+                .delegated_permission
+                .expect("delegated_permission is not set"),
 
-            payer: self.instruction.payer.expect("payer is not set"),
+            delegation_buffer: self
+                .instruction
+                .delegation_buffer
+                .expect("delegation_buffer is not set"),
+
+            validator: self.instruction.validator.expect("validator is not set"),
 
             system_program: self
                 .instruction
@@ -401,13 +451,13 @@ impl<'a, 'b> CreateGroupCpiBuilder<'a, 'b> {
     }
 }
 
-struct CreateGroupCpiBuilderInstruction<'a, 'b> {
+struct UndelegatePermissionCpiBuilderInstruction<'a, 'b> {
     __program: &'b solana_program::account_info::AccountInfo<'a>,
-    group: Option<&'b solana_program::account_info::AccountInfo<'a>>,
-    payer: Option<&'b solana_program::account_info::AccountInfo<'a>>,
+    delegated_permission: Option<&'b solana_program::account_info::AccountInfo<'a>>,
+    delegation_buffer: Option<&'b solana_program::account_info::AccountInfo<'a>>,
+    validator: Option<&'b solana_program::account_info::AccountInfo<'a>>,
     system_program: Option<&'b solana_program::account_info::AccountInfo<'a>>,
-    id: Option<Pubkey>,
-    members: Option<Vec<Pubkey>>,
+    pda_seeds: Option<Vec<Vec<u8>>>,
     /// Additional instruction accounts `(AccountInfo, is_writable, is_signer)`.
     __remaining_accounts: Vec<(
         &'b solana_program::account_info::AccountInfo<'a>,

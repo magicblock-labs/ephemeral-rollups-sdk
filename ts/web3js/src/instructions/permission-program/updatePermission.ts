@@ -20,6 +20,7 @@ export function createUpdatePermissionInstruction(
     permission: PublicKey;
     delegatedAccount: PublicKey;
     group: PublicKey;
+    permissionProgram?: PublicKey;
   },
   args?: UpdatePermissionInstructionArgs,
 ): TransactionInstruction {
@@ -32,7 +33,7 @@ export function createUpdatePermissionInstruction(
   const instructionData = serializeUpdatePermissionInstructionData(args);
 
   return new TransactionInstruction({
-    programId: PERMISSION_PROGRAM_ID,
+    programId: accounts.permissionProgram ?? PERMISSION_PROGRAM_ID,
     keys,
     data: instructionData,
   });

@@ -10,3 +10,19 @@ export {
   createUpdatePermissionInstruction,
   type UpdatePermissionInstructionArgs,
 } from "./updatePermission";
+export {
+  createClosePermissionInstruction,
+  type ClosePermissionInstructionArgs,
+} from "./closePermission";
+export {
+  createDelegatePermissionInstruction,
+  type DelegatePermissionInstructionArgs,
+} from "./delegatePermission";
+export {
+  createCommitPermissionInstruction,
+  type CommitPermissionInstructionArgs,
+} from "./commitPermission";
+export {
+  createCommitAndUndelegatePermissionInstruction,
+  type CommitAndUndelegatePermissionInstructionArgs,
+} from "./commitAndUndelegatePermission";

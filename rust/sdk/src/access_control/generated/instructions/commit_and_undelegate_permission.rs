@@ -9,16 +9,18 @@ use super::BorshCompatibility;
 use borsh::{BorshDeserialize, BorshSerialize};
 
 /// Accounts.
-pub struct UpdatePermission {
-    /// The permission
-    pub permission: solana_program::pubkey::Pubkey,
-    /// The delegatable account
+pub struct CommitAndUndelegatePermission {
+    /// The account committing and undelegating the permission
     pub delegated_account: solana_program::pubkey::Pubkey,
-    /// The new group for the permission
-    pub group: solana_program::pubkey::Pubkey,
+    /// The permission account
+    pub permission: solana_program::pubkey::Pubkey,
+    /// The ephemeral rollups program
+    pub magic_program: solana_program::pubkey::Pubkey,
+    /// The ephemeral rollups context
+    pub magic_context: solana_program::pubkey::Pubkey,
 }
 
-impl UpdatePermission {
+impl CommitAndUndelegatePermission {
     pub fn instruction(&self) -> solana_program::instruction::Instruction {
         self.instruction_with_remaining_accounts(&[])
     }
@@ -27,20 +29,27 @@ impl UpdatePermission {
         &self,
         remaining_accounts: &[solana_program::instruction::AccountMeta],
     ) -> solana_program::instruction::Instruction {
-        let mut accounts = Vec::with_capacity(3 + remaining_accounts.len());
+        let mut accounts = Vec::with_capacity(4 + remaining_accounts.len());
+        accounts.push(solana_program::instruction::AccountMeta::new(
+            self.delegated_account,
+            true,
+        ));
         accounts.push(solana_program::instruction::AccountMeta::new(
             self.permission,
             false,
         ));
         accounts.push(solana_program::instruction::AccountMeta::new_readonly(
-            self.delegated_account,
-            true,
+            self.magic_program,
+            false,
         ));
-        accounts.push(solana_program::instruction::AccountMeta::new_readonly(
-            self.group, false,
+        accounts.push(solana_program::instruction::AccountMeta::new(
+            self.magic_context,
+            false,
         ));
         accounts.extend_from_slice(remaining_accounts);
-        let data = UpdatePermissionInstructionData::new().try_to_vec().unwrap();
+        let data = CommitAndUndelegatePermissionInstructionData::new()
+            .try_to_vec()
+            .unwrap();
 
         solana_program::instruction::Instruction {
             program_id: super::MAGICBLOCK_PERMISSION_PROGRAM_ID,
@@ -51,42 +60,38 @@ impl UpdatePermission {
 }
 
 #[derive(BorshSerialize, BorshDeserialize)]
-pub struct UpdatePermissionInstructionData {
+pub struct CommitAndUndelegatePermissionInstructionData {
     discriminator: u8,
 }
 
-impl UpdatePermissionInstructionData {
+impl CommitAndUndelegatePermissionInstructionData {
     pub fn new() -> Self {
-        Self { discriminator: 2 }
+        Self { discriminator: 6 }
     }
 }
 
-/// Instruction builder for `UpdatePermission`.
+/// Instruction builder for `CommitAndUndelegatePermission`.
 ///
 /// ### Accounts:
 ///
-///   0. `[writable]` permission
-///   1. `[signer]` delegated_account
-///   2. `[]` group
+///   0. `[writable, signer]` delegated_account
+///   1. `[writable]` permission
+///   2. `[]` magic_program
+///   3. `[writable]` magic_context
 #[derive(Default)]
-pub struct UpdatePermissionBuilder {
-    permission: Option<solana_program::pubkey::Pubkey>,
+pub struct CommitAndUndelegatePermissionBuilder {
     delegated_account: Option<solana_program::pubkey::Pubkey>,
-    group: Option<solana_program::pubkey::Pubkey>,
+    permission: Option<solana_program::pubkey::Pubkey>,
+    magic_program: Option<solana_program::pubkey::Pubkey>,
+    magic_context: Option<solana_program::pubkey::Pubkey>,
     __remaining_accounts: Vec<solana_program::instruction::AccountMeta>,
 }
 
-impl UpdatePermissionBuilder {
+impl CommitAndUndelegatePermissionBuilder {
     pub fn new() -> Self {
         Self::default()
     }
-    /// The permission
-    #[inline(always)]
-    pub fn permission(&mut self, permission: solana_program::pubkey::Pubkey) -> &mut Self {
-        self.permission = Some(permission);
-        self
-    }
-    /// The delegatable account
+    /// The account committing and undelegating the permission
     #[inline(always)]
     pub fn delegated_account(
         &mut self,
@@ -95,10 +100,22 @@ impl UpdatePermissionBuilder {
         self.delegated_account = Some(delegated_account);
         self
     }
-    /// The new group for the permission
+    /// The permission account
     #[inline(always)]
-    pub fn group(&mut self, group: solana_program::pubkey::Pubkey) -> &mut Self {
-        self.group = Some(group);
+    pub fn permission(&mut self, permission: solana_program::pubkey::Pubkey) -> &mut Self {
+        self.permission = Some(permission);
+        self
+    }
+    /// The ephemeral rollups program
+    #[inline(always)]
+    pub fn magic_program(&mut self, magic_program: solana_program::pubkey::Pubkey) -> &mut Self {
+        self.magic_program = Some(magic_program);
+        self
+    }
+    /// The ephemeral rollups context
+    #[inline(always)]
+    pub fn magic_context(&mut self, magic_context: solana_program::pubkey::Pubkey) -> &mut Self {
+        self.magic_context = Some(magic_context);
         self
     }
     /// Add an aditional account to the instruction.
@@ -121,50 +138,56 @@ impl UpdatePermissionBuilder {
     }
     #[allow(clippy::clone_on_copy)]
     pub fn instruction(&self) -> solana_program::instruction::Instruction {
-        let accounts = UpdatePermission {
-            permission: self.permission.expect("permission is not set"),
+        let accounts = CommitAndUndelegatePermission {
             delegated_account: self
                 .delegated_account
                 .expect("delegated_account is not set"),
-            group: self.group.expect("group is not set"),
+            permission: self.permission.expect("permission is not set"),
+            magic_program: self.magic_program.expect("magic_program is not set"),
+            magic_context: self.magic_context.expect("magic_context is not set"),
         };
 
         accounts.instruction_with_remaining_accounts(&self.__remaining_accounts)
     }
 }
 
-/// `update_permission` CPI accounts.
-pub struct UpdatePermissionCpiAccounts<'a, 'b> {
-    /// The permission
-    pub permission: &'b solana_program::account_info::AccountInfo<'a>,
-    /// The delegatable account
+/// `commit_and_undelegate_permission` CPI accounts.
+pub struct CommitAndUndelegatePermissionCpiAccounts<'a, 'b> {
+    /// The account committing and undelegating the permission
     pub delegated_account: &'b solana_program::account_info::AccountInfo<'a>,
-    /// The new group for the permission
-    pub group: &'b solana_program::account_info::AccountInfo<'a>,
+    /// The permission account
+    pub permission: &'b solana_program::account_info::AccountInfo<'a>,
+    /// The ephemeral rollups program
+    pub magic_program: &'b solana_program::account_info::AccountInfo<'a>,
+    /// The ephemeral rollups context
+    pub magic_context: &'b solana_program::account_info::AccountInfo<'a>,
 }
 
-/// `update_permission` CPI instruction.
-pub struct UpdatePermissionCpi<'a, 'b> {
+/// `commit_and_undelegate_permission` CPI instruction.
+pub struct CommitAndUndelegatePermissionCpi<'a, 'b> {
     /// The program to invoke.
     pub __program: &'b solana_program::account_info::AccountInfo<'a>,
-    /// The permission
-    pub permission: &'b solana_program::account_info::AccountInfo<'a>,
-    /// The delegatable account
+    /// The account committing and undelegating the permission
     pub delegated_account: &'b solana_program::account_info::AccountInfo<'a>,
-    /// The new group for the permission
-    pub group: &'b solana_program::account_info::AccountInfo<'a>,
+    /// The permission account
+    pub permission: &'b solana_program::account_info::AccountInfo<'a>,
+    /// The ephemeral rollups program
+    pub magic_program: &'b solana_program::account_info::AccountInfo<'a>,
+    /// The ephemeral rollups context
+    pub magic_context: &'b solana_program::account_info::AccountInfo<'a>,
 }
 
-impl<'a, 'b> UpdatePermissionCpi<'a, 'b> {
+impl<'a, 'b> CommitAndUndelegatePermissionCpi<'a, 'b> {
     pub fn new(
         program: &'b solana_program::account_info::AccountInfo<'a>,
-        accounts: UpdatePermissionCpiAccounts<'a, 'b>,
+        accounts: CommitAndUndelegatePermissionCpiAccounts<'a, 'b>,
     ) -> Self {
         Self {
             __program: program,
-            permission: accounts.permission,
             delegated_account: accounts.delegated_account,
-            group: accounts.group,
+            permission: accounts.permission,
+            magic_program: accounts.magic_program,
+            magic_context: accounts.magic_context,
         }
     }
     #[inline(always)]
@@ -200,17 +223,21 @@ impl<'a, 'b> UpdatePermissionCpi<'a, 'b> {
             bool,
         )],
     ) -> solana_program::entrypoint::ProgramResult {
-        let mut accounts = Vec::with_capacity(3 + remaining_accounts.len());
+        let mut accounts = Vec::with_capacity(4 + remaining_accounts.len());
+        accounts.push(solana_program::instruction::AccountMeta::new(
+            *self.delegated_account.key,
+            true,
+        ));
         accounts.push(solana_program::instruction::AccountMeta::new(
             *self.permission.key,
             false,
         ));
         accounts.push(solana_program::instruction::AccountMeta::new_readonly(
-            *self.delegated_account.key,
-            true,
+            *self.magic_program.key,
+            false,
         ));
-        accounts.push(solana_program::instruction::AccountMeta::new_readonly(
-            *self.group.key,
+        accounts.push(solana_program::instruction::AccountMeta::new(
+            *self.magic_context.key,
             false,
         ));
         remaining_accounts.iter().for_each(|remaining_account| {
@@ -220,18 +247,21 @@ impl<'a, 'b> UpdatePermissionCpi<'a, 'b> {
                 is_writable: remaining_account.2,
             })
         });
-        let data = UpdatePermissionInstructionData::new().try_to_vec().unwrap();
+        let data = CommitAndUndelegatePermissionInstructionData::new()
+            .try_to_vec()
+            .unwrap();
 
         let instruction = solana_program::instruction::Instruction {
             program_id: super::MAGICBLOCK_PERMISSION_PROGRAM_ID,
             accounts,
             data,
         };
-        let mut account_infos = Vec::with_capacity(3 + 1 + remaining_accounts.len());
+        let mut account_infos = Vec::with_capacity(4 + 1 + remaining_accounts.len());
         account_infos.push(self.__program.clone());
-        account_infos.push(self.permission.clone());
         account_infos.push(self.delegated_account.clone());
-        account_infos.push(self.group.clone());
+        account_infos.push(self.permission.clone());
+        account_infos.push(self.magic_program.clone());
+        account_infos.push(self.magic_context.clone());
         remaining_accounts
             .iter()
             .for_each(|remaining_account| account_infos.push(remaining_account.0.clone()));
@@ -244,38 +274,31 @@ impl<'a, 'b> UpdatePermissionCpi<'a, 'b> {
     }
 }
 
-/// Instruction builder for `UpdatePermission` via CPI.
+/// Instruction builder for `CommitAndUndelegatePermission` via CPI.
 ///
 /// ### Accounts:
 ///
-///   0. `[writable]` permission
-///   1. `[signer]` delegated_account
-///   2. `[]` group
-pub struct UpdatePermissionCpiBuilder<'a, 'b> {
-    instruction: Box<UpdatePermissionCpiBuilderInstruction<'a, 'b>>,
+///   0. `[writable, signer]` delegated_account
+///   1. `[writable]` permission
+///   2. `[]` magic_program
+///   3. `[writable]` magic_context
+pub struct CommitAndUndelegatePermissionCpiBuilder<'a, 'b> {
+    instruction: Box<CommitAndUndelegatePermissionCpiBuilderInstruction<'a, 'b>>,
 }
 
-impl<'a, 'b> UpdatePermissionCpiBuilder<'a, 'b> {
+impl<'a, 'b> CommitAndUndelegatePermissionCpiBuilder<'a, 'b> {
     pub fn new(program: &'b solana_program::account_info::AccountInfo<'a>) -> Self {
-        let instruction = Box::new(UpdatePermissionCpiBuilderInstruction {
+        let instruction = Box::new(CommitAndUndelegatePermissionCpiBuilderInstruction {
             __program: program,
-            permission: None,
             delegated_account: None,
-            group: None,
+            permission: None,
+            magic_program: None,
+            magic_context: None,
             __remaining_accounts: Vec::new(),
         });
         Self { instruction }
     }
-    /// The permission
-    #[inline(always)]
-    pub fn permission(
-        &mut self,
-        permission: &'b solana_program::account_info::AccountInfo<'a>,
-    ) -> &mut Self {
-        self.instruction.permission = Some(permission);
-        self
-    }
-    /// The delegatable account
+    /// The account committing and undelegating the permission
     #[inline(always)]
     pub fn delegated_account(
         &mut self,
@@ -284,10 +307,31 @@ impl<'a, 'b> UpdatePermissionCpiBuilder<'a, 'b> {
         self.instruction.delegated_account = Some(delegated_account);
         self
     }
-    /// The new group for the permission
+    /// The permission account
     #[inline(always)]
-    pub fn group(&mut self, group: &'b solana_program::account_info::AccountInfo<'a>) -> &mut Self {
-        self.instruction.group = Some(group);
+    pub fn permission(
+        &mut self,
+        permission: &'b solana_program::account_info::AccountInfo<'a>,
+    ) -> &mut Self {
+        self.instruction.permission = Some(permission);
+        self
+    }
+    /// The ephemeral rollups program
+    #[inline(always)]
+    pub fn magic_program(
+        &mut self,
+        magic_program: &'b solana_program::account_info::AccountInfo<'a>,
+    ) -> &mut Self {
+        self.instruction.magic_program = Some(magic_program);
+        self
+    }
+    /// The ephemeral rollups context
+    #[inline(always)]
+    pub fn magic_context(
+        &mut self,
+        magic_context: &'b solana_program::account_info::AccountInfo<'a>,
+    ) -> &mut Self {
+        self.instruction.magic_context = Some(magic_context);
         self
     }
     /// Add an additional account to the instruction.
@@ -331,17 +375,25 @@ impl<'a, 'b> UpdatePermissionCpiBuilder<'a, 'b> {
         &self,
         signers_seeds: &[&[&[u8]]],
     ) -> solana_program::entrypoint::ProgramResult {
-        let instruction = UpdatePermissionCpi {
+        let instruction = CommitAndUndelegatePermissionCpi {
             __program: self.instruction.__program,
-
-            permission: self.instruction.permission.expect("permission is not set"),
 
             delegated_account: self
                 .instruction
                 .delegated_account
                 .expect("delegated_account is not set"),
 
-            group: self.instruction.group.expect("group is not set"),
+            permission: self.instruction.permission.expect("permission is not set"),
+
+            magic_program: self
+                .instruction
+                .magic_program
+                .expect("magic_program is not set"),
+
+            magic_context: self
+                .instruction
+                .magic_context
+                .expect("magic_context is not set"),
         };
         instruction.invoke_signed_with_remaining_accounts(
             signers_seeds,
@@ -350,11 +402,12 @@ impl<'a, 'b> UpdatePermissionCpiBuilder<'a, 'b> {
     }
 }
 
-struct UpdatePermissionCpiBuilderInstruction<'a, 'b> {
+struct CommitAndUndelegatePermissionCpiBuilderInstruction<'a, 'b> {
     __program: &'b solana_program::account_info::AccountInfo<'a>,
-    permission: Option<&'b solana_program::account_info::AccountInfo<'a>>,
     delegated_account: Option<&'b solana_program::account_info::AccountInfo<'a>>,
-    group: Option<&'b solana_program::account_info::AccountInfo<'a>>,
+    permission: Option<&'b solana_program::account_info::AccountInfo<'a>>,
+    magic_program: Option<&'b solana_program::account_info::AccountInfo<'a>>,
+    magic_context: Option<&'b solana_program::account_info::AccountInfo<'a>>,
     /// Additional instruction accounts `(AccountInfo, is_writable, is_signer)`.
     __remaining_accounts: Vec<(
         &'b solana_program::account_info::AccountInfo<'a>,

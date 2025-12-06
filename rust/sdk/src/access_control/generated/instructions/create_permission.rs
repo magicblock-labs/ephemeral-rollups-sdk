@@ -5,9 +5,8 @@
 //! [https://github.com/metaplex-foundation/kinobi]
 //!
 
-use borsh::{BorshDeserialize, BorshSerialize};
-
 use super::BorshCompatibility;
+use borsh::{BorshDeserialize, BorshSerialize};
 
 /// Accounts.
 pub struct CreatePermission {

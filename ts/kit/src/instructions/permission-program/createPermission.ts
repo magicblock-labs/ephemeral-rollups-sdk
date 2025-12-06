@@ -18,9 +18,11 @@ export function createCreatePermissionInstruction(
     delegatedAccount: Address;
     group: Address;
     payer: Address;
+    permissionProgram?: Address;
   },
   args?: CreatePermissionInstructionArgs,
 ): Instruction {
+  
   const accountsMeta: AccountMeta[] = [
     { address: accounts.permission, role: AccountRole.WRITABLE },
     { address: accounts.delegatedAccount, role: AccountRole.READONLY_SIGNER },
@@ -34,7 +36,7 @@ export function createCreatePermissionInstruction(
   return {
     accounts: accountsMeta,
     data: instructionData,
-    programAddress: PERMISSION_PROGRAM_ID,
+    programAddress: accounts.permissionProgram ?? PERMISSION_PROGRAM_ID,
   };
 }
 

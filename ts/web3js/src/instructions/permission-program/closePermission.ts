@@ -1,41 +1,35 @@
 import {
   PublicKey,
   TransactionInstruction,
-  SystemProgram,
   AccountMeta,
 } from "@solana/web3.js";
 import { PERMISSION_PROGRAM_ID } from "../../constants";
 
 /**
- * CreatePermission instruction arguments
+ * ClosePermission instruction arguments
  */
 // eslint-disable-next-line @typescript-eslint/no-empty-interface
-export interface CreatePermissionInstructionArgs {}
+export interface ClosePermissionInstructionArgs {}
 
 /**
- * Instruction: CreatePermission
- * Discriminator: 1
+ * Instruction: ClosePermission
+ * Discriminator: 3
  */
-export function createCreatePermissionInstruction(
+export function createClosePermissionInstruction(
   accounts: {
     permission: PublicKey;
     delegatedAccount: PublicKey;
-    group: PublicKey;
-    payer: PublicKey;
     permissionProgram?: PublicKey;
   },
-  args?: CreatePermissionInstructionArgs,
+  args?: ClosePermissionInstructionArgs,
 ): TransactionInstruction {
   
   const keys: AccountMeta[] = [
     { pubkey: accounts.permission, isWritable: true, isSigner: false },
-    { pubkey: accounts.delegatedAccount, isWritable: false, isSigner: true },
-    { pubkey: accounts.group, isWritable: false, isSigner: false },
-    { pubkey: accounts.payer, isWritable: true, isSigner: true },
-    { pubkey: SystemProgram.programId, isWritable: false, isSigner: false },
+    { pubkey: accounts.delegatedAccount, isWritable: true, isSigner: true },
   ];
 
-  const instructionData = serializeCreatePermissionInstructionData(args);
+  const instructionData = serializeClosePermissionInstructionData(args);
 
   return new TransactionInstruction({
     programId: accounts.permissionProgram ?? PERMISSION_PROGRAM_ID,
@@ -44,10 +38,10 @@ export function createCreatePermissionInstruction(
   });
 }
 
-export function serializeCreatePermissionInstructionData(
-  args?: CreatePermissionInstructionArgs,
+export function serializeClosePermissionInstructionData(
+  args?: ClosePermissionInstructionArgs,
 ): Buffer {
-  const discriminator = 1;
+  const discriminator = 3;
   const buffer = Buffer.alloc(1);
   let offset = 0;
 
