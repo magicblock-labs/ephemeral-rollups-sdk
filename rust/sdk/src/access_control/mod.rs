@@ -36,7 +36,5 @@ impl_borsh!(
     ClosePermissionInstructionData,
     CommitAndUndelegatePermissionInstructionData,
     CommitPermissionInstructionData,
-    DelegatePermissionInstructionData,
-    UndelegatePermissionInstructionData,
-    UndelegatePermissionInstructionArgs,
+    DelegatePermissionInstructionData
 );
