@@ -9,7 +9,7 @@ import { PERMISSION_PROGRAM_ID, DELEGATION_PROGRAM_ID } from "../../constants";
 import {
   delegationRecordPdaFromDelegatedAccount,
   delegationMetadataPdaFromDelegatedAccount,
-  delegateBufferPdaFromPermissionAndOwnerProgram,
+  delegateBufferPdaFromDelegatedAccountAndOwnerProgram,
 } from "../../pda";
 
 /**
@@ -24,6 +24,7 @@ export interface DelegatePermissionInstructionArgs {}
  */
 export async function createDelegatePermissionInstruction(
   accounts: {
+    payer: Address
     delegatedAccount: Address;
     permission: Address;
     permissionProgram?: Address;
@@ -31,7 +32,7 @@ export async function createDelegatePermissionInstruction(
   args?: DelegatePermissionInstructionArgs,
 ): Promise<Instruction> {
 
-  const delegationBuffer = await delegateBufferPdaFromPermissionAndOwnerProgram(
+  const delegationBuffer = await delegateBufferPdaFromDelegatedAccountAndOwnerProgram(
     accounts.permission,
     accounts.permissionProgram ?? PERMISSION_PROGRAM_ID,
   );
@@ -43,6 +44,7 @@ export async function createDelegatePermissionInstruction(
   );
 
   const accountsMeta: AccountMeta[] = [
+    { address: accounts.payer, role: AccountRole.WRITABLE_SIGNER },
     { address: accounts.delegatedAccount, role: AccountRole.READONLY_SIGNER },
     { address: SYSTEM_PROGRAM_ADDRESS, role: AccountRole.READONLY },
     { address: accounts.permission, role: AccountRole.WRITABLE },

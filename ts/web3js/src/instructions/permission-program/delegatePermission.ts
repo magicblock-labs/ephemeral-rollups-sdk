@@ -8,7 +8,7 @@ import { PERMISSION_PROGRAM_ID, DELEGATION_PROGRAM_ID } from "../../constants";
 import {
   delegationRecordPdaFromDelegatedAccount,
   delegationMetadataPdaFromDelegatedAccount,
-  delegateBufferPdaFromPermissionAndOwnerProgram,
+  delegateBufferPdaFromDelegatedAccountAndOwnerProgram,
 } from "../../pda";
 
 /**
@@ -23,6 +23,7 @@ export interface DelegatePermissionInstructionArgs {}
  */
 export function createDelegatePermissionInstruction(
   accounts: {
+    payer: PublicKey;
     delegatedAccount: PublicKey;
     permission: PublicKey;
     permissionProgram?: PublicKey;
@@ -30,7 +31,7 @@ export function createDelegatePermissionInstruction(
   args?: DelegatePermissionInstructionArgs,
 ): TransactionInstruction {
 
-  const delegationBuffer = delegateBufferPdaFromPermissionAndOwnerProgram(
+  const delegationBuffer = delegateBufferPdaFromDelegatedAccountAndOwnerProgram(
     accounts.permission,
     accounts.permissionProgram ?? PERMISSION_PROGRAM_ID,
   );
@@ -42,6 +43,7 @@ export function createDelegatePermissionInstruction(
   );
 
   const keys: AccountMeta[] = [
+    { pubkey: accounts.payer, isWritable: true, isSigner: true },
     { pubkey: accounts.delegatedAccount, isWritable: false, isSigner: true },
     { pubkey: SystemProgram.programId, isWritable: false, isSigner: false },
     { pubkey: accounts.permission, isWritable: true, isSigner: false },
