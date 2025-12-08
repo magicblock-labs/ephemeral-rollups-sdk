@@ -7,6 +7,7 @@ pub mod solana {
     pub use solana_program::program::invoke_signed;
     pub use solana_program::program_error::ProgramError;
     pub use solana_program::program_memory::sol_memset;
+    pub use solana_program::pubkey;
     pub use solana_program::pubkey::Pubkey;
     pub use solana_program::sysvar::rent::Rent;
     pub use solana_program::sysvar::Sysvar;
@@ -36,6 +37,7 @@ pub mod solana {
     pub use solana_instruction::{AccountMeta, Instruction};
     pub use solana_program_error::ProgramError;
     pub use solana_program_memory::sol_memset;
+    pub use solana_pubkey::pubkey;
     pub use solana_pubkey::Pubkey;
     pub use solana_system_interface::instruction as system_instruction;
     pub use solana_system_interface::program as system_program;
@@ -51,6 +53,7 @@ pub mod solana {
 
 #[cfg(feature = "anchor")]
 pub mod solana {
+    pub use anchor_lang::prelude::pubkey;
     pub use anchor_lang::prelude::AccountInfo;
     pub use anchor_lang::prelude::ProgramError;
     pub use anchor_lang::prelude::Pubkey;

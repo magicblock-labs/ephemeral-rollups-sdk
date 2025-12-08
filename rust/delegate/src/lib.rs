@@ -34,10 +34,12 @@ pub fn delegate(_attr: TokenStream, item: TokenStream) -> TokenStream {
             }
         };
 
-        // Check if the field has the `del` attribute
-        let has_del = field_attrs
-            .iter()
-            .any(|attr| attr.path.is_ident("account") && attr.tokens.to_string().contains("del"));
+        // Check if the field has the `del` or `delegate` attribute
+        let has_del = field_attrs.iter().any(|attr| {
+            attr.path.is_ident("account")
+                && (attr.tokens.to_string().contains("del")
+                    || attr.tokens.to_string().contains("delegate"))
+        });
 
         if has_del {
             let buffer_field = syn::Ident::new(&format!("buffer_{field_name}"), field.span());
@@ -46,12 +48,15 @@ pub fn delegate(_attr: TokenStream, item: TokenStream) -> TokenStream {
             let delegation_metadata_field =
                 syn::Ident::new(&format!("delegation_metadata_{field_name}"), field.span());
 
-            // Remove `del` from attributes
+            // Remove `del` or `delegate` from attributes
             for attr in &mut field_attrs {
                 if attr.path.is_ident("account") {
                     let tokens = attr.tokens.to_string();
-                    if tokens.contains("del") {
+                    if tokens.contains("del") || tokens.contains("delegate") {
                         let new_tokens = tokens
+                            .replace(", delegate", "")
+                            .replace("delegate, ", "")
+                            .replace("delegate", "")
                             .replace(", del", "")
                             .replace("del, ", "")
                             .replace("del", "");
@@ -65,7 +70,7 @@ pub fn delegate(_attr: TokenStream, item: TokenStream) -> TokenStream {
                 /// CHECK: The buffer account
                 #[account(
                     mut, seeds = [ephemeral_rollups_sdk::pda::DELEGATE_BUFFER_TAG, #field_name.key().as_ref()],
-                    bump, seeds::program = crate::id()
+                    bump, seeds::program = owner_program.key()
                 )]
                 pub #buffer_field: AccountInfo<'info>,
             });

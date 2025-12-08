@@ -11,6 +11,8 @@ use borsh::{BorshDeserialize, BorshSerialize};
 /// Accounts.
 pub struct DelegatePermission {
     /// The account delegating the permission
+    pub payer: solana_program::pubkey::Pubkey,
+    /// The account that is permissioned
     pub delegated_account: solana_program::pubkey::Pubkey,
     /// The system program
     pub system_program: solana_program::pubkey::Pubkey,
@@ -39,6 +41,9 @@ impl DelegatePermission {
     ) -> solana_program::instruction::Instruction {
         let mut accounts = Vec::with_capacity(8 + remaining_accounts.len());
         accounts.push(solana_program::instruction::AccountMeta::new(
+            self.payer, true,
+        ));
+        accounts.push(solana_program::instruction::AccountMeta::new_readonly(
             self.delegated_account,
             true,
         ));
@@ -98,16 +103,18 @@ impl DelegatePermissionInstructionData {
 ///
 /// ### Accounts:
 ///
-///   0. `[writable, signer]` delegated_account
-///   1. `[optional]` system_program (default to `11111111111111111111111111111111`)
-///   2. `[writable]` permission
-///   3. `[]` owner_program
-///   4. `[writable]` delegation_buffer
-///   5. `[writable]` delegation_record
-///   6. `[writable]` delegation_metadata
-///   7. `[]` delegation_program
+///   0. `[writable, signer]` payer
+///   1. `[signer]` delegated_account
+///   2. `[optional]` system_program (default to `11111111111111111111111111111111`)
+///   3. `[writable]` permission
+///   4. `[]` owner_program
+///   5. `[writable]` delegation_buffer
+///   6. `[writable]` delegation_record
+///   7. `[writable]` delegation_metadata
+///   8. `[]` delegation_program
 #[derive(Default)]
 pub struct DelegatePermissionBuilder {
+    payer: Option<solana_program::pubkey::Pubkey>,
     delegated_account: Option<solana_program::pubkey::Pubkey>,
     system_program: Option<solana_program::pubkey::Pubkey>,
     permission: Option<solana_program::pubkey::Pubkey>,
@@ -122,6 +129,12 @@ pub struct DelegatePermissionBuilder {
 impl DelegatePermissionBuilder {
     pub fn new() -> Self {
         Self::default()
+    }
+    /// The account delegating the permission
+    #[inline(always)]
+    pub fn payer(&mut self, payer: solana_program::pubkey::Pubkey) -> &mut Self {
+        self.payer = Some(payer);
+        self
     }
     /// The account delegating the permission
     #[inline(always)]
@@ -208,6 +221,7 @@ impl DelegatePermissionBuilder {
     #[allow(clippy::clone_on_copy)]
     pub fn instruction(&self) -> solana_program::instruction::Instruction {
         let accounts = DelegatePermission {
+            payer: self.payer.expect("payer is not set"),
             delegated_account: self
                 .delegated_account
                 .expect("delegated_account is not set"),
@@ -237,6 +251,8 @@ impl DelegatePermissionBuilder {
 /// `delegate_permission` CPI accounts.
 pub struct DelegatePermissionCpiAccounts<'a, 'b> {
     /// The account delegating the permission
+    pub payer: &'b solana_program::account_info::AccountInfo<'a>,
+    /// The account that is permissioned
     pub delegated_account: &'b solana_program::account_info::AccountInfo<'a>,
     /// The system program
     pub system_program: &'b solana_program::account_info::AccountInfo<'a>,
@@ -259,6 +275,8 @@ pub struct DelegatePermissionCpi<'a, 'b> {
     /// The program to invoke.
     pub __program: &'b solana_program::account_info::AccountInfo<'a>,
     /// The account delegating the permission
+    pub payer: &'b solana_program::account_info::AccountInfo<'a>,
+    /// The account that is permissioned
     pub delegated_account: &'b solana_program::account_info::AccountInfo<'a>,
     /// The system program
     pub system_program: &'b solana_program::account_info::AccountInfo<'a>,
@@ -283,6 +301,7 @@ impl<'a, 'b> DelegatePermissionCpi<'a, 'b> {
     ) -> Self {
         Self {
             __program: program,
+            payer: accounts.payer,
             delegated_account: accounts.delegated_account,
             system_program: accounts.system_program,
             permission: accounts.permission,
@@ -328,6 +347,10 @@ impl<'a, 'b> DelegatePermissionCpi<'a, 'b> {
     ) -> solana_program::entrypoint::ProgramResult {
         let mut accounts = Vec::with_capacity(8 + remaining_accounts.len());
         accounts.push(solana_program::instruction::AccountMeta::new(
+            *self.payer.key,
+            true,
+        ));
+        accounts.push(solana_program::instruction::AccountMeta::new_readonly(
             *self.delegated_account.key,
             true,
         ));
@@ -377,6 +400,7 @@ impl<'a, 'b> DelegatePermissionCpi<'a, 'b> {
         };
         let mut account_infos = Vec::with_capacity(8 + 1 + remaining_accounts.len());
         account_infos.push(self.__program.clone());
+        account_infos.push(self.payer.clone());
         account_infos.push(self.delegated_account.clone());
         account_infos.push(self.system_program.clone());
         account_infos.push(self.permission.clone());
@@ -401,14 +425,15 @@ impl<'a, 'b> DelegatePermissionCpi<'a, 'b> {
 ///
 /// ### Accounts:
 ///
-///   0. `[writable, signer]` delegated_account
-///   1. `[]` system_program
-///   2. `[writable]` permission
-///   3. `[]` owner_program
-///   4. `[writable]` delegation_buffer
-///   5. `[writable]` delegation_record
-///   6. `[writable]` delegation_metadata
-///   7. `[]` delegation_program
+///   0. `[writable, signer]` payer
+///   1. `[signer]` delegated_account
+///   2. `[]` system_program
+///   3. `[writable]` permission
+///   4. `[]` owner_program
+///   5. `[writable]` delegation_buffer
+///   6. `[writable]` delegation_record
+///   7. `[writable]` delegation_metadata
+///   8. `[]` delegation_program
 pub struct DelegatePermissionCpiBuilder<'a, 'b> {
     instruction: Box<DelegatePermissionCpiBuilderInstruction<'a, 'b>>,
 }
@@ -417,6 +442,7 @@ impl<'a, 'b> DelegatePermissionCpiBuilder<'a, 'b> {
     pub fn new(program: &'b solana_program::account_info::AccountInfo<'a>) -> Self {
         let instruction = Box::new(DelegatePermissionCpiBuilderInstruction {
             __program: program,
+            payer: None,
             delegated_account: None,
             system_program: None,
             permission: None,
@@ -430,6 +456,12 @@ impl<'a, 'b> DelegatePermissionCpiBuilder<'a, 'b> {
         Self { instruction }
     }
     /// The account delegating the permission
+    #[inline(always)]
+    pub fn payer(&mut self, payer: &'b solana_program::account_info::AccountInfo<'a>) -> &mut Self {
+        self.instruction.payer = Some(payer);
+        self
+    }
+    /// The account that is permissioned
     #[inline(always)]
     pub fn delegated_account(
         &mut self,
@@ -545,6 +577,8 @@ impl<'a, 'b> DelegatePermissionCpiBuilder<'a, 'b> {
         let instruction = DelegatePermissionCpi {
             __program: self.instruction.__program,
 
+            payer: self.instruction.payer.expect("payer is not set"),
+
             delegated_account: self
                 .instruction
                 .delegated_account
@@ -591,6 +625,7 @@ impl<'a, 'b> DelegatePermissionCpiBuilder<'a, 'b> {
 
 struct DelegatePermissionCpiBuilderInstruction<'a, 'b> {
     __program: &'b solana_program::account_info::AccountInfo<'a>,
+    payer: Option<&'b solana_program::account_info::AccountInfo<'a>>,
     delegated_account: Option<&'b solana_program::account_info::AccountInfo<'a>>,
     system_program: Option<&'b solana_program::account_info::AccountInfo<'a>>,
     permission: Option<&'b solana_program::account_info::AccountInfo<'a>>,
