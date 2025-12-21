@@ -124,41 +124,44 @@ pub fn create_schedule_commit_ix<'a>(
     magic_context: &'a AccountInfo,
     magic_program: &'a AccountInfo,
     allow_undelegation: bool,
+    account_metas: &'a mut [MaybeUninit<AccountMeta<'a>>],
 ) -> Result<Instruction<'a, 'a, 'a, 'a>, ProgramError> {
     let num_accounts = 2 + account_infos.len();
 
-    if num_accounts > MAX_CPI_ACCOUNTS {
+    if num_accounts > account_metas.len() {
         return Err(ProgramError::InvalidArgument);
     }
 
-    const ALLOW_UNDELEGATION_DATA: [u8; 4] = [2, 0, 0, 0];
-    const DISALLOW_UNDELEGATION_DATA: [u8; 4] = [1, 0, 0, 0];
+    const COMMIT_AND_UNDELEGATE: [u8; 4] = [2, 0, 0, 0];
+    const COMMIT: [u8; 4] = [1, 0, 0, 0];
 
     let instruction_data = if allow_undelegation {
-        &ALLOW_UNDELEGATION_DATA
+        &COMMIT_AND_UNDELEGATE
     } else {
-        &DISALLOW_UNDELEGATION_DATA
+        &COMMIT
     };
 
-    const UNINIT_META: MaybeUninit<AccountMeta> = MaybeUninit::<AccountMeta>::uninit();
-    let mut account_metas = [UNINIT_META; MAX_CPI_ACCOUNTS];
-
     unsafe {
-        // SAFETY: num_accounts <= MAX_CPI_ACCOUNTS
-        account_metas
-            .get_unchecked_mut(0)
-            .write(AccountMeta::new(payer.key(), true, true));
-        account_metas.get_unchecked_mut(1).write(AccountMeta::new(
-            magic_context.key(),
-            true,
-            false,
-        ));
+        account_metas.get_unchecked_mut(0).write(AccountMeta {
+            pubkey: payer.key(),
+            is_signer: true,
+            // Do not escalate privileges: mirror the actual writability of the payer account
+            is_writable: payer.is_writable(),
+        });
+
+        account_metas.get_unchecked_mut(1).write(AccountMeta {
+            pubkey: magic_context.key(),
+            is_signer: false,
+            is_writable: true,
+        });
 
         for i in 0..account_infos.len() {
-            let account = account_infos.get_unchecked(i);
-            account_metas
-                .get_unchecked_mut(2 + i)
-                .write(AccountMeta::new(account.key(), true, true));
+            let a = account_infos.get_unchecked(i);
+            account_metas.get_unchecked_mut(2 + i).write(AccountMeta {
+                pubkey: a.key(),
+                is_signer: a.is_signer(),
+                is_writable: a.is_writable(),
+            });
         }
     }
 
