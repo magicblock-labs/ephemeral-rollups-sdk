@@ -7,11 +7,12 @@ use pinocchio::{
 
 const MAX_LOCAL_CPI_ACCOUNTS: usize = 16;
 
-pub fn commit_accounts(
+pub(crate) fn commit_accounts_internal(
     payer: &AccountInfo,
     accounts: &[AccountInfo],
     magic_context: &AccountInfo,
     magic_program: &AccountInfo,
+    allow_undelegation: bool,
 ) -> ProgramResult {
     let mut metas: [MaybeUninit<AccountMeta>; MAX_LOCAL_CPI_ACCOUNTS] = unsafe {
         MaybeUninit::<[MaybeUninit<AccountMeta>; MAX_LOCAL_CPI_ACCOUNTS]>::uninit().assume_init()
@@ -22,7 +23,7 @@ pub fn commit_accounts(
         accounts,
         magic_context,
         magic_program,
-        false,
+        allow_undelegation,
         &mut metas,
     )?;
 
@@ -44,4 +45,13 @@ pub fn commit_accounts(
 
     slice_invoke(&ix, &all_accounts[..num_accounts])?;
     Ok(())
+}
+
+pub fn commit_accounts(
+    payer: &AccountInfo,
+    accounts: &[AccountInfo],
+    magic_context: &AccountInfo,
+    magic_program: &AccountInfo,
+) -> ProgramResult {
+    commit_accounts_internal(payer, accounts, magic_context, magic_program, false)
 }
