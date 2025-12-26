@@ -1,5 +1,5 @@
-use crate::ephem::deprecated::v1::MagicAction;
-use crate::solana_compat::solana::{AccountInfo, Pubkey};
+use crate::ephem::deprecated::v1::{CallHandler, MagicAction};
+use crate::solana_compat::solana::{AccountInfo, ProgramResult};
 
 pub use crate::ephem::deprecated::v0::{
     commit_accounts, commit_and_undelegate_accounts, create_schedule_commit_ix,
@@ -28,9 +28,20 @@ pub mod deprecated;
 
 /// Describes types of Base Intents
 pub enum BaseIntent<'info> {
-    CommitIntent(AccountInfo<'info>),
-    CommitAndUndelegateIntent(AccountInfo<'info>),
-    ActionIntent(MagicAction<'info>),
+    CommitAccounts(CommitIntent<'info>),
+    CommitAndUndelegateAccounts(CommitAndUndelegateIntent<'info>),
+    StandaloneActions(Vec<CallHandler<'info>>),
+}
+
+struct CommitIntent<'info> {
+    accounts: Vec<AccountInfo<'info>>,
+    actions: Vec<CallHandler<'info>>,
+}
+
+struct CommitAndUndelegateIntent<'info> {
+    accounts: Vec<AccountInfo<'info>>,
+    post_commit_actions: Vec<CallHandler<'info>>,
+    post_undelegate_actions: Vec<CallHandler<'info>>,
 }
 
 pub struct MagicIntentsBuilder<'info> {
@@ -54,111 +65,101 @@ impl<'info> MagicIntentsBuilder<'info> {
         }
     }
 
-    pub fn commit(self, account: AccountInfo<'info>) -> CommitIntentBuilder {
-        CommitIntentBuilder {
-            builder: self,
-            account,
-            undelegate: false,
-        }
+    pub fn commit<'a>(self, accounts: &'a [AccountInfo<'info>]) -> CommitIntentBuilder<'a, 'info> {
+        CommitIntentBuilder::new(self, accounts)
     }
 
-    pub fn commit_multiple<'a>(
+    pub fn commit_and_undelegate<'a>(
         self,
         accounts: &'a [AccountInfo<'info>],
-    ) -> CommitMultipleBuilder<'a, 'info> {
-        CommitMultipleBuilder {
-            builder: self,
-            accounts,
-            undelegate: false,
-        }
+    ) -> CommitAndUndelegateAccountsBuilder<'a, 'info> {
+        CommitAndUndelegateAccountsBuilder::new(self, accounts)
+    }
+
+    pub fn build_and_invoke(self) -> ProgramResult {
+        todo!()
     }
 }
 
-pub struct CommitIntentBuilder<'info> {
+pub struct CommitIntentBuilder<'a, 'info> {
     builder: MagicIntentsBuilder<'info>,
-    account: AccountInfo<'info>,
-    undelegate: bool,
+    accounts: &'a [AccountInfo<'info>],
+    actions: Vec<CallHandler<'info>>,
 }
 
-impl<'info> CommitIntentBuilder<'info> {
-    pub fn undelegate(mut self) -> MagicIntentsBuilder<'info> {
-        self.undelegate = true;
-        self.consume()
-    }
-
-    pub fn commit(mut self, account: AccountInfo<'info>) -> CommitIntentBuilder<'info> {
-        let builder = self.consume();
+impl<'a, 'info> CommitIntentBuilder<'a, 'info> {
+    pub fn new(builder: MagicIntentsBuilder<'info>, accounts: &'a [AccountInfo<'info>]) -> Self {
         Self {
             builder,
-            account,
-            undelegate: false,
+            accounts,
+            actions: vec![],
         }
     }
 
-    pub fn commit_multiple<'a>(
-        self,
-        accounts: &'a [AccountInfo<'info>],
-    ) -> CommitMultipleBuilder<'a, 'info> {
-        let builder = self.consume();
-        CommitMultipleBuilder {
-            builder,
-            accounts,
-            undelegate: false,
-        }
+    pub fn add_actions(
+        mut self,
+        actions: impl IntoIterator<Item = CallHandler<'info>>,
+    ) -> MagicIntentsBuilder<'info> {
+        self.actions.extend(actions);
+        self.done()
     }
 
     /// Consume current builder
     /// Build Commit Intent Type and add it to `MagicIntentsBuilder`
-    fn consume(mut self) -> MagicIntentsBuilder<'info> {
-        let intent = if self.undelegate {
-            BaseIntent::CommitIntent(self.account)
-        } else {
-            BaseIntent::CommitAndUndelegateIntent(self.account)
+    pub fn done(mut self) -> MagicIntentsBuilder<'info> {
+        let intent = CommitIntent {
+            accounts: self.accounts.to_vec(),
+            actions: self.actions,
         };
-        self.builder.intents.push(intent);
-
+        self.builder
+            .intents
+            .push(BaseIntent::CommitAccounts(intent));
         self.builder
     }
 }
 
-pub struct CommitMultipleBuilder<'a, 'info> {
+pub struct CommitAndUndelegateAccountsBuilder<'a, 'info> {
     builder: MagicIntentsBuilder<'info>,
     accounts: &'a [AccountInfo<'info>],
-    undelegate: bool,
+    post_commit_actions: Vec<CallHandler<'info>>,
+    post_undelegate_actions: Vec<CallHandler<'info>>,
 }
 
-impl<'a, 'info> CommitMultipleBuilder<'a, 'info> {
-    fn new(builder: MagicIntentsBuilder<'info>, accounts: &'a [AccountInfo<'info>]) -> Self {
+impl<'a, 'info> CommitAndUndelegateAccountsBuilder<'a, 'info> {
+    pub fn new(builder: MagicIntentsBuilder<'info>, accounts: &'a [AccountInfo<'info>]) -> Self {
         Self {
             builder,
             accounts,
-            undelegate: false,
+            post_commit_actions: vec![],
+            post_undelegate_actions: vec![],
         }
     }
 
-    pub fn undelegate(mut self) -> MagicIntentsBuilder<'info> {
-        self.undelegate = true;
-        self.consume()
+    pub fn add_post_commit_actions(
+        mut self,
+        actions: impl IntoIterator<Item = CallHandler<'info>>,
+    ) -> Self {
+        self.post_commit_actions.extend(actions);
+        self
     }
 
-    pub fn commit(self, account: AccountInfo<'info>) -> CommitIntentBuilder<'info> {
-        let builder = self.consume();
-        CommitIntentBuilder {
-            builder,
-            account,
-            undelegate: false,
-        }
+    pub fn add_post_undelegate_actions(
+        mut self,
+        actions: impl IntoIterator<Item = CallHandler<'info>>,
+    ) -> Self {
+        self.post_undelegate_actions.extend(actions);
+        self
     }
 
-    pub fn consume(mut self) -> MagicIntentsBuilder<'info> {
-        let iter = self.accounts.into_iter().map(|account| {
-            if self.undelegate {
-                BaseIntent::CommitAndUndelegateIntent(account.clone())
-            } else {
-                BaseIntent::CommitIntent(account.clone())
-            }
-        });
-        self.builder.intents.extend(iter);
+    pub fn done(mut self) -> MagicIntentsBuilder<'info> {
+        let intent = CommitAndUndelegateIntent {
+            accounts: self.accounts.to_vec(),
+            post_commit_actions: self.post_commit_actions,
+            post_undelegate_actions: self.post_undelegate_actions,
+        };
+        self.builder
+            .intents
+            .push(BaseIntent::CommitAndUndelegateAccounts(intent));
 
         self.builder
     }
@@ -167,13 +168,12 @@ impl<'a, 'info> CommitMultipleBuilder<'a, 'info> {
 fn asd<'info>(accounts: &[AccountInfo<'info>]) {
     let ([payer, magic_context, magic_program, pda1, pda2, pda3], others) = accounts.split_at(3);
     MagicIntentsBuilder::new(payer.clone(), magic_context.clone(), magic_program.clone())
-        .commit(pda1.clone())
-        .undelegate()
-        .commit_multiple(others)
-        .undelegate()
-        .add_action(action1)
-        .commit(pda2.clone())
-        .add_action(action2)
+        .commit(&[pda1.clone()])
+        .add_actions([])
+        .commit_and_undelegate(&[pda3.clone()])
+        .add_post_commit_actions([])
+        .add_post_undelegate_actions([])
+        .done()
         .build_and_invoke();
 
     todo!()
