@@ -101,7 +101,7 @@ export function initVaultIx(
     programId: EATA_PROGRAM_ID,
     keys: [
       { pubkey: vault, isSigner: false, isWritable: true },
-      { pubkey: payer, isSigner: true, isWritable: false },
+      { pubkey: payer, isSigner: true, isWritable: true },
       { pubkey: mint, isSigner: false, isWritable: false },
       { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
     ],
