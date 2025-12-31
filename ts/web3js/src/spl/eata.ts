@@ -2,9 +2,6 @@ import {
   PublicKey,
   TransactionInstruction,
   SystemProgram,
-  Connection,
-  Commitment,
-  GetMultipleAccountsConfig,
 } from "@solana/web3.js";
 import {
   getAssociatedTokenAddressSync,
@@ -142,8 +139,11 @@ export function delegateIx(
   payer: PublicKey,
   ephemeralAta: PublicKey,
   bump: number,
-  validator: PublicKey,
+  validator?: PublicKey,
 ): TransactionInstruction {
+  const data = validator
+    ? Buffer.concat([Buffer.from([4, bump]), validator.toBuffer()])
+    : Buffer.from([4, bump]);
   return new TransactionInstruction({
     programId: EATA_PROGRAM_ID,
     keys: [
@@ -171,7 +171,7 @@ export function delegateIx(
       { pubkey: DELEGATION_PROGRAM_ID, isSigner: false, isWritable: false },
       { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
     ],
-    data: Buffer.concat([Buffer.from([4, bump]), validator.toBuffer()]),
+    data,
   });
 }
 
@@ -259,9 +259,7 @@ export async function delegateSpl(
   },
 ): Promise<TransactionInstruction[]> {
   const payer = opts?.payer ?? owner;
-  const validator =
-    opts?.validator ??
-    new PublicKey("mAGicPQYBMvcYveUZA5F5UNNwyHvfYh5xkLS2Fr1mev");
+  const validator = opts?.validator; // Use the default validator authority if not specified
   const initIfMissing = opts?.initIfMissing ?? true;
 
   const instructions: TransactionInstruction[] = [];
