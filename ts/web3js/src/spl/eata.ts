@@ -147,7 +147,7 @@ export function delegateIx(
   return new TransactionInstruction({
     programId: EATA_PROGRAM_ID,
     keys: [
-      { pubkey: payer, isSigner: true, isWritable: false },
+      { pubkey: payer, isSigner: true, isWritable: true },
       { pubkey: ephemeralAta, isSigner: false, isWritable: true },
       { pubkey: EATA_PROGRAM_ID, isSigner: false, isWritable: false },
       {
