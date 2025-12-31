@@ -276,15 +276,9 @@ export async function delegateSpl(
   if (initIfMissing) {
     instructions.push(
       initEphemeralAtaIx(ephemeralAta, owner, mint, payer, eataBump),
+      initVaultAtaIx(payer, vaultAta, vault, mint),
+      initVaultIx(vault, mint, payer, vaultBump),
     );
-  }
-
-  if (initIfMissing) {
-    instructions.push(initVaultAtaIx(payer, vaultAta, vault, mint));
-  }
-
-  if (initIfMissing) {
-    instructions.push(initVaultIx(vault, mint, payer, vaultBump));
   }
 
   instructions.push(
