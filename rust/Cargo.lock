@@ -1029,7 +1029,7 @@ dependencies = [
 
 [[package]]
 name = "ephemeral-rollups-pinocchio"
-version = "0.6.6"
+version = "0.7.0"
 dependencies = [
  "pinocchio",
  "pinocchio-log",
@@ -1040,7 +1040,7 @@ dependencies = [
 
 [[package]]
 name = "ephemeral-rollups-sdk"
-version = "0.6.6"
+version = "0.7.0"
 dependencies = [
  "anchor-lang",
  "base64ct",
@@ -1070,7 +1070,7 @@ dependencies = [
 
 [[package]]
 name = "ephemeral-rollups-sdk-attribute-action"
-version = "0.6.6"
+version = "0.7.0"
 dependencies = [
  "quote",
  "syn 1.0.109",
@@ -1078,7 +1078,7 @@ dependencies = [
 
 [[package]]
 name = "ephemeral-rollups-sdk-attribute-commit"
-version = "0.6.6"
+version = "0.7.0"
 dependencies = [
  "quote",
  "syn 1.0.109",
@@ -1086,7 +1086,7 @@ dependencies = [
 
 [[package]]
 name = "ephemeral-rollups-sdk-attribute-delegate"
-version = "0.6.6"
+version = "0.7.0"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1095,7 +1095,7 @@ dependencies = [
 
 [[package]]
 name = "ephemeral-rollups-sdk-attribute-ephemeral"
-version = "0.6.6"
+version = "0.7.0"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1906,7 +1906,7 @@ dependencies = [
 
 [[package]]
 name = "magic-resolver"
-version = "0.6.6"
+version = "0.7.0"
 dependencies = [
  "base64 0.12.3",
  "bincode",
