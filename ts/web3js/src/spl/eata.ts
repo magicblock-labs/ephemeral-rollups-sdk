@@ -266,7 +266,6 @@ export async function delegateSpl(
 
   const [ephemeralAta, eataBump] = deriveEphemeralAta(owner, mint);
   const [vault, vaultBump] = deriveVault(mint);
-  void vaultBump; // currently unused but reserved by spec
   const vaultAta = deriveVaultAta(mint, vault);
 
   const ownerAta = getAssociatedTokenAddressSync(mint, owner);
