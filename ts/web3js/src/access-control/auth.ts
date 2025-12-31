@@ -35,10 +35,10 @@ export async function getAuthToken(
   const { challenge, error }: AuthChallengeResponse =
     await challengeResponse.json();
 
-  if (error) {
+  if (typeof error === "string" && error.length > 0) {
     throw new Error(`Failed to get challenge: ${error}`);
   }
-  if (!challenge) {
+  if (typeof challenge !== "string" || challenge.length === 0) {
     throw new Error("No challenge received");
   }
 
@@ -63,7 +63,7 @@ export async function getAuthToken(
   if (authResponse.status !== 200) {
     throw new Error(`Failed to authenticate: ${authJson.error}`);
   }
-  if (!authJson.token) {
+  if (typeof authJson.token !== "string" || authJson.token.length === 0) {
     throw new Error("No token received");
   }
 
