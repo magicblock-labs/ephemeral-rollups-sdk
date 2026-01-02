@@ -25,7 +25,8 @@ function getAssociatedTokenAddressSync(
   associatedTokenProgramId: PublicKey = ASSOCIATED_TOKEN_PROGRAM_ID,
 ): PublicKey {
   // If the owner is not on curve and off-curve owners are not allowed, throw.
-  // Note: In this SDK we only call with allowOwnerOffCurve=true for PDAs.
+  // Note: Pass allowOwnerOffCurve=true when deriving ATAs for PDA owners (e.g., vaults).
+  // For regular wallet owners, the default false is used.
   if (!allowOwnerOffCurve && !PublicKey.isOnCurve(owner)) {
     throw new Error("Owner public key is off-curve");
   }
