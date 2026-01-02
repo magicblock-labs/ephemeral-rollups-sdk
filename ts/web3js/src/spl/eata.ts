@@ -3,11 +3,66 @@ import {
   TransactionInstruction,
   SystemProgram,
 } from "@solana/web3.js";
-import {
-  getAssociatedTokenAddressSync,
-  createAssociatedTokenAccountIdempotentInstruction,
-  TOKEN_PROGRAM_ID,
-} from "@solana/spl-token";
+// Minimal SPL Token helpers (vendored) to avoid importing @solana/spl-token.
+// This prevents bundlers from pulling transitive deps like spl-token-group and
+// also avoids package.exports issues when targeting browsers.
+
+// SPL Token program IDs
+const TOKEN_PROGRAM_ID = new PublicKey(
+  "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+);
+const ASSOCIATED_TOKEN_PROGRAM_ID = new PublicKey(
+  "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL",
+);
+
+// Derive the Associated Token Account for a given mint/owner pair. Mirrors the
+// behavior of @solana/spl-token's getAssociatedTokenAddressSync.
+function getAssociatedTokenAddressSync(
+  mint: PublicKey,
+  owner: PublicKey,
+  allowOwnerOffCurve: boolean = false,
+  programId: PublicKey = TOKEN_PROGRAM_ID,
+  associatedTokenProgramId: PublicKey = ASSOCIATED_TOKEN_PROGRAM_ID,
+): PublicKey {
+  // If the owner is not on curve and off-curve owners are not allowed, throw.
+  // Note: Pass allowOwnerOffCurve=true when deriving ATAs for PDA owners (e.g., vaults).
+  // For regular wallet owners, the default false is used.
+  if (!allowOwnerOffCurve && !PublicKey.isOnCurve(owner)) {
+    throw new Error("Owner public key is off-curve");
+  }
+
+  const [ata] = PublicKey.findProgramAddressSync(
+    [owner.toBuffer(), programId.toBuffer(), mint.toBuffer()],
+    associatedTokenProgramId,
+  );
+  return ata;
+}
+
+// Build an idempotent ATA create instruction. Mirrors
+// @solana/spl-token's createAssociatedTokenAccountIdempotentInstruction.
+function createAssociatedTokenAccountIdempotentInstruction(
+  payer: PublicKey,
+  associatedToken: PublicKey,
+  owner: PublicKey,
+  mint: PublicKey,
+  programId: PublicKey = TOKEN_PROGRAM_ID,
+  associatedTokenProgramId: PublicKey = ASSOCIATED_TOKEN_PROGRAM_ID,
+): TransactionInstruction {
+  // Instruction index 1 = CreateIdempotent
+  const data = Buffer.from([1]);
+  return new TransactionInstruction({
+    programId: associatedTokenProgramId,
+    keys: [
+      { pubkey: payer, isSigner: true, isWritable: true },
+      { pubkey: associatedToken, isSigner: false, isWritable: true },
+      { pubkey: owner, isSigner: false, isWritable: false },
+      { pubkey: mint, isSigner: false, isWritable: false },
+      { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+      { pubkey: programId, isSigner: false, isWritable: false },
+    ],
+    data,
+  });
+}
 
 import {
   DELEGATION_PROGRAM_ID,
