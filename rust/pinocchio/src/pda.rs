@@ -28,7 +28,11 @@ fn find_program_address_impl(seeds: &[&[u8]], program_id: &Address) -> (Address,
         // Use derive_address with the bump
         let derived = match seeds.len() {
             1 => derive_address(&[seeds[0], &bump_slice], Some(bump), program_id_bytes),
-            2 => derive_address(&[seeds[0], seeds[1], &bump_slice], Some(bump), program_id_bytes),
+            2 => derive_address(
+                &[seeds[0], seeds[1], &bump_slice],
+                Some(bump),
+                program_id_bytes,
+            ),
             3 => derive_address(
                 &[seeds[0], seeds[1], seeds[2], &bump_slice],
                 Some(bump),

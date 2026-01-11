@@ -48,8 +48,13 @@ pub(crate) fn commit_accounts_internal(
             invoke(&ix, &accs)?;
         }
         5 => {
-            let accs: [&AccountView; 5] =
-                [payer, magic_context, &accounts[0], &accounts[1], &accounts[2]];
+            let accs: [&AccountView; 5] = [
+                payer,
+                magic_context,
+                &accounts[0],
+                &accounts[1],
+                &accounts[2],
+            ];
             invoke(&ix, &accs)?;
         }
         6 => {
