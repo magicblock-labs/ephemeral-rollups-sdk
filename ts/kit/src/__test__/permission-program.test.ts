@@ -7,7 +7,7 @@ import {
 import { PERMISSION_PROGRAM_ID } from "../constants";
 
 describe("Permission Program Instructions (@solana/kit)", () => {
-  const mockAddress = address("11111111111111111111111111111111");
+  const mockAddress = address("11111111111111111111111111111113");
   const differentAddress = address("11111111111111111111111111111112");
 
   describe("createPermission instruction", () => {

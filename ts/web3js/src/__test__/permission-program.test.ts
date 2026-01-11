@@ -7,7 +7,7 @@ import {
 import { PERMISSION_PROGRAM_ID } from "../constants";
 
 describe("Permission Program Instructions (web3.js)", () => {
-  const mockPublicKey = new PublicKey("11111111111111111111111111111111");
+  const mockPublicKey = new PublicKey("11111111111111111111111111111113");
   const differentPublicKey = new PublicKey("11111111111111111111111111111112");
 
   describe("createPermission instruction", () => {
