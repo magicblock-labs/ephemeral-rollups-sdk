@@ -1,10 +1,9 @@
 use pinocchio::{
-    account_info::AccountInfo,
-    instruction::{Seed, Signer},
-    program_error::ProgramError,
-    pubkey::find_program_address,
-    ProgramResult,
+    cpi::{Seed, Signer},
+    error::ProgramError,
+    AccountView, ProgramResult,
 };
+use pinocchio_pubkey::derive_address;
 use pinocchio_system::instructions::{Assign, CreateAccount};
 
 use crate::consts::DELEGATION_PROGRAM_ID;
@@ -12,9 +11,32 @@ use crate::types::DelegateAccountArgs;
 use crate::utils::{cpi_delegate, make_seed_buf};
 use crate::{consts::BUFFER, types::DelegateConfig, utils::close_pda_acc};
 
+// On Solana targets, use bytes_are_curve_point for validation
+#[cfg(any(target_os = "solana", target_arch = "bpf"))]
+use pinocchio::address::bytes_are_curve_point;
+
+// On non-Solana targets (for cargo check), provide a stub
+#[cfg(not(any(target_os = "solana", target_arch = "bpf")))]
+fn bytes_are_curve_point(_bytes: &[u8; 32]) -> bool {
+    false
+}
+
+/// Find the bump for a buffer PDA
+fn find_buffer_pda_bump(pda_key: &[u8], owner_program: &pinocchio::Address) -> u8 {
+    let owner_bytes: &[u8; 32] = owner_program.as_array();
+    for bump in (0u8..=255).rev() {
+        let bump_slice = [bump];
+        let derived = derive_address(&[BUFFER, pda_key, &bump_slice], Some(bump), owner_bytes);
+        if !bytes_are_curve_point(&derived) {
+            return bump;
+        }
+    }
+    panic!("Unable to find valid buffer PDA bump");
+}
+
 #[allow(unknown_lints, clippy::cloned_ref_to_slice_refs)]
 pub fn delegate_account(
-    accounts: &[&AccountInfo],
+    accounts: &[&AccountView],
     seeds: &[&[u8]],
     bump: u8,
     config: DelegateConfig,
@@ -30,16 +52,16 @@ pub fn delegate_account(
     }
 
     // Buffer PDA seeds
-    let buffer_seeds: &[&[u8]] = &[BUFFER, pda_acc.key().as_ref()];
+    let pda_key_bytes: &[u8; 32] = pda_acc.address().as_array();
 
-    // Bumps
-    let (_, buffer_pda_bump) = find_program_address(buffer_seeds, owner_program.key());
+    // Find buffer PDA bump
+    let buffer_pda_bump = find_buffer_pda_bump(pda_key_bytes.as_ref(), owner_program.address());
 
     // Buffer signer seeds
     let buffer_bump_slice = [buffer_pda_bump];
     let buffer_seed_binding = [
         Seed::from(BUFFER),
-        Seed::from(pda_acc.key().as_ref()),
+        Seed::from(pda_key_bytes.as_ref()),
         Seed::from(&buffer_bump_slice),
     ];
     let buffer_signer_seeds = Signer::from(&buffer_seed_binding);
@@ -53,18 +75,18 @@ pub fn delegate_account(
         to: buffer_acc,
         lamports: 0,
         space: data_len as u64,
-        owner: owner_program.key(),
+        owner: owner_program.address(),
     }
     .invoke_signed(&[buffer_signer_seeds])?;
 
     // Copy delegated PDA -> buffer, then zero delegated PDA
     {
-        let pda_ro = pda_acc.try_borrow_data()?;
-        let mut buf_data = buffer_acc.try_borrow_mut_data()?;
+        let pda_ro = pda_acc.try_borrow()?;
+        let mut buf_data = buffer_acc.try_borrow_mut()?;
         buf_data.copy_from_slice(&pda_ro);
     }
     {
-        let mut pda_mut = pda_acc.try_borrow_mut_data()?;
+        let mut pda_mut = pda_acc.try_borrow_mut()?;
         for b in pda_mut.iter_mut().take(data_len) {
             *b = 0;
         }
@@ -76,8 +98,8 @@ pub fn delegate_account(
     let delegate_signer_seeds = Signer::from(filled);
 
     let current_owner = unsafe { pda_acc.owner() };
-    if current_owner != &pinocchio_system::id() {
-        unsafe { pda_acc.assign(&pinocchio_system::id()) };
+    if current_owner != &pinocchio_system::ID {
+        unsafe { pda_acc.assign(&pinocchio_system::ID) };
     }
     let current_owner = unsafe { pda_acc.owner() };
     if current_owner != &DELEGATION_PROGRAM_ID {

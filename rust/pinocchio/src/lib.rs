@@ -1,6 +1,5 @@
-#![cfg_attr(not(feature = "std"), no_std)]
+#![no_std]
 
-#[cfg(not(feature = "std"))]
 extern crate alloc;
 
 pub mod consts;
@@ -10,4 +9,16 @@ pub mod seeds;
 pub mod types;
 pub mod utils;
 
-pinocchio_pubkey::declare_id!("DELeGGvXpWV2fqJUhqcF5ZSYMS4JTLjteaAMARRSaeSh");
+use pinocchio::Address;
+use pinocchio_pubkey::pubkey;
+
+/// The delegation program ID as bytes.
+pub const ID_BYTES: [u8; 32] = pubkey!("DELeGGvXpWV2fqJUhqcF5ZSYMS4JTLjteaAMARRSaeSh");
+
+/// The delegation program ID.
+pub const ID: Address = Address::new_from_array(ID_BYTES);
+
+/// Returns a reference to the program ID.
+pub fn id() -> &'static Address {
+    &ID
+}

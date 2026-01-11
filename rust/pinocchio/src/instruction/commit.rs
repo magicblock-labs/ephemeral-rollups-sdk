@@ -1,21 +1,21 @@
 use crate::utils::create_schedule_commit_ix;
 use core::mem::MaybeUninit;
-use pinocchio::instruction::AccountMeta;
 use pinocchio::{
-    account_info::AccountInfo, cpi::slice_invoke, program_error::ProgramError, ProgramResult,
+    cpi::invoke, error::ProgramError, instruction::InstructionAccount, AccountView, ProgramResult,
 };
 
 const MAX_LOCAL_CPI_ACCOUNTS: usize = 16;
 
 pub(crate) fn commit_accounts_internal(
-    payer: &AccountInfo,
-    accounts: &[AccountInfo],
-    magic_context: &AccountInfo,
-    magic_program: &AccountInfo,
+    payer: &AccountView,
+    accounts: &[AccountView],
+    magic_context: &AccountView,
+    magic_program: &AccountView,
     allow_undelegation: bool,
 ) -> ProgramResult {
-    let mut metas: [MaybeUninit<AccountMeta>; MAX_LOCAL_CPI_ACCOUNTS] = unsafe {
-        MaybeUninit::<[MaybeUninit<AccountMeta>; MAX_LOCAL_CPI_ACCOUNTS]>::uninit().assume_init()
+    let mut metas: [MaybeUninit<InstructionAccount>; MAX_LOCAL_CPI_ACCOUNTS] = unsafe {
+        MaybeUninit::<[MaybeUninit<InstructionAccount>; MAX_LOCAL_CPI_ACCOUNTS]>::uninit()
+            .assume_init()
     };
 
     let ix = create_schedule_commit_ix(
@@ -32,26 +32,48 @@ pub(crate) fn commit_accounts_internal(
         return Err(ProgramError::InvalidArgument);
     }
 
-    let mut all_accounts: [&AccountInfo; MAX_LOCAL_CPI_ACCOUNTS] = [payer; MAX_LOCAL_CPI_ACCOUNTS];
-
-    all_accounts[0] = payer;
-    all_accounts[1] = magic_context;
-
-    let mut i = 0usize;
-    while i < accounts.len() {
-        all_accounts[2 + i] = &accounts[i];
-        i += 1;
+    // Build account references array based on actual number of accounts
+    // Using a fixed-size array with invoke
+    match num_accounts {
+        2 => {
+            let accs: [&AccountView; 2] = [payer, magic_context];
+            invoke(&ix, &accs)?;
+        }
+        3 => {
+            let accs: [&AccountView; 3] = [payer, magic_context, &accounts[0]];
+            invoke(&ix, &accs)?;
+        }
+        4 => {
+            let accs: [&AccountView; 4] = [payer, magic_context, &accounts[0], &accounts[1]];
+            invoke(&ix, &accs)?;
+        }
+        5 => {
+            let accs: [&AccountView; 5] =
+                [payer, magic_context, &accounts[0], &accounts[1], &accounts[2]];
+            invoke(&ix, &accs)?;
+        }
+        6 => {
+            let accs: [&AccountView; 6] = [
+                payer,
+                magic_context,
+                &accounts[0],
+                &accounts[1],
+                &accounts[2],
+                &accounts[3],
+            ];
+            invoke(&ix, &accs)?;
+        }
+        _ => return Err(ProgramError::InvalidArgument),
     }
 
-    slice_invoke(&ix, &all_accounts[..num_accounts])?;
     Ok(())
 }
 
 pub fn commit_accounts(
-    payer: &AccountInfo,
-    accounts: &[AccountInfo],
-    magic_context: &AccountInfo,
-    magic_program: &AccountInfo,
+    payer: &AccountView,
+    accounts: &[AccountView],
+    magic_context: &AccountView,
+    magic_program: &AccountView,
 ) -> ProgramResult {
     commit_accounts_internal(payer, accounts, magic_context, magic_program, false)
 }

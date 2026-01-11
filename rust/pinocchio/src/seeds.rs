@@ -1,16 +1,16 @@
-use pinocchio::pubkey::Pubkey;
+use pinocchio::Address;
 
 /// Represents all types of seeds used for PDAs
 pub enum Seed<'a> {
-    Delegation(&'a Pubkey),
-    DelegationMetadata(&'a Pubkey),
-    Buffer(&'a Pubkey),
-    CommitState(&'a Pubkey),
-    CommitRecord(&'a Pubkey),
-    UndelegateBuffer(&'a Pubkey),
-    ValidatorFeesVault(&'a Pubkey),
-    EphemeralBalance { payer: &'a Pubkey, index: u8 },
-    ProgramConfig(&'a Pubkey),
+    Delegation(&'a Address),
+    DelegationMetadata(&'a Address),
+    Buffer(&'a Address),
+    CommitState(&'a Address),
+    CommitRecord(&'a Address),
+    UndelegateBuffer(&'a Address),
+    ValidatorFeesVault(&'a Address),
+    EphemeralBalance { payer: &'a Address, index: u8 },
+    ProgramConfig(&'a Address),
     FeesVault,
 }
 

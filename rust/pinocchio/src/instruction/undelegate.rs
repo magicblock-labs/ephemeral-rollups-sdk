@@ -1,21 +1,58 @@
 use core::mem::MaybeUninit;
-use pinocchio::pubkey::{Pubkey, MAX_SEEDS};
 use pinocchio::{
-    account_info::AccountInfo,
-    instruction::{Seed, Signer},
-    program_error::ProgramError,
-    pubkey::find_program_address,
+    address::MAX_SEEDS,
+    cpi::{Seed, Signer},
+    error::ProgramError,
     sysvars::{rent::Rent, Sysvar},
-    ProgramResult,
+    AccountView, Address, ProgramResult,
 };
+use pinocchio_pubkey::derive_address;
 use pinocchio_system::instructions::CreateAccount;
+
+// On Solana targets, use bytes_are_curve_point for validation
+#[cfg(any(target_os = "solana", target_arch = "bpf"))]
+use pinocchio::address::bytes_are_curve_point;
+
+// On non-Solana targets (for cargo check), provide a stub
+#[cfg(not(any(target_os = "solana", target_arch = "bpf")))]
+fn bytes_are_curve_point(_bytes: &[u8; 32]) -> bool {
+    false
+}
+
+/// Find the bump for a PDA given seeds and program ID
+fn find_pda_bump(seeds: &[&[u8]], program_id: &Address) -> u8 {
+    let program_id_bytes: &[u8; 32] = program_id.as_array();
+    for bump in (0u8..=255).rev() {
+        let bump_slice = [bump];
+        // Build seeds array dynamically based on seed count
+        let derived = match seeds.len() {
+            1 => derive_address(&[seeds[0], &bump_slice], Some(bump), program_id_bytes),
+            2 => derive_address(&[seeds[0], seeds[1], &bump_slice], Some(bump), program_id_bytes),
+            3 => derive_address(
+                &[seeds[0], seeds[1], seeds[2], &bump_slice],
+                Some(bump),
+                program_id_bytes,
+            ),
+            4 => derive_address(
+                &[seeds[0], seeds[1], seeds[2], seeds[3], &bump_slice],
+                Some(bump),
+                program_id_bytes,
+            ),
+            _ => continue,
+        };
+        if !bytes_are_curve_point(&derived) {
+            return bump;
+        }
+    }
+    panic!("Unable to find valid PDA bump");
+}
 
 #[inline(always)]
 pub fn undelegate(
-    delegated_account: &AccountInfo,
-    owner_program: &Pubkey,
-    buffer: &AccountInfo,
-    payer: &AccountInfo,
+    delegated_account: &AccountView,
+    owner_program: &Address,
+    buffer: &AccountView,
+    payer: &AccountView,
     mut callback_args: &[u8],
 ) -> ProgramResult {
     if !buffer.is_signer() {
@@ -57,7 +94,8 @@ pub fn undelegate(
     }
 
     let pda_seeds = &seed_refs[..seeds_len];
-    let (_, bump) = find_program_address(pda_seeds, owner_program);
+    // Find bump by iterating through possible values
+    let bump = find_pda_bump(pda_seeds, owner_program);
 
     // collect seeds into static array (avoid dynamic alloc)
     const UNINIT: MaybeUninit<Seed> = MaybeUninit::<Seed>::uninit();
@@ -79,7 +117,7 @@ pub fn undelegate(
 
     // create delegated account and copy buffer data
     let space = buffer.data_len() as u64;
-    let lamports = Rent::get()?.minimum_balance(space as usize);
+    let lamports = Rent::get()?.try_minimum_balance(space as usize)?;
 
     CreateAccount {
         from: payer,
@@ -90,8 +128,8 @@ pub fn undelegate(
     }
     .invoke_signed(&[signer])?;
 
-    let mut data = delegated_account.try_borrow_mut_data()?;
-    let buffer_data = buffer.try_borrow_data()?;
+    let mut data = delegated_account.try_borrow_mut()?;
+    let buffer_data = buffer.try_borrow()?;
     (*data).copy_from_slice(&buffer_data);
 
     Ok(())

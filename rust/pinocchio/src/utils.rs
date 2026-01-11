@@ -3,12 +3,12 @@ use crate::{
     types::{DelegateAccountArgs, MAX_DELEGATE_ACCOUNT_ARGS_SIZE},
 };
 use core::mem::MaybeUninit;
-use pinocchio::pubkey::MAX_SEEDS;
 use pinocchio::{
-    account_info::AccountInfo,
-    cpi::{invoke_signed, MAX_CPI_ACCOUNTS},
-    instruction::{AccountMeta, Instruction, Seed, Signer},
-    program_error::ProgramError,
+    address::MAX_SEEDS,
+    cpi::{invoke_signed, Seed, Signer, MAX_CPI_ACCOUNTS},
+    error::ProgramError,
+    instruction::{InstructionAccount, InstructionView},
+    AccountView,
 };
 
 #[inline(always)]
@@ -30,14 +30,12 @@ pub fn make_seed_buf<'a>() -> [Seed<'a>; MAX_SEEDS] {
     unsafe { core::mem::transmute_copy::<_, [Seed<'a>; MAX_SEEDS]>(&buf) }
 }
 
-pub fn close_pda_acc(payer: &AccountInfo, pda_acc: &AccountInfo) -> Result<(), ProgramError> {
-    unsafe {
-        *payer.borrow_mut_lamports_unchecked() += *pda_acc.borrow_lamports_unchecked();
-        *pda_acc.borrow_mut_lamports_unchecked() = 0;
-    }
+pub fn close_pda_acc(payer: &AccountView, pda_acc: &AccountView) -> Result<(), ProgramError> {
+    payer.set_lamports(payer.lamports() + pda_acc.lamports());
+    pda_acc.set_lamports(0);
 
     pda_acc
-        .realloc(0, false)
+        .resize(0)
         .map_err(|_| ProgramError::AccountDataTooSmall)?;
     unsafe { pda_acc.assign(&pinocchio_system::ID) };
 
@@ -46,17 +44,18 @@ pub fn close_pda_acc(payer: &AccountInfo, pda_acc: &AccountInfo) -> Result<(), P
 
 #[allow(clippy::too_many_arguments)]
 pub fn cpi_delegate(
-    payer: &AccountInfo,
-    pda_acc: &AccountInfo,
-    owner_program: &AccountInfo,
-    buffer_acc: &AccountInfo,
-    delegation_record: &AccountInfo,
-    delegation_metadata: &AccountInfo,
+    payer: &AccountView,
+    pda_acc: &AccountView,
+    owner_program: &AccountView,
+    buffer_acc: &AccountView,
+    delegation_record: &AccountView,
+    delegation_metadata: &AccountView,
     delegate_args: DelegateAccountArgs,
     signer_seeds: Signer<'_, '_>,
 ) -> Result<(), ProgramError> {
-    const UNINIT_META: MaybeUninit<AccountMeta> = MaybeUninit::<AccountMeta>::uninit();
-    let mut account_metas = [UNINIT_META; MAX_CPI_ACCOUNTS];
+    const UNINIT_ACCOUNT: MaybeUninit<InstructionAccount> =
+        MaybeUninit::<InstructionAccount>::uninit();
+    let mut account_metas = [UNINIT_ACCOUNT; MAX_CPI_ACCOUNTS];
 
     let num_accounts = 7;
 
@@ -64,29 +63,25 @@ pub fn cpi_delegate(
         // SAFETY: num_accounts <= MAX_CPI_ACCOUNTS
         account_metas
             .get_unchecked_mut(0)
-            .write(AccountMeta::new(payer.key(), true, true));
+            .write(InstructionAccount::writable_signer(payer.address()));
         account_metas
             .get_unchecked_mut(1)
-            .write(AccountMeta::new(pda_acc.key(), true, true));
+            .write(InstructionAccount::writable_signer(pda_acc.address()));
         account_metas
             .get_unchecked_mut(2)
-            .write(AccountMeta::readonly(owner_program.key()));
+            .write(InstructionAccount::readonly(owner_program.address()));
         account_metas
             .get_unchecked_mut(3)
-            .write(AccountMeta::new(buffer_acc.key(), true, false));
-        account_metas.get_unchecked_mut(4).write(AccountMeta::new(
-            delegation_record.key(),
-            true,
-            false,
-        ));
-        account_metas.get_unchecked_mut(5).write(AccountMeta::new(
-            delegation_metadata.key(),
-            true,
-            false,
-        ));
+            .write(InstructionAccount::writable(buffer_acc.address()));
+        account_metas
+            .get_unchecked_mut(4)
+            .write(InstructionAccount::writable(delegation_record.address()));
+        account_metas
+            .get_unchecked_mut(5)
+            .write(InstructionAccount::writable(delegation_metadata.address()));
         account_metas
             .get_unchecked_mut(6)
-            .write(AccountMeta::readonly(&pinocchio_system::ID));
+            .write(InstructionAccount::readonly(&pinocchio_system::ID));
     }
 
     // Prepare instruction data with 8-byte discriminator prefix followed by serialized args
@@ -97,15 +92,18 @@ pub fn cpi_delegate(
     let total_len = 8 + args_slice.len();
     let data_slice = &data[..total_len];
 
-    let instruction = Instruction {
+    let instruction = InstructionView {
         program_id: &DELEGATION_PROGRAM_ID,
         accounts: unsafe {
-            core::slice::from_raw_parts(account_metas.as_ptr() as *const AccountMeta, num_accounts)
+            core::slice::from_raw_parts(
+                account_metas.as_ptr() as *const InstructionAccount,
+                num_accounts,
+            )
         },
         data: data_slice,
     };
 
-    let acc_infos = [
+    let acc_infos: [&AccountView; 6] = [
         payer,
         pda_acc,
         owner_program,
@@ -119,14 +117,14 @@ pub fn cpi_delegate(
 }
 
 pub fn create_schedule_commit_ix<'a>(
-    payer: &'a AccountInfo,
-    account_infos: &'a [AccountInfo],
-    magic_context: &'a AccountInfo,
-    magic_program: &'a AccountInfo,
+    payer: &'a AccountView,
+    account_views: &'a [AccountView],
+    magic_context: &'a AccountView,
+    magic_program: &'a AccountView,
     allow_undelegation: bool,
-    account_metas: &'a mut [MaybeUninit<AccountMeta<'a>>],
-) -> Result<Instruction<'a, 'a, 'a, 'a>, ProgramError> {
-    let num_accounts = 2 + account_infos.len();
+    account_metas: &'a mut [MaybeUninit<InstructionAccount<'a>>],
+) -> Result<InstructionView<'a, 'a, 'a, 'a>, ProgramError> {
+    let num_accounts = 2 + account_views.len();
 
     if num_accounts > account_metas.len() {
         return Err(ProgramError::InvalidArgument);
@@ -142,33 +140,39 @@ pub fn create_schedule_commit_ix<'a>(
     };
 
     unsafe {
-        account_metas.get_unchecked_mut(0).write(AccountMeta {
-            pubkey: payer.key(),
-            is_signer: true,
-            // Do not escalate privileges: mirror the actual writability of the payer account
-            is_writable: payer.is_writable(),
-        });
+        // payer is signer, may or may not be writable
+        account_metas
+            .get_unchecked_mut(0)
+            .write(InstructionAccount::new(
+                payer.address(),
+                payer.is_writable(),
+                true,
+            ));
 
-        account_metas.get_unchecked_mut(1).write(AccountMeta {
-            pubkey: magic_context.key(),
-            is_signer: false,
-            is_writable: true,
-        });
+        // magic_context is writable, not signer
+        account_metas
+            .get_unchecked_mut(1)
+            .write(InstructionAccount::writable(magic_context.address()));
 
-        for i in 0..account_infos.len() {
-            let a = account_infos.get_unchecked(i);
-            account_metas.get_unchecked_mut(2 + i).write(AccountMeta {
-                pubkey: a.key(),
-                is_signer: a.is_signer(),
-                is_writable: a.is_writable(),
-            });
+        for i in 0..account_views.len() {
+            let a = account_views.get_unchecked(i);
+            account_metas
+                .get_unchecked_mut(2 + i)
+                .write(InstructionAccount::new(
+                    a.address(),
+                    a.is_writable(),
+                    a.is_signer(),
+                ));
         }
     }
 
-    let ix = Instruction {
-        program_id: magic_program.key(),
+    let ix = InstructionView {
+        program_id: magic_program.address(),
         accounts: unsafe {
-            core::slice::from_raw_parts(account_metas.as_ptr() as *const AccountMeta, num_accounts)
+            core::slice::from_raw_parts(
+                account_metas.as_ptr() as *const InstructionAccount,
+                num_accounts,
+            )
         },
         data: instruction_data,
     };
