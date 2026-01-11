@@ -172,33 +172,18 @@ export async function commitRecordPdaFromDelegatedAccount(
 // Permission Program PDAs
 // ============================================================================
 
-const PERMISSION_SEED = Buffer.from("permission:");
-const GROUP_SEED = Buffer.from("group:");
+export const PERMISSION_SEED = Buffer.from("permission:");
 
 /**
  * Derives the permission PDA for a given account
- * @param account - The account address
+ * @param permissioned_account - The account address permissioned
  * @returns The permission PDA
  */
-export async function permissionPdaFromAccount(account: Address) {
+export async function permissionPdaFromAccount(permissioned_account: Address) {
   const addressEncoder = getAddressEncoder();
   const [permissionPda] = await getProgramDerivedAddress({
     programAddress: PERMISSION_PROGRAM_ID,
-    seeds: [PERMISSION_SEED, addressEncoder.encode(account)],
+    seeds: [PERMISSION_SEED, addressEncoder.encode(permissioned_account)],
   });
   return permissionPda;
-}
-
-/**
- * Derives the group PDA for a given group ID
- * @param id - The group ID
- * @returns The group PDA
- */
-export async function groupPdaFromId(id: Address) {
-  const addressEncoder = getAddressEncoder();
-  const [groupPda] = await getProgramDerivedAddress({
-    programAddress: PERMISSION_PROGRAM_ID,
-    seeds: [GROUP_SEED, addressEncoder.encode(id)],
-  });
-  return groupPda;
 }

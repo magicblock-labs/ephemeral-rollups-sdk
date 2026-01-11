@@ -5,30 +5,39 @@ import {
   AccountMeta,
 } from "@solana/web3.js";
 import { PERMISSION_PROGRAM_ID } from "../../constants";
+import { permissionPdaFromAccount } from "../../pda";
 
 /**
- * CreatePermission instruction arguments
+ * Permission member with authorization info
  */
-// eslint-disable-next-line @typescript-eslint/no-empty-interface
-export interface CreatePermissionInstructionArgs {}
+export interface Member {
+  pubkey: PublicKey;
+  authority: boolean;
+}
+
+/**
+ * Create permission instruction arguments
+ */
+export interface CreatePermissionInstructionArgs {
+  members?: Member[];
+}
 
 /**
  * Instruction: CreatePermission
- * Discriminator: 1
+ * Discriminator: [0, 0, 0, 0, 0, 0, 0, 0]
  */
 export function createCreatePermissionInstruction(
   accounts: {
-    permission: PublicKey;
-    delegatedAccount: PublicKey;
-    group: PublicKey;
+    permissionedAccount: PublicKey;
     payer: PublicKey;
   },
   args?: CreatePermissionInstructionArgs,
 ): TransactionInstruction {
+  const permission = permissionPdaFromAccount(accounts.permissionedAccount);
+
   const keys: AccountMeta[] = [
-    { pubkey: accounts.permission, isWritable: true, isSigner: false },
-    { pubkey: accounts.delegatedAccount, isWritable: false, isSigner: true },
-    { pubkey: accounts.group, isWritable: false, isSigner: false },
+    { pubkey: accounts.permissionedAccount, isWritable: false, isSigner: true },
+    { pubkey: permission, isWritable: true, isSigner: false },
     { pubkey: accounts.payer, isWritable: true, isSigner: true },
     { pubkey: SystemProgram.programId, isWritable: false, isSigner: false },
   ];
@@ -45,12 +54,28 @@ export function createCreatePermissionInstruction(
 export function serializeCreatePermissionInstructionData(
   args?: CreatePermissionInstructionArgs,
 ): Buffer {
-  const discriminator = 1;
-  const buffer = Buffer.alloc(1);
+  const discriminator = [0, 0, 0, 0, 0, 0, 0, 0];
+  const members = args?.members ?? [];
+  const buffer = Buffer.alloc(2048);
   let offset = 0;
 
-  // Write discriminator (u8)
-  buffer[offset++] = discriminator;
+  // Write discriminator (u64)
+  for (let i = 0; i < 8; i++) {
+    buffer[offset++] = discriminator[i];
+  }
+
+  // Write members count (u32)
+  buffer.writeUInt32LE(members.length, offset);
+  offset += 4;
+
+  // Write members
+  for (const member of members) {
+    buffer.set(member.pubkey.toBuffer(), offset);
+    offset += 32;
+
+    // Write authority flag (bool as u8)
+    buffer[offset++] = member.authority ? 1 : 0;
+  }
 
   return buffer.subarray(0, offset);
 }

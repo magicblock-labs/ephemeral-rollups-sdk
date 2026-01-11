@@ -1,30 +1,45 @@
-import { Address, Instruction, AccountMeta, AccountRole } from "@solana/kit";
+import {
+  Address,
+  Instruction,
+  AccountMeta,
+  AccountRole,
+  getAddressEncoder,
+} from "@solana/kit";
 import { SYSTEM_PROGRAM_ADDRESS } from "@solana-program/system";
-import { PERMISSION_PROGRAM_ID } from "../../constants";
+import { PERMISSION_PROGRAM_ID, MAGIC_PROGRAM_ID, MAGIC_CONTEXT_ID } from "../../constants";
+import { permissionPdaFromAccount } from "../../pda";
 
 /**
- * CreatePermission instruction arguments
+ * Permission member with authorization info
  */
-// eslint-disable-next-line @typescript-eslint/no-empty-interface
-export interface CreatePermissionInstructionArgs {}
+export interface Member {
+  pubkey: Address;
+  authority: boolean;
+}
+
+/**
+ * Create permission instruction arguments
+ */
+export interface CreatePermissionInstructionArgs {
+  members?: Member[];
+}
 
 /**
  * Instruction: CreatePermission
- * Discriminator: 1
+ * Discriminator: [0, 0, 0, 0, 0, 0, 0, 0]
  */
-export function createCreatePermissionInstruction(
+export async function createCreatePermissionInstruction(
   accounts: {
-    permission: Address;
-    delegatedAccount: Address;
-    group: Address;
+    permissionedAccount: Address;
     payer: Address;
   },
   args?: CreatePermissionInstructionArgs,
-): Instruction {
+): Promise<Instruction> {
+  const permission = await permissionPdaFromAccount(accounts.permissionedAccount);
+
   const accountsMeta: AccountMeta[] = [
-    { address: accounts.permission, role: AccountRole.WRITABLE },
-    { address: accounts.delegatedAccount, role: AccountRole.READONLY_SIGNER },
-    { address: accounts.group, role: AccountRole.READONLY },
+    { address: accounts.permissionedAccount, role: AccountRole.READONLY_SIGNER },
+    { address: permission, role: AccountRole.WRITABLE },
     { address: accounts.payer, role: AccountRole.WRITABLE_SIGNER },
     { address: SYSTEM_PROGRAM_ADDRESS, role: AccountRole.READONLY },
   ];
@@ -41,13 +56,32 @@ export function createCreatePermissionInstruction(
 export function serializeCreatePermissionInstructionData(
   args?: CreatePermissionInstructionArgs,
 ): [Uint8Array] {
-  const discriminator = 1;
+  const discriminator = [0, 0, 0, 0, 0, 0, 0, 0];
+  const members = args?.members ?? [];
   let offset = 0;
-  const buffer = new ArrayBuffer(1);
+  const buffer = new ArrayBuffer(2048);
   const view = new DataView(buffer);
 
-  // Write discriminator (u8)
-  view.setUint8(offset++, discriminator);
+  // Write discriminator (u64)
+  for (let i = 0; i < 8; i++) {
+    view.setUint8(offset++, discriminator[i]);
+  }
+
+  // Write members count (u32)
+  view.setUint32(offset, members.length, true);
+  offset += 4;
+
+  // Write members
+  const addressEncoder = getAddressEncoder();
+  for (const member of members) {
+    const addressBytes = addressEncoder.encode(member.pubkey);
+    const memberBytes = new Uint8Array(buffer, offset, 33);
+    memberBytes.set(addressBytes);
+    offset += 32;
+    
+    // Write authority flag (bool as u8)
+    view.setUint8(offset++, member.authority ? 1 : 0);
+  }
 
   return [new Uint8Array(buffer, 0, offset)];
 }

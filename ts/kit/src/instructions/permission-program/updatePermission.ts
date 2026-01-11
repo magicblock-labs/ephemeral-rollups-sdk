@@ -1,28 +1,45 @@
-import { Address, Instruction, AccountMeta, AccountRole } from "@solana/kit";
+import {
+  Address,
+  Instruction,
+  AccountMeta,
+  AccountRole,
+  getAddressEncoder,
+} from "@solana/kit";
 import { PERMISSION_PROGRAM_ID } from "../../constants";
+import { permissionPdaFromAccount } from "../../pda";
 
 /**
- * UpdatePermission instruction arguments
+ * Permission member with authorization info
  */
-// eslint-disable-next-line @typescript-eslint/no-empty-interface
-export interface UpdatePermissionInstructionArgs {}
+export interface Member {
+  pubkey: Address;
+  authority: boolean;
+}
+
+/**
+ * Update permission instruction arguments
+ */
+export interface UpdatePermissionInstructionArgs {
+  members?: Member[];
+}
 
 /**
  * Instruction: UpdatePermission
- * Discriminator: 2
+ * Discriminator: [1, 0, 0, 0, 0, 0, 0, 0]
  */
-export function createUpdatePermissionInstruction(
+export async function createUpdatePermissionInstruction(
   accounts: {
-    permission: Address;
-    delegatedAccount: Address;
-    group: Address;
+    authority: Address;
+    permissionedAccount: Address;
   },
   args?: UpdatePermissionInstructionArgs,
-): Instruction {
+): Promise<Instruction> {
+  const permission = await permissionPdaFromAccount(accounts.permissionedAccount);
+
   const accountsMeta: AccountMeta[] = [
-    { address: accounts.permission, role: AccountRole.WRITABLE },
-    { address: accounts.delegatedAccount, role: AccountRole.READONLY_SIGNER },
-    { address: accounts.group, role: AccountRole.READONLY },
+    { address: accounts.authority, role: AccountRole.READONLY_SIGNER },
+    { address: accounts.permissionedAccount, role: AccountRole.READONLY_SIGNER },
+    { address: permission, role: AccountRole.WRITABLE },
   ];
 
   const [instructionData] = serializeUpdatePermissionInstructionData(args);
@@ -37,13 +54,32 @@ export function createUpdatePermissionInstruction(
 export function serializeUpdatePermissionInstructionData(
   args?: UpdatePermissionInstructionArgs,
 ): [Uint8Array] {
-  const discriminator = 2;
+  const discriminator = [1, 0, 0, 0, 0, 0, 0, 0];
+  const members = args?.members ?? [];
   let offset = 0;
-  const buffer = new ArrayBuffer(1);
+  const buffer = new ArrayBuffer(2048);
   const view = new DataView(buffer);
 
-  // Write discriminator (u8)
-  view.setUint8(offset++, discriminator);
+  // Write discriminator (u64)
+  for (let i = 0; i < 8; i++) {
+    view.setUint8(offset++, discriminator[i]);
+  }
+
+  // Write members count (u32)
+  view.setUint32(offset, members.length, true);
+  offset += 4;
+
+  // Write members
+  const addressEncoder = getAddressEncoder();
+  for (const member of members) {
+    const addressBytes = addressEncoder.encode(member.pubkey);
+    const memberBytes = new Uint8Array(buffer, offset, 33);
+    memberBytes.set(addressBytes);
+    offset += 32;
+    
+    // Write authority flag (bool as u8)
+    view.setUint8(offset++, member.authority ? 1 : 0);
+  }
 
   return [new Uint8Array(buffer, 0, offset)];
 }

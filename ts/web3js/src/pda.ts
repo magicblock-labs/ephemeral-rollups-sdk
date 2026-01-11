@@ -2,6 +2,7 @@ import { PublicKey } from "@solana/web3.js";
 
 import { DELEGATION_PROGRAM_ID, PERMISSION_PROGRAM_ID } from "./constants.js";
 
+
 // ============================================================================
 // Delegation Program PDAs
 // ============================================================================
@@ -138,8 +139,7 @@ export function commitRecordPdaFromDelegatedAccount(
 // Permission Program PDAs
 // ============================================================================
 
-const PERMISSION_SEED = Buffer.from("permission:");
-const GROUP_SEED = Buffer.from("group:");
+export const PERMISSION_SEED = Buffer.from("permission:");
 
 /**
  * Derives the permission PDA for a given account
@@ -149,18 +149,6 @@ const GROUP_SEED = Buffer.from("group:");
 export function permissionPdaFromAccount(account: PublicKey) {
   return PublicKey.findProgramAddressSync(
     [PERMISSION_SEED, account.toBuffer()],
-    PERMISSION_PROGRAM_ID,
-  )[0];
-}
-
-/**
- * Derives the group PDA for a given group ID
- * @param id - The group ID
- * @returns The group PDA
- */
-export function groupPdaFromId(id: PublicKey) {
-  return PublicKey.findProgramAddressSync(
-    [GROUP_SEED, id.toBuffer()],
     PERMISSION_PROGRAM_ID,
   )[0];
 }
