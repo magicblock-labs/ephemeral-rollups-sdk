@@ -1086,7 +1086,7 @@ dependencies = [
 
 [[package]]
 name = "ephemeral-rollups-pinocchio"
-version = "0.7.2"
+version = "0.7.3"
 dependencies = [
  "pinocchio 0.10.1",
  "pinocchio-log",
@@ -1097,7 +1097,7 @@ dependencies = [
 
 [[package]]
 name = "ephemeral-rollups-sdk"
-version = "0.7.2"
+version = "0.7.3"
 dependencies = [
  "anchor-lang",
  "base64ct",
@@ -1120,14 +1120,14 @@ dependencies = [
  "solana-program-error 2.2.2",
  "solana-program-memory 2.3.1",
  "solana-pubkey 2.4.0",
- "solana-system-interface 2.0.0",
+ "solana-system-interface 1.0.0",
  "solana-sysvar 2.3.0",
  "thiserror 1.0.69",
 ]
 
 [[package]]
 name = "ephemeral-rollups-sdk-attribute-action"
-version = "0.7.2"
+version = "0.7.3"
 dependencies = [
  "quote",
  "syn 1.0.109",
@@ -1135,7 +1135,7 @@ dependencies = [
 
 [[package]]
 name = "ephemeral-rollups-sdk-attribute-commit"
-version = "0.7.2"
+version = "0.7.3"
 dependencies = [
  "quote",
  "syn 1.0.109",
@@ -1143,7 +1143,7 @@ dependencies = [
 
 [[package]]
 name = "ephemeral-rollups-sdk-attribute-delegate"
-version = "0.7.2"
+version = "0.7.3"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1152,7 +1152,7 @@ dependencies = [
 
 [[package]]
 name = "ephemeral-rollups-sdk-attribute-ephemeral"
-version = "0.7.2"
+version = "0.7.3"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -2013,7 +2013,7 @@ dependencies = [
 
 [[package]]
 name = "magic-resolver"
-version = "0.7.2"
+version = "0.7.3"
 dependencies = [
  "base64 0.12.3",
  "bincode",
@@ -5230,9 +5230,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4e1790547bfc3061f1ee68ea9d8dc6c973c02a163697b24263a8e9f2e6d4afa2"
 dependencies = [
  "num-traits",
- "serde",
- "serde_derive",
- "solana-instruction 3.1.0",
  "solana-msg 3.0.0",
  "solana-program-error 3.0.0",
  "solana-pubkey 3.0.0",
