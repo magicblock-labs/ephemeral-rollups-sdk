@@ -1,4 +1,4 @@
-import { PublicKey } from '@solana/web3.js';
+import { PublicKey } from "@solana/web3.js";
 
 // Flags for Member
 export const MEMBER_FLAG_DEFAULT: number = 0;
@@ -6,7 +6,10 @@ export const MEMBER_FLAG_AUTHORITY: number = 1 << 0; // Member has authority pri
 export const MEMBER_FLAG_TX_LOGS: number = 1 << 1; // Member can see transaction logs
 export const MEMBER_FLAG_TX_BALANCES: number = 1 << 2; // Member can see transaction balances
 
-export type Member = { flags: number; pubkey: PublicKey };
+export interface Member {
+  flags: number;
+  pubkey: PublicKey;
+}
 
 export type MemberArgs = Member;
 
@@ -41,8 +44,7 @@ export function deserializeMember(buffer: Buffer, offset: number = 0): Member {
  */
 export function isAuthority(member: Member, user: PublicKey): boolean {
   return (
-    (member.flags & MEMBER_FLAG_AUTHORITY) !== 0 &&
-    member.pubkey.equals(user)
+    (member.flags & MEMBER_FLAG_AUTHORITY) !== 0 && member.pubkey.equals(user)
   );
 }
 
@@ -60,8 +62,6 @@ export function canSeeTxLogs(member: Member, user: PublicKey): boolean {
  */
 export function canSeeTxBalances(member: Member, user: PublicKey): boolean {
   return (
-    (member.flags & MEMBER_FLAG_TX_BALANCES) !== 0 &&
-    member.pubkey.equals(user)
+    (member.flags & MEMBER_FLAG_TX_BALANCES) !== 0 && member.pubkey.equals(user)
   );
 }
-

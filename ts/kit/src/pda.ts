@@ -176,14 +176,14 @@ export const PERMISSION_SEED = Buffer.from("permission:");
 
 /**
  * Derives the permission PDA for a given account
- * @param permissioned_account - The account address permissioned
+ * @param permissionedAccount - The account address permissioned
  * @returns The permission PDA
  */
-export async function permissionPdaFromAccount(permissioned_account: Address) {
+export async function permissionPdaFromAccount(permissionedAccount: Address) {
   const addressEncoder = getAddressEncoder();
   const [permissionPda] = await getProgramDerivedAddress({
     programAddress: PERMISSION_PROGRAM_ID,
-    seeds: [PERMISSION_SEED, addressEncoder.encode(permissioned_account)],
+    seeds: [PERMISSION_SEED, addressEncoder.encode(permissionedAccount)],
   });
   return permissionPda;
 }

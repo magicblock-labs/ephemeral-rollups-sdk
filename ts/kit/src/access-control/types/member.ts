@@ -18,7 +18,7 @@ import {
   type FixedSizeCodec,
   type FixedSizeDecoder,
   type FixedSizeEncoder,
-} from '@solana/kit';
+} from "@solana/kit";
 
 // Flags for Member
 export const MEMBER_FLAG_DEFAULT: number = 0;
@@ -26,21 +26,24 @@ export const MEMBER_FLAG_AUTHORITY: number = 1 << 0; // Member has authority pri
 export const MEMBER_FLAG_TX_LOGS: number = 1 << 1; // Member can see transaction logs
 export const MEMBER_FLAG_TX_BALANCES: number = 1 << 2; // Member can see transaction balances
 
-export type Member = { flags: number; pubkey: Address };
+export interface Member {
+  flags: number;
+  pubkey: Address;
+}
 
 export type MemberArgs = Member;
 
 export function getMemberEncoder(): FixedSizeEncoder<MemberArgs> {
   return getStructEncoder([
-    ['flags', getU8Encoder()],
-    ['pubkey', getAddressEncoder()],
+    ["flags", getU8Encoder()],
+    ["pubkey", getAddressEncoder()],
   ]);
 }
 
 export function getMemberDecoder(): FixedSizeDecoder<Member> {
   return getStructDecoder([
-    ['flags', getU8Decoder()],
-    ['pubkey', getAddressDecoder()],
+    ["flags", getU8Decoder()],
+    ["pubkey", getAddressDecoder()],
   ]);
 }
 
@@ -52,19 +55,14 @@ export function getMemberCodec(): FixedSizeCodec<MemberArgs, Member> {
  * Check if a member is an authority for a given user
  */
 export function isAuthority(member: Member, user: Address): boolean {
-  return (
-    (member.flags & MEMBER_FLAG_AUTHORITY) !== 0 &&
-    member.pubkey === user
-  );
+  return (member.flags & MEMBER_FLAG_AUTHORITY) !== 0 && member.pubkey === user;
 }
 
 /**
  * Check if a member can see transaction logs for a given user
  */
 export function canSeeTxLogs(member: Member, user: Address): boolean {
-  return (
-    (member.flags & MEMBER_FLAG_TX_LOGS) !== 0 && member.pubkey === user
-  );
+  return (member.flags & MEMBER_FLAG_TX_LOGS) !== 0 && member.pubkey === user;
 }
 
 /**
@@ -72,8 +70,6 @@ export function canSeeTxLogs(member: Member, user: Address): boolean {
  */
 export function canSeeTxBalances(member: Member, user: Address): boolean {
   return (
-    (member.flags & MEMBER_FLAG_TX_BALANCES) !== 0 &&
-    member.pubkey === user
+    (member.flags & MEMBER_FLAG_TX_BALANCES) !== 0 && member.pubkey === user
   );
 }
-

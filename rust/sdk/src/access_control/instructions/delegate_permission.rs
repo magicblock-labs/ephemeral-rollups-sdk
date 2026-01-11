@@ -555,7 +555,8 @@ impl<'a, 'b> DelegatePermissionCpiBuilder<'a, 'b> {
         // Derive PDAs from permission account's pubkey
         let permission_pubkey = *permission_account.key;
         let owner_program_pubkey = *owner_program_account.key;
-        let delegate_accounts = DelegatePermissionAccounts::new(permission_pubkey, owner_program_pubkey);
+        let delegate_accounts =
+            DelegatePermissionAccounts::new(permission_pubkey, owner_program_pubkey);
 
         // Find the derived accounts in remaining accounts
         let delegation_buffer = self

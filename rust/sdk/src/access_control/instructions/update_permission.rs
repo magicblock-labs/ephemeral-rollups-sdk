@@ -1,4 +1,3 @@
-
 use borsh::{BorshDeserialize, BorshSerialize};
 
 use crate::access_control::programs::MAGICBLOCK_PERMISSION_API_ID;

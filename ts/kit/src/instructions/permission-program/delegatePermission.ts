@@ -1,12 +1,7 @@
-import {
-  Address,
-  Instruction,
-  AccountMeta,
-  AccountRole,
-} from "@solana/kit";
+import { Address, Instruction, AccountMeta, AccountRole } from "@solana/kit";
 import { SYSTEM_PROGRAM_ADDRESS } from "@solana-program/system";
 import { PERMISSION_PROGRAM_ID, DELEGATION_PROGRAM_ID } from "../../constants";
-import { 
+import {
   permissionPdaFromAccount,
   delegateBufferPdaFromDelegatedAccountAndOwnerProgram,
   delegationRecordPdaFromDelegatedAccount,
@@ -34,17 +29,18 @@ export async function createDelegatePermissionInstruction(
   args?: DelegatePermissionInstructionArgs,
 ): Promise<Instruction> {
   const ownerProgram = accounts.ownerProgram ?? PERMISSION_PROGRAM_ID;
-  const permissionPda = await permissionPdaFromAccount(accounts.permissionedAccount);
-  const delegateBuffer = await delegateBufferPdaFromDelegatedAccountAndOwnerProgram(
-    permissionPda,
-    ownerProgram,
+  const permissionPda = await permissionPdaFromAccount(
+    accounts.permissionedAccount,
   );
-  const delegationRecord = await delegationRecordPdaFromDelegatedAccount(
-    permissionPda,
-  );
-  const delegationMetadata = await delegationMetadataPdaFromDelegatedAccount(
-    permissionPda,
-  );
+  const delegateBuffer =
+    await delegateBufferPdaFromDelegatedAccountAndOwnerProgram(
+      permissionPda,
+      ownerProgram,
+    );
+  const delegationRecord =
+    await delegationRecordPdaFromDelegatedAccount(permissionPda);
+  const delegationMetadata =
+    await delegationMetadataPdaFromDelegatedAccount(permissionPda);
 
   const validator = args?.validator ?? accounts.validator;
 

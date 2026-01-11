@@ -38,12 +38,10 @@ export function createDelegatePermissionInstruction(
     permissionPda,
     ownerProgram,
   );
-  const delegationRecord = delegationRecordPdaFromDelegatedAccount(
-    permissionPda,
-  );
-  const delegationMetadata = delegationMetadataPdaFromDelegatedAccount(
-    permissionPda,
-  );
+  const delegationRecord =
+    delegationRecordPdaFromDelegatedAccount(permissionPda);
+  const delegationMetadata =
+    delegationMetadataPdaFromDelegatedAccount(permissionPda);
 
   const validator = args?.validator ?? accounts.validator;
 
@@ -53,7 +51,11 @@ export function createDelegatePermissionInstruction(
 
   const keys: AccountMeta[] = [
     { pubkey: accounts.payer, isWritable: true, isSigner: true },
-    { pubkey: accounts.permissionedAccount, isWritable: false, isSigner: false },
+    {
+      pubkey: accounts.permissionedAccount,
+      isWritable: false,
+      isSigner: false,
+    },
     { pubkey: permissionPda, isWritable: true, isSigner: false },
     { pubkey: SystemProgram.programId, isWritable: false, isSigner: false },
     { pubkey: ownerProgram, isWritable: false, isSigner: false },

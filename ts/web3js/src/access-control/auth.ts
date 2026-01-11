@@ -23,14 +23,14 @@ interface AuthLoginResponse {
 export async function getAuthToken(
   rpcUrl: string,
   publicKey: PublicKey,
-  signMessage: (message: Uint8Array) => Promise<Uint8Array>
+  signMessage: (message: Uint8Array) => Promise<Uint8Array>,
 ): Promise<{ token: string; expiresAt: number }> {
   // Import this way because bs58 is an ECMAScript module
   const bs58 = (await import("bs58")).default;
 
   // Getting the challenge from the RPC
   const challengeResponse = await fetch(
-    `${rpcUrl}/auth/challenge?pubkey=${publicKey.toString()}`
+    `${rpcUrl}/auth/challenge?pubkey=${publicKey.toString()}`,
   );
   const { challenge, error }: AuthChallengeResponse =
     await challengeResponse.json();
@@ -44,7 +44,7 @@ export async function getAuthToken(
 
   // Signing the challenge
   const signature = await signMessage(
-    new Uint8Array(Buffer.from(challenge, "utf-8"))
+    new Uint8Array(Buffer.from(challenge, "utf-8")),
   );
   const signatureString = bs58.encode(signature);
 

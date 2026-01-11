@@ -17,21 +17,23 @@ import {
   type Codec,
   type Decoder,
   type Encoder,
-} from '@solana/kit';
+} from "@solana/kit";
 
-export type UndelegateArgs = { pdaSeeds: Array<Array<number>> };
+export interface UndelegateArgs {
+  pdaSeeds: number[][];
+}
 
 export type UndelegateArgsArgs = UndelegateArgs;
 
 export function getUndelegateArgsEncoder(): Encoder<UndelegateArgsArgs> {
   return getStructEncoder([
-    ['pdaSeeds', getArrayEncoder(getArrayEncoder(getU8Encoder()))],
+    ["pdaSeeds", getArrayEncoder(getArrayEncoder(getU8Encoder()))],
   ]);
 }
 
 export function getUndelegateArgsDecoder(): Decoder<UndelegateArgs> {
   return getStructDecoder([
-    ['pdaSeeds', getArrayDecoder(getArrayDecoder(getU8Decoder()))],
+    ["pdaSeeds", getArrayDecoder(getArrayDecoder(getU8Decoder()))],
   ]);
 }
 

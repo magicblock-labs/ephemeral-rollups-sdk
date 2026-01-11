@@ -1,4 +1,3 @@
-
 use borsh::{BorshDeserialize, BorshSerialize};
 
 use crate::access_control::programs::MAGICBLOCK_PERMISSION_API_ID;
@@ -376,16 +375,16 @@ impl<'a, 'b> CommitPermissionCpiBuilder<'a, 'b> {
     pub fn invoke_signed(&self, signers_seeds: &[&[&[u8]]]) -> ProgramResult {
         let instruction = CommitPermissionCpi {
             __program: self.instruction.__program,
-    
+
             authority: self.instruction.authority.expect("authority is not set"),
-    
+
             permissioned_account: self
                 .instruction
                 .permissioned_account
                 .expect("permissioned_account is not set"),
-    
+
             permission: self.instruction.permission.expect("permission is not set"),
-    
+
             magic_program: self
                 .instruction
                 .__remaining_accounts
@@ -393,7 +392,7 @@ impl<'a, 'b> CommitPermissionCpiBuilder<'a, 'b> {
                 .find(|(acc, _, _)| acc.key == &MAGIC_PROGRAM_ID)
                 .map(|(acc, _, _)| acc)
                 .expect("magic_program account not found in remaining accounts"),
-    
+
             magic_context: self
                 .instruction
                 .__remaining_accounts

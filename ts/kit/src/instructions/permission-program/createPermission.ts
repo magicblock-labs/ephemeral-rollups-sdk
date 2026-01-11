@@ -6,7 +6,7 @@ import {
   getAddressEncoder,
 } from "@solana/kit";
 import { SYSTEM_PROGRAM_ADDRESS } from "@solana-program/system";
-import { PERMISSION_PROGRAM_ID, MAGIC_PROGRAM_ID, MAGIC_CONTEXT_ID } from "../../constants";
+import { PERMISSION_PROGRAM_ID } from "../../constants";
 import { permissionPdaFromAccount } from "../../pda";
 
 /**
@@ -35,10 +35,15 @@ export async function createCreatePermissionInstruction(
   },
   args?: CreatePermissionInstructionArgs,
 ): Promise<Instruction> {
-  const permission = await permissionPdaFromAccount(accounts.permissionedAccount);
+  const permission = await permissionPdaFromAccount(
+    accounts.permissionedAccount,
+  );
 
   const accountsMeta: AccountMeta[] = [
-    { address: accounts.permissionedAccount, role: AccountRole.READONLY_SIGNER },
+    {
+      address: accounts.permissionedAccount,
+      role: AccountRole.READONLY_SIGNER,
+    },
     { address: permission, role: AccountRole.WRITABLE },
     { address: accounts.payer, role: AccountRole.WRITABLE_SIGNER },
     { address: SYSTEM_PROGRAM_ADDRESS, role: AccountRole.READONLY },
@@ -78,7 +83,7 @@ export function serializeCreatePermissionInstructionData(
     const memberBytes = new Uint8Array(buffer, offset, 33);
     memberBytes.set(addressBytes);
     offset += 32;
-    
+
     // Write authority flag (bool as u8)
     view.setUint8(offset++, member.authority ? 1 : 0);
   }

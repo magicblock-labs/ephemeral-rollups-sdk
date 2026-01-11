@@ -2,7 +2,6 @@ import { PublicKey } from "@solana/web3.js";
 
 import { DELEGATION_PROGRAM_ID, PERMISSION_PROGRAM_ID } from "./constants.js";
 
-
 // ============================================================================
 // Delegation Program PDAs
 // ============================================================================

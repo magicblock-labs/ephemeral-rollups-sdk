@@ -1,33 +1,36 @@
+import { Address, Instruction, AccountMeta, AccountRole } from "@solana/kit";
 import {
-  Address,
-  Instruction,
-  AccountMeta,
-  AccountRole,
-} from "@solana/kit";
-import { PERMISSION_PROGRAM_ID, MAGIC_PROGRAM_ID, MAGIC_CONTEXT_ID } from "../../constants";
+  PERMISSION_PROGRAM_ID,
+  MAGIC_PROGRAM_ID,
+  MAGIC_CONTEXT_ID,
+} from "../../constants";
 import { permissionPdaFromAccount } from "../../pda";
 
 /**
  * Instruction: CommitAndUndelegatePermission
  * Discriminator: [5, 0, 0, 0, 0, 0, 0, 0]
  */
-export async function createCommitAndUndelegatePermissionInstruction(
-  accounts: {
-    authority: Address;
-    permissionedAccount: Address;
-  },
-): Promise<Instruction> {
-  const permission = await permissionPdaFromAccount(accounts.permissionedAccount);
+export async function createCommitAndUndelegatePermissionInstruction(accounts: {
+  authority: Address;
+  permissionedAccount: Address;
+}): Promise<Instruction> {
+  const permission = await permissionPdaFromAccount(
+    accounts.permissionedAccount,
+  );
 
   const accountsMeta: AccountMeta[] = [
     { address: accounts.authority, role: AccountRole.READONLY_SIGNER },
-    { address: accounts.permissionedAccount, role: AccountRole.WRITABLE_SIGNER },
+    {
+      address: accounts.permissionedAccount,
+      role: AccountRole.WRITABLE_SIGNER,
+    },
     { address: permission, role: AccountRole.WRITABLE },
     { address: MAGIC_PROGRAM_ID, role: AccountRole.READONLY },
     { address: MAGIC_CONTEXT_ID, role: AccountRole.WRITABLE },
   ];
 
-  const [instructionData] = serializeCommitAndUndelegatePermissionInstructionData();
+  const [instructionData] =
+    serializeCommitAndUndelegatePermissionInstructionData();
 
   return {
     accounts: accountsMeta,
@@ -36,7 +39,9 @@ export async function createCommitAndUndelegatePermissionInstruction(
   };
 }
 
-export function serializeCommitAndUndelegatePermissionInstructionData(): [Uint8Array] {
+export function serializeCommitAndUndelegatePermissionInstructionData(): [
+  Uint8Array,
+] {
   const discriminator = [5, 0, 0, 0, 0, 0, 0, 0];
   const buffer = new ArrayBuffer(8);
   const view = new DataView(buffer);

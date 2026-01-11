@@ -3,11 +3,15 @@ import {
   serializeMember,
   type Member,
   type MemberArgs,
-} from './member';
+} from "./member";
 
-export type MembersArgs = { members: Member[] | null };
+export interface MembersArgs {
+  members: Member[] | null;
+}
 
-export type MembersArgsArgs = { members: MemberArgs[] | null };
+export interface MembersArgsArgs {
+  members: MemberArgs[] | null;
+}
 
 export function serializeMembersArgs(args: MembersArgsArgs): Buffer {
   const buffer = Buffer.alloc(4096); // Allocate enough space

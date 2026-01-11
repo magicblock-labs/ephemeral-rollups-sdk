@@ -3,19 +3,21 @@ import {
   TransactionInstruction,
   AccountMeta,
 } from "@solana/web3.js";
-import { PERMISSION_PROGRAM_ID, MAGIC_PROGRAM_ID, MAGIC_CONTEXT_ID } from "../../constants";
+import {
+  PERMISSION_PROGRAM_ID,
+  MAGIC_PROGRAM_ID,
+  MAGIC_CONTEXT_ID,
+} from "../../constants";
 import { permissionPdaFromAccount } from "../../pda";
 
 /**
  * Instruction: CommitPermission
  * Discriminator: [4, 0, 0, 0, 0, 0, 0, 0]
  */
-export function createCommitPermissionInstruction(
-  accounts: {
-    authority: PublicKey;
-    permissionedAccount: PublicKey;
-  },
-): TransactionInstruction {
+export function createCommitPermissionInstruction(accounts: {
+  authority: PublicKey;
+  permissionedAccount: PublicKey;
+}): TransactionInstruction {
   const permission = permissionPdaFromAccount(accounts.permissionedAccount);
 
   const keys: AccountMeta[] = [

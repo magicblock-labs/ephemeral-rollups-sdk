@@ -1,9 +1,4 @@
-import {
-  Address,
-  Instruction,
-  AccountMeta,
-  AccountRole,
-} from "@solana/kit";
+import { Address, Instruction, AccountMeta, AccountRole } from "@solana/kit";
 import { SYSTEM_PROGRAM_ADDRESS } from "@solana-program/system";
 import { PERMISSION_PROGRAM_ID } from "../../constants";
 
@@ -46,7 +41,7 @@ export function serializeUndelegatePermissionInstructionData(
   args?: UndelegatePermissionInstructionArgs,
 ): [Uint8Array] {
   // Discriminator for UndelegatePermission: 12048014319693667524 in little-endian
-  const discriminator = [0xA4, 0xA7, 0x5C, 0xCC, 0x04, 0x8A, 0xA9, 0xA6];
+  const discriminator = [0xa4, 0xa7, 0x5c, 0xcc, 0x04, 0x8a, 0xa9, 0xa6];
   const pdaSeeds = args?.pdaSeeds ?? [];
   let offset = 0;
   const buffer = new ArrayBuffer(2048);

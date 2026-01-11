@@ -34,11 +34,16 @@ export async function createUpdatePermissionInstruction(
   },
   args?: UpdatePermissionInstructionArgs,
 ): Promise<Instruction> {
-  const permission = await permissionPdaFromAccount(accounts.permissionedAccount);
+  const permission = await permissionPdaFromAccount(
+    accounts.permissionedAccount,
+  );
 
   const accountsMeta: AccountMeta[] = [
     { address: accounts.authority, role: AccountRole.READONLY_SIGNER },
-    { address: accounts.permissionedAccount, role: AccountRole.READONLY_SIGNER },
+    {
+      address: accounts.permissionedAccount,
+      role: AccountRole.READONLY_SIGNER,
+    },
     { address: permission, role: AccountRole.WRITABLE },
   ];
 
@@ -76,7 +81,7 @@ export function serializeUpdatePermissionInstructionData(
     const memberBytes = new Uint8Array(buffer, offset, 33);
     memberBytes.set(addressBytes);
     offset += 32;
-    
+
     // Write authority flag (bool as u8)
     view.setUint8(offset++, member.authority ? 1 : 0);
   }

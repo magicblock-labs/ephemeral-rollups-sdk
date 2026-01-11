@@ -47,12 +47,10 @@ describe("Permission Program Instructions (web3.js)", () => {
     });
 
     it("should include permissionedAccount as readonly signer", () => {
-      const instruction = createCreatePermissionInstruction(
-        {
-          permissionedAccount: mockPublicKey,
-          payer: differentPublicKey,
-        },
-      );
+      const instruction = createCreatePermissionInstruction({
+        permissionedAccount: mockPublicKey,
+        payer: differentPublicKey,
+      });
 
       const permissionedAccount = instruction.keys.find((key) =>
         key.pubkey.equals(mockPublicKey),
@@ -64,12 +62,10 @@ describe("Permission Program Instructions (web3.js)", () => {
 
     it("should include payer as writable signer", () => {
       const payerAddress = new PublicKey("11111111111111111111111111111115");
-      const instruction = createCreatePermissionInstruction(
-        {
-          permissionedAccount: mockPublicKey,
-          payer: payerAddress,
-        },
-      );
+      const instruction = createCreatePermissionInstruction({
+        permissionedAccount: mockPublicKey,
+        payer: payerAddress,
+      });
 
       const payerAccount = instruction.keys.find((key) =>
         key.pubkey.equals(payerAddress),
@@ -80,12 +76,10 @@ describe("Permission Program Instructions (web3.js)", () => {
     });
 
     it("should include permission PDA as writable", () => {
-      const instruction = createCreatePermissionInstruction(
-        {
-          permissionedAccount: mockPublicKey,
-          payer: mockPublicKey,
-        },
-      );
+      const instruction = createCreatePermissionInstruction({
+        permissionedAccount: mockPublicKey,
+        payer: mockPublicKey,
+      });
 
       const permissionAccount = instruction.keys.find(
         (key) => key.pubkey.equals(mockPublicKey) && key.isWritable,
@@ -94,12 +88,10 @@ describe("Permission Program Instructions (web3.js)", () => {
     });
 
     it("should include system program", () => {
-      const instruction = createCreatePermissionInstruction(
-        {
-          permissionedAccount: mockPublicKey,
-          payer: mockPublicKey,
-        },
-      );
+      const instruction = createCreatePermissionInstruction({
+        permissionedAccount: mockPublicKey,
+        payer: mockPublicKey,
+      });
 
       const systemProgram = instruction.keys.find(
         (key) => key.pubkey.toBase58() === "11111111111111111111111111111111",
@@ -127,7 +119,10 @@ describe("Permission Program Instructions (web3.js)", () => {
       const members = [
         { pubkey: mockPublicKey, authority: true },
         { pubkey: differentPublicKey, authority: false },
-        { pubkey: new PublicKey("11111111111111111111111111111113"), authority: true },
+        {
+          pubkey: new PublicKey("11111111111111111111111111111113"),
+          authority: true,
+        },
       ];
 
       const instruction = createCreatePermissionInstruction(
@@ -145,12 +140,10 @@ describe("Permission Program Instructions (web3.js)", () => {
     });
 
     it("should use discriminator [0, 0, 0, 0, 0, 0, 0, 0]", () => {
-      const instruction = createCreatePermissionInstruction(
-        {
-          permissionedAccount: mockPublicKey,
-          payer: mockPublicKey,
-        },
-      );
+      const instruction = createCreatePermissionInstruction({
+        permissionedAccount: mockPublicKey,
+        payer: mockPublicKey,
+      });
 
       // First 8 bytes should be discriminator
       expect(instruction.data[0]).toBe(0);
@@ -165,7 +158,10 @@ describe("Permission Program Instructions (web3.js)", () => {
 
     it("should encode authority flag correctly", () => {
       const authorityMember = { pubkey: mockPublicKey, authority: true };
-      const nonAuthorityMember = { pubkey: differentPublicKey, authority: false };
+      const nonAuthorityMember = {
+        pubkey: differentPublicKey,
+        authority: false,
+      };
 
       const instruction1 = createCreatePermissionInstruction(
         {
@@ -211,13 +207,13 @@ describe("Permission Program Instructions (web3.js)", () => {
     });
 
     it("should include authority as readonly signer", () => {
-      const authorityAddress = new PublicKey("11111111111111111111111111111113");
-      const instruction = createUpdatePermissionInstruction(
-        {
-          authority: authorityAddress,
-          permissionedAccount: mockPublicKey,
-        },
+      const authorityAddress = new PublicKey(
+        "11111111111111111111111111111113",
       );
+      const instruction = createUpdatePermissionInstruction({
+        authority: authorityAddress,
+        permissionedAccount: mockPublicKey,
+      });
 
       const authorityAccount = instruction.keys.find((key) =>
         key.pubkey.equals(authorityAddress),
@@ -228,13 +224,13 @@ describe("Permission Program Instructions (web3.js)", () => {
     });
 
     it("should include permissionedAccount as readonly signer", () => {
-      const permissionedAddress = new PublicKey("11111111111111111111111111111114");
-      const instruction = createUpdatePermissionInstruction(
-        {
-          authority: mockPublicKey,
-          permissionedAccount: permissionedAddress,
-        },
+      const permissionedAddress = new PublicKey(
+        "11111111111111111111111111111114",
       );
+      const instruction = createUpdatePermissionInstruction({
+        authority: mockPublicKey,
+        permissionedAccount: permissionedAddress,
+      });
 
       const permissionedAccount = instruction.keys.find((key) =>
         key.pubkey.equals(permissionedAddress),
@@ -245,24 +241,20 @@ describe("Permission Program Instructions (web3.js)", () => {
     });
 
     it("should include permission PDA as writable", () => {
-      const instruction = createUpdatePermissionInstruction(
-        {
-          authority: mockPublicKey,
-          permissionedAccount: mockPublicKey,
-        },
-      );
+      const instruction = createUpdatePermissionInstruction({
+        authority: mockPublicKey,
+        permissionedAccount: mockPublicKey,
+      });
 
       const writableAccounts = instruction.keys.filter((key) => key.isWritable);
       expect(writableAccounts.length).toBeGreaterThan(0);
     });
 
     it("should use discriminator [1, 0, 0, 0, 0, 0, 0, 0]", () => {
-      const instruction = createUpdatePermissionInstruction(
-        {
-          authority: mockPublicKey,
-          permissionedAccount: mockPublicKey,
-        },
-      );
+      const instruction = createUpdatePermissionInstruction({
+        authority: mockPublicKey,
+        permissionedAccount: mockPublicKey,
+      });
 
       // First byte should be discriminator 1
       expect(instruction.data[0]).toBe(1);
@@ -293,7 +285,10 @@ describe("Permission Program Instructions (web3.js)", () => {
       const members = [
         { pubkey: mockPublicKey, authority: true },
         { pubkey: differentPublicKey, authority: false },
-        { pubkey: new PublicKey("11111111111111111111111111111113"), authority: true },
+        {
+          pubkey: new PublicKey("11111111111111111111111111111113"),
+          authority: true,
+        },
       ];
 
       const instruction = createUpdatePermissionInstruction(
@@ -323,12 +318,12 @@ describe("Permission Program Instructions (web3.js)", () => {
         permissionedAccount: mockPublicKey,
       });
 
-      expect(createPermissionInstr.programId.equals(PERMISSION_PROGRAM_ID)).toBe(
-        true,
-      );
-      expect(updatePermissionInstr.programId.equals(PERMISSION_PROGRAM_ID)).toBe(
-        true,
-      );
+      expect(
+        createPermissionInstr.programId.equals(PERMISSION_PROGRAM_ID),
+      ).toBe(true);
+      expect(
+        updatePermissionInstr.programId.equals(PERMISSION_PROGRAM_ID),
+      ).toBe(true);
     });
 
     it("should have unique discriminators", () => {

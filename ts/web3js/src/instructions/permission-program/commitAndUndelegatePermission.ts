@@ -3,19 +3,21 @@ import {
   TransactionInstruction,
   AccountMeta,
 } from "@solana/web3.js";
-import { PERMISSION_PROGRAM_ID, MAGIC_PROGRAM_ID, MAGIC_CONTEXT_ID } from "../../constants";
+import {
+  PERMISSION_PROGRAM_ID,
+  MAGIC_PROGRAM_ID,
+  MAGIC_CONTEXT_ID,
+} from "../../constants";
 import { permissionPdaFromAccount } from "../../pda";
 
 /**
  * Instruction: CommitAndUndelegatePermission
  * Discriminator: [5, 0, 0, 0, 0, 0, 0, 0]
  */
-export function createCommitAndUndelegatePermissionInstruction(
-  accounts: {
-    authority: PublicKey;
-    permissionedAccount: PublicKey;
-  },
-): TransactionInstruction {
+export function createCommitAndUndelegatePermissionInstruction(accounts: {
+  authority: PublicKey;
+  permissionedAccount: PublicKey;
+}): TransactionInstruction {
   const permission = permissionPdaFromAccount(accounts.permissionedAccount);
 
   const keys: AccountMeta[] = [
@@ -26,7 +28,8 @@ export function createCommitAndUndelegatePermissionInstruction(
     { pubkey: MAGIC_CONTEXT_ID, isWritable: true, isSigner: false },
   ];
 
-  const instructionData = serializeCommitAndUndelegatePermissionInstructionData();
+  const instructionData =
+    serializeCommitAndUndelegatePermissionInstructionData();
 
   return new TransactionInstruction({
     programId: PERMISSION_PROGRAM_ID,

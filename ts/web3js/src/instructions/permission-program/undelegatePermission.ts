@@ -45,7 +45,7 @@ export function serializeUndelegatePermissionInstructionData(
   args?: UndelegatePermissionInstructionArgs,
 ): Buffer {
   // Discriminator for UndelegatePermission: 12048014319693667524 in little-endian
-  const discriminator = [0xA4, 0xA7, 0x5C, 0xCC, 0x04, 0x8A, 0xA9, 0xA6];
+  const discriminator = [0xa4, 0xa7, 0x5c, 0xcc, 0x04, 0x8a, 0xa9, 0xa6];
   const pdaSeeds = args?.pdaSeeds ?? [];
   const buffer = Buffer.alloc(2048);
   let offset = 0;

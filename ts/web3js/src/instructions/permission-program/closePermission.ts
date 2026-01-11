@@ -10,12 +10,10 @@ import { permissionPdaFromAccount } from "../../pda";
  * Instruction: ClosePermission
  * Discriminator: [2, 0, 0, 0, 0, 0, 0, 0]
  */
-export function createClosePermissionInstruction(
-  accounts: {
-    payer: PublicKey;
-    permissionedAccount: PublicKey;
-  },
-): TransactionInstruction {
+export function createClosePermissionInstruction(accounts: {
+  payer: PublicKey;
+  permissionedAccount: PublicKey;
+}): TransactionInstruction {
   const permission = permissionPdaFromAccount(accounts.permissionedAccount);
 
   const keys: AccountMeta[] = [

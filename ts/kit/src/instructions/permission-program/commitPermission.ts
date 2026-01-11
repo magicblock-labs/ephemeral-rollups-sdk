@@ -1,27 +1,29 @@
+import { Address, Instruction, AccountMeta, AccountRole } from "@solana/kit";
 import {
-  Address,
-  Instruction,
-  AccountMeta,
-  AccountRole,
-} from "@solana/kit";
-import { PERMISSION_PROGRAM_ID, MAGIC_PROGRAM_ID, MAGIC_CONTEXT_ID } from "../../constants";
+  PERMISSION_PROGRAM_ID,
+  MAGIC_PROGRAM_ID,
+  MAGIC_CONTEXT_ID,
+} from "../../constants";
 import { permissionPdaFromAccount } from "../../pda";
 
 /**
  * Instruction: CommitPermission
  * Discriminator: [4, 0, 0, 0, 0, 0, 0, 0]
  */
-export async function createCommitPermissionInstruction(
-  accounts: {
-    authority: Address;
-    permissionedAccount: Address;
-  },
-): Promise<Instruction> {
-  const permission = await permissionPdaFromAccount(accounts.permissionedAccount);
+export async function createCommitPermissionInstruction(accounts: {
+  authority: Address;
+  permissionedAccount: Address;
+}): Promise<Instruction> {
+  const permission = await permissionPdaFromAccount(
+    accounts.permissionedAccount,
+  );
 
   const accountsMeta: AccountMeta[] = [
     { address: accounts.authority, role: AccountRole.READONLY_SIGNER },
-    { address: accounts.permissionedAccount, role: AccountRole.WRITABLE_SIGNER },
+    {
+      address: accounts.permissionedAccount,
+      role: AccountRole.WRITABLE_SIGNER,
+    },
     { address: permission, role: AccountRole.WRITABLE },
     { address: MAGIC_PROGRAM_ID, role: AccountRole.READONLY },
     { address: MAGIC_CONTEXT_ID, role: AccountRole.WRITABLE },

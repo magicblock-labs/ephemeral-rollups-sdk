@@ -19,27 +19,31 @@ import {
   type Encoder,
   type Option,
   type OptionOrNullable,
-} from '@solana/kit';
+} from "@solana/kit";
 import {
   getMemberDecoder,
   getMemberEncoder,
   type Member,
   type MemberArgs,
-} from '.';
+} from ".";
 
-export type MembersArgs = { members: Option<Array<Member>> };
+export interface MembersArgs {
+  members: Option<Member[]>;
+}
 
-export type MembersArgsArgs = { members: OptionOrNullable<Array<MemberArgs>> };
+export interface MembersArgsArgs {
+  members: OptionOrNullable<MemberArgs[]>;
+}
 
 export function getMembersArgsEncoder(): Encoder<MembersArgsArgs> {
   return getStructEncoder([
-    ['members', getOptionEncoder(getArrayEncoder(getMemberEncoder()))],
+    ["members", getOptionEncoder(getArrayEncoder(getMemberEncoder()))],
   ]);
 }
 
 export function getMembersArgsDecoder(): Decoder<MembersArgs> {
   return getStructDecoder([
-    ['members', getOptionDecoder(getArrayDecoder(getMemberDecoder()))],
+    ["members", getOptionDecoder(getArrayDecoder(getMemberDecoder()))],
   ]);
 }
 

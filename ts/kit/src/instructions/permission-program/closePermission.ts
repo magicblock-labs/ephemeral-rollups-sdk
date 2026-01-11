@@ -1,9 +1,4 @@
-import {
-  Address,
-  Instruction,
-  AccountMeta,
-  AccountRole,
-} from "@solana/kit";
+import { Address, Instruction, AccountMeta, AccountRole } from "@solana/kit";
 import { PERMISSION_PROGRAM_ID } from "../../constants";
 import { permissionPdaFromAccount } from "../../pda";
 
@@ -11,17 +6,20 @@ import { permissionPdaFromAccount } from "../../pda";
  * Instruction: ClosePermission
  * Discriminator: [2, 0, 0, 0, 0, 0, 0, 0]
  */
-export async function createClosePermissionInstruction(
-  accounts: {
-    payer: Address;
-    permissionedAccount: Address;
-  },
-): Promise<Instruction> {
-  const permission = await permissionPdaFromAccount(accounts.permissionedAccount);
+export async function createClosePermissionInstruction(accounts: {
+  payer: Address;
+  permissionedAccount: Address;
+}): Promise<Instruction> {
+  const permission = await permissionPdaFromAccount(
+    accounts.permissionedAccount,
+  );
 
   const accountsMeta: AccountMeta[] = [
     { address: accounts.payer, role: AccountRole.WRITABLE_SIGNER },
-    { address: accounts.permissionedAccount, role: AccountRole.READONLY_SIGNER },
+    {
+      address: accounts.permissionedAccount,
+      role: AccountRole.READONLY_SIGNER,
+    },
     { address: permission, role: AccountRole.WRITABLE },
   ];
 

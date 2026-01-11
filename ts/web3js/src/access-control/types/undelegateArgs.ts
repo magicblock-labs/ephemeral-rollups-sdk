@@ -1,4 +1,6 @@
-export type UndelegateArgs = { pdaSeeds: Array<Array<number>> };
+export interface UndelegateArgs {
+  pdaSeeds: number[][];
+}
 
 export type UndelegateArgsArgs = UndelegateArgs;
 
@@ -28,12 +30,12 @@ export function deserializeUndelegateArgs(
   // Read pdaSeeds (Vec<Vec<u8>>)
   const seedsLen = buffer.readUInt32LE(offset);
   offset += 4;
-  const pdaSeeds: Array<Array<number>> = [];
+  const pdaSeeds: number[][] = [];
 
   for (let i = 0; i < seedsLen; i++) {
     const seedLen = buffer.readUInt32LE(offset);
     offset += 4;
-    const seed: Array<number> = [];
+    const seed: number[] = [];
     for (let j = 0; j < seedLen; j++) {
       seed.push(buffer[offset++]);
     }
