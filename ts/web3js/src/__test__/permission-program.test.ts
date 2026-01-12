@@ -6,6 +6,7 @@ import {
 } from "../instructions/permission-program";
 import { PERMISSION_PROGRAM_ID } from "../constants";
 import { permissionPdaFromAccount } from "../pda";
+import { MEMBER_FLAG_AUTHORITY } from "../access-control/types";
 
 describe("Permission Program Instructions (web3.js)", () => {
   const mockPublicKey = new PublicKey("11111111111111111111111111111113");
@@ -20,8 +21,8 @@ describe("Permission Program Instructions (web3.js)", () => {
         },
         {
           members: [
-            { pubkey: mockPublicKey, authority: true },
-            { pubkey: differentPublicKey, authority: false },
+            { pubkey: mockPublicKey, flags: MEMBER_FLAG_AUTHORITY },
+            { pubkey: differentPublicKey, flags: 0 },
           ],
         },
       );
@@ -33,7 +34,7 @@ describe("Permission Program Instructions (web3.js)", () => {
     });
 
     it("should serialize members correctly", () => {
-      const members = [{ pubkey: mockPublicKey, authority: true }];
+      const members = [{ pubkey: mockPublicKey, flags: MEMBER_FLAG_AUTHORITY }];
       const instruction = createCreatePermissionInstruction(
         {
           permissionedAccount: mockPublicKey,
@@ -125,11 +126,11 @@ describe("Permission Program Instructions (web3.js)", () => {
 
     it("should handle multiple members", () => {
       const members = [
-        { pubkey: mockPublicKey, authority: true },
-        { pubkey: differentPublicKey, authority: false },
+        { pubkey: mockPublicKey, flags: MEMBER_FLAG_AUTHORITY },
+        { pubkey: differentPublicKey, flags: 0 },
         {
           pubkey: new PublicKey("11111111111111111111111111111113"),
-          authority: true,
+          flags: MEMBER_FLAG_AUTHORITY,
         },
       ];
 
@@ -165,10 +166,10 @@ describe("Permission Program Instructions (web3.js)", () => {
     });
 
     it("should encode authority flag correctly", () => {
-      const authorityMember = { pubkey: mockPublicKey, authority: true };
+      const authorityMember = { pubkey: mockPublicKey, flags: MEMBER_FLAG_AUTHORITY };
       const nonAuthorityMember = {
         pubkey: differentPublicKey,
-        authority: false,
+        flags: 0,
       };
 
       const instruction1 = createCreatePermissionInstruction(
@@ -203,8 +204,8 @@ describe("Permission Program Instructions (web3.js)", () => {
         },
         {
           members: [
-            { pubkey: mockPublicKey, authority: true },
-            { pubkey: differentPublicKey, authority: false },
+            { pubkey: mockPublicKey, flags: MEMBER_FLAG_AUTHORITY },
+            { pubkey: differentPublicKey, flags: 0 },
           ],
         },
       );
@@ -291,11 +292,11 @@ describe("Permission Program Instructions (web3.js)", () => {
 
     it("should handle multiple members", () => {
       const members = [
-        { pubkey: mockPublicKey, authority: true },
-        { pubkey: differentPublicKey, authority: false },
+        { pubkey: mockPublicKey, flags: MEMBER_FLAG_AUTHORITY },
+        { pubkey: differentPublicKey, flags: 0 },
         {
           pubkey: new PublicKey("11111111111111111111111111111113"),
-          authority: true,
+          flags: MEMBER_FLAG_AUTHORITY,
         },
       ];
 
