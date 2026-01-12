@@ -252,14 +252,23 @@ describe("Permission Program Instructions (web3.js)", () => {
       expect(permissionedAccount?.isSigner).toBe(true);
     });
 
-    it("should include permission PDA as writable", () => {
+    it("should include permission PDA as writable at index 2", () => {
+      const permissionedAccountAddress = new PublicKey(
+        "11111111111111111111111111111117",
+      );
       const instruction = createUpdatePermissionInstruction({
         authority: mockPublicKey,
-        permissionedAccount: mockPublicKey,
+        permissionedAccount: permissionedAccountAddress,
       });
 
-      const writableAccounts = instruction.keys.filter((key) => key.isWritable);
-      expect(writableAccounts.length).toBeGreaterThan(0);
+      const expectedPda = permissionPdaFromAccount(permissionedAccountAddress);
+
+      // Verify the permission PDA is at the expected index (2)
+      const permissionAccount = instruction.keys[2];
+      expect(permissionAccount).toBeDefined();
+      expect(permissionAccount.pubkey.equals(expectedPda)).toBe(true);
+      expect(permissionAccount.isWritable).toBe(true);
+      expect(permissionAccount.isSigner).toBe(false);
     });
 
     it("should use discriminator [1, 0, 0, 0, 0, 0, 0, 0]", () => {

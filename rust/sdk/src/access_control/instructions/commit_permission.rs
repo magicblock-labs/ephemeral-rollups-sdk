@@ -301,13 +301,15 @@ impl<'a, 'b> CommitPermissionCpiBuilder<'a, 'b> {
             authority: None,
             permissioned_account: None,
             permission: None,
+            magic_program: None,
+            magic_context: None,
             __remaining_accounts: Vec::new(),
         });
         Self { instruction }
     }
 
     /// Create a CPI builder with the required accounts
-    /// Magic program and magic context are auto-set
+    /// Magic program and magic context are auto-set (can be overridden via remaining_accounts)
     pub fn with_accounts(
         program: &'b AccountInfo<'a>,
         authority: &'b AccountInfo<'a>,
@@ -321,6 +323,8 @@ impl<'a, 'b> CommitPermissionCpiBuilder<'a, 'b> {
             authority: Some((authority, authority_is_signer)),
             permissioned_account: Some((permissioned_account, permissioned_is_signer)),
             permission: Some(permission),
+            magic_program: None,
+            magic_context: None,
             __remaining_accounts: Vec::new(),
         });
         Self { instruction }
@@ -372,6 +376,18 @@ impl<'a, 'b> CommitPermissionCpiBuilder<'a, 'b> {
             .extend_from_slice(accounts);
         self
     }
+
+    #[inline(always)]
+    pub fn magic_program(&mut self, magic_program: &'b AccountInfo<'a>) -> &mut Self {
+        self.instruction.magic_program = Some(magic_program);
+        self
+    }
+
+    #[inline(always)]
+    pub fn magic_context(&mut self, magic_context: &'b AccountInfo<'a>) -> &mut Self {
+        self.instruction.magic_context = Some(magic_context);
+        self
+    }
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
         self.invoke_signed(&[])
@@ -397,7 +413,8 @@ impl<'a, 'b> CommitPermissionCpiBuilder<'a, 'b> {
                 .iter()
                 .find(|(acc, _, _)| acc.key == &MAGIC_PROGRAM_ID)
                 .map(|(acc, _, _)| acc)
-                .unwrap_or(&self.instruction.magic_program),
+                .or(self.instruction.magic_program)
+                .expect("magic_program account not found"),
 
             magic_context: self
                 .instruction
@@ -405,7 +422,8 @@ impl<'a, 'b> CommitPermissionCpiBuilder<'a, 'b> {
                 .iter()
                 .find(|(acc, _, _)| acc.key == &MAGIC_CONTEXT_ID)
                 .map(|(acc, _, _)| acc)
-                .unwrap_or(&self.instruction.magic_context),
+                .or(self.instruction.magic_context)
+                .expect("magic_context account not found"),
         };
         instruction.invoke_signed_with_remaining_accounts(
             signers_seeds,
@@ -420,6 +438,8 @@ struct CommitPermissionCpiBuilderInstruction<'a, 'b> {
     authority: Option<(&'b AccountInfo<'a>, bool)>,
     permissioned_account: Option<(&'b AccountInfo<'a>, bool)>,
     permission: Option<&'b AccountInfo<'a>>,
+    magic_program: Option<&'b AccountInfo<'a>>,
+    magic_context: Option<&'b AccountInfo<'a>>,
     /// Additional instruction accounts `(AccountInfo, is_writable, is_signer)`.
     __remaining_accounts: Vec<(&'b AccountInfo<'a>, bool, bool)>,
 }

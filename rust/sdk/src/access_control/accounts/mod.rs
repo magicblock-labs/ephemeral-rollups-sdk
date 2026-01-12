@@ -1,3 +1,3 @@
-pub(crate) mod r#permission;
+pub(crate) mod permission;
 
-pub use self::r#permission::*;
+pub use self::permission::*;

@@ -94,7 +94,7 @@ impl DelegatePermission {
         accounts.extend_from_slice(remaining_accounts);
         let data = DelegatePermissionInstructionData::new()
             .try_to_vec()
-            .unwrap();
+            .expect("failed to serialize DelegatePermissionInstructionData");
 
         Instruction {
             program_id: MAGICBLOCK_PERMISSION_API_ID,
@@ -383,7 +383,7 @@ impl<'a, 'b> DelegatePermissionCpi<'a, 'b> {
         });
         let data = DelegatePermissionInstructionData::new()
             .try_to_vec()
-            .unwrap();
+            .expect("failed to serialize DelegatePermissionInstructionData");
 
         let instruction = Instruction {
             program_id: MAGICBLOCK_PERMISSION_API_ID,

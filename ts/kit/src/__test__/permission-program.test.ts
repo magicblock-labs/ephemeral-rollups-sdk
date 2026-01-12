@@ -202,6 +202,7 @@ describe("Permission Program Instructions (@solana/kit)", () => {
         (acc) => acc.address === authorityAddress,
       );
       expect(authorityAccount).toBeDefined();
+      expect(authorityAccount?.role).toBe(AccountRole.READONLY_SIGNER);
     });
 
     it("should include permissionedAccount as readonly signer", async () => {
@@ -215,6 +216,7 @@ describe("Permission Program Instructions (@solana/kit)", () => {
         (acc) => acc.address === permissionedAddress,
       );
       expect(permissionedAccount).toBeDefined();
+      expect(permissionedAccount?.role).toBe(AccountRole.READONLY_SIGNER);
     });
 
     it("should include permission PDA as writable", async () => {
@@ -225,6 +227,9 @@ describe("Permission Program Instructions (@solana/kit)", () => {
 
       expect(instruction.accounts).toBeDefined();
       expect(instruction.accounts?.length).toBe(3);
+
+      const permissionPda = instruction.accounts?.[2];
+      expect(permissionPda?.role).toBe(AccountRole.WRITABLE);
     });
 
     it("should use discriminator [1, 0, 0, 0, 0, 0, 0, 0]", async () => {

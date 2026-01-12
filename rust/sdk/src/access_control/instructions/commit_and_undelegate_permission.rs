@@ -65,7 +65,9 @@ pub struct CommitAndUndelegatePermissionInstructionData {
 
 impl CommitAndUndelegatePermissionInstructionData {
     pub fn new() -> Self {
-        Self { discriminator: 5 }
+        Self {
+            discriminator: COMMIT_AND_UNDELEGATE_PERMISSION_DISCRIMINATOR,
+        }
     }
 
     pub(crate) fn try_to_vec(&self) -> Result<Vec<u8>, std::io::Error> {
@@ -293,12 +295,18 @@ pub struct CommitAndUndelegatePermissionCpiBuilder<'a, 'b> {
 }
 
 impl<'a, 'b> CommitAndUndelegatePermissionCpiBuilder<'a, 'b> {
-    pub fn new(program: &'b AccountInfo<'a>) -> Self {
+    pub fn new(
+        program: &'b AccountInfo<'a>,
+        magic_program: &'b AccountInfo<'a>,
+        magic_context: &'b AccountInfo<'a>,
+    ) -> Self {
         let instruction = Box::new(CommitAndUndelegatePermissionCpiBuilderInstruction {
             __program: program,
             authority: None,
             permissioned_account: None,
             permission: None,
+            magic_program,
+            magic_context,
             __remaining_accounts: Vec::new(),
         });
         Self { instruction }
@@ -313,12 +321,16 @@ impl<'a, 'b> CommitAndUndelegatePermissionCpiBuilder<'a, 'b> {
         permissioned_account: &'b AccountInfo<'a>,
         permissioned_is_signer: bool,
         permission: &'b AccountInfo<'a>,
+        magic_program: &'b AccountInfo<'a>,
+        magic_context: &'b AccountInfo<'a>,
     ) -> Self {
         let instruction = Box::new(CommitAndUndelegatePermissionCpiBuilderInstruction {
             __program: program,
             authority: Some((authority, authority_is_signer)),
             permissioned_account: Some((permissioned_account, permissioned_is_signer)),
             permission: Some(permission),
+            magic_program,
+            magic_context,
             __remaining_accounts: Vec::new(),
         });
         Self { instruction }
@@ -377,35 +389,16 @@ impl<'a, 'b> CommitAndUndelegatePermissionCpiBuilder<'a, 'b> {
     #[allow(clippy::clone_on_copy)]
     #[allow(clippy::vec_init_then_push)]
     pub fn invoke_signed(&self, signers_seeds: &[&[&[u8]]]) -> ProgramResult {
-        // Create magic_program and magic_context AccountInfos from constants
-        // These should be passed via remaining accounts in actual usage
         let instruction = CommitAndUndelegatePermissionCpi {
             __program: self.instruction.__program,
-
             authority: self.instruction.authority.expect("authority is not set"),
-
             permissioned_account: self
                 .instruction
                 .permissioned_account
                 .expect("permissioned_account is not set"),
-
             permission: self.instruction.permission.expect("permission is not set"),
-
-            magic_program: self
-                .instruction
-                .__remaining_accounts
-                .iter()
-                .find(|(acc, _, _)| acc.key == &MAGIC_PROGRAM_ID)
-                .map(|(acc, _, _)| acc)
-                .unwrap_or(&self.instruction.magic_program),
-
-            magic_context: self
-                .instruction
-                .__remaining_accounts
-                .iter()
-                .find(|(acc, _, _)| acc.key == &MAGIC_CONTEXT_ID)
-                .map(|(acc, _, _)| acc)
-                .unwrap_or(&self.instruction.magic_context),
+            magic_program: self.instruction.magic_program,
+            magic_context: self.instruction.magic_context,
         };
         instruction.invoke_signed_with_remaining_accounts(
             signers_seeds,
@@ -420,6 +413,8 @@ struct CommitAndUndelegatePermissionCpiBuilderInstruction<'a, 'b> {
     authority: Option<(&'b AccountInfo<'a>, bool)>,
     permissioned_account: Option<(&'b AccountInfo<'a>, bool)>,
     permission: Option<&'b AccountInfo<'a>>,
+    magic_program: &'b AccountInfo<'a>,
+    magic_context: &'b AccountInfo<'a>,
     /// Additional instruction accounts `(AccountInfo, is_writable, is_signer)`.
     __remaining_accounts: Vec<(&'b AccountInfo<'a>, bool, bool)>,
 }

@@ -17,7 +17,14 @@ export interface MembersArgsArgs {
 }
 
 export function serializeMembersArgs(args: MembersArgsArgs): Buffer {
-  const buffer = Buffer.alloc(4096); // Allocate enough space
+  // Calculate exact buffer size needed:
+  // 1 byte (discriminant) + [4 bytes (count) + (33 bytes per member)] if Some
+  let requiredSize = 1;
+  if (args.members !== null) {
+    requiredSize += 4 + args.members.length * MEMBER_SIZE;
+  }
+
+  const buffer = Buffer.alloc(requiredSize);
   let offset = 0;
 
   // Write members (Option<Vec<Member>>)
@@ -44,15 +51,33 @@ export function deserializeMembersArgs(
   offset: number = 0,
 ): MembersArgs {
   // Read members (Option<Vec<Member>>)
+  if (offset + 1 > buffer.length) {
+    throw new Error(
+      "Buffer underflow: insufficient bytes to read members discriminant",
+    );
+  }
+
   const discriminant = buffer[offset++];
   let members: Member[] | null = null;
 
   if (discriminant === 1) {
     // Some variant
+    if (offset + 4 > buffer.length) {
+      throw new Error(
+        "Buffer underflow: insufficient bytes to read members length",
+      );
+    }
+
     const len = buffer.readUInt32LE(offset);
     offset += 4;
     members = [];
     for (let i = 0; i < len; i++) {
+      if (offset + MEMBER_SIZE > buffer.length) {
+        throw new Error(
+          `Buffer underflow: insufficient bytes to read member ${i} (expected ${MEMBER_SIZE} bytes)`,
+        );
+      }
+
       const member = deserializeMember(buffer, offset);
       members.push(member);
       offset += MEMBER_SIZE;

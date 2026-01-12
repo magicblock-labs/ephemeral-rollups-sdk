@@ -54,9 +54,17 @@ export function serializeUpdatePermissionInstructionData(
 ): [Uint8Array] {
   const discriminator = [1, 0, 0, 0, 0, 0, 0, 0];
   const members = args?.members ?? [];
-  let offset = 0;
-  const buffer = new ArrayBuffer(2048);
+
+  // Calculate exact buffer size needed:
+  // 8 bytes (discriminator) + 4 bytes (members count) + (32 bytes + 1 byte) per member
+  let requiredSize = 8 + 4;
+  for (let i = 0; i < members.length; i++) {
+    requiredSize += 32 + 1;
+  }
+
+  const buffer = new ArrayBuffer(requiredSize);
   const view = new DataView(buffer);
+  let offset = 0;
 
   // Write discriminator (u64)
   for (let i = 0; i < 8; i++) {

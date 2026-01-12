@@ -44,11 +44,18 @@ export function createUndelegatePermissionInstruction(
 export function serializeUndelegatePermissionInstructionData(
   args?: UndelegatePermissionInstructionArgs,
 ): Buffer {
-  const MAX_BUFFER_SIZE = 2048;
   // Discriminator for UndelegatePermission: 12048014319693667524 in little-endian
   const discriminator = [0xa4, 0xa7, 0x5c, 0xcc, 0x04, 0x8a, 0xa9, 0xa6];
   const pdaSeeds = args?.pdaSeeds ?? [];
-  const buffer = Buffer.alloc(MAX_BUFFER_SIZE);
+
+  // Calculate exact buffer size needed:
+  // 8 bytes (discriminator) + 4 bytes (vec length) + (4 bytes + seed length) per seed
+  let requiredSize = 8 + 4;
+  for (const seed of pdaSeeds) {
+    requiredSize += 4 + seed.length;
+  }
+
+  const buffer = Buffer.alloc(requiredSize);
   let offset = 0;
 
   // Write discriminator (u64)
@@ -57,25 +64,15 @@ export function serializeUndelegatePermissionInstructionData(
   }
 
   // Write pda_seeds (vec<vec<u8>>)
-  if (offset + 4 > MAX_BUFFER_SIZE) {
-    throw new Error(
-      `Serialized data exceeds buffer size (${MAX_BUFFER_SIZE} bytes)`,
-    );
-  }
   buffer.writeUInt32LE(pdaSeeds.length, offset);
   offset += 4;
 
   for (const seed of pdaSeeds) {
-    if (offset + 4 + seed.length > MAX_BUFFER_SIZE) {
-      throw new Error(
-        `Serialized data exceeds buffer size (${MAX_BUFFER_SIZE} bytes)`,
-      );
-    }
     buffer.writeUInt32LE(seed.length, offset);
     offset += 4;
     buffer.set(seed, offset);
     offset += seed.length;
   }
 
-  return buffer.subarray(0, offset);
+  return buffer;
 }
