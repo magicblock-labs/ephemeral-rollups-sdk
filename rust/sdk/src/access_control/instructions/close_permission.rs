@@ -53,7 +53,9 @@ pub struct ClosePermissionInstructionData {
 
 impl ClosePermissionInstructionData {
     pub fn new() -> Self {
-        Self { discriminator: 2 }
+        Self {
+            discriminator: CLOSE_PERMISSION_DISCRIMINATOR,
+        }
     }
 
     pub(crate) fn try_to_vec(&self) -> Result<Vec<u8>, std::io::Error> {

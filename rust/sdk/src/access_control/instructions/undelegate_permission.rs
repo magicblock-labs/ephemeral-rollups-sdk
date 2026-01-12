@@ -60,7 +60,7 @@ pub struct UndelegatePermissionInstructionData {
 impl UndelegatePermissionInstructionData {
     pub fn new() -> Self {
         Self {
-            discriminator: 12048014319693668000,
+            discriminator: UNDELEGATE_PERMISSION_DISCRIMINATOR,
         }
     }
 

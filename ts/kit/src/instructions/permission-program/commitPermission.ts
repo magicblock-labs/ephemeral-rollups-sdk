@@ -9,20 +9,38 @@ import { permissionPdaFromAccount } from "../../pda";
 /**
  * Instruction: CommitPermission
  * Discriminator: [4, 0, 0, 0, 0, 0, 0, 0]
+ *
+ * Accounts:
+ *   0. `[signer?]` authority - Either this or permissionedAccount must be a signer
+ *   1. `[writable, signer?]` permissionedAccount - Either this or authority must be a signer
+ *   2. `[writable]` permission
+ *   3. `[]` magic_program
+ *   4. `[writable]` magic_context
+ *
+ * Note: The processor validates that at least one of authority or permissionedAccount
+ * is authorized (either as a direct signer or as a permission member).
  */
 export async function createCommitPermissionInstruction(accounts: {
-  authority: Address;
-  permissionedAccount: Address;
+  authority: [Address, boolean];
+  permissionedAccount: [Address, boolean];
 }): Promise<Instruction> {
   const permission = await permissionPdaFromAccount(
-    accounts.permissionedAccount,
+    accounts.permissionedAccount[0],
   );
 
+  // Either authority or permissionedAccount must be a signer
   const accountsMeta: AccountMeta[] = [
-    { address: accounts.authority, role: AccountRole.READONLY_SIGNER },
     {
-      address: accounts.permissionedAccount,
-      role: AccountRole.WRITABLE_SIGNER,
+      address: accounts.authority[0],
+      role: accounts.authority[1]
+        ? AccountRole.READONLY_SIGNER
+        : AccountRole.READONLY,
+    },
+    {
+      address: accounts.permissionedAccount[0],
+      role: accounts.permissionedAccount[1]
+        ? AccountRole.WRITABLE_SIGNER
+        : AccountRole.WRITABLE,
     },
     { address: permission, role: AccountRole.WRITABLE },
     { address: MAGIC_PROGRAM_ID, role: AccountRole.READONLY },

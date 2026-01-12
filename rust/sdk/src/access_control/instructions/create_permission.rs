@@ -57,7 +57,9 @@ pub struct CreatePermissionInstructionData {
 
 impl CreatePermissionInstructionData {
     pub fn new() -> Self {
-        Self { discriminator: 0 }
+        Self {
+            discriminator: CREATE_PERMISSION_DISCRIMINATOR,
+        }
     }
 
     pub(crate) fn try_to_vec(&self) -> Result<Vec<u8>, std::io::Error> {

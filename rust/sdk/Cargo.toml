@@ -71,6 +71,7 @@ path = "../tests/unit_test.rs"
 [[test]]
 name = "access_control_test"
 path = "../tests/access_control_test.rs"
+required-features = ["access-control", "modular-sdk"]
 
 [[test]]
 name = "pinocchio_test"

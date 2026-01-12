@@ -85,8 +85,8 @@ impl Default for CommitPermissionInstructionData {
 ///
 /// ### Accounts (magic_program and magic_context are auto-set):
 ///
-///   0. `[signer]` authority
-///   1. `[writable, signer]` permissioned_account
+///   0. `[signer?]` authority - Either this or permissioned_account must be a signer
+///   1. `[writable, signer?]` permissioned_account - Either this or authority must be a signer
 ///   2. `[writable]` permission
 ///   3. `[]` magic_program (auto-set to MAGIC_PROGRAM_ID)
 ///   4. `[writable]` magic_context (auto-set to MAGIC_CONTEXT_ID)
@@ -101,23 +101,6 @@ pub struct CommitPermissionBuilder {
 impl CommitPermissionBuilder {
     pub fn new() -> Self {
         Self::default()
-    }
-
-    /// Create a builder with the required accounts
-    /// Magic program and magic context are auto-set
-    pub fn with_accounts(
-        authority: Pubkey,
-        authority_is_signer: bool,
-        permissioned_account: Pubkey,
-        permissioned_is_signer: bool,
-        permission: Pubkey,
-    ) -> Self {
-        Self {
-            authority: Some((authority, authority_is_signer)),
-            permissioned_account: Some((permissioned_account, permissioned_is_signer)),
-            permission: Some(permission),
-            __remaining_accounts: Vec::new(),
-        }
     }
 
     #[inline(always)]
@@ -284,8 +267,8 @@ impl<'a, 'b> CommitPermissionCpi<'a, 'b> {
 ///
 /// ### Accounts (magic_program and magic_context are auto-set):
 ///
-///   0. `[signer]` authority
-///   1. `[writable, signer]` permissioned_account
+///   0. `[signer?]` authority - Either this or permissioned_account must be a signer
+///   1. `[writable, signer?]` permissioned_account - Either this or authority must be a signer
 ///   2. `[writable]` permission
 ///   3. `[]` magic_program (auto-set)
 ///   4. `[writable]` magic_context (auto-set)
@@ -301,28 +284,6 @@ impl<'a, 'b> CommitPermissionCpiBuilder<'a, 'b> {
             authority: None,
             permissioned_account: None,
             permission: None,
-            magic_program: None,
-            magic_context: None,
-            __remaining_accounts: Vec::new(),
-        });
-        Self { instruction }
-    }
-
-    /// Create a CPI builder with the required accounts
-    /// Magic program and magic context are auto-set (can be overridden via remaining_accounts)
-    pub fn with_accounts(
-        program: &'b AccountInfo<'a>,
-        authority: &'b AccountInfo<'a>,
-        authority_is_signer: bool,
-        permissioned_account: &'b AccountInfo<'a>,
-        permissioned_is_signer: bool,
-        permission: &'b AccountInfo<'a>,
-    ) -> Self {
-        let instruction = Box::new(CommitPermissionCpiBuilderInstruction {
-            __program: program,
-            authority: Some((authority, authority_is_signer)),
-            permissioned_account: Some((permissioned_account, permissioned_is_signer)),
-            permission: Some(permission),
             magic_program: None,
             magic_context: None,
             __remaining_accounts: Vec::new(),
@@ -412,8 +373,8 @@ impl<'a, 'b> CommitPermissionCpiBuilder<'a, 'b> {
                 .__remaining_accounts
                 .iter()
                 .find(|(acc, _, _)| acc.key == &MAGIC_PROGRAM_ID)
-                .map(|(acc, _, _)| acc)
-                .or(self.instruction.magic_program)
+                .map(|(acc, _, _)| *acc)
+                .or_else(|| self.instruction.magic_program)
                 .expect("magic_program account not found"),
 
             magic_context: self
@@ -421,8 +382,8 @@ impl<'a, 'b> CommitPermissionCpiBuilder<'a, 'b> {
                 .__remaining_accounts
                 .iter()
                 .find(|(acc, _, _)| acc.key == &MAGIC_CONTEXT_ID)
-                .map(|(acc, _, _)| acc)
-                .or(self.instruction.magic_context)
+                .map(|(acc, _, _)| *acc)
+                .or_else(|| self.instruction.magic_context)
                 .expect("magic_context account not found"),
         };
         instruction.invoke_signed_with_remaining_accounts(

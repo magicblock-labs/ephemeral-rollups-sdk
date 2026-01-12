@@ -60,7 +60,9 @@ pub struct UpdatePermissionInstructionData {
 
 impl UpdatePermissionInstructionData {
     pub fn new() -> Self {
-        Self { discriminator: 1 }
+        Self {
+            discriminator: UPDATE_PERMISSION_DISCRIMINATOR,
+        }
     }
 
     pub(crate) fn try_to_vec(&self) -> Result<Vec<u8>, std::io::Error> {
