@@ -252,7 +252,7 @@ impl DelegatePermissionBuilder {
             delegation_program: self
                 .delegation_program
                 .expect("delegation_program is not set"),
-            validator: self.validator,
+            validator: self.validator.expect("validator is not set"),
         };
 
         accounts.instruction_with_remaining_accounts(&self.__remaining_accounts)
