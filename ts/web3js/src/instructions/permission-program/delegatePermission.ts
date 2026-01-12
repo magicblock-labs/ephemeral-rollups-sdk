@@ -45,10 +45,6 @@ export function createDelegatePermissionInstruction(
 
   const validator = args?.validator ?? accounts.validator;
 
-  if (!validator) {
-    throw new Error("validator is required");
-  }
-
   const keys: AccountMeta[] = [
     { pubkey: accounts.payer, isWritable: true, isSigner: true },
     {
@@ -63,12 +59,15 @@ export function createDelegatePermissionInstruction(
     { pubkey: delegationRecord, isWritable: true, isSigner: false },
     { pubkey: delegationMetadata, isWritable: true, isSigner: false },
     { pubkey: DELEGATION_PROGRAM_ID, isWritable: false, isSigner: false },
-    {
+  ];
+
+  if (validator) {
+    keys.push({
       pubkey: validator,
       isWritable: false,
       isSigner: false,
-    },
-  ];
+    });
+  }
 
   const instructionData = serializeDelegatePermissionInstructionData();
 

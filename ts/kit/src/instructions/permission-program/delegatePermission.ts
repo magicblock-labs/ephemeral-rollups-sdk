@@ -44,10 +44,6 @@ export async function createDelegatePermissionInstruction(
 
   const validator = args?.validator ?? accounts.validator;
 
-  if (!validator) {
-    throw new Error("validator is required");
-  }
-
   const accountsMeta: AccountMeta[] = [
     { address: accounts.payer, role: AccountRole.WRITABLE_SIGNER },
     { address: accounts.permissionedAccount, role: AccountRole.READONLY },
@@ -58,11 +54,14 @@ export async function createDelegatePermissionInstruction(
     { address: delegationRecord, role: AccountRole.WRITABLE },
     { address: delegationMetadata, role: AccountRole.WRITABLE },
     { address: DELEGATION_PROGRAM_ID, role: AccountRole.READONLY },
-    {
+  ];
+
+  if (validator) {
+    accountsMeta.push({
       address: validator,
       role: AccountRole.READONLY,
-    },
-  ];
+    });
+  }
 
   const [instructionData] = serializeDelegatePermissionInstructionData();
 
