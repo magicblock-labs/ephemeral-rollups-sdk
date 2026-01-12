@@ -142,7 +142,10 @@ describe("Permission Program Instructions (@solana/kit)", () => {
     });
 
     it("should encode authority flag correctly", async () => {
-      const authorityMember = { pubkey: mockAddress, flags: MEMBER_FLAG_AUTHORITY };
+      const authorityMember = {
+        pubkey: mockAddress,
+        flags: MEMBER_FLAG_AUTHORITY,
+      };
       const nonAuthorityMember = { pubkey: differentAddress, flags: 0 };
 
       const instruction1 = await createCreatePermissionInstruction(

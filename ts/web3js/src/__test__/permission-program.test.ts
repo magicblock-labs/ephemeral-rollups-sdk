@@ -166,7 +166,10 @@ describe("Permission Program Instructions (web3.js)", () => {
     });
 
     it("should encode authority flag correctly", () => {
-      const authorityMember = { pubkey: mockPublicKey, flags: MEMBER_FLAG_AUTHORITY };
+      const authorityMember = {
+        pubkey: mockPublicKey,
+        flags: MEMBER_FLAG_AUTHORITY,
+      };
       const nonAuthorityMember = {
         pubkey: differentPublicKey,
         flags: 0,
