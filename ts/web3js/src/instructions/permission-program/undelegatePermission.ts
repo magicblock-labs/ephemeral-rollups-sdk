@@ -44,9 +44,19 @@ export function createUndelegatePermissionInstruction(
 export function serializeUndelegatePermissionInstructionData(
   args?: UndelegatePermissionInstructionArgs,
 ): Buffer {
+  const MAX_SEED_LENGTH = 32; // Solana PDA seed maximum length
   // Discriminator for UndelegatePermission: 12048014319693667524 in little-endian
   const discriminator = [0xa4, 0xa7, 0x5c, 0xcc, 0x04, 0x8a, 0xa9, 0xa6];
   const pdaSeeds = args?.pdaSeeds ?? [];
+
+  // Validate seed lengths
+  for (let i = 0; i < pdaSeeds.length; i++) {
+    if (pdaSeeds[i].length > MAX_SEED_LENGTH) {
+      throw new Error(
+        `PDA seed ${i} exceeds maximum length of ${MAX_SEED_LENGTH} bytes (got ${pdaSeeds[i].length})`,
+      );
+    }
+  }
 
   // Calculate exact buffer size needed:
   // 8 bytes (discriminator) + 4 bytes (vec length) + (4 bytes + seed length) per seed

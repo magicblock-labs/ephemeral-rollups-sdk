@@ -5,8 +5,14 @@ export interface UndelegateArgs {
 export type UndelegateArgsArgs = UndelegateArgs;
 
 export function serializeUndelegateArgs(args: UndelegateArgsArgs): Buffer {
-  const MAX_BUFFER_SIZE = 4096;
-  const buffer = Buffer.alloc(MAX_BUFFER_SIZE);
+  // Calculate exact buffer size needed:
+  // 4 bytes (vec length) + (4 bytes + seed length) per seed
+  let requiredSize = 4;
+  for (const seed of args.pdaSeeds) {
+    requiredSize += 4 + seed.length;
+  }
+
+  const buffer = Buffer.alloc(requiredSize);
   let offset = 0;
 
   // Write pdaSeeds (Vec<Vec<u8>>)
@@ -14,11 +20,6 @@ export function serializeUndelegateArgs(args: UndelegateArgsArgs): Buffer {
   offset += 4;
 
   for (const seed of args.pdaSeeds) {
-    if (offset + 4 + seed.length > MAX_BUFFER_SIZE) {
-      throw new Error(
-        `Serialized pdaSeeds exceed maximum buffer size (${MAX_BUFFER_SIZE} bytes)`,
-      );
-    }
     buffer.writeUInt32LE(seed.length, offset);
     offset += 4;
     for (const byte of seed) {

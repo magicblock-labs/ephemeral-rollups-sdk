@@ -47,7 +47,7 @@ impl CommitAndUndelegatePermission {
         accounts.extend_from_slice(remaining_accounts);
         let data = CommitAndUndelegatePermissionInstructionData::new()
             .try_to_vec()
-            .unwrap();
+            .expect("failed to serialize CommitAndUndelegatePermissionInstructionData");
 
         Instruction {
             program_id: MAGICBLOCK_PERMISSION_API_ID,
@@ -360,18 +360,18 @@ impl<'a, 'b> CommitAndUndelegatePermissionCpiBuilder<'a, 'b> {
     pub fn add_remaining_account(
         &mut self,
         account: &'b AccountInfo<'a>,
-        is_writable: bool,
         is_signer: bool,
+        is_writable: bool,
     ) -> &mut Self {
         self.instruction
             .__remaining_accounts
-            .push((account, is_writable, is_signer));
+            .push((account, is_signer, is_writable));
         self
     }
     /// Add additional accounts to the instruction.
     ///
-    /// Each account is represented by a tuple of the `AccountInfo`, a `bool` indicating whether the account is writable or not,
-    /// and a `bool` indicating whether the account is a signer or not.
+    /// Each account is represented by a tuple of the `AccountInfo`, a `bool` indicating whether the account is a signer or not,
+    /// and a `bool` indicating whether the account is writable or not.
     #[inline(always)]
     pub fn add_remaining_accounts(
         &mut self,
@@ -415,6 +415,6 @@ struct CommitAndUndelegatePermissionCpiBuilderInstruction<'a, 'b> {
     permission: Option<&'b AccountInfo<'a>>,
     magic_program: &'b AccountInfo<'a>,
     magic_context: &'b AccountInfo<'a>,
-    /// Additional instruction accounts `(AccountInfo, is_writable, is_signer)`.
+    /// Additional instruction accounts `(AccountInfo, is_signer, is_writable)`.
     __remaining_accounts: Vec<(&'b AccountInfo<'a>, bool, bool)>,
 }

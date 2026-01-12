@@ -38,8 +38,13 @@ export function serializeMembersArgs(args: MembersArgsArgs): Buffer {
     // Write each member
     for (const member of args.members) {
       const memberBuffer = serializeMember(member);
+      if (memberBuffer.length !== MEMBER_SIZE) {
+        throw new Error(
+          `Member serialization mismatch: expected ${MEMBER_SIZE} bytes, got ${memberBuffer.length}`,
+        );
+      }
       buffer.set(memberBuffer, offset);
-      offset += memberBuffer.length;
+      offset += MEMBER_SIZE;
     }
   }
 
@@ -60,7 +65,10 @@ export function deserializeMembersArgs(
   const discriminant = buffer[offset++];
   let members: Member[] | null = null;
 
-  if (discriminant === 1) {
+  if (discriminant === 0) {
+    // None variant
+    members = null;
+  } else if (discriminant === 1) {
     // Some variant
     if (offset + 4 > buffer.length) {
       throw new Error(
@@ -82,6 +90,10 @@ export function deserializeMembersArgs(
       members.push(member);
       offset += MEMBER_SIZE;
     }
+  } else {
+    throw new Error(
+      `Invalid discriminant for MembersArgs: expected 0 (None) or 1 (Some), got ${discriminant}`,
+    );
   }
 
   return { members };
