@@ -5,6 +5,7 @@ import {
   createUpdatePermissionInstruction,
 } from "../instructions/permission-program";
 import { PERMISSION_PROGRAM_ID } from "../constants";
+import { permissionPdaFromAccount } from "../pda";
 
 describe("Permission Program Instructions (web3.js)", () => {
   const mockPublicKey = new PublicKey("11111111111111111111111111111113");
@@ -76,15 +77,22 @@ describe("Permission Program Instructions (web3.js)", () => {
     });
 
     it("should include permission PDA as writable", () => {
+      const permissionedAccountAddress = new PublicKey(
+        "11111111111111111111111111111116",
+      );
       const instruction = createCreatePermissionInstruction({
-        permissionedAccount: mockPublicKey,
-        payer: mockPublicKey,
+        permissionedAccount: permissionedAccountAddress,
+        payer: differentPublicKey,
       });
 
-      const permissionAccount = instruction.keys.find(
-        (key) => key.pubkey.equals(mockPublicKey) && key.isWritable,
-      );
+      const expectedPda = permissionPdaFromAccount(permissionedAccountAddress);
+
+      // Verify the permission PDA is at the expected index (1)
+      const permissionAccount = instruction.keys[1];
       expect(permissionAccount).toBeDefined();
+      expect(permissionAccount.pubkey.equals(expectedPda)).toBe(true);
+      expect(permissionAccount.isWritable).toBe(true);
+      expect(permissionAccount.isSigner).toBe(false);
     });
 
     it("should include system program", () => {

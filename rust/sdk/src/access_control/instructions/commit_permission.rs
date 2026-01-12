@@ -45,7 +45,9 @@ impl CommitPermission {
         accounts.push(AccountMeta::new_readonly(self.magic_program, false));
         accounts.push(AccountMeta::new(self.magic_context, false));
         accounts.extend_from_slice(remaining_accounts);
-        let data = CommitPermissionInstructionData::new().try_to_vec().unwrap();
+        let data = CommitPermissionInstructionData::new()
+            .try_to_vec()
+            .expect("failed to serialize CommitPermissionInstructionData");
 
         Instruction {
             program_id: MAGICBLOCK_PERMISSION_API_ID,
@@ -63,7 +65,9 @@ pub struct CommitPermissionInstructionData {
 
 impl CommitPermissionInstructionData {
     pub fn new() -> Self {
-        Self { discriminator: 4 }
+        Self {
+            discriminator: COMMIT_PERMISSION_DISCRIMINATOR,
+        }
     }
 
     pub(crate) fn try_to_vec(&self) -> Result<Vec<u8>, std::io::Error> {
@@ -248,7 +252,9 @@ impl<'a, 'b> CommitPermissionCpi<'a, 'b> {
                 is_writable: remaining_account.2,
             })
         });
-        let data = CommitPermissionInstructionData::new().try_to_vec().unwrap();
+        let data = CommitPermissionInstructionData::new()
+            .try_to_vec()
+            .expect("failed to serialize CommitPermissionInstructionData");
 
         let instruction = Instruction {
             program_id: MAGICBLOCK_PERMISSION_API_ID,
@@ -391,7 +397,7 @@ impl<'a, 'b> CommitPermissionCpiBuilder<'a, 'b> {
                 .iter()
                 .find(|(acc, _, _)| acc.key == &MAGIC_PROGRAM_ID)
                 .map(|(acc, _, _)| acc)
-                .expect("magic_program account not found in remaining accounts"),
+                .unwrap_or(&self.instruction.magic_program),
 
             magic_context: self
                 .instruction
@@ -399,7 +405,7 @@ impl<'a, 'b> CommitPermissionCpiBuilder<'a, 'b> {
                 .iter()
                 .find(|(acc, _, _)| acc.key == &MAGIC_CONTEXT_ID)
                 .map(|(acc, _, _)| acc)
-                .expect("magic_context account not found in remaining accounts"),
+                .unwrap_or(&self.instruction.magic_context),
         };
         instruction.invoke_signed_with_remaining_accounts(
             signers_seeds,

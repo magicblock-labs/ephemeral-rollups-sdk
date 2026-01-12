@@ -5,6 +5,9 @@ import {
   type MemberArgs,
 } from "./member";
 
+// Member size: 1 byte flags + 32 bytes pubkey
+const MEMBER_SIZE = 33;
+
 export interface MembersArgs {
   members: Member[] | null;
 }
@@ -52,7 +55,7 @@ export function deserializeMembersArgs(
     for (let i = 0; i < len; i++) {
       const member = deserializeMember(buffer, offset);
       members.push(member);
-      offset += 33; // 1 byte flags + 32 bytes pubkey
+      offset += MEMBER_SIZE;
     }
   }
 

@@ -5,14 +5,7 @@ import {
 } from "@solana/web3.js";
 import { PERMISSION_PROGRAM_ID } from "../../constants";
 import { permissionPdaFromAccount } from "../../pda";
-
-/**
- * Permission member with authorization info
- */
-export interface Member {
-  pubkey: PublicKey;
-  authority: boolean;
-}
+import type { Member } from "../../access-control/types";
 
 /**
  * Update permission instruction arguments
@@ -52,9 +45,10 @@ export function createUpdatePermissionInstruction(
 export function serializeUpdatePermissionInstructionData(
   args?: UpdatePermissionInstructionArgs,
 ): Buffer {
+  const MAX_BUFFER_SIZE = 2048;
   const discriminator = [1, 0, 0, 0, 0, 0, 0, 0];
   const members = args?.members ?? [];
-  const buffer = Buffer.alloc(2048);
+  const buffer = Buffer.alloc(MAX_BUFFER_SIZE);
   let offset = 0;
 
   // Write discriminator (u64)
@@ -63,16 +57,26 @@ export function serializeUpdatePermissionInstructionData(
   }
 
   // Write members count (u32)
+  if (offset + 4 > MAX_BUFFER_SIZE) {
+    throw new Error(
+      `Serialized data exceeds buffer size (${MAX_BUFFER_SIZE} bytes)`,
+    );
+  }
   buffer.writeUInt32LE(members.length, offset);
   offset += 4;
 
   // Write members
   for (const member of members) {
+    if (offset + 33 > MAX_BUFFER_SIZE) {
+      throw new Error(
+        `Serialized data exceeds buffer size (${MAX_BUFFER_SIZE} bytes)`,
+      );
+    }
     buffer.set(member.pubkey.toBuffer(), offset);
     offset += 32;
 
-    // Write authority flag (bool as u8)
-    buffer[offset++] = member.authority ? 1 : 0;
+    // Write flags (u8)
+    buffer[offset++] = member.flags;
   }
 
   return buffer.subarray(0, offset);

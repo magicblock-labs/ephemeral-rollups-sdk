@@ -13,9 +13,9 @@ pub enum MagicblockPermissionApiError {
     /// 2 - Error serializing account
     #[error("Error serializing account")]
     SerializationError = 0x2,
-    /// 3 - Invalid Group Size
-    #[error("Invalid Group Size")]
-    InvalidGroupSize = 0x3,
+    /// 3 - Invalid Members Size
+    #[error("Invalid Members Size")]
+    InvalidMembersSize = 0x3,
     /// 4 - Invalid Owner
     #[error("Invalid Owner")]
     InvalidOwner = 0x4,

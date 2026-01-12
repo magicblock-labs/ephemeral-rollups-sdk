@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { address, type Address } from "@solana/kit";
+import { AccountRole, address, type Address } from "@solana/kit";
 import {
   createCreatePermissionInstruction,
   createUpdatePermissionInstruction,
@@ -55,6 +55,7 @@ describe("Permission Program Instructions (@solana/kit)", () => {
         (acc) => acc.address === mockAddress,
       );
       expect(permissionedAccount).toBeDefined();
+      expect(permissionedAccount?.role).toBe(AccountRole.READONLY_SIGNER);
     });
 
     it("should include payer as writable signer", async () => {
@@ -68,6 +69,7 @@ describe("Permission Program Instructions (@solana/kit)", () => {
         (acc) => acc.address === payerAddress,
       );
       expect(payerAccount).toBeDefined();
+      expect(payerAccount?.role).toBe(AccountRole.WRITABLE_SIGNER);
     });
 
     it("should include permission PDA as writable", async () => {
@@ -78,6 +80,9 @@ describe("Permission Program Instructions (@solana/kit)", () => {
 
       expect(instruction.accounts).toBeDefined();
       expect(instruction.accounts?.length).toBe(4);
+
+      const permissionPda = instruction.accounts?.[1];
+      expect(permissionPda?.role).toBe(AccountRole.WRITABLE);
     });
 
     it("should handle empty members list", async () => {
@@ -99,7 +104,7 @@ describe("Permission Program Instructions (@solana/kit)", () => {
         { pubkey: mockAddress, authority: true },
         { pubkey: differentAddress, authority: false },
         {
-          pubkey: address("11111111111111111111111111111113"),
+          pubkey: address("11111111111111111111111111111114"),
           authority: true,
         },
       ];
@@ -254,7 +259,7 @@ describe("Permission Program Instructions (@solana/kit)", () => {
         { pubkey: mockAddress, authority: true },
         { pubkey: differentAddress, authority: false },
         {
-          pubkey: address("11111111111111111111111111111113"),
+          pubkey: address("11111111111111111111111111111114"),
           authority: true,
         },
       ];

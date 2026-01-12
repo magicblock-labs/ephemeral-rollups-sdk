@@ -397,7 +397,7 @@ impl<'a, 'b> CommitAndUndelegatePermissionCpiBuilder<'a, 'b> {
                 .iter()
                 .find(|(acc, _, _)| acc.key == &MAGIC_PROGRAM_ID)
                 .map(|(acc, _, _)| acc)
-                .expect("magic_program account not found in remaining accounts"),
+                .unwrap_or(&self.instruction.magic_program),
 
             magic_context: self
                 .instruction
@@ -405,7 +405,7 @@ impl<'a, 'b> CommitAndUndelegatePermissionCpiBuilder<'a, 'b> {
                 .iter()
                 .find(|(acc, _, _)| acc.key == &MAGIC_CONTEXT_ID)
                 .map(|(acc, _, _)| acc)
-                .expect("magic_context account not found in remaining accounts"),
+                .unwrap_or(&self.instruction.magic_context),
         };
         instruction.invoke_signed_with_remaining_accounts(
             signers_seeds,

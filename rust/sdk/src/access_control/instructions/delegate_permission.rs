@@ -64,7 +64,7 @@ pub struct DelegatePermission {
 
     pub delegation_program: Pubkey,
 
-    pub validator: Option<Pubkey>,
+    pub validator: Pubkey,
 }
 
 impl DelegatePermission {
@@ -90,10 +90,7 @@ impl DelegatePermission {
         accounts.push(AccountMeta::new(self.delegation_record, false));
         accounts.push(AccountMeta::new(self.delegation_metadata, false));
         accounts.push(AccountMeta::new_readonly(self.delegation_program, false));
-        accounts.push(AccountMeta::new_readonly(
-            self.validator.expect("validator is required"),
-            false,
-        ));
+        accounts.push(AccountMeta::new_readonly(self.validator, false));
         accounts.extend_from_slice(remaining_accounts);
         let data = DelegatePermissionInstructionData::new()
             .try_to_vec()
@@ -115,7 +112,9 @@ pub struct DelegatePermissionInstructionData {
 
 impl DelegatePermissionInstructionData {
     pub fn new() -> Self {
-        Self { discriminator: 3 }
+        Self {
+            discriminator: DELEGATE_PERMISSION_DISCRIMINATOR,
+        }
     }
 
     pub(crate) fn try_to_vec(&self) -> Result<Vec<u8>, std::io::Error> {

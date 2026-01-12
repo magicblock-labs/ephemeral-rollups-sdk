@@ -8,14 +8,7 @@ import {
 import { SYSTEM_PROGRAM_ADDRESS } from "@solana-program/system";
 import { PERMISSION_PROGRAM_ID } from "../../constants";
 import { permissionPdaFromAccount } from "../../pda";
-
-/**
- * Permission member with authorization info
- */
-export interface Member {
-  pubkey: Address;
-  authority: boolean;
-}
+import type { Member } from "../../access-control/types";
 
 /**
  * Create permission instruction arguments
@@ -84,8 +77,8 @@ export function serializeCreatePermissionInstructionData(
     memberBytes.set(addressBytes);
     offset += 32;
 
-    // Write authority flag (bool as u8)
-    view.setUint8(offset++, member.authority ? 1 : 0);
+    // Write flags (u8)
+    view.setUint8(offset++, member.flags);
   }
 
   return [new Uint8Array(buffer, 0, offset)];
