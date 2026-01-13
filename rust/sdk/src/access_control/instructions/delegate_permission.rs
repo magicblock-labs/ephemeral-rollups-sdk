@@ -44,7 +44,7 @@ impl DelegatePermission {
         remaining_accounts: &[AccountMeta],
     ) -> Instruction {
         let mut accounts = Vec::with_capacity(11 + remaining_accounts.len());
-        accounts.push(AccountMeta::new(self.payer, false));
+        accounts.push(AccountMeta::new(self.payer, true));
         accounts.push(AccountMeta::new_readonly(
             self.authority.0,
             self.authority.1,
@@ -332,7 +332,7 @@ impl<'a, 'b> DelegatePermissionCpi<'a, 'b> {
         remaining_accounts: &[(&'b AccountInfo<'a>, bool, bool)],
     ) -> ProgramResult {
         let mut accounts = Vec::with_capacity(11 + remaining_accounts.len());
-        accounts.push(AccountMeta::new(*self.payer.key, false));
+        accounts.push(AccountMeta::new(*self.payer.key, true));
         accounts.push(AccountMeta::new_readonly(
             *self.authority.0.key,
             self.authority.1,
@@ -401,7 +401,7 @@ impl<'a, 'b> DelegatePermissionCpi<'a, 'b> {
 ///
 /// ### Accounts:
 ///
-///   0. `[writable]` payer
+///   0. `[writable, signer]` payer
 ///   1. `[signer?]` authority - Either this or permissioned_account must be a signer
 ///   2. `[signer?]` permissioned_account - Either this or authority must be a signer
 ///   3. `[writable]` permission

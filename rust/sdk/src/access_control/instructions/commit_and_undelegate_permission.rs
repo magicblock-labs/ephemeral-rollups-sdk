@@ -328,18 +328,18 @@ impl<'a, 'b> CommitAndUndelegatePermissionCpiBuilder<'a, 'b> {
     pub fn add_remaining_account(
         &mut self,
         account: &'b AccountInfo<'a>,
-        is_signer: bool,
         is_writable: bool,
+        is_signer: bool,
     ) -> &mut Self {
         self.instruction
             .__remaining_accounts
-            .push((account, is_signer, is_writable));
+            .push((account, is_writable, is_signer));
         self
     }
     /// Add additional accounts to the instruction.
     ///
-    /// Each account is represented by a tuple of the `AccountInfo`, a `bool` indicating whether the account is a signer or not,
-    /// and a `bool` indicating whether the account is writable or not.
+    /// Each account is represented by a tuple of the `AccountInfo`, a `bool` indicating whether the account is writable or not,
+    /// and a `bool` indicating whether the account is a signer or not.
     #[inline(always)]
     pub fn add_remaining_accounts(
         &mut self,
@@ -389,6 +389,6 @@ struct CommitAndUndelegatePermissionCpiBuilderInstruction<'a, 'b> {
     permission: Option<&'b AccountInfo<'a>>,
     magic_program: Option<&'b AccountInfo<'a>>,
     magic_context: Option<&'b AccountInfo<'a>>,
-    /// Additional instruction accounts `(AccountInfo, is_signer, is_writable)`.
+    /// Additional instruction accounts `(AccountInfo, is_writable, is_signer)`.
     __remaining_accounts: Vec<(&'b AccountInfo<'a>, bool, bool)>,
 }

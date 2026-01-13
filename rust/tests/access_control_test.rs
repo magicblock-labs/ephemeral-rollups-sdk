@@ -219,9 +219,10 @@ mod tests {
         let instruction = builder.instruction();
 
         assert_eq!(instruction.program_id, PERMISSION_PROGRAM_ID);
-        assert_eq!(instruction.accounts.len(), 3); // payer, permissioned_account, permission
+        assert_eq!(instruction.accounts.len(), 4); // payer, authority, permissioned_account, permission
         assert!(instruction.accounts[0].is_signer); // payer is signer
-        assert!(instruction.accounts[1].is_signer); // permissioned_account is signer
+        assert!(instruction.accounts[1].is_signer); // authority is signer
+        assert!(instruction.accounts[2].is_signer); // permissioned_account is signer
     }
 
     #[test]
@@ -240,11 +241,12 @@ mod tests {
         let instruction = builder.instruction();
 
         assert!(instruction.accounts[0].is_signer); // payer is signer
-        assert!(!instruction.accounts[1].is_signer); // permissioned_account is not signer
-    }
+        assert!(instruction.accounts[1].is_signer); // authority is signer
+        assert!(!instruction.accounts[2].is_signer); // permissioned_account is not signer
+        }
 
-    #[test]
-    fn test_close_permission_builder_permissioned_account_only_signer() {
+        #[test]
+        fn test_close_permission_builder_permissioned_account_only_signer() {
         let payer = Pubkey::new_unique();
         let permissioned_account = Pubkey::new_unique();
         let permission = Pubkey::new_unique();
@@ -258,7 +260,8 @@ mod tests {
 
         let instruction = builder.instruction();
 
-        assert!(!instruction.accounts[0].is_signer); // payer is not signer
-        assert!(instruction.accounts[1].is_signer); // permissioned_account is signer
+        assert!(instruction.accounts[0].is_signer); // payer is signer
+        assert!(!instruction.accounts[1].is_signer); // authority is not signer
+        assert!(instruction.accounts[2].is_signer); // permissioned_account is signer
     }
 }

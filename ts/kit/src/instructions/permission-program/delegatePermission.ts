@@ -22,7 +22,7 @@ export interface DelegatePermissionInstructionArgs {
  * Accounts:
  *   0. `[writable, signer]` payer
  *   1. `[signer?]` authority - Either this or permissionedAccount must be a signer
- *   2. `[writable, signer?]` permissionedAccount - Either this or authority must be a signer
+ *   2. `[signer?]` permissionedAccount - Either this or authority must be a signer
  *   3. `[writable]` permission
  *   4. `[]` systemProgram
  *   5. `[]` ownerProgram
@@ -69,8 +69,8 @@ export async function createDelegatePermissionInstruction(
     {
       address: accounts.permissionedAccount[0],
       role: accounts.permissionedAccount[1]
-        ? AccountRole.WRITABLE_SIGNER
-        : AccountRole.WRITABLE,
+        ? AccountRole.READONLY_SIGNER
+        : AccountRole.READONLY,
     },
     { address: permissionPda, role: AccountRole.WRITABLE },
     { address: SYSTEM_PROGRAM_ADDRESS, role: AccountRole.READONLY },

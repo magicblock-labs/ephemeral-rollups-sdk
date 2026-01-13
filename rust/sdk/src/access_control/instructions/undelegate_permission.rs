@@ -237,8 +237,8 @@ impl<'a, 'b> UndelegatePermissionCpi<'a, 'b> {
         remaining_accounts.iter().for_each(|remaining_account| {
             accounts.push(AccountMeta {
                 pubkey: *remaining_account.0.key,
-                is_signer: remaining_account.1,
-                is_writable: remaining_account.2,
+                is_signer: remaining_account.2,
+                is_writable: remaining_account.1,
             })
         });
         let mut data = UndelegatePermissionInstructionData::new()
