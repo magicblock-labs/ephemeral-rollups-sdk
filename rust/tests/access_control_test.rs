@@ -243,10 +243,10 @@ mod tests {
         assert!(instruction.accounts[0].is_signer); // payer is signer
         assert!(instruction.accounts[1].is_signer); // authority is signer
         assert!(!instruction.accounts[2].is_signer); // permissioned_account is not signer
-        }
+    }
 
-        #[test]
-        fn test_close_permission_builder_permissioned_account_only_signer() {
+    #[test]
+    fn test_close_permission_builder_permissioned_account_only_signer() {
         let payer = Pubkey::new_unique();
         let permissioned_account = Pubkey::new_unique();
         let permission = Pubkey::new_unique();
