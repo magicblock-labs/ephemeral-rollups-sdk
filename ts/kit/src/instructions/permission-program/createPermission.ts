@@ -65,6 +65,9 @@ export function serializeCreatePermissionInstructionData(
     view.setUint8(offset++, discriminator[i]);
   }
 
+  // Write option discriminant (u8) - 1 if members are present
+  view.setUint8(offset++, members.length > 0 ? 1 : 0);
+
   // Write members count (u32)
   view.setUint32(offset, members.length, true);
   offset += 4;

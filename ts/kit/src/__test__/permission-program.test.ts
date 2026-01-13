@@ -98,9 +98,9 @@ describe("Permission Program Instructions (@solana/kit)", () => {
       expect(instruction.data).toBeDefined();
       // Discriminator (8) + Option discriminant (1) + count (4) = 13 minimum
       expect(instruction.data?.length).toBeGreaterThanOrEqual(13);
-      });
+    });
 
-      it("should handle multiple members", async () => {
+    it("should handle multiple members", async () => {
       const members: Array<{ pubkey: Address; flags: number }> = [
         { pubkey: mockAddress, flags: MEMBER_FLAG_AUTHORITY },
         { pubkey: differentAddress, flags: 0 },
@@ -164,8 +164,8 @@ describe("Permission Program Instructions (@solana/kit)", () => {
         { members: [nonAuthorityMember] },
       );
 
-      // Authority flag is after discriminator (8) + count (4) + pubkey (32)
-      const authorityFlagIndex = 8 + 4 + 32;
+      // Authority flag is after discriminator (8) + option discriminant (1) + count (4) + pubkey (32)
+      const authorityFlagIndex = 8 + 1 + 4 + 32;
       expect(instruction1.data?.[authorityFlagIndex]).toBe(1);
       expect(instruction2.data?.[authorityFlagIndex]).toBe(0);
     });

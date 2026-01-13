@@ -58,6 +58,14 @@ export function serializeCreatePermissionInstructionData(
     buffer[offset++] = discriminator[i];
   }
 
+  // Write option discriminant (u8) - 1 if members are present
+  if (offset + 1 > MAX_BUFFER_SIZE) {
+    throw new Error(
+      `Serialized data exceeds buffer size (${MAX_BUFFER_SIZE} bytes)`,
+    );
+  }
+  buffer[offset++] = members.length > 0 ? 1 : 0;
+
   // Write members count (u32)
   if (offset + 4 > MAX_BUFFER_SIZE) {
     throw new Error(
