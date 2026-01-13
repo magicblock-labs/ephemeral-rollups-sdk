@@ -50,6 +50,7 @@ pub fn cpi_delegate(
     buffer_acc: &AccountView,
     delegation_record: &AccountView,
     delegation_metadata: &AccountView,
+    system_program: &AccountView,
     delegate_args: DelegateAccountArgs,
     signer_seeds: Signer<'_, '_>,
 ) -> Result<(), ProgramError> {
@@ -103,13 +104,14 @@ pub fn cpi_delegate(
         data: data_slice,
     };
 
-    let acc_infos: [&AccountView; 6] = [
+    let acc_infos: [&AccountView; 7] = [
         payer,
         pda_acc,
         owner_program,
         buffer_acc,
         delegation_record,
         delegation_metadata,
+        system_program,
     ];
 
     invoke_signed(&instruction, &acc_infos, &[signer_seeds])?;

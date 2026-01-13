@@ -1,54 +1,41 @@
 use crate::seeds::Seed;
 use pinocchio::Address;
-use pinocchio_pubkey::derive_address;
 
-// On Solana targets, use bytes_are_curve_point for validation
-#[cfg(any(target_os = "solana", target_arch = "bpf"))]
-use pinocchio::address::bytes_are_curve_point;
-
-// On non-Solana targets (for cargo check), provide a stub that always returns false
-// This means all derived addresses will be considered valid PDAs during host compilation
-#[cfg(not(any(target_os = "solana", target_arch = "bpf")))]
-fn bytes_are_curve_point(_bytes: &[u8; 32]) -> bool {
-    // During host compilation (cargo check), we can't validate curve points
-    // Return false to treat all addresses as valid PDAs
-    false
+/// Find a valid program derived address (PDA) using the library's syscall.
+/// Returns the PDA address and bump seed.
+#[cfg(target_os = "solana")]
+fn find_program_address_impl(seeds: &[&[u8]], program_id: &Address) -> (Address, u8) {
+    Address::find_program_address(seeds, program_id)
 }
 
-/// Find a valid program derived address (PDA) by iterating through bumps.
-/// Returns the PDA address and bump seed.
+// On non-Solana targets (for cargo check), provide a stub implementation
+#[cfg(not(target_os = "solana"))]
 fn find_program_address_impl(seeds: &[&[u8]], program_id: &Address) -> (Address, u8) {
+    use pinocchio_pubkey::derive_address;
+
     let program_id_bytes: &[u8; 32] = program_id.as_array();
+    let bump: u8 = 255; // Default bump for compilation checks
 
-    // Try bumps from 255 down to 0 to find a valid PDA (off-curve point)
-    for bump in (0u8..=255).rev() {
-        // Create seeds array with bump appended
-        let bump_slice = [bump];
+    // Create seeds array with bump appended
+    let bump_slice = [bump];
 
-        // Use derive_address with the bump
-        let derived = match seeds.len() {
-            1 => derive_address(&[seeds[0], &bump_slice], Some(bump), program_id_bytes),
-            2 => derive_address(
-                &[seeds[0], seeds[1], &bump_slice],
-                Some(bump),
-                program_id_bytes,
-            ),
-            3 => derive_address(
-                &[seeds[0], seeds[1], seeds[2], &bump_slice],
-                Some(bump),
-                program_id_bytes,
-            ),
-            _ => continue, // Unsupported seed count
-        };
+    // Use derive_address with the bump
+    let derived = match seeds.len() {
+        1 => derive_address(&[seeds[0], &bump_slice], Some(bump), program_id_bytes),
+        2 => derive_address(
+            &[seeds[0], seeds[1], &bump_slice],
+            Some(bump),
+            program_id_bytes,
+        ),
+        3 => derive_address(
+            &[seeds[0], seeds[1], seeds[2], &bump_slice],
+            Some(bump),
+            program_id_bytes,
+        ),
+        _ => panic!("Unsupported seed count"),
+    };
 
-        // Check if the derived address is off-curve (valid PDA)
-        if !bytes_are_curve_point(&derived) {
-            return (Address::new_from_array(derived), bump);
-        }
-    }
-
-    // This should never happen with valid inputs
-    panic!("Unable to find valid PDA");
+    (Address::new_from_array(derived), bump)
 }
 
 /// Generic DRY function to find a PDA from a typed `Seed`

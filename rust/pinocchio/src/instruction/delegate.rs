@@ -1,9 +1,8 @@
 use pinocchio::{
     cpi::{Seed, Signer},
     error::ProgramError,
-    AccountView, ProgramResult,
+    AccountView, Address, ProgramResult,
 };
-use pinocchio_pubkey::derive_address;
 use pinocchio_system::instructions::{Assign, CreateAccount};
 
 use crate::consts::DELEGATION_PROGRAM_ID;
@@ -11,27 +10,17 @@ use crate::types::DelegateAccountArgs;
 use crate::utils::{cpi_delegate, make_seed_buf};
 use crate::{consts::BUFFER, types::DelegateConfig, utils::close_pda_acc};
 
-// On Solana targets, use bytes_are_curve_point for validation
-#[cfg(any(target_os = "solana", target_arch = "bpf"))]
-use pinocchio::address::bytes_are_curve_point;
-
-// On non-Solana targets (for cargo check), provide a stub
-#[cfg(not(any(target_os = "solana", target_arch = "bpf")))]
-fn bytes_are_curve_point(_bytes: &[u8; 32]) -> bool {
-    false
+/// Find the bump for a buffer PDA using the library's find_program_address syscall
+#[cfg(target_os = "solana")]
+fn find_buffer_pda_bump(pda_key: &[u8], owner_program: &Address) -> u8 {
+    let (_, bump) = Address::find_program_address(&[BUFFER, pda_key], owner_program);
+    bump
 }
 
-/// Find the bump for a buffer PDA
-fn find_buffer_pda_bump(pda_key: &[u8], owner_program: &pinocchio::Address) -> u8 {
-    let owner_bytes: &[u8; 32] = owner_program.as_array();
-    for bump in (0u8..=255).rev() {
-        let bump_slice = [bump];
-        let derived = derive_address(&[BUFFER, pda_key, &bump_slice], Some(bump), owner_bytes);
-        if !bytes_are_curve_point(&derived) {
-            return bump;
-        }
-    }
-    panic!("Unable to find valid buffer PDA bump");
+// On non-Solana targets (for cargo check), provide a stub that returns a default bump
+#[cfg(not(target_os = "solana"))]
+fn find_buffer_pda_bump(_pda_key: &[u8], _owner_program: &Address) -> u8 {
+    255 // Default bump for compilation checks
 }
 
 #[allow(unknown_lints, clippy::cloned_ref_to_slice_refs)]
@@ -41,7 +30,7 @@ pub fn delegate_account(
     bump: u8,
     config: DelegateConfig,
 ) -> ProgramResult {
-    let [payer, pda_acc, owner_program, buffer_acc, delegation_record, delegation_metadata] =
+    let [payer, pda_acc, owner_program, buffer_acc, delegation_record, delegation_metadata, system_program] =
         accounts
     else {
         return Err(ProgramError::NotEnoughAccountKeys);
@@ -124,6 +113,7 @@ pub fn delegate_account(
         buffer_acc,
         delegation_record,
         delegation_metadata,
+        system_program,
         delegate_args,
         delegate_signer_seeds,
     )?;
