@@ -18,11 +18,25 @@ export interface DelegatePermissionInstructionArgs {
 /**
  * Instruction: DelegatePermission
  * Discriminator: [3, 0, 0, 0, 0, 0, 0, 0]
+ *
+ * Accounts:
+ *   0. `[writable, signer]` payer
+ *   1. `[signer?]` authority - Either this or permissionedAccount must be a signer
+ *   2. `[writable, signer?]` permissionedAccount - Either this or authority must be a signer
+ *   3. `[writable]` permission
+ *   4. `[]` systemProgram
+ *   5. `[]` ownerProgram
+ *   6. `[writable]` delegateBuffer
+ *   7. `[writable]` delegationRecord
+ *   8. `[writable]` delegationMetadata
+ *   9. `[]` delegationProgram
+ *   10. `[optional]` validator
  */
 export async function createDelegatePermissionInstruction(
   accounts: {
     payer: Address;
-    permissionedAccount: Address;
+    authority: [Address, boolean];
+    permissionedAccount: [Address, boolean];
     ownerProgram?: Address;
     validator?: Address | null;
   },
@@ -30,7 +44,7 @@ export async function createDelegatePermissionInstruction(
 ): Promise<Instruction> {
   const ownerProgram = accounts.ownerProgram ?? PERMISSION_PROGRAM_ID;
   const permissionPda = await permissionPdaFromAccount(
-    accounts.permissionedAccount,
+    accounts.permissionedAccount[0],
   );
   const delegateBuffer =
     await delegateBufferPdaFromDelegatedAccountAndOwnerProgram(
@@ -46,7 +60,18 @@ export async function createDelegatePermissionInstruction(
 
   const accountsMeta: AccountMeta[] = [
     { address: accounts.payer, role: AccountRole.WRITABLE_SIGNER },
-    { address: accounts.permissionedAccount, role: AccountRole.READONLY },
+    {
+      address: accounts.authority[0],
+      role: accounts.authority[1]
+        ? AccountRole.READONLY_SIGNER
+        : AccountRole.READONLY,
+    },
+    {
+      address: accounts.permissionedAccount[0],
+      role: accounts.permissionedAccount[1]
+        ? AccountRole.WRITABLE_SIGNER
+        : AccountRole.WRITABLE,
+    },
     { address: permissionPda, role: AccountRole.WRITABLE },
     { address: SYSTEM_PROGRAM_ADDRESS, role: AccountRole.READONLY },
     { address: ownerProgram, role: AccountRole.READONLY },

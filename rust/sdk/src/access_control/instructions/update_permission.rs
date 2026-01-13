@@ -1,7 +1,8 @@
 use borsh::{BorshDeserialize, BorshSerialize};
 
-use crate::access_control::programs::MAGICBLOCK_PERMISSION_API_ID;
-use crate::access_control::types::MembersArgs;
+use crate::access_control::structs::MembersArgs;
+use crate::access_control::structs::Permission;
+use crate::consts::PERMISSION_PROGRAM_ID;
 use crate::solana_compat::solana::{
     invoke, invoke_signed, AccountInfo, AccountMeta, Instruction, ProgramResult, Pubkey,
 };
@@ -45,7 +46,7 @@ impl UpdatePermission {
         data.append(&mut args);
 
         Instruction {
-            program_id: MAGICBLOCK_PERMISSION_API_ID,
+            program_id: PERMISSION_PROGRAM_ID,
             accounts,
             data,
         }
@@ -92,8 +93,8 @@ impl UpdatePermissionInstructionArgs {
 ///
 /// ### Accounts:
 ///
-///   0. `[signer]` authority
-///   1. `[signer]` permissioned_account
+///   0. `[signer?]` authority - Either this or permissioned_account must be a signer
+///   1. `[signer?]` permissioned_account - Either this or authority must be a signer
 ///   2. `[writable]` permission
 #[derive(Clone, Debug, Default)]
 pub struct UpdatePermissionBuilder {
@@ -120,6 +121,9 @@ impl UpdatePermissionBuilder {
         as_signer: bool,
     ) -> &mut Self {
         self.permissioned_account = Some((permissioned_account, as_signer));
+        // Automatically derive and set the permission PDA
+        let (permission_pda, _bump) = Permission::find_pda(&permissioned_account);
+        self.permission = Some(permission_pda);
         self
     }
     #[inline(always)]
@@ -243,7 +247,7 @@ impl<'a, 'b> UpdatePermissionCpi<'a, 'b> {
         data.append(&mut args);
 
         let instruction = Instruction {
-            program_id: MAGICBLOCK_PERMISSION_API_ID,
+            program_id: PERMISSION_PROGRAM_ID,
             accounts,
             data,
         };
@@ -268,8 +272,8 @@ impl<'a, 'b> UpdatePermissionCpi<'a, 'b> {
 ///
 /// ### Accounts:
 ///
-///   0. `[signer]` authority
-///   1. `[signer]` permissioned_account
+///   0. `[signer?]` authority - Either this or permissioned_account must be a signer
+///   1. `[signer?]` permissioned_account - Either this or authority must be a signer
 ///   2. `[writable]` permission
 #[derive(Clone, Debug)]
 pub struct UpdatePermissionCpiBuilder<'a, 'b> {

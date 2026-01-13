@@ -1,7 +1,7 @@
 use borsh::{BorshDeserialize, BorshSerialize};
 
-use crate::access_control::programs::MAGICBLOCK_PERMISSION_API_ID;
-use crate::access_control::types::UndelegateArgs;
+use crate::access_control::structs::UndelegateArgs;
+use crate::consts::PERMISSION_PROGRAM_ID;
 use crate::solana_compat::solana::{
     invoke, invoke_signed, AccountInfo, AccountMeta, Instruction, ProgramResult, Pubkey,
 };
@@ -44,7 +44,7 @@ impl UndelegatePermission {
         data.append(&mut args);
 
         Instruction {
-            program_id: MAGICBLOCK_PERMISSION_API_ID,
+            program_id: PERMISSION_PROGRAM_ID,
             accounts,
             data,
         }
@@ -250,7 +250,7 @@ impl<'a, 'b> UndelegatePermissionCpi<'a, 'b> {
         data.append(&mut args);
 
         let instruction = Instruction {
-            program_id: MAGICBLOCK_PERMISSION_API_ID,
+            program_id: PERMISSION_PROGRAM_ID,
             accounts,
             data,
         };

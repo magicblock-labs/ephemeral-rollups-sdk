@@ -7,7 +7,7 @@ mod tests {
         ClosePermissionBuilder, CommitAndUndelegatePermissionBuilder, CommitPermissionBuilder,
         CreatePermissionBuilder, UpdatePermissionBuilder,
     };
-    use ephemeral_rollups_sdk::access_control::programs::MAGICBLOCK_PERMISSION_API_ID;
+    use ephemeral_rollups_sdk::consts::PERMISSION_PROGRAM_ID;
     use ephemeral_rollups_sdk::access_control::types::MembersArgs;
     use solana_pubkey::Pubkey;
 
@@ -44,7 +44,7 @@ mod tests {
             .permission(permission);
 
         let instruction = builder.instruction();
-        assert_eq!(instruction.program_id, MAGICBLOCK_PERMISSION_API_ID);
+        assert_eq!(instruction.program_id, PERMISSION_PROGRAM_ID);
         assert_eq!(instruction.accounts.len(), 5); // authority, permissioned_account, permission, magic_program, magic_context
         assert!(instruction.accounts[0].is_signer); // authority is signer
         assert!(instruction.accounts[1].is_signer); // permissioned_account is signer
@@ -97,7 +97,7 @@ mod tests {
             .permission(permission);
 
         let instruction = builder.instruction();
-        assert_eq!(instruction.program_id, MAGICBLOCK_PERMISSION_API_ID);
+        assert_eq!(instruction.program_id, PERMISSION_PROGRAM_ID);
         assert_eq!(instruction.accounts.len(), 5); // authority, permissioned_account, permission, magic_program, magic_context
         assert!(instruction.accounts[0].is_signer); // authority is signer
         assert!(instruction.accounts[1].is_signer); // permissioned_account is signer
@@ -157,7 +157,7 @@ mod tests {
 
         let instruction = builder.instruction();
 
-        assert_eq!(instruction.program_id, MAGICBLOCK_PERMISSION_API_ID);
+        assert_eq!(instruction.program_id, PERMISSION_PROGRAM_ID);
         assert_eq!(instruction.accounts.len(), 4); // permissioned_account, permission, payer, system_program
         assert!(instruction.accounts[0].is_signer); // permissioned_account is signer
         assert!(instruction.accounts[2].is_signer); // payer is signer
@@ -181,7 +181,7 @@ mod tests {
 
         let instruction = builder.instruction();
 
-        assert_eq!(instruction.program_id, MAGICBLOCK_PERMISSION_API_ID);
+        assert_eq!(instruction.program_id, PERMISSION_PROGRAM_ID);
         assert_eq!(instruction.accounts.len(), 3); // authority, permissioned_account, permission
         assert!(instruction.accounts[0].is_signer); // authority is signer
         assert!(instruction.accounts[1].is_signer); // permissioned_account is signer
@@ -223,7 +223,7 @@ mod tests {
 
         let instruction = builder.instruction();
 
-        assert_eq!(instruction.program_id, MAGICBLOCK_PERMISSION_API_ID);
+        assert_eq!(instruction.program_id, PERMISSION_PROGRAM_ID);
         assert_eq!(instruction.accounts.len(), 3); // payer, permissioned_account, permission
         assert!(instruction.accounts[0].is_signer); // payer is signer
         assert!(instruction.accounts[1].is_signer); // permissioned_account is signer

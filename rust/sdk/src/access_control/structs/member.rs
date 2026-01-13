@@ -19,6 +19,14 @@ pub struct Member {
     pub pubkey: Pubkey,
 }
 
+#[cfg_attr(feature = "anchor", derive(AnchorSerialize, AnchorDeserialize))]
+#[cfg_attr(not(feature = "anchor"), derive(BorshSerialize, BorshDeserialize))]
+#[derive(Clone, Debug, Eq, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct MembersArgs {
+    pub members: Option<Vec<Member>>,
+}
+
 // Flags for Member
 pub const MEMBER_FLAG_DEFAULT: u8 = 0;
 pub const MEMBER_FLAG_AUTHORITY: u8 = 1 << 0; // Member has authority privileges

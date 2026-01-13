@@ -1,52 +1,18 @@
 use borsh::{BorshDeserialize, BorshSerialize};
 
-use crate::access_control::programs::MAGICBLOCK_PERMISSION_API_ID;
-use crate::cpi::DELEGATION_PROGRAM_ID;
+use crate::consts::PERMISSION_PROGRAM_ID;
 use crate::solana_compat::solana::{
-    invoke, invoke_signed, system_program, AccountInfo, AccountMeta, Instruction, ProgramResult,
-    Pubkey,
-};
-use dlp::pda::{
-    delegate_buffer_pda_from_delegated_account_and_owner_program,
-    delegation_metadata_pda_from_delegated_account, delegation_record_pda_from_delegated_account,
+    invoke, invoke_signed, AccountInfo, AccountMeta, Instruction, ProgramResult, Pubkey,
 };
 
 pub const DELEGATE_PERMISSION_DISCRIMINATOR: u64 = 3;
 
-/// Helper struct to derive delegation PDAs from permission account
-#[derive(Debug, Clone)]
-pub struct DelegatePermissionAccounts {
-    pub permission: Pubkey,
-    pub delegation_buffer: Pubkey,
-    pub delegation_record: Pubkey,
-    pub delegation_metadata: Pubkey,
-    pub owner_program: Pubkey,
-}
-
-impl DelegatePermissionAccounts {
-    pub fn new(permission: Pubkey, owner_program: Pubkey) -> Self {
-        let delegate_buffer = delegate_buffer_pda_from_delegated_account_and_owner_program(
-            &permission.to_bytes().into(),
-            &owner_program.to_bytes().into(),
-        );
-        let delegation_record =
-            delegation_record_pda_from_delegated_account(&permission.to_bytes().into());
-        let delegation_metadata =
-            delegation_metadata_pda_from_delegated_account(&permission.to_bytes().into());
-        Self {
-            permission,
-            delegation_buffer: delegate_buffer.to_bytes().into(),
-            delegation_record: delegation_record.to_bytes().into(),
-            delegation_metadata: delegation_metadata.to_bytes().into(),
-            owner_program,
-        }
-    }
-}
-
 /// Accounts.
 #[derive(Debug)]
 pub struct DelegatePermission {
-    pub payer: (Pubkey, bool),
+    pub payer: Pubkey,
+
+    pub authority: (Pubkey, bool),
 
     pub permissioned_account: (Pubkey, bool),
 
@@ -77,11 +43,15 @@ impl DelegatePermission {
         &self,
         remaining_accounts: &[AccountMeta],
     ) -> Instruction {
-        let mut accounts = Vec::with_capacity(10 + remaining_accounts.len());
-        accounts.push(AccountMeta::new(self.payer.0, self.payer.1));
+        let mut accounts = Vec::with_capacity(11 + remaining_accounts.len());
+        accounts.push(AccountMeta::new(self.payer, false));
+        accounts.push(AccountMeta::new_readonly(
+            self.authority.0,
+            self.authority.1,
+        ));
         accounts.push(AccountMeta::new_readonly(
             self.permissioned_account.0,
-            false,
+            self.permissioned_account.1,
         ));
         accounts.push(AccountMeta::new(self.permission, false));
         accounts.push(AccountMeta::new_readonly(self.system_program, false));
@@ -97,7 +67,7 @@ impl DelegatePermission {
             .expect("failed to serialize DelegatePermissionInstructionData");
 
         Instruction {
-            program_id: MAGICBLOCK_PERMISSION_API_ID,
+            program_id: PERMISSION_PROGRAM_ID,
             accounts,
             data,
         }
@@ -130,25 +100,30 @@ impl Default for DelegatePermissionInstructionData {
 
 /// Instruction builder for `DelegatePermission`.
 ///
-/// ### Accounts (auto-derived from permission account):
+/// ### Accounts (auto-derived from permissioned_account):
 ///
 ///   0. `[writable, signer]` payer
-///   1. `[]` permissioned_account
-///   2. `[writable]` permission (used to derive delegation PDAs)
-///   3. `[]` system_program
-///   4. `[]` owner_program (defaults to PERMISSION_PROGRAM_ID)
-///   5. `[writable]` delegation_buffer (derived from permission + owner_program)
-///   6. `[writable]` delegation_record (derived from permission)
-///   7. `[writable]` delegation_metadata (derived from permission)
-///   8. `[]` delegation_program
-///   9. `[optional]` validator
+///   1. `[signer?]` authority - Either this or permissioned_account must be a signer
+///   2. `[signer?]` permissioned_account - Either this or authority must be a signer
+///   3. `[writable]` permission (auto-derived from permissioned_account)
+///   4. `[]` system_program
+///   5. `[]` owner_program (defaults to PERMISSION_PROGRAM_ID)
+///   6. `[writable]` delegation_buffer (auto-derived from permission + permission_program)
+///   7. `[writable]` delegation_record (auto-derived from permission)
+///   8. `[writable]` delegation_metadata (auto-derived from permission)
+///   9. `[]` delegation_program
+///   10. `[optional]` validator
 #[derive(Clone, Debug, Default)]
 pub struct DelegatePermissionBuilder {
-    payer: Option<(Pubkey, bool)>,
+    payer: Option<Pubkey>,
+    authority: Option<(Pubkey, bool)>,
     permissioned_account: Option<(Pubkey, bool)>,
     permission: Option<Pubkey>,
     system_program: Option<Pubkey>,
     owner_program: Option<Pubkey>,
+    delegation_buffer: Option<Pubkey>,
+    delegation_record: Option<Pubkey>,
+    delegation_metadata: Option<Pubkey>,
     delegation_program: Option<Pubkey>,
     validator: Option<Pubkey>,
     __remaining_accounts: Vec<AccountMeta>,
@@ -156,32 +131,17 @@ pub struct DelegatePermissionBuilder {
 
 impl DelegatePermissionBuilder {
     pub fn new() -> Self {
-        Self {
-            system_program: Some(system_program::ID),
-            delegation_program: Some(DELEGATION_PROGRAM_ID),
-            ..Default::default()
-        }
-    }
-
-    /// Create a builder with the minimum required accounts
-    /// System program and delegation program are auto-set
-    pub fn with_accounts(
-        payer: Pubkey,
-        payer_is_signer: bool,
-        permissioned_account: Pubkey,
-        permissioned_is_signer: bool,
-        permission: Pubkey,
-    ) -> Self {
-        let mut builder = Self::new();
-        builder.payer = Some((payer, payer_is_signer));
-        builder.permissioned_account = Some((permissioned_account, permissioned_is_signer));
-        builder.permission = Some(permission);
-        builder
+        Self::default()
     }
 
     #[inline(always)]
-    pub fn payer(&mut self, payer: Pubkey, as_signer: bool) -> &mut Self {
-        self.payer = Some((payer, as_signer));
+    pub fn payer(&mut self, payer: Pubkey) -> &mut Self {
+        self.payer = Some(payer);
+        self
+    }
+    #[inline(always)]
+    pub fn authority(&mut self, authority: Pubkey, as_signer: bool) -> &mut Self {
+        self.authority = Some((authority, as_signer));
         self
     }
     #[inline(always)]
@@ -209,6 +169,21 @@ impl DelegatePermissionBuilder {
         self
     }
     #[inline(always)]
+    pub fn delegation_buffer(&mut self, delegation_buffer: Pubkey) -> &mut Self {
+        self.delegation_buffer = Some(delegation_buffer);
+        self
+    }
+    #[inline(always)]
+    pub fn delegation_record(&mut self, delegation_record: Pubkey) -> &mut Self {
+        self.delegation_record = Some(delegation_record);
+        self
+    }
+    #[inline(always)]
+    pub fn delegation_metadata(&mut self, delegation_metadata: Pubkey) -> &mut Self {
+        self.delegation_metadata = Some(delegation_metadata);
+        self
+    }
+    #[inline(always)]
     pub fn delegation_program(&mut self, delegation_program: Pubkey) -> &mut Self {
         self.delegation_program = Some(delegation_program);
         self
@@ -233,28 +208,28 @@ impl DelegatePermissionBuilder {
     }
     #[allow(clippy::clone_on_copy)]
     pub fn instruction(&self) -> Instruction {
-        let permission = self.permission.expect("permission is not set");
-        let owner_program = self.owner_program.unwrap_or(MAGICBLOCK_PERMISSION_API_ID);
-
-        let delegate_accounts = DelegatePermissionAccounts::new(permission, owner_program);
-
         let accounts = DelegatePermission {
             payer: self.payer.expect("payer is not set"),
+            authority: self.authority.expect("authority is not set"),
             permissioned_account: self
                 .permissioned_account
                 .expect("permissioned_account is not set"),
-            permission: delegate_accounts.permission,
+            permission: self.permission.expect("permission is not set"),
             system_program: self.system_program.expect("system_program is not set"),
-            owner_program: delegate_accounts.owner_program,
-            delegation_buffer: delegate_accounts.delegation_buffer,
-            delegation_record: delegate_accounts.delegation_record,
-            delegation_metadata: delegate_accounts.delegation_metadata,
+            owner_program: self.owner_program.expect("owner_program is not set"),
+            delegation_buffer: self
+                .delegation_buffer
+                .expect("delegation_buffer is not set"),
+            delegation_record: self
+                .delegation_record
+                .expect("delegation_record is not set"),
+            delegation_metadata: self
+                .delegation_metadata
+                .expect("delegation_metadata is not set"),
             delegation_program: self
                 .delegation_program
                 .expect("delegation_program is not set"),
-            validator: self
-                .validator
-                .expect("validator is not set (can be provided via args or remaining_accounts)"),
+            validator: self.validator.expect("validator is not set"),
         };
 
         accounts.instruction_with_remaining_accounts(&self.__remaining_accounts)
@@ -263,7 +238,9 @@ impl DelegatePermissionBuilder {
 
 /// `delegate_permission` CPI accounts.
 pub struct DelegatePermissionCpiAccounts<'a, 'b> {
-    pub payer: (&'b AccountInfo<'a>, bool),
+    pub payer: &'b AccountInfo<'a>,
+
+    pub authority: (&'b AccountInfo<'a>, bool),
 
     pub permissioned_account: (&'b AccountInfo<'a>, bool),
 
@@ -289,7 +266,9 @@ pub struct DelegatePermissionCpi<'a, 'b> {
     /// The program to invoke.
     pub __program: &'b AccountInfo<'a>,
 
-    pub payer: (&'b AccountInfo<'a>, bool),
+    pub payer: &'b AccountInfo<'a>,
+
+    pub authority: (&'b AccountInfo<'a>, bool),
 
     pub permissioned_account: (&'b AccountInfo<'a>, bool),
 
@@ -318,6 +297,7 @@ impl<'a, 'b> DelegatePermissionCpi<'a, 'b> {
         Self {
             __program: program,
             payer: accounts.payer,
+            authority: accounts.authority,
             permissioned_account: accounts.permissioned_account,
             permission: accounts.permission,
             system_program: accounts.system_program,
@@ -352,8 +332,12 @@ impl<'a, 'b> DelegatePermissionCpi<'a, 'b> {
         signers_seeds: &[&[&[u8]]],
         remaining_accounts: &[(&'b AccountInfo<'a>, bool, bool)],
     ) -> ProgramResult {
-        let mut accounts = Vec::with_capacity(10 + remaining_accounts.len());
-        accounts.push(AccountMeta::new(*self.payer.0.key, self.payer.1));
+        let mut accounts = Vec::with_capacity(11 + remaining_accounts.len());
+        accounts.push(AccountMeta::new(*self.payer.key, false));
+        accounts.push(AccountMeta::new_readonly(
+            *self.authority.0.key,
+            self.authority.1,
+        ));
         accounts.push(AccountMeta::new_readonly(
             *self.permissioned_account.0.key,
             self.permissioned_account.1,
@@ -370,11 +354,6 @@ impl<'a, 'b> DelegatePermissionCpi<'a, 'b> {
         ));
         if let Some(validator) = self.validator {
             accounts.push(AccountMeta::new_readonly(*validator.key, false));
-        } else {
-            accounts.push(AccountMeta::new_readonly(
-                MAGICBLOCK_PERMISSION_API_ID,
-                false,
-            ));
         }
         remaining_accounts.iter().for_each(|remaining_account| {
             accounts.push(AccountMeta {
@@ -388,13 +367,14 @@ impl<'a, 'b> DelegatePermissionCpi<'a, 'b> {
             .expect("failed to serialize DelegatePermissionInstructionData");
 
         let instruction = Instruction {
-            program_id: MAGICBLOCK_PERMISSION_API_ID,
+            program_id: PERMISSION_PROGRAM_ID,
             accounts,
             data,
         };
-        let mut account_infos = Vec::with_capacity(11 + remaining_accounts.len());
+        let mut account_infos = Vec::with_capacity(12 + remaining_accounts.len());
         account_infos.push(self.__program.clone());
-        account_infos.push(self.payer.0.clone());
+        account_infos.push(self.payer.clone());
+        account_infos.push(self.authority.0.clone());
         account_infos.push(self.permissioned_account.0.clone());
         account_infos.push(self.permission.clone());
         account_infos.push(self.system_program.clone());
@@ -420,62 +400,55 @@ impl<'a, 'b> DelegatePermissionCpi<'a, 'b> {
 
 /// Instruction builder for `DelegatePermission` via CPI.
 ///
-/// ### Accounts (auto-derived from permission account):
+/// ### Accounts:
 ///
-///   0. `[writable, signer]` payer
-///   1. `[]` permissioned_account
-///   2. `[writable]` permission (used to derive delegation PDAs)
-///   3. `[]` system_program
-///   4. `[]` owner_program (defaults to PERMISSION_PROGRAM_ID)
-///   5. `[writable]` delegation_buffer (derived from permission + owner_program)
-///   6. `[writable]` delegation_record (derived from permission)
-///   7. `[writable]` delegation_metadata (derived from permission)
-///   8. `[]` delegation_program
-///   9. `[optional]` validator
+///   0. `[writable]` payer
+///   1. `[signer?]` authority - Either this or permissioned_account must be a signer
+///   2. `[signer?]` permissioned_account - Either this or authority must be a signer
+///   3. `[writable]` permission
+///   4. `[]` system_program
+///   5. `[]` owner_program
+///   6. `[writable]` delegation_buffer
+///   7. `[writable]` delegation_record
+///   8. `[writable]` delegation_metadata
+///   9. `[]` delegation_program
+///   10. `[optional]` validator
 #[derive(Clone, Debug)]
 pub struct DelegatePermissionCpiBuilder<'a, 'b> {
     instruction: Box<DelegatePermissionCpiBuilderInstruction<'a, 'b>>,
 }
 
 impl<'a, 'b> DelegatePermissionCpiBuilder<'a, 'b> {
+    /// Create a new delegate permission CPI builder.
+    ///
+    /// Optionally accepts a `permission` AccountInfo. All other accounts must be set
+    /// via their respective builder methods (payer, authority, permissioned_account, etc.)
     pub fn new(program: &'b AccountInfo<'a>) -> Self {
         let instruction = Box::new(DelegatePermissionCpiBuilderInstruction {
             __program: program,
             payer: None,
+            authority: None,
             permissioned_account: None,
             permission: None,
             system_program: None,
             owner_program: None,
+            delegation_buffer: None,
+            delegation_record: None,
+            delegation_metadata: None,
             delegation_program: None,
             validator: None,
             __remaining_accounts: Vec::new(),
         });
         Self { instruction }
     }
-
-    /// Create a CPI builder with the minimum required accounts
-    /// System program and delegation program are auto-set
-    pub fn with_accounts(
-        program: &'b AccountInfo<'a>,
-        payer: &'b AccountInfo<'a>,
-        payer_is_signer: bool,
-        permissioned_account: &'b AccountInfo<'a>,
-        permissioned_is_signer: bool,
-        permission: &'b AccountInfo<'a>,
-    ) -> Self {
-        let mut builder = Self::new(program);
-        builder.instruction.payer = Some((payer, payer_is_signer));
-        builder.instruction.permissioned_account =
-            Some((permissioned_account, permissioned_is_signer));
-        builder.instruction.permission = Some(permission);
-        builder.instruction.system_program = Some(program);
-        builder.instruction.delegation_program = Some(program);
-        builder
-    }
-
     #[inline(always)]
-    pub fn payer(&mut self, payer: &'b AccountInfo<'a>, as_signer: bool) -> &mut Self {
-        self.instruction.payer = Some((payer, as_signer));
+    pub fn payer(&mut self, payer: &'b AccountInfo<'a>) -> &mut Self {
+        self.instruction.payer = Some(payer);
+        self
+    }
+    #[inline(always)]
+    pub fn authority(&mut self, authority: &'b AccountInfo<'a>, as_signer: bool) -> &mut Self {
+        self.instruction.authority = Some((authority, as_signer));
         self
     }
     #[inline(always)]
@@ -500,6 +473,21 @@ impl<'a, 'b> DelegatePermissionCpiBuilder<'a, 'b> {
     #[inline(always)]
     pub fn owner_program(&mut self, owner_program: &'b AccountInfo<'a>) -> &mut Self {
         self.instruction.owner_program = Some(owner_program);
+        self
+    }
+    #[inline(always)]
+    pub fn delegation_buffer(&mut self, delegation_buffer: &'b AccountInfo<'a>) -> &mut Self {
+        self.instruction.delegation_buffer = Some(delegation_buffer);
+        self
+    }
+    #[inline(always)]
+    pub fn delegation_record(&mut self, delegation_record: &'b AccountInfo<'a>) -> &mut Self {
+        self.instruction.delegation_record = Some(delegation_record);
+        self
+    }
+    #[inline(always)]
+    pub fn delegation_metadata(&mut self, delegation_metadata: &'b AccountInfo<'a>) -> &mut Self {
+        self.instruction.delegation_metadata = Some(delegation_metadata);
         self
     }
     #[inline(always)]
@@ -547,74 +535,51 @@ impl<'a, 'b> DelegatePermissionCpiBuilder<'a, 'b> {
     #[allow(clippy::clone_on_copy)]
     #[allow(clippy::vec_init_then_push)]
     pub fn invoke_signed(&self, signers_seeds: &[&[&[u8]]]) -> ProgramResult {
-        let permission_account = self.instruction.permission.expect("permission is not set");
-        let owner_program_account = self
-            .instruction
-            .owner_program
-            .expect("owner_program is not set");
-
-        // Derive PDAs from permission account's pubkey
-        let permission_pubkey = *permission_account.key;
-        let owner_program_pubkey = *owner_program_account.key;
-        let delegate_accounts =
-            DelegatePermissionAccounts::new(permission_pubkey, owner_program_pubkey);
-
-        // Find the derived accounts in remaining accounts
-        let delegation_buffer = self
-            .instruction
-            .__remaining_accounts
-            .iter()
-            .find(|(acc, _, _)| *acc.key == delegate_accounts.delegation_buffer)
-            .map(|(acc, _, _)| acc)
-            .expect("delegation_buffer account not found in remaining accounts");
-
-        let delegation_record = self
-            .instruction
-            .__remaining_accounts
-            .iter()
-            .find(|(acc, _, _)| *acc.key == delegate_accounts.delegation_record)
-            .map(|(acc, _, _)| acc)
-            .expect("delegation_record account not found in remaining accounts");
-
-        let delegation_metadata = self
-            .instruction
-            .__remaining_accounts
-            .iter()
-            .find(|(acc, _, _)| *acc.key == delegate_accounts.delegation_metadata)
-            .map(|(acc, _, _)| acc)
-            .expect("delegation_metadata account not found in remaining accounts");
-
         let instruction = DelegatePermissionCpi {
             __program: self.instruction.__program,
 
             payer: self.instruction.payer.expect("payer is not set"),
+
+            authority: self.instruction.authority.expect("authority is not set"),
 
             permissioned_account: self
                 .instruction
                 .permissioned_account
                 .expect("permissioned_account is not set"),
 
-            permission: permission_account,
+            permission: self.instruction.permission.expect("permission is not set"),
 
             system_program: self
                 .instruction
                 .system_program
                 .expect("system_program is not set"),
 
-            owner_program: owner_program_account,
+            owner_program: self
+                .instruction
+                .owner_program
+                .expect("owner_program is not set"),
 
-            delegation_buffer,
+            delegation_buffer: self
+                .instruction
+                .delegation_buffer
+                .expect("delegation_buffer is not set"),
 
-            delegation_record,
+            delegation_record: self
+                .instruction
+                .delegation_record
+                .expect("delegation_record is not set"),
 
-            delegation_metadata,
+            delegation_metadata: self
+                .instruction
+                .delegation_metadata
+                .expect("delegation_metadata is not set"),
 
             delegation_program: self
                 .instruction
                 .delegation_program
                 .expect("delegation_program is not set"),
 
-            validator: self.instruction.validator,
+            validator: Some(self.instruction.validator.expect("validator is not set")),
         };
         instruction.invoke_signed_with_remaining_accounts(
             signers_seeds,
@@ -626,11 +591,15 @@ impl<'a, 'b> DelegatePermissionCpiBuilder<'a, 'b> {
 #[derive(Clone, Debug)]
 struct DelegatePermissionCpiBuilderInstruction<'a, 'b> {
     __program: &'b AccountInfo<'a>,
-    payer: Option<(&'b AccountInfo<'a>, bool)>,
+    payer: Option<&'b AccountInfo<'a>>,
+    authority: Option<(&'b AccountInfo<'a>, bool)>,
     permissioned_account: Option<(&'b AccountInfo<'a>, bool)>,
     permission: Option<&'b AccountInfo<'a>>,
     system_program: Option<&'b AccountInfo<'a>>,
     owner_program: Option<&'b AccountInfo<'a>>,
+    delegation_buffer: Option<&'b AccountInfo<'a>>,
+    delegation_record: Option<&'b AccountInfo<'a>>,
+    delegation_metadata: Option<&'b AccountInfo<'a>>,
     delegation_program: Option<&'b AccountInfo<'a>>,
     validator: Option<&'b AccountInfo<'a>>,
     /// Additional instruction accounts `(AccountInfo, is_writable, is_signer)`.

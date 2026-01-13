@@ -1,6 +1,7 @@
 use borsh::{BorshDeserialize, BorshSerialize};
 
-use crate::access_control::programs::MAGICBLOCK_PERMISSION_API_ID;
+use crate::access_control::structs::Permission;
+use crate::consts::PERMISSION_PROGRAM_ID;
 use crate::consts::{MAGIC_CONTEXT_ID, MAGIC_PROGRAM_ID};
 use crate::solana_compat::solana::{
     invoke, invoke_signed, AccountInfo, AccountMeta, Instruction, ProgramResult, Pubkey,
@@ -50,7 +51,7 @@ impl CommitAndUndelegatePermission {
             .expect("failed to serialize CommitAndUndelegatePermissionInstructionData");
 
         Instruction {
-            program_id: MAGICBLOCK_PERMISSION_API_ID,
+            program_id: PERMISSION_PROGRAM_ID,
             accounts,
             data,
         }
@@ -115,6 +116,9 @@ impl CommitAndUndelegatePermissionBuilder {
         as_signer: bool,
     ) -> &mut Self {
         self.permissioned_account = Some((permissioned_account, as_signer));
+        // Automatically derive and set the permission PDA
+        let (permission_pda, _bump) = Permission::find_pda(&permissioned_account);
+        self.permission = Some(permission_pda);
         self
     }
     #[inline(always)]
@@ -240,7 +244,7 @@ impl<'a, 'b> CommitAndUndelegatePermissionCpi<'a, 'b> {
             .unwrap();
 
         let instruction = Instruction {
-            program_id: MAGICBLOCK_PERMISSION_API_ID,
+            program_id: PERMISSION_PROGRAM_ID,
             accounts,
             data,
         };
@@ -278,18 +282,14 @@ pub struct CommitAndUndelegatePermissionCpiBuilder<'a, 'b> {
 }
 
 impl<'a, 'b> CommitAndUndelegatePermissionCpiBuilder<'a, 'b> {
-    pub fn new(
-        program: &'b AccountInfo<'a>,
-        magic_program: &'b AccountInfo<'a>,
-        magic_context: &'b AccountInfo<'a>,
-    ) -> Self {
+    pub fn new(program: &'b AccountInfo<'a>) -> Self {
         let instruction = Box::new(CommitAndUndelegatePermissionCpiBuilderInstruction {
             __program: program,
             authority: None,
             permissioned_account: None,
             permission: None,
-            magic_program,
-            magic_context,
+            magic_program: None,
+            magic_context: None,
             __remaining_accounts: Vec::new(),
         });
         Self { instruction }
@@ -312,6 +312,16 @@ impl<'a, 'b> CommitAndUndelegatePermissionCpiBuilder<'a, 'b> {
     #[inline(always)]
     pub fn permission(&mut self, permission: &'b AccountInfo<'a>) -> &mut Self {
         self.instruction.permission = Some(permission);
+        self
+    }
+    #[inline(always)]
+    pub fn magic_program(&mut self, magic_program: &'b AccountInfo<'a>) -> &mut Self {
+        self.instruction.magic_program = Some(magic_program);
+        self
+    }
+    #[inline(always)]
+    pub fn magic_context(&mut self, magic_context: &'b AccountInfo<'a>) -> &mut Self {
+        self.instruction.magic_context = Some(magic_context);
         self
     }
     /// Add an additional account to the instruction.
@@ -356,8 +366,14 @@ impl<'a, 'b> CommitAndUndelegatePermissionCpiBuilder<'a, 'b> {
                 .permissioned_account
                 .expect("permissioned_account is not set"),
             permission: self.instruction.permission.expect("permission is not set"),
-            magic_program: self.instruction.magic_program,
-            magic_context: self.instruction.magic_context,
+            magic_program: self
+                .instruction
+                .magic_program
+                .expect("magic_program is not set"),
+            magic_context: self
+                .instruction
+                .magic_context
+                .expect("magic_context is not set"),
         };
         instruction.invoke_signed_with_remaining_accounts(
             signers_seeds,
@@ -372,8 +388,8 @@ struct CommitAndUndelegatePermissionCpiBuilderInstruction<'a, 'b> {
     authority: Option<(&'b AccountInfo<'a>, bool)>,
     permissioned_account: Option<(&'b AccountInfo<'a>, bool)>,
     permission: Option<&'b AccountInfo<'a>>,
-    magic_program: &'b AccountInfo<'a>,
-    magic_context: &'b AccountInfo<'a>,
+    magic_program: Option<&'b AccountInfo<'a>>,
+    magic_context: Option<&'b AccountInfo<'a>>,
     /// Additional instruction accounts `(AccountInfo, is_signer, is_writable)`.
     __remaining_accounts: Vec<(&'b AccountInfo<'a>, bool, bool)>,
 }

@@ -8,8 +8,6 @@ pub mod solana {
     pub use solana_program::program_error::ProgramError;
     pub use solana_program::program_memory::sol_memset;
     pub use solana_program::pubkey::Pubkey;
-    #[allow(unused_imports)]
-    pub use solana_program::pubkey::PubkeyError;
     pub use solana_program::sysvar::rent::Rent;
     pub use solana_program::sysvar::Sysvar;
     pub use solana_system_interface::instruction as system_instruction;
@@ -70,7 +68,6 @@ pub mod solana {
     pub use anchor_lang::solana_program::program::invoke;
     pub use anchor_lang::solana_program::program::invoke_signed;
     pub use anchor_lang::solana_program::program_memory::sol_memset;
-    pub use anchor_lang::solana_program::pubkey::{pubkey, PubkeyError};
     pub use anchor_lang::solana_program::system_instruction;
     pub use anchor_lang::solana_program::system_program;
     pub use anchor_lang::solana_program::sysvar::rent::Rent;

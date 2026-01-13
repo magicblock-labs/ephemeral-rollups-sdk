@@ -22,18 +22,32 @@ export interface DelegatePermissionInstructionArgs {
 /**
  * Instruction: DelegatePermission
  * Discriminator: [3, 0, 0, 0, 0, 0, 0, 0]
+ *
+ * Accounts:
+ *   0. `[writable, signer]` payer
+ *   1. `[signer?]` authority - Either this or permissionedAccount must be a signer
+ *   2. `[writable, signer?]` permissionedAccount - Either this or authority must be a signer
+ *   3. `[writable]` permission
+ *   4. `[]` systemProgram
+ *   5. `[]` ownerProgram
+ *   6. `[writable]` delegateBuffer
+ *   7. `[writable]` delegationRecord
+ *   8. `[writable]` delegationMetadata
+ *   9. `[]` delegationProgram
+ *   10. `[optional]` validator
  */
 export function createDelegatePermissionInstruction(
   accounts: {
     payer: PublicKey;
-    permissionedAccount: PublicKey;
+    authority: [PublicKey, boolean];
+    permissionedAccount: [PublicKey, boolean];
     ownerProgram?: PublicKey;
     validator?: PublicKey | null;
   },
   args?: DelegatePermissionInstructionArgs,
 ): TransactionInstruction {
   const ownerProgram = accounts.ownerProgram ?? PERMISSION_PROGRAM_ID;
-  const permissionPda = permissionPdaFromAccount(accounts.permissionedAccount);
+  const permissionPda = permissionPdaFromAccount(accounts.permissionedAccount[0]);
   const delegateBuffer = delegateBufferPdaFromDelegatedAccountAndOwnerProgram(
     permissionPda,
     ownerProgram,
@@ -48,9 +62,14 @@ export function createDelegatePermissionInstruction(
   const keys: AccountMeta[] = [
     { pubkey: accounts.payer, isWritable: true, isSigner: true },
     {
-      pubkey: accounts.permissionedAccount,
+      pubkey: accounts.authority[0],
       isWritable: false,
-      isSigner: false,
+      isSigner: accounts.authority[1],
+    },
+    {
+      pubkey: accounts.permissionedAccount[0],
+      isWritable: false,
+      isSigner: accounts.permissionedAccount[1],
     },
     { pubkey: permissionPda, isWritable: true, isSigner: false },
     { pubkey: SystemProgram.programId, isWritable: false, isSigner: false },

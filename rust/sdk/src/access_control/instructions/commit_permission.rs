@@ -1,6 +1,7 @@
 use borsh::{BorshDeserialize, BorshSerialize};
 
-use crate::access_control::programs::MAGICBLOCK_PERMISSION_API_ID;
+use crate::access_control::structs::Permission;
+use crate::consts::PERMISSION_PROGRAM_ID;
 use crate::consts::{MAGIC_CONTEXT_ID, MAGIC_PROGRAM_ID};
 use crate::solana_compat::solana::{
     invoke, invoke_signed, AccountInfo, AccountMeta, Instruction, ProgramResult, Pubkey,
@@ -50,7 +51,7 @@ impl CommitPermission {
             .expect("failed to serialize CommitPermissionInstructionData");
 
         Instruction {
-            program_id: MAGICBLOCK_PERMISSION_API_ID,
+            program_id: PERMISSION_PROGRAM_ID,
             accounts,
             data,
         }
@@ -83,18 +84,17 @@ impl Default for CommitPermissionInstructionData {
 
 /// Instruction builder for `CommitPermission`.
 ///
-/// ### Accounts (magic_program and magic_context are auto-set):
+/// ### Accounts (auto-derived from permissioned_account; magic_program and magic_context are auto-set):
 ///
 ///   0. `[signer?]` authority - Either this or permissioned_account must be a signer
 ///   1. `[writable, signer?]` permissioned_account - Either this or authority must be a signer
 ///   2. `[writable]` permission
-///   3. `[]` magic_program (auto-set to MAGIC_PROGRAM_ID)
-///   4. `[writable]` magic_context (auto-set to MAGIC_CONTEXT_ID)
+///   3. `[]` magic_program
+///   4. `[writable]` magic_context
 #[derive(Clone, Debug, Default)]
 pub struct CommitPermissionBuilder {
     authority: Option<(Pubkey, bool)>,
     permissioned_account: Option<(Pubkey, bool)>,
-    permission: Option<Pubkey>,
     __remaining_accounts: Vec<AccountMeta>,
 }
 
@@ -117,11 +117,6 @@ impl CommitPermissionBuilder {
         self.permissioned_account = Some((permissioned_account, as_signer));
         self
     }
-    #[inline(always)]
-    pub fn permission(&mut self, permission: Pubkey) -> &mut Self {
-        self.permission = Some(permission);
-        self
-    }
     /// Add an additional account to the instruction.
     #[inline(always)]
     pub fn add_remaining_account(&mut self, account: AccountMeta) -> &mut Self {
@@ -136,12 +131,17 @@ impl CommitPermissionBuilder {
     }
     #[allow(clippy::clone_on_copy)]
     pub fn instruction(&self) -> Instruction {
+        let permissioned_account_pk = self
+            .permissioned_account
+            .expect("permissioned_account is not set")
+            .0;
+        let (permission, _bump) = Permission::find_pda(&permissioned_account_pk);
         let accounts = CommitPermission {
             authority: self.authority.expect("authority is not set"),
             permissioned_account: self
                 .permissioned_account
                 .expect("permissioned_account is not set"),
-            permission: self.permission.expect("permission is not set"),
+            permission,
             magic_program: MAGIC_PROGRAM_ID,
             magic_context: MAGIC_CONTEXT_ID,
         };
@@ -240,7 +240,7 @@ impl<'a, 'b> CommitPermissionCpi<'a, 'b> {
             .expect("failed to serialize CommitPermissionInstructionData");
 
         let instruction = Instruction {
-            program_id: MAGICBLOCK_PERMISSION_API_ID,
+            program_id: PERMISSION_PROGRAM_ID,
             accounts,
             data,
         };
@@ -270,8 +270,8 @@ impl<'a, 'b> CommitPermissionCpi<'a, 'b> {
 ///   0. `[signer?]` authority - Either this or permissioned_account must be a signer
 ///   1. `[writable, signer?]` permissioned_account - Either this or authority must be a signer
 ///   2. `[writable]` permission
-///   3. `[]` magic_program (auto-set)
-///   4. `[writable]` magic_context (auto-set)
+///   3. `[]` magic_program
+///   4. `[writable]` magic_context
 #[derive(Clone, Debug)]
 pub struct CommitPermissionCpiBuilder<'a, 'b> {
     instruction: Box<CommitPermissionCpiBuilderInstruction<'a, 'b>>,
@@ -370,21 +370,13 @@ impl<'a, 'b> CommitPermissionCpiBuilder<'a, 'b> {
 
             magic_program: self
                 .instruction
-                .__remaining_accounts
-                .iter()
-                .find(|(acc, _, _)| acc.key == &MAGIC_PROGRAM_ID)
-                .map(|(acc, _, _)| *acc)
-                .or_else(|| self.instruction.magic_program)
-                .expect("magic_program account not found"),
+                .magic_program
+                .expect("magic_program is not set"),
 
             magic_context: self
                 .instruction
-                .__remaining_accounts
-                .iter()
-                .find(|(acc, _, _)| acc.key == &MAGIC_CONTEXT_ID)
-                .map(|(acc, _, _)| *acc)
-                .or_else(|| self.instruction.magic_context)
-                .expect("magic_context account not found"),
+                .magic_context
+                .expect("magic_context is not set"),
         };
         instruction.invoke_signed_with_remaining_accounts(
             signers_seeds,
