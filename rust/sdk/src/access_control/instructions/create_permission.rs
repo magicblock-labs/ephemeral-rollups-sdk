@@ -51,7 +51,6 @@ impl CreatePermission {
 }
 
 #[derive(BorshSerialize, BorshDeserialize, Clone, Debug, Eq, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct CreatePermissionInstructionData {
     discriminator: u64,
 }
@@ -75,7 +74,6 @@ impl Default for CreatePermissionInstructionData {
 }
 
 #[derive(BorshSerialize, BorshDeserialize, Clone, Debug, Eq, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct CreatePermissionInstructionArgs {
     pub args: MembersArgs,
 }

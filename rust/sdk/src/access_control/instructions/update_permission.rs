@@ -54,7 +54,6 @@ impl UpdatePermission {
 }
 
 #[derive(BorshSerialize, BorshDeserialize, Clone, Debug, Eq, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct UpdatePermissionInstructionData {
     discriminator: u64,
 }
@@ -78,7 +77,6 @@ impl Default for UpdatePermissionInstructionData {
 }
 
 #[derive(BorshSerialize, BorshDeserialize, Clone, Debug, Eq, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct UpdatePermissionInstructionArgs {
     pub args: MembersArgs,
 }

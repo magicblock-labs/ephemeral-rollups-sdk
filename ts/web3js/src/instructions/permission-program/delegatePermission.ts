@@ -47,7 +47,9 @@ export function createDelegatePermissionInstruction(
   args?: DelegatePermissionInstructionArgs,
 ): TransactionInstruction {
   const ownerProgram = accounts.ownerProgram ?? PERMISSION_PROGRAM_ID;
-  const permissionPda = permissionPdaFromAccount(accounts.permissionedAccount[0]);
+  const permissionPda = permissionPdaFromAccount(
+    accounts.permissionedAccount[0],
+  );
   const delegateBuffer = delegateBufferPdaFromDelegatedAccountAndOwnerProgram(
     permissionPda,
     ownerProgram,

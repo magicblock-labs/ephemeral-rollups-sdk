@@ -7,8 +7,8 @@ mod tests {
         ClosePermissionBuilder, CommitAndUndelegatePermissionBuilder, CommitPermissionBuilder,
         CreatePermissionBuilder, UpdatePermissionBuilder,
     };
+    use ephemeral_rollups_sdk::access_control::structs::MembersArgs;
     use ephemeral_rollups_sdk::consts::PERMISSION_PROGRAM_ID;
-    use ephemeral_rollups_sdk::access_control::types::MembersArgs;
     use solana_pubkey::Pubkey;
 
     #[test]
@@ -35,13 +35,11 @@ mod tests {
     fn test_commit_permission_builder_with_both_signers() {
         let authority = Pubkey::new_unique();
         let permissioned_account = Pubkey::new_unique();
-        let permission = Pubkey::new_unique();
 
         let mut builder = CommitPermissionBuilder::new();
         builder
             .authority(authority, true)
-            .permissioned_account(permissioned_account, true)
-            .permission(permission);
+            .permissioned_account(permissioned_account, true);
 
         let instruction = builder.instruction();
         assert_eq!(instruction.program_id, PERMISSION_PROGRAM_ID);
@@ -54,13 +52,11 @@ mod tests {
     fn test_commit_permission_builder_authority_only_signer() {
         let authority = Pubkey::new_unique();
         let permissioned_account = Pubkey::new_unique();
-        let permission = Pubkey::new_unique();
 
         let mut builder = CommitPermissionBuilder::new();
         builder
             .authority(authority, true)
-            .permissioned_account(permissioned_account, false)
-            .permission(permission);
+            .permissioned_account(permissioned_account, false);
 
         let instruction = builder.instruction();
         assert!(instruction.accounts[0].is_signer); // authority is signer
@@ -71,13 +67,11 @@ mod tests {
     fn test_commit_permission_builder_permissioned_account_only_signer() {
         let authority = Pubkey::new_unique();
         let permissioned_account = Pubkey::new_unique();
-        let permission = Pubkey::new_unique();
 
         let mut builder = CommitPermissionBuilder::new();
         builder
             .authority(authority, false)
-            .permissioned_account(permissioned_account, true)
-            .permission(permission);
+            .permissioned_account(permissioned_account, true);
 
         let instruction = builder.instruction();
         assert!(!instruction.accounts[0].is_signer); // authority is not signer
@@ -217,7 +211,8 @@ mod tests {
 
         let mut builder = ClosePermissionBuilder::new();
         builder
-            .payer(payer, true)
+            .payer(payer)
+            .authority(payer, true)
             .permissioned_account(permissioned_account, true)
             .permission(permission);
 
@@ -237,7 +232,8 @@ mod tests {
 
         let mut builder = ClosePermissionBuilder::new();
         builder
-            .payer(payer, true)
+            .payer(payer)
+            .authority(payer, true)
             .permissioned_account(permissioned_account, false)
             .permission(permission);
 
@@ -255,7 +251,8 @@ mod tests {
 
         let mut builder = ClosePermissionBuilder::new();
         builder
-            .payer(payer, false)
+            .payer(payer)
+            .authority(payer, false)
             .permissioned_account(permissioned_account, true)
             .permission(permission);
 
