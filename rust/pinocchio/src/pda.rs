@@ -3,39 +3,8 @@ use pinocchio::Address;
 
 /// Find a valid program derived address (PDA) using the library's syscall.
 /// Returns the PDA address and bump seed.
-#[cfg(target_os = "solana")]
 fn find_program_address_impl(seeds: &[&[u8]], program_id: &Address) -> (Address, u8) {
     Address::find_program_address(seeds, program_id)
-}
-
-// On non-Solana targets (for cargo check), provide a stub implementation
-#[cfg(not(target_os = "solana"))]
-fn find_program_address_impl(seeds: &[&[u8]], program_id: &Address) -> (Address, u8) {
-    use pinocchio_pubkey::derive_address;
-
-    let program_id_bytes: &[u8; 32] = program_id.as_array();
-    let bump: u8 = 255; // Default bump for compilation checks
-
-    // Create seeds array with bump appended
-    let bump_slice = [bump];
-
-    // Use derive_address with the bump
-    let derived = match seeds.len() {
-        1 => derive_address(&[seeds[0], &bump_slice], Some(bump), program_id_bytes),
-        2 => derive_address(
-            &[seeds[0], seeds[1], &bump_slice],
-            Some(bump),
-            program_id_bytes,
-        ),
-        3 => derive_address(
-            &[seeds[0], seeds[1], seeds[2], &bump_slice],
-            Some(bump),
-            program_id_bytes,
-        ),
-        _ => panic!("Unsupported seed count"),
-    };
-
-    (Address::new_from_array(derived), bump)
 }
 
 /// Generic DRY function to find a PDA from a typed `Seed`

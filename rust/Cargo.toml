@@ -73,7 +73,7 @@ solana-program-memory = { version = ">=2, <3" }
 solana-system-interface = { version = ">=1, <3", features = ["bincode"] }
 solana-instruction = { version = ">=1, <3" }
 solana-sysvar = { version = ">=2, <3" }
-pinocchio = { version = "0.10", default-features = false, features = ["cpi"] }
+pinocchio = { version = "0.10", default-features = false, features = ["cpi", "alloc"] }
 pinocchio-log = { version = "0.5", default-features = false }
 pinocchio-pubkey = { version = "0.3", default-features = false, features = ["const"] }
 pinocchio-system = { version = "0.5", default-features = false }

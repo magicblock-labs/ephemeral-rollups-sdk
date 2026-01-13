@@ -11,16 +11,9 @@ use crate::utils::{cpi_delegate, make_seed_buf};
 use crate::{consts::BUFFER, types::DelegateConfig, utils::close_pda_acc};
 
 /// Find the bump for a buffer PDA using the library's find_program_address syscall
-#[cfg(target_os = "solana")]
 fn find_buffer_pda_bump(pda_key: &[u8], owner_program: &Address) -> u8 {
     let (_, bump) = Address::find_program_address(&[BUFFER, pda_key], owner_program);
     bump
-}
-
-// On non-Solana targets (for cargo check), provide a stub that returns a default bump
-#[cfg(not(target_os = "solana"))]
-fn find_buffer_pda_bump(_pda_key: &[u8], _owner_program: &Address) -> u8 {
-    255 // Default bump for compilation checks
 }
 
 #[allow(unknown_lints, clippy::cloned_ref_to_slice_refs)]

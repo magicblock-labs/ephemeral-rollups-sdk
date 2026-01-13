@@ -6,50 +6,7 @@ use pinocchio::{
     sysvars::{rent::Rent, Sysvar},
     AccountView, Address, ProgramResult,
 };
-use pinocchio_pubkey::derive_address;
 use pinocchio_system::instructions::CreateAccount;
-
-// On Solana targets, use bytes_are_curve_point for validation
-#[cfg(any(target_os = "solana", target_arch = "bpf"))]
-use pinocchio::address::bytes_are_curve_point;
-
-// On non-Solana targets (for cargo check), provide a stub
-#[cfg(not(any(target_os = "solana", target_arch = "bpf")))]
-fn bytes_are_curve_point(_bytes: &[u8; 32]) -> bool {
-    false
-}
-
-/// Find the bump for a PDA given seeds and program ID
-fn find_pda_bump(seeds: &[&[u8]], program_id: &Address) -> u8 {
-    let program_id_bytes: &[u8; 32] = program_id.as_array();
-    for bump in (0u8..=255).rev() {
-        let bump_slice = [bump];
-        // Build seeds array dynamically based on seed count
-        let derived = match seeds.len() {
-            1 => derive_address(&[seeds[0], &bump_slice], Some(bump), program_id_bytes),
-            2 => derive_address(
-                &[seeds[0], seeds[1], &bump_slice],
-                Some(bump),
-                program_id_bytes,
-            ),
-            3 => derive_address(
-                &[seeds[0], seeds[1], seeds[2], &bump_slice],
-                Some(bump),
-                program_id_bytes,
-            ),
-            4 => derive_address(
-                &[seeds[0], seeds[1], seeds[2], seeds[3], &bump_slice],
-                Some(bump),
-                program_id_bytes,
-            ),
-            _ => continue,
-        };
-        if !bytes_are_curve_point(&derived) {
-            return bump;
-        }
-    }
-    panic!("Unable to find valid PDA bump");
-}
 
 #[inline(always)]
 pub fn undelegate(
@@ -62,9 +19,6 @@ pub fn undelegate(
     if !buffer.is_signer() {
         return Err(ProgramError::MissingRequiredSignature);
     }
-
-    // Parse PDA seeds from instruction data: Borsh-serialized Vec<Vec<u8>>.
-    // Format: u32 vec_len, then for each: u32 elem_len, then elem_len bytes.
 
     // fast u32 reader (inlined to avoid closure)
     #[inline(always)]
@@ -98,8 +52,7 @@ pub fn undelegate(
     }
 
     let pda_seeds = &seed_refs[..seeds_len];
-    // Find bump by iterating through possible values
-    let bump = find_pda_bump(pda_seeds, owner_program);
+    let (_, bump) = Address::find_program_address(pda_seeds, owner_program);
 
     // collect seeds into static array (avoid dynamic alloc)
     const UNINIT: MaybeUninit<Seed> = MaybeUninit::<Seed>::uninit();

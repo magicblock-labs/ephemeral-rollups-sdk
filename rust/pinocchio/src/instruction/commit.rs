@@ -1,7 +1,8 @@
 use crate::utils::create_schedule_commit_ix;
 use core::mem::MaybeUninit;
 use pinocchio::{
-    cpi::invoke, error::ProgramError, instruction::InstructionAccount, AccountView, ProgramResult,
+    cpi::invoke_with_slice, error::ProgramError, instruction::InstructionAccount, AccountView,
+    ProgramResult,
 };
 
 const MAX_LOCAL_CPI_ACCOUNTS: usize = 16;
@@ -32,44 +33,17 @@ pub(crate) fn commit_accounts_internal(
         return Err(ProgramError::InvalidArgument);
     }
 
-    // Build account references array based on actual number of accounts
-    // Using a fixed-size array with invoke
-    match num_accounts {
-        2 => {
-            let accs: [&AccountView; 2] = [payer, magic_context];
-            invoke(&ix, &accs)?;
-        }
-        3 => {
-            let accs: [&AccountView; 3] = [payer, magic_context, &accounts[0]];
-            invoke(&ix, &accs)?;
-        }
-        4 => {
-            let accs: [&AccountView; 4] = [payer, magic_context, &accounts[0], &accounts[1]];
-            invoke(&ix, &accs)?;
-        }
-        5 => {
-            let accs: [&AccountView; 5] = [
-                payer,
-                magic_context,
-                &accounts[0],
-                &accounts[1],
-                &accounts[2],
-            ];
-            invoke(&ix, &accs)?;
-        }
-        6 => {
-            let accs: [&AccountView; 6] = [
-                payer,
-                magic_context,
-                &accounts[0],
-                &accounts[1],
-                &accounts[2],
-                &accounts[3],
-            ];
-            invoke(&ix, &accs)?;
-        }
-        _ => return Err(ProgramError::InvalidArgument),
+    let mut all_accounts: [&AccountView; MAX_LOCAL_CPI_ACCOUNTS] = [payer; MAX_LOCAL_CPI_ACCOUNTS];
+    all_accounts[0] = payer;
+    all_accounts[1] = magic_context;
+
+    let mut i = 0;
+    while i < accounts.len() {
+        all_accounts[2 + i] = &accounts[i];
+        i += 1;
     }
+
+    invoke_with_slice(&ix, &all_accounts[..num_accounts])?;
 
     Ok(())
 }
