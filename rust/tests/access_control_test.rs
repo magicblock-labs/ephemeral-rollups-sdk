@@ -226,7 +226,7 @@ mod tests {
     }
 
     #[test]
-    fn test_close_permission_builder_payer_only_signer() {
+    fn test_close_permission_builder_authority_only_signer() {
         let payer = Pubkey::new_unique();
         let permissioned_account = Pubkey::new_unique();
         let permission = Pubkey::new_unique();
