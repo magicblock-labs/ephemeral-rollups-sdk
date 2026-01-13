@@ -42,8 +42,8 @@ describe("Permission Program Instructions (@solana/kit)", () => {
       );
 
       expect(instruction.data).toBeDefined();
-      // Discriminator (8) + count (4) + member (32 + 1) = 45 minimum
-      expect(instruction.data?.length).toBeGreaterThanOrEqual(45);
+      // Discriminator (8) + Option discriminant (1) + count (4) + member (32 + 1) = 46 minimum
+      expect(instruction.data?.length).toBeGreaterThanOrEqual(46);
     });
 
     it("should include permissionedAccount as readonly signer", async () => {
@@ -96,11 +96,11 @@ describe("Permission Program Instructions (@solana/kit)", () => {
       );
 
       expect(instruction.data).toBeDefined();
-      // Discriminator (8) + count (4) = 12 minimum
-      expect(instruction.data?.length).toBeGreaterThanOrEqual(12);
-    });
+      // Discriminator (8) + Option discriminant (1) + count (4) = 13 minimum
+      expect(instruction.data?.length).toBeGreaterThanOrEqual(13);
+      });
 
-    it("should handle multiple members", async () => {
+      it("should handle multiple members", async () => {
       const members: Array<{ pubkey: Address; flags: number }> = [
         { pubkey: mockAddress, flags: MEMBER_FLAG_AUTHORITY },
         { pubkey: differentAddress, flags: 0 },
@@ -119,8 +119,8 @@ describe("Permission Program Instructions (@solana/kit)", () => {
       );
 
       expect(instruction.data).toBeDefined();
-      // Discriminator (8) + count (4) + members (each 33 bytes)
-      const expectedSize = 8 + 4 + members.length * 33;
+      // Discriminator (8) + Option discriminant (1) + count (4) + members (each 33 bytes)
+      const expectedSize = 8 + 1 + 4 + members.length * 33;
       expect(instruction.data?.length).toBeGreaterThanOrEqual(expectedSize);
     });
 

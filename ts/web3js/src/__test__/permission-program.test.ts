@@ -44,8 +44,8 @@ describe("Permission Program Instructions (web3.js)", () => {
       );
 
       expect(instruction.data).toBeDefined();
-      // Discriminator (8) + count (4) + member (32 + 1) = 45 minimum
-      expect(instruction.data.length).toBeGreaterThanOrEqual(45);
+      // Discriminator (8) + Option discriminant (1) + count (4) + member (32 + 1) = 46 minimum
+      expect(instruction.data.length).toBeGreaterThanOrEqual(46);
     });
 
     it("should include permissionedAccount as readonly signer", () => {
@@ -111,17 +111,17 @@ describe("Permission Program Instructions (web3.js)", () => {
     });
 
     it("should handle empty members list", () => {
-      const instruction = createCreatePermissionInstruction(
-        {
-          permissionedAccount: testAuthority,
-          payer: testAuthority,
-        },
-        { members: [] },
-      );
+       const instruction = createCreatePermissionInstruction(
+         {
+           permissionedAccount: testAuthority,
+           payer: testAuthority,
+         },
+         { members: [] },
+       );
 
-      expect(instruction.data).toBeDefined();
-      // Discriminator (8) + count (4) = 12 minimum
-      expect(instruction.data.length).toBeGreaterThanOrEqual(12);
+       expect(instruction.data).toBeDefined();
+       // Discriminator (8) + Option discriminant (1) + count (4) = 13 minimum
+       expect(instruction.data.length).toBeGreaterThanOrEqual(13);
     });
 
     it("should handle multiple members", () => {
@@ -143,8 +143,8 @@ describe("Permission Program Instructions (web3.js)", () => {
       );
 
       expect(instruction.data).toBeDefined();
-      // Discriminator (8) + count (4) + members (each 33 bytes)
-      const expectedSize = 8 + 4 + members.length * 33;
+      // Discriminator (8) + Option discriminant (1) + count (4) + members (each 33 bytes)
+      const expectedSize = 8 + 1 + 4 + members.length * 33;
       expect(instruction.data.length).toBeGreaterThanOrEqual(expectedSize);
     });
 
