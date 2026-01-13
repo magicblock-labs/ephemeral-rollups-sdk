@@ -129,7 +129,7 @@ describe("Permission Program Instructions (web3.js)", () => {
         { pubkey: testAuthority, flags: MEMBER_FLAG_AUTHORITY },
         { pubkey: testMember, flags: 0 },
         {
-          pubkey: new PublicKey("11111111111111111111111111111113"),
+          pubkey: new PublicKey("11111111111111111111111111111111"),
           flags: MEMBER_FLAG_AUTHORITY,
         },
       ];
