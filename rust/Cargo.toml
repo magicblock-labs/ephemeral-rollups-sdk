@@ -12,7 +12,7 @@ members = [
 resolver = "2"
 
 [workspace.package]
-version = "0.7.2"
+version = "0.7.3"
 authors = ["Magicblock Labs <dev@magicblock.gg>"]
 edition = "2021"
 license = "MIT"
@@ -23,11 +23,11 @@ readme = "README.md"
 keywords = ["solana", "crypto", "delegation", "ephemeral-rollups", "magicblock"]
 
 [workspace.dependencies]
-ephemeral-rollups-sdk = { path = "sdk", version = "=0.7.2" }
-ephemeral-rollups-sdk-attribute-ephemeral = { path = "ephemeral", version = "=0.7.2" }
-ephemeral-rollups-sdk-attribute-delegate = { path = "delegate", version = "=0.7.2" }
-ephemeral-rollups-sdk-attribute-commit = { path = "commit-attribute", version = "=0.7.2" }
-ephemeral-rollups-sdk-attribute-action = { path = "action-attribute", version = "=0.7.2" }
+ephemeral-rollups-sdk = { path = "sdk", version = "=0.7.3" }
+ephemeral-rollups-sdk-attribute-ephemeral = { path = "ephemeral", version = "=0.7.3" }
+ephemeral-rollups-sdk-attribute-delegate = { path = "delegate", version = "=0.7.3" }
+ephemeral-rollups-sdk-attribute-commit = { path = "commit-attribute", version = "=0.7.3" }
+ephemeral-rollups-sdk-attribute-action = { path = "action-attribute", version = "=0.7.3" }
 
 
 # Magicblock
@@ -73,11 +73,11 @@ solana-program-memory = { version = ">=2, <3" }
 solana-system-interface = { version = ">=1, <3", features = ["bincode"] }
 solana-instruction = { version = ">=1, <3" }
 solana-sysvar = { version = ">=2, <3" }
-pinocchio = { version = "0.8.1", default-features = false }
-pinocchio-log = { version = "0.4.0", default-features = false }
-pinocchio-pubkey = { version = "0.2.4", default-features = false }
-pinocchio-system = { version = "0.2.3", default-features = false }
-pinocchio-token = { version = "0.3.0", default-features = false }
+pinocchio = { version = "0.10", default-features = false, features = ["cpi", "alloc"] }
+pinocchio-log = { version = "0.5", default-features = false }
+pinocchio-pubkey = { version = "0.3", default-features = false, features = ["const"] }
+pinocchio-system = { version = "0.5", default-features = false }
+pinocchio-token = { version = "0.5", default-features = false }
 
 # solana alias
 sdk = { package = "solana-sdk", version = ">=1.16, <3" }

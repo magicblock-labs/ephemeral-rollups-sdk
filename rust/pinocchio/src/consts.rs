@@ -1,15 +1,18 @@
 // NOTE: this should go into a core package that both the sdk + the program can depend on
-use pinocchio::pubkey::Pubkey;
+use pinocchio::Address;
 use pinocchio_pubkey::pubkey;
 
 /// The delegation program ID.
-pub const DELEGATION_PROGRAM_ID: Pubkey = pubkey!("DELeGGvXpWV2fqJUhqcF5ZSYMS4JTLjteaAMARRSaeSh");
+pub const DELEGATION_PROGRAM_ID: Address =
+    Address::new_from_array(pubkey!("DELeGGvXpWV2fqJUhqcF5ZSYMS4JTLjteaAMARRSaeSh"));
 
 /// The magic program ID.
-pub const MAGIC_PROGRAM_ID: Pubkey = pubkey!("Magic11111111111111111111111111111111111111");
+pub const MAGIC_PROGRAM_ID: Address =
+    Address::new_from_array(pubkey!("Magic11111111111111111111111111111111111111"));
 
 /// The magic context ID.
-pub const MAGIC_CONTEXT_ID: Pubkey = pubkey!("MagicContext1111111111111111111111111111111");
+pub const MAGIC_CONTEXT_ID: Address =
+    Address::new_from_array(pubkey!("MagicContext1111111111111111111111111111111"));
 
 ///
 /// The seed of the authority account PDA.
