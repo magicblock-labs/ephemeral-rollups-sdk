@@ -25,6 +25,8 @@ pub struct MembersArgs {
 pub const AUTHORITY_FLAG: u8 = 1 << 0; // Member has authority privileges
 pub const TX_LOGS_FLAG: u8 = 1 << 1; // Member can see transaction logs
 pub const TX_BALANCES_FLAG: u8 = 1 << 2; // Member can see transaction balances
+pub const TX_MESSAGE_FLAG: u8 = 1 << 3; // Member can see transaction messages
+pub const ACCOUNT_SIGNATURES_FLAG: u8 = 1 << 4; // Member can see account signatures
 
 impl Member {
     pub fn is_authority(&self, user: &Pubkey) -> bool {

@@ -4,6 +4,8 @@ import { PublicKey } from "@solana/web3.js";
 export const AUTHORITY_FLAG: number = 1 << 0; // Member has authority privileges
 export const TX_LOGS_FLAG: number = 1 << 1; // Member can see transaction logs
 export const TX_BALANCES_FLAG: number = 1 << 2; // Member can see transaction balances
+export const TX_MESSAGE_FLAG: number = 1 << 3; // Member can see transaction messages
+export const ACCOUNT_SIGNATURES_FLAG: number = 1 << 4; // Member can see account signatures
 
 export interface Member {
   flags: number;
@@ -57,4 +59,23 @@ export function canSeeTxLogs(member: Member, user: PublicKey): boolean {
  */
 export function canSeeTxBalances(member: Member, user: PublicKey): boolean {
   return (member.flags & TX_BALANCES_FLAG) !== 0 && member.pubkey.equals(user);
+}
+
+/**
+ * Check if a member can see transaction messages for a given user
+ */
+export function canSeeTxMessages(member: Member, user: PublicKey): boolean {
+  return (member.flags & TX_MESSAGE_FLAG) !== 0 && member.pubkey.equals(user);
+}
+
+/**
+ * Check if a member can see account signatures for a given user
+ */
+export function canSeeAccountSignatures(
+  member: Member,
+  user: PublicKey,
+): boolean {
+  return (
+    (member.flags & ACCOUNT_SIGNATURES_FLAG) !== 0 && member.pubkey.equals(user)
+  );
 }
