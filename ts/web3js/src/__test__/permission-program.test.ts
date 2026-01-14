@@ -191,8 +191,8 @@ describe("Permission Program Instructions (web3.js)", () => {
         { members: [nonAuthorityMember] },
       );
 
-      // Authority flag is after discriminator (8) + option discriminant (1) + count (4) + pubkey (32)
-      const authorityFlagIndex = 8 + 1 + 4 + 32;
+      // Authority flag is after discriminator (8) + option discriminant (1) + count (4)
+      const authorityFlagIndex = 8 + 1 + 4;
       expect(instruction1.data[authorityFlagIndex]).toBe(1);
       expect(instruction2.data[authorityFlagIndex]).toBe(0);
     });

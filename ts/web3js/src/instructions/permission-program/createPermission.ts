@@ -82,11 +82,11 @@ export function serializeCreatePermissionInstructionData(
         `Serialized data exceeds buffer size (${MAX_BUFFER_SIZE} bytes)`,
       );
     }
-    buffer.set(member.pubkey.toBuffer(), offset);
-    offset += 32;
-
     // Write flags (u8)
     buffer[offset++] = member.flags;
+
+    buffer.set(member.pubkey.toBuffer(), offset);
+    offset += 32;
   }
 
   return buffer.subarray(0, offset);
