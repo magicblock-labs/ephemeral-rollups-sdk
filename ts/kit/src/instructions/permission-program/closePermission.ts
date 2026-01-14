@@ -5,20 +5,38 @@ import { permissionPdaFromAccount } from "../../pda";
 /**
  * Instruction: ClosePermission
  * Discriminator: [2, 0, 0, 0, 0, 0, 0, 0]
+ *
+ * Accounts:
+ *   0. `[writable, signer]` payer
+ *   1. `[signer?]` authority - Either this or permissionedAccount must be a signer
+ *   2. `[signer?]` permissionedAccount - Either this or authority must be a signer
+ *   3. `[writable]` permission
+ *
+ * Note: The processor validates that at least one of authority or permissionedAccount
+ * is authorized (either as a direct signer or as a permission member).
  */
 export async function createClosePermissionInstruction(accounts: {
   payer: Address;
-  permissionedAccount: Address;
+  authority: [Address, boolean];
+  permissionedAccount: [Address, boolean];
 }): Promise<Instruction> {
   const permission = await permissionPdaFromAccount(
-    accounts.permissionedAccount,
+    accounts.permissionedAccount[0],
   );
 
   const accountsMeta: AccountMeta[] = [
     { address: accounts.payer, role: AccountRole.WRITABLE_SIGNER },
     {
-      address: accounts.permissionedAccount,
-      role: AccountRole.READONLY_SIGNER,
+      address: accounts.authority[0],
+      role: accounts.authority[1]
+        ? AccountRole.READONLY_SIGNER
+        : AccountRole.READONLY,
+    },
+    {
+      address: accounts.permissionedAccount[0],
+      role: accounts.permissionedAccount[1]
+        ? AccountRole.READONLY_SIGNER
+        : AccountRole.READONLY,
     },
     { address: permission, role: AccountRole.WRITABLE },
   ];
