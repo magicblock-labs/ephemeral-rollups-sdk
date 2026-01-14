@@ -20,7 +20,7 @@ pinocchio-token  = { workspace = true }
 solana-address = { version = ">=2, <3", features = ["curve25519"], optional = true }
 
 [target.'cfg(not(any(target_os = "solana", target_arch = "bpf")))'.dependencies]
-solana-pubkey = { workspace = true }
+solana-pubkey = { workspace = true, features = ["curve25519"] }
 
 [features]
 default = []
