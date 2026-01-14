@@ -6,7 +6,7 @@ import {
 } from "../instructions/permission-program";
 import { PERMISSION_PROGRAM_ID } from "../constants";
 import { permissionPdaFromAccount } from "../pda";
-import { MEMBER_FLAG_AUTHORITY } from "../access-control/types";
+import { AUTHORITY_FLAG } from "../access-control/types";
 
 describe("Permission Program Instructions (web3.js)", () => {
   const testAuthority = new PublicKey("11111111111111111111111111111113");
@@ -21,7 +21,7 @@ describe("Permission Program Instructions (web3.js)", () => {
         },
         {
           members: [
-            { pubkey: testAuthority, flags: MEMBER_FLAG_AUTHORITY },
+            { pubkey: testAuthority, flags: AUTHORITY_FLAG },
             { pubkey: testMember, flags: 0 },
           ],
         },
@@ -34,7 +34,7 @@ describe("Permission Program Instructions (web3.js)", () => {
     });
 
     it("should serialize members correctly", () => {
-      const members = [{ pubkey: testAuthority, flags: MEMBER_FLAG_AUTHORITY }];
+      const members = [{ pubkey: testAuthority, flags: AUTHORITY_FLAG }];
       const instruction = createCreatePermissionInstruction(
         {
           permissionedAccount: testAuthority,
@@ -126,11 +126,11 @@ describe("Permission Program Instructions (web3.js)", () => {
 
     it("should handle multiple members", () => {
       const members = [
-        { pubkey: testAuthority, flags: MEMBER_FLAG_AUTHORITY },
+        { pubkey: testAuthority, flags: AUTHORITY_FLAG },
         { pubkey: testMember, flags: 0 },
         {
           pubkey: new PublicKey("11111111111111111111111111111111"),
-          flags: MEMBER_FLAG_AUTHORITY,
+          flags: AUTHORITY_FLAG,
         },
       ];
 
@@ -168,7 +168,7 @@ describe("Permission Program Instructions (web3.js)", () => {
     it("should encode authority flag correctly", () => {
       const authorityMember = {
         pubkey: testAuthority,
-        flags: MEMBER_FLAG_AUTHORITY,
+        flags: AUTHORITY_FLAG,
       };
       const nonAuthorityMember = {
         pubkey: testMember,
@@ -207,7 +207,7 @@ describe("Permission Program Instructions (web3.js)", () => {
         },
         {
           members: [
-            { pubkey: testAuthority, flags: MEMBER_FLAG_AUTHORITY },
+            { pubkey: testAuthority, flags: AUTHORITY_FLAG },
             { pubkey: testMember, flags: 0 },
           ],
         },
@@ -304,11 +304,11 @@ describe("Permission Program Instructions (web3.js)", () => {
 
     it("should handle multiple members", () => {
       const members = [
-        { pubkey: testAuthority, flags: MEMBER_FLAG_AUTHORITY },
+        { pubkey: testAuthority, flags: AUTHORITY_FLAG },
         { pubkey: testMember, flags: 0 },
         {
           pubkey: new PublicKey("11111111111111111111111111111113"),
-          flags: MEMBER_FLAG_AUTHORITY,
+          flags: AUTHORITY_FLAG,
         },
       ];
 

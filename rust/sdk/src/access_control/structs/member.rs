@@ -22,22 +22,21 @@ pub struct MembersArgs {
 }
 
 // Flags for Member
-pub const MEMBER_FLAG_DEFAULT: u8 = 0;
-pub const MEMBER_FLAG_AUTHORITY: u8 = 1 << 0; // Member has authority privileges
-pub const MEMBER_FLAG_TX_LOGS: u8 = 1 << 1; // Member can see transaction logs
-pub const MEMBER_FLAG_TX_BALANCES: u8 = 1 << 2; // Member can see transaction balances
+pub const AUTHORITY_FLAG: u8 = 1 << 0; // Member has authority privileges
+pub const TX_LOGS_FLAG: u8 = 1 << 1; // Member can see transaction logs
+pub const TX_BALANCES_FLAG: u8 = 1 << 2; // Member can see transaction balances
 
 impl Member {
     pub fn is_authority(&self, user: &Pubkey) -> bool {
-        self.flags & MEMBER_FLAG_AUTHORITY != 0 && &self.pubkey == user
+        self.flags & AUTHORITY_FLAG != 0 && &self.pubkey == user
     }
 
     pub fn can_see_tx_logs(&self, user: &Pubkey) -> bool {
-        self.flags & MEMBER_FLAG_TX_LOGS != 0 && &self.pubkey == user
+        self.flags & TX_LOGS_FLAG != 0 && &self.pubkey == user
     }
 
     pub fn can_see_tx_balances(&self, user: &Pubkey) -> bool {
-        self.flags & MEMBER_FLAG_TX_BALANCES != 0 && &self.pubkey == user
+        self.flags & TX_BALANCES_FLAG != 0 && &self.pubkey == user
     }
 
     // Set multiple flags at once

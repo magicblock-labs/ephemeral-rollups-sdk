@@ -5,7 +5,7 @@ import {
   createUpdatePermissionInstruction,
 } from "../instructions/permission-program";
 import { PERMISSION_PROGRAM_ID } from "../constants";
-import { MEMBER_FLAG_AUTHORITY } from "../access-control/types";
+import { AUTHORITY_FLAG } from "../access-control/types";
 
 describe("Permission Program Instructions (@solana/kit)", () => {
   const mockAddress = address("11111111111111111111111111111113");
@@ -20,7 +20,7 @@ describe("Permission Program Instructions (@solana/kit)", () => {
         },
         {
           members: [
-            { pubkey: mockAddress, flags: MEMBER_FLAG_AUTHORITY },
+            { pubkey: mockAddress, flags: AUTHORITY_FLAG },
             { pubkey: differentAddress, flags: 0 },
           ],
         },
@@ -32,7 +32,7 @@ describe("Permission Program Instructions (@solana/kit)", () => {
     });
 
     it("should serialize members correctly", async () => {
-      const members = [{ pubkey: mockAddress, flags: MEMBER_FLAG_AUTHORITY }];
+      const members = [{ pubkey: mockAddress, flags: AUTHORITY_FLAG }];
       const instruction = await createCreatePermissionInstruction(
         {
           permissionedAccount: mockAddress,
@@ -102,11 +102,11 @@ describe("Permission Program Instructions (@solana/kit)", () => {
 
     it("should handle multiple members", async () => {
       const members: Array<{ pubkey: Address; flags: number }> = [
-        { pubkey: mockAddress, flags: MEMBER_FLAG_AUTHORITY },
+        { pubkey: mockAddress, flags: AUTHORITY_FLAG },
         { pubkey: differentAddress, flags: 0 },
         {
           pubkey: address("11111111111111111111111111111114"),
-          flags: MEMBER_FLAG_AUTHORITY,
+          flags: AUTHORITY_FLAG,
         },
       ];
 
@@ -144,7 +144,7 @@ describe("Permission Program Instructions (@solana/kit)", () => {
     it("should encode authority flag correctly", async () => {
       const authorityMember = {
         pubkey: mockAddress,
-        flags: MEMBER_FLAG_AUTHORITY,
+        flags: AUTHORITY_FLAG,
       };
       const nonAuthorityMember = { pubkey: differentAddress, flags: 0 };
 
@@ -180,7 +180,7 @@ describe("Permission Program Instructions (@solana/kit)", () => {
         },
         {
           members: [
-            { pubkey: mockAddress, flags: MEMBER_FLAG_AUTHORITY },
+            { pubkey: mockAddress, flags: AUTHORITY_FLAG },
             { pubkey: differentAddress, flags: 0 },
           ],
         },
@@ -265,11 +265,11 @@ describe("Permission Program Instructions (@solana/kit)", () => {
 
     it("should handle multiple members", async () => {
       const members: Array<{ pubkey: Address; flags: number }> = [
-        { pubkey: mockAddress, flags: MEMBER_FLAG_AUTHORITY },
+        { pubkey: mockAddress, flags: AUTHORITY_FLAG },
         { pubkey: differentAddress, flags: 0 },
         {
           pubkey: address("11111111111111111111111111111114"),
-          flags: MEMBER_FLAG_AUTHORITY,
+          flags: AUTHORITY_FLAG,
         },
       ];
 

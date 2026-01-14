@@ -21,10 +21,9 @@ import {
 } from "@solana/kit";
 
 // Flags for Member
-export const MEMBER_FLAG_DEFAULT: number = 0;
-export const MEMBER_FLAG_AUTHORITY: number = 1 << 0; // Member has authority privileges
-export const MEMBER_FLAG_TX_LOGS: number = 1 << 1; // Member can see transaction logs
-export const MEMBER_FLAG_TX_BALANCES: number = 1 << 2; // Member can see transaction balances
+export const AUTHORITY_FLAG: number = 1 << 0; // Member has authority privileges
+export const TX_LOGS_FLAG: number = 1 << 1; // Member can see transaction logs
+export const TX_BALANCES_FLAG: number = 1 << 2; // Member can see transaction balances
 
 export interface Member {
   flags: number;
@@ -55,21 +54,19 @@ export function getMemberCodec(): FixedSizeCodec<MemberArgs, Member> {
  * Check if a member is an authority for a given user
  */
 export function isAuthority(member: Member, user: Address): boolean {
-  return (member.flags & MEMBER_FLAG_AUTHORITY) !== 0 && member.pubkey === user;
+  return (member.flags & AUTHORITY_FLAG) !== 0 && member.pubkey === user;
 }
 
 /**
  * Check if a member can see transaction logs for a given user
  */
 export function canSeeTxLogs(member: Member, user: Address): boolean {
-  return (member.flags & MEMBER_FLAG_TX_LOGS) !== 0 && member.pubkey === user;
+  return (member.flags & TX_LOGS_FLAG) !== 0 && member.pubkey === user;
 }
 
 /**
  * Check if a member can see transaction balances for a given user
  */
 export function canSeeTxBalances(member: Member, user: Address): boolean {
-  return (
-    (member.flags & MEMBER_FLAG_TX_BALANCES) !== 0 && member.pubkey === user
-  );
+  return (member.flags & TX_BALANCES_FLAG) !== 0 && member.pubkey === user;
 }
