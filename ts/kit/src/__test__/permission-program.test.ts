@@ -191,7 +191,7 @@ describe("Permission Program Instructions (@solana/kit)", () => {
       expect(instruction.data).toBeDefined();
     });
 
-    it("should include authority as readonly signer", async () => {
+    it("should include authority as writable signer", async () => {
       const authorityAddress = address("11111111111111111111111111111113");
       const instruction = await createUpdatePermissionInstruction({
         authority: [authorityAddress, true],
@@ -202,10 +202,10 @@ describe("Permission Program Instructions (@solana/kit)", () => {
         (acc) => acc.address === authorityAddress,
       );
       expect(authorityAccount).toBeDefined();
-      expect(authorityAccount?.role).toBe(AccountRole.READONLY_SIGNER);
+      expect(authorityAccount?.role).toBe(AccountRole.WRITABLE_SIGNER);
     });
 
-    it("should include permissionedAccount as readonly signer", async () => {
+    it("should include permissionedAccount as writable signer", async () => {
       const permissionedAddress = address("11111111111111111111111111111114");
       const instruction = await createUpdatePermissionInstruction({
         authority: [mockAddress, false],
@@ -216,7 +216,7 @@ describe("Permission Program Instructions (@solana/kit)", () => {
         (acc) => acc.address === permissionedAddress,
       );
       expect(permissionedAccount).toBeDefined();
-      expect(permissionedAccount?.role).toBe(AccountRole.READONLY_SIGNER);
+      expect(permissionedAccount?.role).toBe(AccountRole.WRITABLE_SIGNER);
     });
 
     it("should include permission PDA as writable", async () => {

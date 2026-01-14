@@ -218,7 +218,7 @@ describe("Permission Program Instructions (web3.js)", () => {
       expect(instruction.data).toBeDefined();
     });
 
-    it("should include authority as readonly signer", () => {
+    it("should include authority as writable signer", () => {
       const authorityAddress = new PublicKey(
         "11111111111111111111111111111113",
       );
@@ -231,11 +231,11 @@ describe("Permission Program Instructions (web3.js)", () => {
         key.pubkey.equals(authorityAddress),
       );
       expect(authorityAccount).toBeDefined();
-      expect(authorityAccount?.isWritable).toBe(false);
+      expect(authorityAccount?.isWritable).toBe(true);
       expect(authorityAccount?.isSigner).toBe(true);
     });
 
-    it("should include permissionedAccount as readonly signer", () => {
+    it("should include permissionedAccount as writable signer", () => {
       const permissionedAddress = new PublicKey(
         "11111111111111111111111111111114",
       );
@@ -248,7 +248,7 @@ describe("Permission Program Instructions (web3.js)", () => {
         key.pubkey.equals(permissionedAddress),
       );
       expect(permissionedAccount).toBeDefined();
-      expect(permissionedAccount?.isWritable).toBe(false);
+      expect(permissionedAccount?.isWritable).toBe(true);
       expect(permissionedAccount?.isSigner).toBe(true);
     });
 

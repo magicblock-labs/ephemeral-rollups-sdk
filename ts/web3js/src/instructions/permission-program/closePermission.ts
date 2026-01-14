@@ -30,12 +30,12 @@ export function createClosePermissionInstruction(accounts: {
     { pubkey: accounts.payer, isWritable: true, isSigner: true },
     {
       pubkey: accounts.authority[0],
-      isWritable: false,
+      isWritable: accounts.authority[1],
       isSigner: accounts.authority[1],
     },
     {
       pubkey: accounts.permissionedAccount[0],
-      isWritable: false,
+      isWritable: accounts.permissionedAccount[1],
       isSigner: accounts.permissionedAccount[1],
     },
     { pubkey: permission, isWritable: true, isSigner: false },

@@ -43,13 +43,13 @@ export async function createUpdatePermissionInstruction(
     {
       address: accounts.authority[0],
       role: accounts.authority[1]
-        ? AccountRole.READONLY_SIGNER
+        ? AccountRole.WRITABLE_SIGNER
         : AccountRole.READONLY,
     },
     {
       address: accounts.permissionedAccount[0],
       role: accounts.permissionedAccount[1]
-        ? AccountRole.READONLY_SIGNER
+        ? AccountRole.WRITABLE_SIGNER
         : AccountRole.READONLY,
     },
     { address: permission, role: AccountRole.WRITABLE },

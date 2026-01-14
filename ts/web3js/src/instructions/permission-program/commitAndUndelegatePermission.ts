@@ -34,7 +34,7 @@ export function createCommitAndUndelegatePermissionInstruction(accounts: {
   const keys: AccountMeta[] = [
     {
       pubkey: accounts.authority[0],
-      isWritable: false,
+      isWritable: accounts.authority[1],
       isSigner: accounts.authority[1],
     },
     {
