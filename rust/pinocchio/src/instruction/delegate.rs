@@ -6,13 +6,14 @@ use pinocchio::{
 use pinocchio_system::instructions::{Assign, CreateAccount};
 
 use crate::consts::DELEGATION_PROGRAM_ID;
+use crate::pda::find_program_address;
 use crate::types::DelegateAccountArgs;
 use crate::utils::{cpi_delegate, make_seed_buf};
 use crate::{consts::BUFFER, types::DelegateConfig, utils::close_pda_acc};
 
-/// Find the bump for a buffer PDA using the library's find_program_address syscall
+/// Find the bump for a buffer PDA using the solana_pubkey PDA derivation.
 fn find_buffer_pda_bump(pda_key: &[u8], owner_program: &Address) -> u8 {
-    let (_, bump) = Address::find_program_address(&[BUFFER, pda_key], owner_program);
+    let (_, bump) = find_program_address(&[BUFFER, pda_key], owner_program);
     bump
 }
 

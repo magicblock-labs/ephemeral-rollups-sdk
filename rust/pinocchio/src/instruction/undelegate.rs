@@ -8,6 +8,8 @@ use pinocchio::{
 };
 use pinocchio_system::instructions::CreateAccount;
 
+use crate::pda::find_program_address;
+
 #[inline(always)]
 pub fn undelegate(
     delegated_account: &AccountView,
@@ -52,7 +54,7 @@ pub fn undelegate(
     }
 
     let pda_seeds = &seed_refs[..seeds_len];
-    let (_, bump) = Address::find_program_address(pda_seeds, owner_program);
+    let (_, bump) = find_program_address(pda_seeds, owner_program);
 
     // collect seeds into static array (avoid dynamic alloc)
     const UNINIT: MaybeUninit<Seed> = MaybeUninit::<Seed>::uninit();

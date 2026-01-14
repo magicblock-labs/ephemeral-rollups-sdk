@@ -1093,6 +1093,8 @@ dependencies = [
  "pinocchio-pubkey",
  "pinocchio-system",
  "pinocchio-token",
+ "solana-address 2.0.0",
+ "solana-pubkey 2.4.0",
 ]
 
 [[package]]
