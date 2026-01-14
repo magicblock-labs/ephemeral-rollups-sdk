@@ -93,13 +93,13 @@ export function serializeUpdatePermissionInstructionData(
   // Write members
   const addressEncoder = getAddressEncoder();
   for (const member of members) {
-    const addressBytes = addressEncoder.encode(member.pubkey);
-    const memberBytes = new Uint8Array(buffer, offset, 33);
-    memberBytes.set(addressBytes);
-    offset += 32;
-
     // Write flags (u8)
     view.setUint8(offset++, member.flags);
+
+    const addressBytes = addressEncoder.encode(member.pubkey);
+    const memberBytes = new Uint8Array(buffer, offset, 32);
+    memberBytes.set(addressBytes);
+    offset += 32;
   }
 
   return [new Uint8Array(buffer, 0, offset)];
