@@ -29,7 +29,7 @@ pub(crate) fn commit_accounts_internal(
     )?;
 
     let num_accounts = ix.accounts.len();
-    if num_accounts > MAX_LOCAL_CPI_ACCOUNTS {
+    if num_accounts > MAX_LOCAL_CPI_ACCOUNTS || accounts.len() > MAX_LOCAL_CPI_ACCOUNTS - 2 {
         return Err(ProgramError::InvalidArgument);
     }
 

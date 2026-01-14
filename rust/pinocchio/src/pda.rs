@@ -1,18 +1,12 @@
 use crate::seeds::Seed;
 use pinocchio::Address;
 
-/// Find a valid program derived address (PDA) using the library's syscall.
-/// Returns the PDA address and bump seed.
-fn find_program_address_impl(seeds: &[&[u8]], program_id: &Address) -> (Address, u8) {
-    Address::find_program_address(seeds, program_id)
-}
-
-/// Generic DRY function to find a PDA from a typed `Seed`
+/// Find a PDA from a typed `Seed`
 fn find_seed_pda(seed: &Seed, program_id: &Address) -> Address {
     let mut buf: [&[u8]; 3] = [&[]; 3];
     let mut index_buf = [0u8; 1];
     let seeds = seed.fill_seed_slice(&mut buf, &mut index_buf);
-    let (pda, _bump) = find_program_address_impl(seeds, program_id);
+    let (pda, _bump) = Address::find_program_address(seeds, program_id);
     pda
 }
 
