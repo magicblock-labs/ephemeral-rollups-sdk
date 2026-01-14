@@ -20,7 +20,7 @@ pinocchio-token  = { workspace = true }
 
 [features]
 default = []
-std = [
-    "pinocchio/std",
-]
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ["cfg(target_os, values(\"solana\"))"] }
 
