@@ -3,6 +3,17 @@ import {
   TransactionInstruction,
   SystemProgram,
 } from "@solana/web3.js";
+
+import {
+  DELEGATION_PROGRAM_ID,
+  MAGIC_CONTEXT_ID,
+  MAGIC_PROGRAM_ID,
+} from "../constants.js";
+import {
+  delegateBufferPdaFromDelegatedAccountAndOwnerProgram,
+  delegationRecordPdaFromDelegatedAccount,
+  delegationMetadataPdaFromDelegatedAccount,
+} from "../pda.js";
 // Minimal SPL Token helpers (vendored) to avoid importing @solana/spl-token.
 // This prevents bundlers from pulling transitive deps like spl-token-group and
 // also avoids package.exports issues when targeting browsers.
@@ -63,17 +74,6 @@ function createAssociatedTokenAccountIdempotentInstruction(
     data,
   });
 }
-
-import {
-  DELEGATION_PROGRAM_ID,
-  MAGIC_CONTEXT_ID,
-  MAGIC_PROGRAM_ID,
-} from "../constants.js";
-import {
-  delegateBufferPdaFromDelegatedAccountAndOwnerProgram,
-  delegationRecordPdaFromDelegatedAccount,
-  delegationMetadataPdaFromDelegatedAccount,
-} from "../pda.js";
 
 // ---------------------------------------------------------------------------
 // Constants

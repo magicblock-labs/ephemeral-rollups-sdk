@@ -36,7 +36,8 @@ pub mod solana {
     pub use solana_instruction::{AccountMeta, Instruction};
     pub use solana_program_error::ProgramError;
     pub use solana_program_memory::sol_memset;
-    pub use solana_pubkey::Pubkey;
+    pub use solana_pubkey::PubkeyError;
+    pub use solana_pubkey::{pubkey, Pubkey};
     pub use solana_system_interface::instruction as system_instruction;
     pub use solana_system_interface::program as system_program;
     pub use solana_sysvar::rent::Rent;

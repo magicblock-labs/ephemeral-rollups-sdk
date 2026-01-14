@@ -12,5 +12,5 @@ export const MAGIC_CONTEXT_ID = new PublicKey(
 );
 
 export const PERMISSION_PROGRAM_ID = new PublicKey(
-  "BTWAqWNBmF2TboMh3fxMJfgR16xGHYD7Kgr2dPwbRPBi",
+  "ACLseoPoyC3cBqoUtkbjZ4aDrkurZW86v19pXz2XQnp1",
 );

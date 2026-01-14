@@ -12,7 +12,7 @@ export interface PermissionStatusResponse {
  */
 export async function getPermissionStatus(
   rpcUrl: string,
-  publicKey: Address
+  publicKey: Address,
 ): Promise<PermissionStatusResponse> {
   // Build the route from the provided RPC URL
   // Handle the provided token
@@ -28,7 +28,7 @@ export async function getPermissionStatus(
     const permissionStatusResponse = await fetch(url);
     if (!permissionStatusResponse.ok) {
       throw new Error(
-        `Permission status request failed: ${permissionStatusResponse.statusText}`
+        `Permission status request failed: ${permissionStatusResponse.statusText}`,
       );
     }
     const response: PermissionStatusResponse =
@@ -36,7 +36,7 @@ export async function getPermissionStatus(
     return response;
   } catch (error) {
     throw new Error(
-      `Failed to get permission status: ${error instanceof Error ? error.message : String(error)}`
+      `Failed to get permission status: ${error instanceof Error ? error.message : String(error)}`,
     );
   }
 }
@@ -51,12 +51,12 @@ export async function getPermissionStatus(
 export async function waitUntilPermissionActive(
   rpcUrl: string,
   publicKey: Address,
-  timeout?: number
+  timeout?: number,
 ): Promise<boolean> {
   const timeoutMs = timeout ?? 5000;
 
   // First, try getPermissionStatus with retries for the initial timeout
-  let startTime = Date.now();
+  const startTime = Date.now();
   while (Date.now() - startTime < timeoutMs) {
     try {
       const { authorizedUsers } = await getPermissionStatus(rpcUrl, publicKey);

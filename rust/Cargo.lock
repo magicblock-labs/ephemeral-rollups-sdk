@@ -1104,7 +1104,7 @@ dependencies = [
  "anchor-lang",
  "base64ct",
  "bincode",
- "borsh 1.6.0",
+ "borsh 0.10.4",
  "ephemeral-rollups-sdk-attribute-action",
  "ephemeral-rollups-sdk-attribute-commit",
  "ephemeral-rollups-sdk-attribute-delegate",

@@ -12,5 +12,5 @@ export const MAGIC_CONTEXT_ID = address(
 );
 
 export const PERMISSION_PROGRAM_ID = address(
-  "BTWAqWNBmF2TboMh3fxMJfgR16xGHYD7Kgr2dPwbRPBi",
+  "ACLseoPoyC3cBqoUtkbjZ4aDrkurZW86v19pXz2XQnp1",
 );

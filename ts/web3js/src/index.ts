@@ -4,5 +4,5 @@ export * from "./utils.js";
 export * from "./resolver.js";
 export * from "./magic-router.js";
 export * from "./instructions/index.js";
-export * from "./access-control/index.js";
 export * from "./spl/index.js";
+export * from "./access-control/index.js";
