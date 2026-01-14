@@ -202,8 +202,8 @@ describe("Permission Program Instructions (web3.js)", () => {
     it("should create an updatePermission instruction with valid parameters", () => {
       const instruction = createUpdatePermissionInstruction(
         {
-          authority: testAuthority,
-          permissionedAccount: testAuthority,
+          authority: [testAuthority, true],
+          permissionedAccount: [testAuthority, true],
         },
         {
           members: [
@@ -223,8 +223,8 @@ describe("Permission Program Instructions (web3.js)", () => {
         "11111111111111111111111111111113",
       );
       const instruction = createUpdatePermissionInstruction({
-        authority: authorityAddress,
-        permissionedAccount: testAuthority,
+        authority: [authorityAddress, true],
+        permissionedAccount: [testAuthority, false],
       });
 
       const authorityAccount = instruction.keys.find((key) =>
@@ -240,8 +240,8 @@ describe("Permission Program Instructions (web3.js)", () => {
         "11111111111111111111111111111114",
       );
       const instruction = createUpdatePermissionInstruction({
-        authority: testAuthority,
-        permissionedAccount: permissionedAddress,
+        authority: [testAuthority, false],
+        permissionedAccount: [permissionedAddress, true],
       });
 
       const permissionedAccount = instruction.keys.find((key) =>
@@ -257,8 +257,8 @@ describe("Permission Program Instructions (web3.js)", () => {
         "11111111111111111111111111111117",
       );
       const instruction = createUpdatePermissionInstruction({
-        authority: testAuthority,
-        permissionedAccount: permissionedAccountAddress,
+        authority: [testAuthority, false],
+        permissionedAccount: [permissionedAccountAddress, true],
       });
 
       const expectedPda = permissionPdaFromAccount(permissionedAccountAddress);
@@ -273,8 +273,8 @@ describe("Permission Program Instructions (web3.js)", () => {
 
     it("should use discriminator [1, 0, 0, 0, 0, 0, 0, 0]", () => {
       const instruction = createUpdatePermissionInstruction({
-        authority: testAuthority,
-        permissionedAccount: testAuthority,
+        authority: [testAuthority, true],
+        permissionedAccount: [testAuthority, true],
       });
 
       // First byte should be discriminator 1
@@ -291,8 +291,8 @@ describe("Permission Program Instructions (web3.js)", () => {
     it("should handle empty members list", () => {
       const instruction = createUpdatePermissionInstruction(
         {
-          authority: testAuthority,
-          permissionedAccount: testAuthority,
+          authority: [testAuthority, true],
+          permissionedAccount: [testAuthority, true],
         },
         { members: [] },
       );
@@ -314,8 +314,8 @@ describe("Permission Program Instructions (web3.js)", () => {
 
       const instruction = createUpdatePermissionInstruction(
         {
-          authority: testAuthority,
-          permissionedAccount: testAuthority,
+          authority: [testAuthority, true],
+          permissionedAccount: [testAuthority, true],
         },
         { members },
       );
@@ -335,8 +335,8 @@ describe("Permission Program Instructions (web3.js)", () => {
       });
 
       const updatePermissionInstr = createUpdatePermissionInstruction({
-        authority: testAuthority,
-        permissionedAccount: testAuthority,
+        authority: [testAuthority, true],
+        permissionedAccount: [testAuthority, true],
       });
 
       expect(
@@ -354,8 +354,8 @@ describe("Permission Program Instructions (web3.js)", () => {
       });
 
       const updatePermissionInstr = createUpdatePermissionInstruction({
-        authority: testAuthority,
-        permissionedAccount: testAuthority,
+        authority: [testAuthority, true],
+        permissionedAccount: [testAuthority, true],
       });
 
       const disc1 = createPermissionInstr.data[0];

@@ -17,19 +17,35 @@ export interface UpdatePermissionInstructionArgs {
 /**
  * Instruction: UpdatePermission
  * Discriminator: [1, 0, 0, 0, 0, 0, 0, 0]
+ *
+ * Accounts:
+ *   0. `[signer?]` authority - Either this or permissionedAccount must be a signer
+ *   1. `[signer?]` permissionedAccount - Either this or authority must be a signer
+ *   2. `[writable]` permission
+ *
+ * Note: The processor validates that at least one of authority or permissionedAccount
+ * is authorized (either as a direct signer or as a permission member).
  */
 export function createUpdatePermissionInstruction(
   accounts: {
-    authority: PublicKey;
-    permissionedAccount: PublicKey;
+    authority: [PublicKey, boolean];
+    permissionedAccount: [PublicKey, boolean];
   },
   args?: UpdatePermissionInstructionArgs,
 ): TransactionInstruction {
-  const permission = permissionPdaFromAccount(accounts.permissionedAccount);
+  const permission = permissionPdaFromAccount(accounts.permissionedAccount[0]);
 
   const keys: AccountMeta[] = [
-    { pubkey: accounts.authority, isWritable: false, isSigner: true },
-    { pubkey: accounts.permissionedAccount, isWritable: false, isSigner: true },
+    {
+      pubkey: accounts.authority[0],
+      isWritable: false,
+      isSigner: accounts.authority[1],
+    },
+    {
+      pubkey: accounts.permissionedAccount[0],
+      isWritable: false,
+      isSigner: accounts.permissionedAccount[1],
+    },
     { pubkey: permission, isWritable: true, isSigner: false },
   ];
 
@@ -72,11 +88,11 @@ export function serializeUpdatePermissionInstructionData(
         `Serialized data exceeds buffer size (${MAX_BUFFER_SIZE} bytes)`,
       );
     }
-    buffer.set(member.pubkey.toBuffer(), offset);
-    offset += 32;
-
     // Write flags (u8)
     buffer[offset++] = member.flags;
+
+    buffer.set(member.pubkey.toBuffer(), offset);
+    offset += 32;
   }
 
   return buffer.subarray(0, offset);

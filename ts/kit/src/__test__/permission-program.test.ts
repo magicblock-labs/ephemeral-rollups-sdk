@@ -175,8 +175,8 @@ describe("Permission Program Instructions (@solana/kit)", () => {
     it("should create an updatePermission instruction with valid parameters", async () => {
       const instruction = await createUpdatePermissionInstruction(
         {
-          authority: mockAddress,
-          permissionedAccount: mockAddress,
+          authority: [mockAddress, true],
+          permissionedAccount: [mockAddress, true],
         },
         {
           members: [
@@ -194,8 +194,8 @@ describe("Permission Program Instructions (@solana/kit)", () => {
     it("should include authority as readonly signer", async () => {
       const authorityAddress = address("11111111111111111111111111111113");
       const instruction = await createUpdatePermissionInstruction({
-        authority: authorityAddress,
-        permissionedAccount: mockAddress,
+        authority: [authorityAddress, true],
+        permissionedAccount: [mockAddress, false],
       });
 
       const authorityAccount = instruction.accounts?.find(
@@ -208,8 +208,8 @@ describe("Permission Program Instructions (@solana/kit)", () => {
     it("should include permissionedAccount as readonly signer", async () => {
       const permissionedAddress = address("11111111111111111111111111111114");
       const instruction = await createUpdatePermissionInstruction({
-        authority: mockAddress,
-        permissionedAccount: permissionedAddress,
+        authority: [mockAddress, false],
+        permissionedAccount: [permissionedAddress, true],
       });
 
       const permissionedAccount = instruction.accounts?.find(
@@ -221,8 +221,8 @@ describe("Permission Program Instructions (@solana/kit)", () => {
 
     it("should include permission PDA as writable", async () => {
       const instruction = await createUpdatePermissionInstruction({
-        authority: mockAddress,
-        permissionedAccount: mockAddress,
+        authority: [mockAddress, false],
+        permissionedAccount: [mockAddress, true],
       });
 
       expect(instruction.accounts).toBeDefined();
@@ -234,8 +234,8 @@ describe("Permission Program Instructions (@solana/kit)", () => {
 
     it("should use discriminator [1, 0, 0, 0, 0, 0, 0, 0]", async () => {
       const instruction = await createUpdatePermissionInstruction({
-        authority: mockAddress,
-        permissionedAccount: mockAddress,
+        authority: [mockAddress, true],
+        permissionedAccount: [mockAddress, true],
       });
 
       // First byte should be discriminator 1
@@ -252,8 +252,8 @@ describe("Permission Program Instructions (@solana/kit)", () => {
     it("should handle empty members list", async () => {
       const instruction = await createUpdatePermissionInstruction(
         {
-          authority: mockAddress,
-          permissionedAccount: mockAddress,
+          authority: [mockAddress, true],
+          permissionedAccount: [mockAddress, true],
         },
         { members: [] },
       );
@@ -275,8 +275,8 @@ describe("Permission Program Instructions (@solana/kit)", () => {
 
       const instruction = await createUpdatePermissionInstruction(
         {
-          authority: mockAddress,
-          permissionedAccount: mockAddress,
+          authority: [mockAddress, true],
+          permissionedAccount: [mockAddress, true],
         },
         { members },
       );
@@ -296,8 +296,8 @@ describe("Permission Program Instructions (@solana/kit)", () => {
       });
 
       const updatePermissionInstr = await createUpdatePermissionInstruction({
-        authority: mockAddress,
-        permissionedAccount: mockAddress,
+        authority: [mockAddress, true],
+        permissionedAccount: [mockAddress, true],
       });
 
       expect(createPermissionInstr.programAddress).toBe(PERMISSION_PROGRAM_ID);
@@ -311,8 +311,8 @@ describe("Permission Program Instructions (@solana/kit)", () => {
       });
 
       const updatePermissionInstr = await createUpdatePermissionInstruction({
-        authority: mockAddress,
-        permissionedAccount: mockAddress,
+        authority: [mockAddress, true],
+        permissionedAccount: [mockAddress, true],
       });
 
       const disc1 = createPermissionInstr.data?.[0];
