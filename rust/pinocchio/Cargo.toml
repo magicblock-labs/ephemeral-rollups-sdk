@@ -17,10 +17,14 @@ pinocchio-log  = { workspace = true }
 pinocchio-pubkey  = { workspace = true }
 pinocchio-system  = { workspace = true }
 pinocchio-token  = { workspace = true }
+solana-address = { version = ">=2, <3", features = ["curve25519"], optional = true }
+
+[target.'cfg(not(any(target_os = "solana", target_arch = "bpf")))'.dependencies]
+solana-pubkey = { workspace = true }
 
 [features]
 default = []
+address-find-program-address = ["dep:solana-address"]
 
 [lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = ["cfg(target_os, values(\"solana\"))"] }
-
