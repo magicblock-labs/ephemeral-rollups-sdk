@@ -22,7 +22,7 @@ pub struct MagicInstructionBuilder<'info> {
 impl<'info> MagicInstructionBuilder<'info> {
     /// Build instruction for supplied an action and prepares accounts
     pub fn build(self) -> (Vec<AccountInfo<'info>>, Instruction) {
-        // set those to be first
+        // set those to be firstWith
         let mut all_accounts = vec![self.payer, self.magic_context];
         // collect all accounts to be used in instruction
         self.magic_action.collect_accounts(&mut all_accounts);
@@ -222,7 +222,7 @@ pub struct CallHandler<'info> {
 }
 
 impl<'info> CallHandler<'info> {
-    fn collect_accounts(&self, container: &mut Vec<AccountInfo<'info>>) {
+    pub(crate) fn collect_accounts(&self, container: &mut Vec<AccountInfo<'info>>) {
         container.push(self.escrow_authority.clone());
     }
 
