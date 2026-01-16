@@ -1945,9 +1945,8 @@ dependencies = [
 
 [[package]]
 name = "magicblock-magic-program-api"
-version = "0.6.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e90106f6b76f802c3e7c6d9875fd21cf200e6b53020ba5099b402a90c6d78d10"
+version = "0.6.1"
+source = "git+https://github.com/magicblock-labs/magicblock-validator.git?branch=snawaz%2Fschedule-commit-finalize#3e08a687b4b2662eb6a6c6a4c00f45b184f68eee"
 dependencies = [
  "bincode",
  "serde",
