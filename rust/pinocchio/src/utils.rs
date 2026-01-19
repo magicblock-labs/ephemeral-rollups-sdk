@@ -1,14 +1,14 @@
 use crate::{
     consts::DELEGATION_PROGRAM_ID,
-    types::{DelegateAccountArgs, MAX_DELEGATE_ACCOUNT_ARGS_SIZE},
+    types::{DelegateAccountArgs, MembersArgs, MAX_DELEGATE_ACCOUNT_ARGS_SIZE, MAX_MEMBERS_ARGS_SIZE},
 };
 use core::mem::MaybeUninit;
 use pinocchio::{
     address::MAX_SEEDS,
-    cpi::{invoke_signed, Seed, Signer, MAX_CPI_ACCOUNTS},
+    cpi::{invoke, invoke_signed, Seed, Signer, MAX_CPI_ACCOUNTS},
     error::ProgramError,
     instruction::{InstructionAccount, InstructionView},
-    AccountView,
+    AccountView, Address,
 };
 
 #[inline(always)]
@@ -180,4 +180,201 @@ pub fn create_schedule_commit_ix<'a>(
     };
 
     Ok(ix)
+}
+
+// Permission program CPI helpers
+pub fn cpi_create_permission(
+    permissioned_account: &AccountView,
+    permission: &AccountView,
+    payer: &AccountView,
+    system_program: &AccountView,
+    permission_program: &Address,
+    args: MembersArgs,
+) -> Result<(), ProgramError> {
+    const UNINIT_ACCOUNT: MaybeUninit<InstructionAccount> =
+        MaybeUninit::<InstructionAccount>::uninit();
+    let mut account_metas = [UNINIT_ACCOUNT; MAX_CPI_ACCOUNTS];
+
+    let num_accounts = 4;
+
+    unsafe {
+        account_metas
+            .get_unchecked_mut(0)
+            .write(InstructionAccount::readonly_signer(permissioned_account.address()));
+        account_metas
+            .get_unchecked_mut(1)
+            .write(InstructionAccount::writable(permission.address()));
+        account_metas
+            .get_unchecked_mut(2)
+            .write(InstructionAccount::writable_signer(payer.address()));
+        account_metas
+            .get_unchecked_mut(3)
+            .write(InstructionAccount::readonly(system_program.address()));
+    }
+
+    let mut data = [0u8; 8 + MAX_MEMBERS_ARGS_SIZE];
+    let args_slice = args.try_to_slice(&mut data[8..])?;
+    let total_len = 8 + args_slice.len();
+    let data_slice = &data[..total_len];
+
+    let instruction = InstructionView {
+        program_id: permission_program,
+        accounts: unsafe {
+            core::slice::from_raw_parts(
+                account_metas.as_ptr() as *const InstructionAccount,
+                num_accounts,
+            )
+        },
+        data: data_slice,
+    };
+
+    let acc_infos: [&AccountView; 4] = [
+        permissioned_account,
+        permission,
+        payer,
+        system_program,
+    ];
+
+    invoke(&instruction, &acc_infos)?;
+    Ok(())
+}
+
+pub fn cpi_update_permission(
+    authority: &AccountView,
+    permissioned_account: &AccountView,
+    permission: &AccountView,
+    permission_program: &Address,
+    authority_is_signer: bool,
+    permissioned_account_is_signer: bool,
+    args: MembersArgs,
+) -> Result<(), ProgramError> {
+    const UNINIT_ACCOUNT: MaybeUninit<InstructionAccount> =
+        MaybeUninit::<InstructionAccount>::uninit();
+    let mut account_metas = [UNINIT_ACCOUNT; MAX_CPI_ACCOUNTS];
+
+    let num_accounts = 3;
+
+    unsafe {
+        // authority can be signer or not
+        if authority_is_signer {
+            account_metas
+                .get_unchecked_mut(0)
+                .write(InstructionAccount::writable_signer(authority.address()));
+        } else {
+            account_metas
+                .get_unchecked_mut(0)
+                .write(InstructionAccount::readonly(authority.address()));
+        }
+
+        // permissioned_account can be signer or not
+        if permissioned_account_is_signer {
+            account_metas
+                .get_unchecked_mut(1)
+                .write(InstructionAccount::writable_signer(permissioned_account.address()));
+        } else {
+            account_metas
+                .get_unchecked_mut(1)
+                .write(InstructionAccount::readonly(permissioned_account.address()));
+        }
+
+        account_metas
+            .get_unchecked_mut(2)
+            .write(InstructionAccount::writable(permission.address()));
+    }
+
+    let mut data = [0u8; 8 + MAX_MEMBERS_ARGS_SIZE];
+    let args_slice = args.try_to_slice(&mut data[8..])?;
+    let total_len = 8 + args_slice.len();
+    let data_slice = &data[..total_len];
+
+    let instruction = InstructionView {
+        program_id: permission_program,
+        accounts: unsafe {
+            core::slice::from_raw_parts(
+                account_metas.as_ptr() as *const InstructionAccount,
+                num_accounts,
+            )
+        },
+        data: data_slice,
+    };
+
+    let acc_infos: [&AccountView; 3] = [
+        authority,
+        permissioned_account,
+        permission,
+    ];
+
+    invoke(&instruction, &acc_infos)?;
+    Ok(())
+}
+
+pub fn cpi_close_permission(
+    payer: &AccountView,
+    authority: &AccountView,
+    permissioned_account: &AccountView,
+    permission: &AccountView,
+    permission_program: &Address,
+    authority_is_signer: bool,
+    permissioned_account_is_signer: bool,
+) -> Result<(), ProgramError> {
+    const UNINIT_ACCOUNT: MaybeUninit<InstructionAccount> =
+        MaybeUninit::<InstructionAccount>::uninit();
+    let mut account_metas = [UNINIT_ACCOUNT; MAX_CPI_ACCOUNTS];
+
+    let num_accounts = 4;
+
+    unsafe {
+        account_metas
+            .get_unchecked_mut(0)
+            .write(InstructionAccount::writable(payer.address()));
+
+        // authority can be signer or not
+        if authority_is_signer {
+            account_metas
+                .get_unchecked_mut(1)
+                .write(InstructionAccount::writable_signer(authority.address()));
+        } else {
+            account_metas
+                .get_unchecked_mut(1)
+                .write(InstructionAccount::readonly(authority.address()));
+        }
+
+        // permissioned_account can be signer or not
+        if permissioned_account_is_signer {
+            account_metas
+                .get_unchecked_mut(2)
+                .write(InstructionAccount::writable_signer(permissioned_account.address()));
+        } else {
+            account_metas
+                .get_unchecked_mut(2)
+                .write(InstructionAccount::readonly(permissioned_account.address()));
+        }
+
+        account_metas
+            .get_unchecked_mut(3)
+            .write(InstructionAccount::writable(permission.address()));
+    }
+
+    let data = [2u8; 8]; // ClosePermission discriminator
+    
+    let instruction = InstructionView {
+        program_id: permission_program,
+        accounts: unsafe {
+            core::slice::from_raw_parts(
+                account_metas.as_ptr() as *const InstructionAccount,
+                num_accounts,
+            )
+        },
+        data: &data,
+    };
+
+    let acc_infos: [&AccountView; 4] = [
+        payer,
+        authority,
+        permissioned_account,
+        permission,
+    ];
+
+    invoke(&instruction, &acc_infos)?;
+    Ok(())
 }

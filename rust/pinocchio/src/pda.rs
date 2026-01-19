@@ -1,3 +1,4 @@
+use crate::consts::PERMISSION_PROGRAM_ID;
 use crate::seeds::Seed;
 use pinocchio::Address;
 
@@ -79,4 +80,11 @@ pub fn program_config_from_program_id(program_id: &Address) -> Address {
 
 pub fn ephemeral_balance_pda_from_payer(payer: &Address, index: u8) -> Address {
     find_seed_pda(&Seed::EphemeralBalance { payer, index }, crate::id())
+}
+
+pub fn permission_pda_from_permissioned_account(permissioned_account: &Address) -> Address {
+    find_seed_pda(
+        &Seed::Permission(permissioned_account),
+        &PERMISSION_PROGRAM_ID,
+    )
 }
