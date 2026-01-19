@@ -217,10 +217,18 @@ pub fn cpi_create_permission(
             .write(InstructionAccount::readonly(system_program.address()));
     }
 
+    // Prepare instruction data with 8-byte discriminator prefix followed by serialized args
+    // Calculate exact size needed: 8 bytes for discriminator + actual args size
+    let args_size = args.serialized_size();
+    let total_size = 8 + args_size;
     let mut data = [0u8; 8 + MAX_MEMBERS_ARGS_SIZE];
-    let args_slice = args.try_to_slice(&mut data[8..])?;
-    let total_len = 8 + args_slice.len();
-    let data_slice = &data[..total_len];
+    
+    // Write discriminator (0 as u64 in little-endian)
+    data[0..8].copy_from_slice(&0u64.to_le_bytes());
+    
+    // Serialize args into the slice after the discriminator
+    args.try_to_slice(&mut data[8..])?;
+    let data_slice = &data[..total_size];
 
     let instruction = InstructionView {
         program_id: permission_program,
@@ -289,10 +297,18 @@ pub fn cpi_update_permission(
             .write(InstructionAccount::writable(permission.address()));
     }
 
+    // Prepare instruction data with 8-byte discriminator prefix followed by serialized args
+    // Calculate exact size needed: 8 bytes for discriminator + actual args size
+    let args_size = args.serialized_size();
+    let total_size = 8 + args_size;
     let mut data = [0u8; 8 + MAX_MEMBERS_ARGS_SIZE];
-    let args_slice = args.try_to_slice(&mut data[8..])?;
-    let total_len = 8 + args_slice.len();
-    let data_slice = &data[..total_len];
+    
+    // Write discriminator (1 as u64 in little-endian)
+    data[0..8].copy_from_slice(&1u64.to_le_bytes());
+    
+    // Serialize args into the slice after the discriminator
+    args.try_to_slice(&mut data[8..])?;
+    let data_slice = &data[..total_size];
 
     let instruction = InstructionView {
         program_id: permission_program,
@@ -365,8 +381,9 @@ pub fn cpi_close_permission(
             .write(InstructionAccount::writable(permission.address()));
     }
 
-    let data = [2u8; 8]; // ClosePermission discriminator
-
+    // Prepare instruction data with discriminator only (no args)
+    let data = 2u64.to_le_bytes(); // ClosePermission discriminator
+    
     let instruction = InstructionView {
         program_id: permission_program,
         accounts: unsafe {

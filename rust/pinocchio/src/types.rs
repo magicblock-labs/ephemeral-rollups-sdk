@@ -104,7 +104,7 @@ pub struct Member {
 pub const MAX_MEMBERS_COUNT: usize = 32;
 pub const MAX_MEMBER_SIZE: usize = size_of::<u8>() + size_of::<Address>(); // flags + address = 33 bytes
 pub const MAX_MEMBERS_ARGS_SIZE: usize = size_of::<u32>() // count
-    + MAX_MEMBERS_COUNT * MAX_MEMBER_SIZE; // up to 512 members
+     + MAX_MEMBERS_COUNT * MAX_MEMBER_SIZE; // up to 32 members
 
 pub struct MembersArgs<'a> {
     pub members: Option<&'a [Member]>,
@@ -137,6 +137,12 @@ impl<'a> MembersArgs<'a> {
 }
 
 impl MembersArgs<'_> {
+    /// Calculate the exact size needed to serialize these args
+    pub fn serialized_size(&self) -> usize {
+        let member_count = self.members.map(|m| m.len()).unwrap_or(0);
+        4 + member_count * MAX_MEMBER_SIZE
+    }
+
     pub fn try_to_slice<'b>(&self, data: &'b mut [u8]) -> Result<&'b [u8], ProgramError> {
         if data.len() < 4 {
             return Err(ProgramError::InvalidArgument);
