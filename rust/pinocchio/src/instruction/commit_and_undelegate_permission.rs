@@ -1,6 +1,6 @@
 use pinocchio::{error::ProgramError, AccountView, Address, ProgramResult};
 use core::mem::MaybeUninit;
-use pinocchio::cpi::{invoke, MAX_CPI_ACCOUNTS};
+use pinocchio::cpi::{invoke, invoke_signed, Signer, MAX_CPI_ACCOUNTS};
 use pinocchio::instruction::InstructionAccount;
 use pinocchio::instruction::InstructionView;
 
@@ -10,6 +10,7 @@ pub fn commit_and_undelegate_permission(
     permission_program: &Address,
     authority_is_signer: bool,
     permissioned_account_is_signer: bool,
+    signer_seeds: Option<Signer<'_, '_>>,
 ) -> ProgramResult {
     let [authority, permissioned_account, permission, magic_program, magic_context] = accounts
     else {
@@ -81,6 +82,10 @@ pub fn commit_and_undelegate_permission(
         magic_context,
     ];
 
-    invoke(&instruction, &acc_infos)?;
+    if let Some(seeds) = signer_seeds {
+        invoke_signed(&instruction, &acc_infos, &[seeds])?;
+    } else {
+        invoke(&instruction, &acc_infos)?;
+    }
     Ok(())
 }

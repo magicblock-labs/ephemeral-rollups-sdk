@@ -1,4 +1,5 @@
 use pinocchio::{error::ProgramError, AccountView, Address, ProgramResult};
+use pinocchio::cpi::Signer;
 
 use crate::{types::MembersArgs, utils::cpi_update_permission};
 
@@ -9,6 +10,7 @@ pub fn update_permission(
     authority_is_signer: bool,
     permissioned_account_is_signer: bool,
     args: MembersArgs,
+    signer_seeds: Option<Signer<'_, '_>>,
 ) -> ProgramResult {
     let [authority, permissioned_account, permission] = accounts else {
         return Err(ProgramError::NotEnoughAccountKeys);
@@ -26,5 +28,6 @@ pub fn update_permission(
         authority_is_signer,
         permissioned_account_is_signer,
         args,
+        signer_seeds,
     )
 }

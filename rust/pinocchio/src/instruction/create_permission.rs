@@ -1,4 +1,4 @@
-use pinocchio::{error::ProgramError, AccountView, Address, ProgramResult};
+use pinocchio::{cpi::Signer, error::ProgramError, AccountView, Address, ProgramResult};
 
 use crate::{types::MembersArgs, utils::cpi_create_permission};
 
@@ -7,6 +7,7 @@ pub fn create_permission(
     accounts: &[&AccountView],
     permission_program: &Address,
     args: MembersArgs,
+    signer_seeds: Option<Signer<'_, '_>>,
 ) -> ProgramResult {
     let [permissioned_account, permission, payer, system_program] = accounts else {
         return Err(ProgramError::NotEnoughAccountKeys);
@@ -23,5 +24,6 @@ pub fn create_permission(
         system_program,
         permission_program,
         args,
+        signer_seeds,
     )
 }
