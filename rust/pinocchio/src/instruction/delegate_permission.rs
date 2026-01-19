@@ -1,8 +1,8 @@
-use pinocchio::{error::ProgramError, AccountView, Address, ProgramResult};
 use core::mem::MaybeUninit;
-use pinocchio::cpi::{invoke, MAX_CPI_ACCOUNTS};
+use pinocchio::cpi::{invoke, invoke_signed, Signer, MAX_CPI_ACCOUNTS};
 use pinocchio::instruction::InstructionAccount;
 use pinocchio::instruction::InstructionView;
+use pinocchio::{error::ProgramError, AccountView, Address, ProgramResult};
 
 /// Delegate permission to ephemeral rollups.
 pub fn delegate_permission(
@@ -10,11 +10,12 @@ pub fn delegate_permission(
     permission_program: &Address,
     authority_is_signer: bool,
     permissioned_account_is_signer: bool,
+    signer_seeds: Option<Signer<'_, '_>>,
 ) -> ProgramResult {
     if accounts.len() < 10 || accounts.len() > 11 {
         return Err(ProgramError::NotEnoughAccountKeys);
     }
-    
+
     let payer = accounts[0];
     let authority = accounts[1];
     let permissioned_account = accounts[2];
@@ -61,7 +62,9 @@ pub fn delegate_permission(
         if permissioned_account_is_signer {
             account_metas
                 .get_unchecked_mut(2)
-                .write(InstructionAccount::writable_signer(permissioned_account.address()));
+                .write(InstructionAccount::writable_signer(
+                    permissioned_account.address(),
+                ));
         } else {
             account_metas
                 .get_unchecked_mut(2)
@@ -89,7 +92,7 @@ pub fn delegate_permission(
         account_metas
             .get_unchecked_mut(9)
             .write(InstructionAccount::readonly(delegation_program.address()));
-        
+
         if let Some(validator_acc) = validator {
             account_metas
                 .get_unchecked_mut(10)
@@ -124,7 +127,11 @@ pub fn delegate_permission(
             delegation_program,
             validator_acc,
         ];
-        invoke(&instruction, &acc_infos)?;
+        if let Some(seeds) = signer_seeds {
+            invoke_signed(&instruction, &acc_infos, &[seeds])?;
+        } else {
+            invoke(&instruction, &acc_infos)?;
+        }
     } else {
         let acc_infos: [&AccountView; 10] = [
             payer,
@@ -138,8 +145,12 @@ pub fn delegate_permission(
             delegation_metadata,
             delegation_program,
         ];
-        invoke(&instruction, &acc_infos)?;
+        if let Some(seeds) = signer_seeds {
+            invoke_signed(&instruction, &acc_infos, &[seeds])?;
+        } else {
+            invoke(&instruction, &acc_infos)?;
+        }
     }
-    
+
     Ok(())
 }
