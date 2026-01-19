@@ -11,10 +11,24 @@ pub fn delegate_permission(
     authority_is_signer: bool,
     permissioned_account_is_signer: bool,
 ) -> ProgramResult {
-    let [payer, authority, permissioned_account, permission, system_program, owner_program, delegation_buffer, delegation_record, delegation_metadata, delegation_program] =
-        accounts
-    else {
+    if accounts.len() < 10 || accounts.len() > 11 {
         return Err(ProgramError::NotEnoughAccountKeys);
+    }
+    
+    let payer = accounts[0];
+    let authority = accounts[1];
+    let permissioned_account = accounts[2];
+    let permission = accounts[3];
+    let system_program = accounts[4];
+    let owner_program = accounts[5];
+    let delegation_buffer = accounts[6];
+    let delegation_record = accounts[7];
+    let delegation_metadata = accounts[8];
+    let delegation_program = accounts[9];
+    let validator = if accounts.len() == 11 {
+        Some(accounts[10])
+    } else {
+        None
     };
 
     if !authority_is_signer && !permissioned_account_is_signer {
@@ -25,7 +39,7 @@ pub fn delegate_permission(
         MaybeUninit::<InstructionAccount>::uninit();
     let mut account_metas = [UNINIT_ACCOUNT; MAX_CPI_ACCOUNTS];
 
-    let num_accounts = 10;
+    let num_accounts = if validator.is_some() { 11 } else { 10 };
 
     unsafe {
         account_metas
@@ -75,6 +89,12 @@ pub fn delegate_permission(
         account_metas
             .get_unchecked_mut(9)
             .write(InstructionAccount::readonly(delegation_program.address()));
+        
+        if let Some(validator_acc) = validator {
+            account_metas
+                .get_unchecked_mut(10)
+                .write(InstructionAccount::readonly(validator_acc.address()));
+        }
     }
 
     let data = [3u8; 8]; // DelegatePermission discriminator
@@ -90,19 +110,36 @@ pub fn delegate_permission(
         data: &data,
     };
 
-    let acc_infos: [&AccountView; 10] = [
-        payer,
-        authority,
-        permissioned_account,
-        permission,
-        system_program,
-        owner_program,
-        delegation_buffer,
-        delegation_record,
-        delegation_metadata,
-        delegation_program,
-    ];
-
-    invoke(&instruction, &acc_infos)?;
+    if let Some(validator_acc) = validator {
+        let acc_infos: [&AccountView; 11] = [
+            payer,
+            authority,
+            permissioned_account,
+            permission,
+            system_program,
+            owner_program,
+            delegation_buffer,
+            delegation_record,
+            delegation_metadata,
+            delegation_program,
+            validator_acc,
+        ];
+        invoke(&instruction, &acc_infos)?;
+    } else {
+        let acc_infos: [&AccountView; 10] = [
+            payer,
+            authority,
+            permissioned_account,
+            permission,
+            system_program,
+            owner_program,
+            delegation_buffer,
+            delegation_record,
+            delegation_metadata,
+            delegation_program,
+        ];
+        invoke(&instruction, &acc_infos)?;
+    }
+    
     Ok(())
 }
