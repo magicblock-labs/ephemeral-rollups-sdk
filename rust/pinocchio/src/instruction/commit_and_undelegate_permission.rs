@@ -61,7 +61,8 @@ pub fn commit_and_undelegate_permission(
             .write(InstructionAccount::writable(magic_context.address()));
     }
 
-    let data = [5u8; 8]; // CommitAndUndelegatePermission discriminator
+    // Prepare instruction data with discriminator only (no args)
+    let data = 5u64.to_le_bytes(); // CommitAndUndelegatePermission discriminator
 
     let instruction = InstructionView {
         program_id: permission_program,

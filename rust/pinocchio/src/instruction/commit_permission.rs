@@ -61,7 +61,8 @@ pub fn commit_permission(
             .write(InstructionAccount::writable(magic_context.address()));
     }
 
-    let data = [4u8; 8]; // CommitPermission discriminator
+    // Prepare instruction data with discriminator only (no args)
+    let data = 4u64.to_le_bytes(); // CommitPermission discriminator
 
     let instruction = InstructionView {
         program_id: permission_program,

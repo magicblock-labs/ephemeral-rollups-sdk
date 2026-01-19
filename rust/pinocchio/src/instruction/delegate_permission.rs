@@ -100,7 +100,8 @@ pub fn delegate_permission(
         }
     }
 
-    let data = [3u8; 8]; // DelegatePermission discriminator
+    // Prepare instruction data with discriminator only (no args)
+    let data = 3u64.to_le_bytes(); // DelegatePermission discriminator
 
     let instruction = InstructionView {
         program_id: permission_program,
