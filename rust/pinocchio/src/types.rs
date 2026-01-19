@@ -101,7 +101,7 @@ pub struct Member {
     pub pubkey: Address,
 }
 
-pub const MAX_MEMBERS_COUNT: usize = 512;
+pub const MAX_MEMBERS_COUNT: usize = 32;
 pub const MAX_MEMBER_SIZE: usize = size_of::<u8>() + size_of::<Address>(); // flags + address = 33 bytes
 pub const MAX_MEMBERS_ARGS_SIZE: usize = size_of::<u32>() // count
     + MAX_MEMBERS_COUNT * MAX_MEMBER_SIZE; // up to 512 members
