@@ -32,3 +32,7 @@ pub const COMMIT_RECORD: &[u8] = b"commit-state-record";
 
 /// The discriminator for the external undelegate instruction.
 pub const EXTERNAL_UNDELEGATE_DISCRIMINATOR: [u8; 8] = [196, 28, 41, 206, 48, 37, 51, 167];
+
+/// The permission program ID.
+pub const PERMISSION_PROGRAM_ID: Address =
+    Address::new_from_array(pubkey!("ACLseoPoyC3cBqoUtkbjZ4aDrkurZW86v19pXz2XQnp1"));
