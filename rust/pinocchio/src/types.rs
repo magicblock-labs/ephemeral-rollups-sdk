@@ -96,6 +96,109 @@ pub struct Permission<'a> {
     pub members: Option<&'a [Member]>,
 }
 
+impl<'a> Permission<'a> {
+    /// Calculate the exact size needed to serialize this Permission
+    pub fn serialized_size(&self) -> usize {
+        // discriminator (1) + bump (1) + address (32) = 34 bytes
+        let mut size = 34;
+
+        // If members exist: member_count (4) + members data
+        if let Some(members) = self.members {
+            size += 4 + members.len() * MAX_MEMBER_SIZE;
+        } else {
+            // If no members: just the member count (0)
+            size += 4;
+        }
+
+        size
+    }
+
+    /// Deserialize Permission from a data slice
+    pub fn try_from_slice(data: &'a [u8]) -> Result<Self, ProgramError> {
+        if data.len() < 34 {
+            // discriminator (1) + bump (1) + address (32)
+            return Err(ProgramError::InvalidArgument);
+        }
+
+        let discriminator = data[0];
+        let bump = data[1];
+        let permissioned_account =
+            Address::try_from(&data[2..34]).map_err(|_| ProgramError::InvalidArgument)?;
+
+        // Check if there are members
+        let members = if data.len() > 34 {
+            let member_count_bytes: [u8; 4] = data[34..38]
+                .try_into()
+                .map_err(|_| ProgramError::InvalidArgument)?;
+            let member_count = u32::from_le_bytes(member_count_bytes) as usize;
+
+            if member_count == 0 {
+                None
+            } else {
+                let members_start = 38;
+                let members_end = members_start + member_count * MAX_MEMBER_SIZE;
+                if members_end > data.len() {
+                    return Err(ProgramError::InvalidArgument);
+                }
+
+                let members_data = &data[members_start..members_end];
+                let members_slice = unsafe {
+                    core::slice::from_raw_parts(
+                        members_data.as_ptr() as *const Member,
+                        member_count,
+                    )
+                };
+                Some(members_slice)
+            }
+        } else {
+            None
+        };
+
+        Ok(Permission {
+            discriminator,
+            bump,
+            permissioned_account,
+            members,
+        })
+    }
+
+    /// Serialize Permission to a mutable byte slice
+    pub fn try_to_slice<'b>(&self, data: &'b mut [u8]) -> Result<&'b [u8], ProgramError> {
+        let required_size = self.serialized_size();
+        if data.len() < required_size {
+            return Err(ProgramError::AccountDataTooSmall);
+        }
+
+        // Write discriminator and bump
+        data[0] = self.discriminator;
+        data[1] = self.bump;
+
+        // Write permissioned_account
+        data[2..34].copy_from_slice(self.permissioned_account.as_ref());
+
+        // Write members
+        let member_count = self.members.map(|m| m.len()).unwrap_or(0);
+        data[34..38].copy_from_slice(&(member_count as u32).to_le_bytes());
+
+        let mut offset = 38;
+
+        // Serialize members if present
+        if let Some(members) = self.members {
+            for member in members {
+                // Flags (1 byte)
+                data[offset] = member.flags.as_u8();
+                offset += 1;
+
+                // Address (32 bytes)
+                data[offset..offset + 32].copy_from_slice(member.pubkey.as_ref());
+                offset += 32;
+            }
+        }
+
+        Ok(&data[..offset])
+    }
+}
+
 pub struct Member {
     pub flags: MemberFlags,
     pub pubkey: Address,
