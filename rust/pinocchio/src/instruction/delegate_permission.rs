@@ -3,7 +3,6 @@ use pinocchio::cpi::{invoke, invoke_signed, Signer, MAX_CPI_ACCOUNTS};
 use pinocchio::instruction::InstructionAccount;
 use pinocchio::instruction::InstructionView;
 use pinocchio::{error::ProgramError, AccountView, Address, ProgramResult};
-use pinocchio_log::log;
 
 /// Delegate permission to ephemeral rollups.
 pub fn delegate_permission(
@@ -104,22 +103,6 @@ pub fn delegate_permission(
     // Prepare instruction data with discriminator only (no args)
     let data = 3u64.to_le_bytes(); // DelegatePermission discriminator
 
-    log!("delegate_permission accounts: num={}", num_accounts);
-    log!("  [0] payer: signer={}, writable={}", payer.is_signer(), payer.is_writable());
-    log!("  [1] authority: signer={}, writable={}", authority.is_signer(), authority.is_writable());
-    log!("  [2] permissioned_account: signer={}, writable={}", permissioned_account.is_signer(), permissioned_account.is_writable());
-    log!("  [3] permission: signer={}, writable={}", permission.is_signer(), permission.is_writable());
-    log!("  [4] system_program: signer={}, writable={}", system_program.is_signer(), system_program.is_writable());
-    log!("  [5] owner_program: signer={}, writable={}", owner_program.is_signer(), owner_program.is_writable());
-    log!("  [6] delegation_buffer: signer={}, writable={}", delegation_buffer.is_signer(), delegation_buffer.is_writable());
-    log!("  [7] delegation_record: signer={}, writable={}", delegation_record.is_signer(), delegation_record.is_writable());
-    log!("  [8] delegation_metadata: signer={}, writable={}", delegation_metadata.is_signer(), delegation_metadata.is_writable());
-    log!("  [9] delegation_program: signer={}, writable={}", delegation_program.is_signer(), delegation_program.is_writable());
-
-    if let Some(validator_acc) = validator {
-        log!("  [10] validator: signer={}, writable={}", validator_acc.is_signer(), validator_acc.is_writable());
-    }
-
     let instruction = InstructionView {
         program_id: permission_program,
         accounts: unsafe {
@@ -146,10 +129,8 @@ pub fn delegate_permission(
             validator_acc,
         ];
         if let Some(seeds) = signer_seeds {
-            log!("Invoking with 11 accounts and signer seeds");
             invoke_signed(&instruction, &acc_infos, &[seeds])?;
         } else {
-            log!("Invoking with 11 accounts");
             invoke(&instruction, &acc_infos)?;
         }
     } else {
@@ -166,10 +147,8 @@ pub fn delegate_permission(
             delegation_program,
         ];
         if let Some(seeds) = signer_seeds {
-            log!("Invoking with 10 accounts and signer seeds");
             invoke_signed(&instruction, &acc_infos, &[seeds])?;
         } else {
-            log!("Invoking with 10 accounts");
             invoke(&instruction, &acc_infos)?;
         }
     }
