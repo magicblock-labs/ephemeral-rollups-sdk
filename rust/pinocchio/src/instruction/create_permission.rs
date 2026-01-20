@@ -13,7 +13,7 @@ pub fn create_permission(
         return Err(ProgramError::NotEnoughAccountKeys);
     };
 
-    if !permissioned_account.is_signer() {
+    if signer_seeds.is_none() && !permissioned_account.is_signer() {
         return Err(ProgramError::MissingRequiredSignature);
     }
 

@@ -242,42 +242,63 @@ impl<'a> MembersArgs<'a> {
 impl MembersArgs<'_> {
     /// Calculate the exact size needed to serialize these args
     pub fn serialized_size(&self) -> usize {
-        let member_count = self.members.map(|m| m.len()).unwrap_or(0);
-        4 + member_count * MAX_MEMBER_SIZE
+        // 1 byte for option + 4 bytes for count (if Some) + member data
+        let mut size = 1; // option byte
+        
+        if let Some(members) = self.members {
+            size += 4 + members.len() * MAX_MEMBER_SIZE;
+        }
+        
+        size
     }
 
     pub fn try_to_slice<'b>(&self, data: &'b mut [u8]) -> Result<&'b [u8], ProgramError> {
-        if data.len() < 4 {
+        if data.len() < 1 {
             return Err(ProgramError::InvalidArgument);
         }
 
-        let member_count = self.members.map(|m| m.len()).unwrap_or(0);
+        match self.members {
+            Some(members) => {
+                // Write option byte: 1 for Some
+                data[0] = 1;
+                
+                // Need at least 1 (option) + 4 (count) bytes
+                if data.len() < 5 {
+                    return Err(ProgramError::InvalidArgument);
+                }
+                
+                let member_count = members.len();
+                
+                // Check size
+                if 5 + member_count * MAX_MEMBER_SIZE > data.len() {
+                    return Err(ProgramError::InvalidArgument);
+                }
 
-        // Check size
-        if 4 + member_count * MAX_MEMBER_SIZE > data.len() {
-            return Err(ProgramError::InvalidArgument);
-        }
+                // Serialize count at offset 1
+                let count_bytes = (member_count as u32).to_le_bytes();
+                data[1..5].copy_from_slice(&count_bytes);
 
-        // Serialize count
-        let count_bytes = (member_count as u32).to_le_bytes();
-        data[0..4].copy_from_slice(&count_bytes);
+                let mut offset = 5;
 
-        let mut offset = 4;
+                // Serialize members
+                for member in members {
+                    // Flags (1 byte)
+                    data[offset] = member.flags.as_u8();
+                    offset += 1;
 
-        // Serialize members
-        if let Some(members) = self.members {
-            for member in members {
-                // Flags (1 byte)
-                data[offset] = member.flags.as_u8();
-                offset += 1;
+                    // Address (32 bytes)
+                    data[offset..offset + 32].copy_from_slice(member.pubkey.as_ref());
+                    offset += 32;
+                }
 
-                // Address (32 bytes)
-                data[offset..offset + 32].copy_from_slice(member.pubkey.as_ref());
-                offset += 32;
+                Ok(&data[..offset])
+            }
+            None => {
+                // Write option byte: 0 for None
+                data[0] = 0;
+                Ok(&data[..1])
             }
         }
-
-        Ok(&data[..offset])
     }
 }
 
