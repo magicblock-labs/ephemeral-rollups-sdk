@@ -1,8 +1,8 @@
 use crate::utils::create_schedule_commit_ix;
 use core::mem::MaybeUninit;
 use pinocchio::{
-    cpi::invoke_with_slice, error::ProgramError, instruction::InstructionAccount, AccountView,
-    ProgramResult,
+    cpi::invoke_signed_with_bounds, error::ProgramError, instruction::InstructionAccount,
+    AccountView, ProgramResult,
 };
 
 const MAX_LOCAL_CPI_ACCOUNTS: usize = 16;
@@ -43,7 +43,7 @@ pub(crate) fn commit_accounts_internal(
         i += 1;
     }
 
-    invoke_with_slice(&ix, &all_accounts[..num_accounts])?;
+    invoke_signed_with_bounds::<MAX_LOCAL_CPI_ACCOUNTS>(&ix, &all_accounts[..num_accounts], &[])?;
 
     Ok(())
 }
