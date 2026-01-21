@@ -3,6 +3,8 @@ use pinocchio::cpi::{invoke, invoke_signed, Signer, MAX_CPI_ACCOUNTS};
 use pinocchio::instruction::{InstructionAccount, InstructionView};
 use pinocchio::{error::ProgramError, AccountView, Address, ProgramResult};
 
+const DELEGATE_PERMISSION_DISCRIMINATOR: u64 = 3;
+
 /// Delegate permission to ephemeral rollups.
 pub fn delegate_permission(
     accounts: &[&AccountView],
@@ -41,6 +43,12 @@ pub fn delegate_permission(
 
     let num_accounts = if validator.is_some() { 11 } else { 10 };
 
+    // SAFETY: The slice has length `num_accounts` (10 or 11). This block writes
+    // exactly indices 0..=9 via `account_metas.get_unchecked_mut(...).write(...)`
+    // using `InstructionAccount::writable_signer`, `readonly`, and `writable`,
+    // and conditionally writes index 10 when `validator` is `Some`. There are
+    // no reads of uninitialized memory, no out-of-bounds access, and no aliasing
+    // violations because each index is written once within this unsafe block.
     unsafe {
         account_metas
             .get_unchecked_mut(0)
@@ -100,7 +108,7 @@ pub fn delegate_permission(
     }
 
     // Prepare instruction data with discriminator only (no args)
-    let data = 3u64.to_le_bytes(); // DelegatePermission discriminator
+    let data = DELEGATE_PERMISSION_DISCRIMINATOR.to_le_bytes();
 
     let instruction = InstructionView {
         program_id: permission_program,

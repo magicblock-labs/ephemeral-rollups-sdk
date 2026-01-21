@@ -172,6 +172,9 @@ impl<'a> DelegateAccountCpiBuilder<'a> {
 
     pub fn invoke(self) -> ProgramResult {
         let seeds = self.seeds.ok_or(ProgramError::InvalidInstructionData)?;
+        if seeds.len() > 15 {
+            return Err(ProgramError::InvalidInstructionData);
+        }
         let bump = self.bump.ok_or(ProgramError::InvalidInstructionData)?;
         let config = self.config.ok_or(ProgramError::InvalidInstructionData)?;
         delegate_account(

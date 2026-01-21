@@ -215,6 +215,7 @@ impl MembersArgs<'_> {
     }
 }
 
+#[repr(transparent)]
 pub struct MemberFlags(u8);
 
 impl MemberFlags {
@@ -246,21 +247,21 @@ impl MemberFlags {
 
     /// Build flags from the 5-byte boolean layout used by CreateAtaPermission.
     pub fn from_acl_flags_bytes(bytes: [u8; 5]) -> Self {
-        let mut flags = MemberFlags::default();
-        if bytes[0] == 0 {
-            flags.remove(MemberFlags::AUTHORITY);
+        let mut flags = MemberFlags::new();
+        if bytes[0] != 0 {
+            flags.set(MemberFlags::AUTHORITY);
         }
-        if bytes[1] == 0 {
-            flags.remove(MemberFlags::TX_LOGS);
+        if bytes[1] != 0 {
+            flags.set(MemberFlags::TX_LOGS);
         }
-        if bytes[2] == 0 {
-            flags.remove(MemberFlags::TX_BALANCES);
+        if bytes[2] != 0 {
+            flags.set(MemberFlags::TX_BALANCES);
         }
-        if bytes[3] == 0 {
-            flags.remove(MemberFlags::TX_MESSAGE);
+        if bytes[3] != 0 {
+            flags.set(MemberFlags::TX_MESSAGE);
         }
-        if bytes[4] == 0 {
-            flags.remove(MemberFlags::ACCOUNT_SIGNATURES);
+        if bytes[4] != 0 {
+            flags.set(MemberFlags::ACCOUNT_SIGNATURES);
         }
         flags
     }
