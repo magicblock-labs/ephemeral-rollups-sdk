@@ -25,6 +25,7 @@ modular-sdk = [
     "solana-program-error",
     "solana-program-memory",
     "solana-sysvar",
+    "solana-system-interface",
 ]
 custom-heap = []
 custom-panic = []
