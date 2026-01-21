@@ -27,59 +27,38 @@ impl<'a> Permission<'a> {
 
     /// Deserialize Permission from a data slice
     pub fn try_from_slice(data: &'a [u8]) -> Result<Self, ProgramError> {
-        if data.len() < 34 {
-            // discriminator (1) + bump (1) + address (32)
-            return Err(ProgramError::InvalidArgument);
+        if data.len() < 38 {
+            // discriminator (1) + bump (1) + address (32) + member_count (4)
+            return Err(ProgramError::InvalidAccountData);
         }
 
         let discriminator = data[0];
         let bump = data[1];
         let permissioned_account =
-            Address::try_from(&data[2..34]).map_err(|_| ProgramError::InvalidArgument)?;
+            Address::try_from(&data[2..34]).map_err(|_| ProgramError::InvalidAccountData)?;
 
         // Check if there are members
-        let members = if data.len() >= 38 {
+        let members = {
             let member_count_bytes: [u8; 4] = data[34..38]
                 .try_into()
-                .map_err(|_| ProgramError::InvalidArgument)?;
+                .map_err(|_| ProgramError::InvalidAccountData)?;
             let member_count = u32::from_le_bytes(member_count_bytes) as usize;
 
             if member_count == 0 {
                 None
             } else {
                 if member_count > MAX_MEMBERS_COUNT {
-                    return Err(ProgramError::InvalidArgument);
+                    return Err(ProgramError::InvalidAccountData);
                 }
                 let members_start: usize = 38;
-                let members_len = match member_count.checked_mul(MAX_MEMBER_SIZE) {
-                    Some(len) => len,
-                    None => {
-                        return Ok(Permission {
-                            discriminator,
-                            bump,
-                            permissioned_account,
-                            members: None,
-                        })
-                    }
-                };
-                let members_end = match members_start.checked_add(members_len) {
-                    Some(end) => end,
-                    None => {
-                        return Ok(Permission {
-                            discriminator,
-                            bump,
-                            permissioned_account,
-                            members: None,
-                        })
-                    }
-                };
+                let members_len = member_count
+                    .checked_mul(MAX_MEMBER_SIZE)
+                    .ok_or(ProgramError::InvalidAccountData)?;
+                let members_end = members_start
+                    .checked_add(members_len)
+                    .ok_or(ProgramError::InvalidAccountData)?;
                 if members_end > data.len() {
-                    return Ok(Permission {
-                        discriminator,
-                        bump,
-                        permissioned_account,
-                        members: None,
-                    });
+                    return Err(ProgramError::InvalidAccountData);
                 }
 
                 let members_data = &data[members_start..members_end];
@@ -91,8 +70,6 @@ impl<'a> Permission<'a> {
                 };
                 Some(members_slice)
             }
-        } else {
-            None
         };
 
         Ok(Permission {
