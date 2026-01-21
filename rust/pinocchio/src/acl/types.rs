@@ -111,6 +111,7 @@ impl<'a> Permission<'a> {
     }
 }
 
+#[repr(C)]
 pub struct Member {
     pub flags: MemberFlags,
     pub pubkey: Address,
