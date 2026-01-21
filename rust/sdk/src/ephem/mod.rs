@@ -7,8 +7,7 @@ use crate::ephem::deprecated::v1::{
 use crate::solana_compat::solana::{
     invoke, AccountInfo, AccountMeta, Instruction, ProgramResult, Pubkey,
 };
-use std::cmp::Ordering;
-use std::collections::{HashMap, VecDeque};
+use std::collections::HashMap;
 
 pub mod deprecated;
 
