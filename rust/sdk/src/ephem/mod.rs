@@ -212,9 +212,15 @@ impl<'info> MagicIntentBundle<'info> {
         });
 
         // Remove cross intent duplicates
+        // Only proceed if both intents exist; otherwise no cross-intent dedup needed
         let (mut commit, cau, cau_pubkeys) = match (self.commit_intent.take(), cau) {
             (Some(commit), Some((cau_pubkeys, cau))) => (commit, cau, cau_pubkeys),
-            // In case only one Intent exist we can exit
+            // In case only one Intent exists, put commit_intent back if it was taken
+            (Some(commit), None) => {
+                self.commit_intent = Some(commit);
+                return;
+            }
+            // No commit_intent or neither intent exists - nothing to restore
             _ => return,
         };
 
