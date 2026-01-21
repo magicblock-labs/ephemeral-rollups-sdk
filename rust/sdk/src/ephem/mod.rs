@@ -83,7 +83,7 @@ impl<'info> MagicIntentBundleBuilder<'info> {
         // Dedup Intent Bundle
         self.intent_bundle.normalize();
 
-        // Coll
+        // Collect all accounts used by the bundle, then dedup them + create index map.
         let mut all_accounts = vec![self.payer, self.magic_context];
         self.intent_bundle.collect_accounts(&mut all_accounts);
         let indices_map = utils::filter_duplicates_with_map(&mut all_accounts);
