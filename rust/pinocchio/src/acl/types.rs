@@ -137,6 +137,13 @@ impl<'a> MembersArgs<'a> {
         MembersArgs { members: None }
     }
 
+    pub fn private() -> Self {
+        const EMPTY_MEMBERS: [Member; 0] = [];
+        MembersArgs {
+            members: Some(&EMPTY_MEMBERS),
+        }
+    }
+
     pub fn with_default_flags(
         addresses: &[Address],
         members_buf: &'a mut [Member],

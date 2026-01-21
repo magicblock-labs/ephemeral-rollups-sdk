@@ -76,7 +76,7 @@ impl<'a> CreatePermissionCpiBuilder<'a> {
     }
 
     pub fn invoke(self) -> ProgramResult {
-        let members = self.members.ok_or(ProgramError::InvalidInstructionData)?;
+        let members = self.members.unwrap_or_else(MembersArgs::private);
         let seeds = self.seeds.ok_or(ProgramError::InvalidInstructionData)?;
         let bump = self.bump.ok_or(ProgramError::InvalidInstructionData)?;
         let mut seed_buf = make_seed_buf();
