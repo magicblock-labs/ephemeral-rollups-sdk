@@ -1,8 +1,10 @@
 pub use crate::ephem::deprecated::v0::{
     commit_accounts, commit_and_undelegate_accounts, create_schedule_commit_ix,
 };
-use crate::ephem::deprecated::v1::{
-    utils, CallHandler, CommitAndUndelegate, CommitType, MagicAction, UndelegateType,
+use crate::ephem::deprecated::v1::utils;
+pub use crate::ephem::deprecated::v1::{
+    CallHandler, CommitAndUndelegate, CommitType, MagicAction, MagicInstructionBuilder,
+    UndelegateType,
 };
 use crate::solana_compat::solana::{
     invoke, AccountInfo, AccountMeta, Instruction, ProgramResult, Pubkey,
