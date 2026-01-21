@@ -45,7 +45,7 @@ pub mod solana {
 
     #[inline(always)]
     pub fn resize(target_account: &AccountInfo, new_len: usize) -> ProgramResult {
-        target_account.resize(new_len)
+        target_account.realloc(new_len, true)
     }
 }
 
