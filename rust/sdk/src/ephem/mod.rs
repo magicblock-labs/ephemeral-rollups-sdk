@@ -7,6 +7,8 @@ use crate::ephem::deprecated::v1::{
 use crate::solana_compat::solana::{
     invoke, AccountInfo, AccountMeta, Instruction, ProgramResult, Pubkey,
 };
+use magicblock_magic_program_api::args::MagicIntentBundleArgs;
+use magicblock_magic_program_api::instruction::MagicBlockInstruction;
 use std::collections::HashMap;
 
 pub mod deprecated;
@@ -162,7 +164,8 @@ impl<'info> MagicIntentBundle<'info> {
         let commit_and_undelegate = self
             .commit_and_undelegate_intent
             .map(|c| c.into_args(&indices_map));
-        let standalone_actions = std::mem::take(&mut self.standalone_actions)
+        let standalone_actions = self
+            .standalone_actions
             .into_iter()
             .map(|ch| ch.into_args(&indices_map))
             .collect::<Vec<_>>();
