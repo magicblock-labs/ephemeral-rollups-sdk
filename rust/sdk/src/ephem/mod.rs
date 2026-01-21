@@ -327,3 +327,802 @@ impl<'a, 'info> CommitAndUndelegateIntentBuilder<'a, 'info> {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::solana_compat::solana::{AccountInfo, Pubkey};
+    use magicblock_magic_program_api::args::ActionArgs;
+    use std::cell::RefCell;
+    use std::rc::Rc;
+
+    /// Helper to create a mock AccountInfo for testing
+    fn create_mock_account_info<'a>(
+        key: &'a Pubkey,
+        lamports: &'a mut u64,
+        data: &'a mut [u8],
+        owner: &'a Pubkey,
+        is_signer: bool,
+        is_writable: bool,
+    ) -> AccountInfo<'a> {
+        AccountInfo {
+            key,
+            is_signer,
+            is_writable,
+            lamports: Rc::new(RefCell::new(lamports)),
+            data: Rc::new(RefCell::new(data)),
+            owner,
+            executable: false,
+            rent_epoch: 0,
+        }
+    }
+
+    /// Helper struct to hold account data for tests
+    #[allow(dead_code)]
+    struct TestAccount {
+        key: Pubkey,
+        lamports: u64,
+        data: Vec<u8>,
+        owner: Pubkey,
+    }
+
+    impl TestAccount {
+        fn new() -> Self {
+            Self {
+                key: Pubkey::new_unique(),
+                lamports: 1_000_000,
+                data: vec![0u8; 32],
+                owner: Pubkey::new_unique(),
+            }
+        }
+
+        fn with_key(key: Pubkey) -> Self {
+            Self {
+                key,
+                lamports: 1_000_000,
+                data: vec![0u8; 32],
+                owner: Pubkey::new_unique(),
+            }
+        }
+    }
+
+    /// Helper to create a CallHandler for testing
+    fn create_test_call_handler(escrow_authority: AccountInfo) -> CallHandler {
+        CallHandler {
+            args: ActionArgs::new(vec![1, 2, 3]),
+            compute_units: 100_000,
+            escrow_authority,
+            destination_program: Pubkey::new_unique(),
+            accounts: vec![],
+        }
+    }
+
+    // ----- CommitIntentBuilder Tests -----
+
+    #[test]
+    fn test_commit_intent_builder_standalone() {
+        let mut acc1 = TestAccount::new();
+        let mut acc2 = TestAccount::new();
+        let owner = Pubkey::new_unique();
+
+        let info1 = create_mock_account_info(
+            &acc1.key,
+            &mut acc1.lamports,
+            &mut acc1.data,
+            &owner,
+            false,
+            true,
+        );
+        let info2 = create_mock_account_info(
+            &acc2.key,
+            &mut acc2.lamports,
+            &mut acc2.data,
+            &owner,
+            false,
+            true,
+        );
+
+        let accounts = vec![info1, info2];
+        let commit = CommitIntentBuilder::new(&accounts).build();
+
+        match commit {
+            CommitType::Standalone(accs) => {
+                assert_eq!(accs.len(), 2);
+                assert_eq!(*accs[0].key, acc1.key);
+                assert_eq!(*accs[1].key, acc2.key);
+            }
+            CommitType::WithHandler { .. } => panic!("Expected Standalone variant"),
+        }
+    }
+
+    #[test]
+    fn test_commit_intent_builder_with_handler() {
+        let mut acc1 = TestAccount::new();
+        let mut escrow_acc = TestAccount::new();
+        let owner = Pubkey::new_unique();
+
+        let info1 = create_mock_account_info(
+            &acc1.key,
+            &mut acc1.lamports,
+            &mut acc1.data,
+            &owner,
+            false,
+            true,
+        );
+        let escrow_info = create_mock_account_info(
+            &escrow_acc.key,
+            &mut escrow_acc.lamports,
+            &mut escrow_acc.data,
+            &owner,
+            true,
+            false,
+        );
+
+        let accounts = vec![info1];
+        let handler = create_test_call_handler(escrow_info);
+        let commit = CommitIntentBuilder::new(&accounts)
+            .add_post_commit_actions([handler])
+            .build();
+
+        match commit {
+            CommitType::WithHandler {
+                commited_accounts,
+                call_handlers,
+            } => {
+                assert_eq!(commited_accounts.len(), 1);
+                assert_eq!(call_handlers.len(), 1);
+            }
+            CommitType::Standalone(_) => panic!("Expected WithHandler variant"),
+        }
+    }
+
+    // ----- CommitAndUndelegateIntentBuilder Tests -----
+
+    #[test]
+    fn test_commit_and_undelegate_builder_standalone() {
+        let mut acc1 = TestAccount::new();
+        let owner = Pubkey::new_unique();
+
+        let info1 = create_mock_account_info(
+            &acc1.key,
+            &mut acc1.lamports,
+            &mut acc1.data,
+            &owner,
+            false,
+            true,
+        );
+
+        let accounts = vec![info1];
+        let cau = CommitAndUndelegateIntentBuilder::new(&accounts).build();
+
+        match (&cau.commit_type, &cau.undelegate_type) {
+            (CommitType::Standalone(accs), UndelegateType::Standalone) => {
+                assert_eq!(accs.len(), 1);
+            }
+            _ => panic!("Expected Standalone variants"),
+        }
+    }
+
+    #[test]
+    fn test_commit_and_undelegate_builder_with_actions() {
+        let mut acc1 = TestAccount::new();
+        let mut escrow_acc1 = TestAccount::new();
+        let mut escrow_acc2 = TestAccount::new();
+        let owner = Pubkey::new_unique();
+
+        let info1 = create_mock_account_info(
+            &acc1.key,
+            &mut acc1.lamports,
+            &mut acc1.data,
+            &owner,
+            false,
+            true,
+        );
+        let escrow_info1 = create_mock_account_info(
+            &escrow_acc1.key,
+            &mut escrow_acc1.lamports,
+            &mut escrow_acc1.data,
+            &owner,
+            true,
+            false,
+        );
+        let escrow_info2 = create_mock_account_info(
+            &escrow_acc2.key,
+            &mut escrow_acc2.lamports,
+            &mut escrow_acc2.data,
+            &owner,
+            true,
+            false,
+        );
+
+        let accounts = vec![info1];
+        let post_commit_handler = create_test_call_handler(escrow_info1);
+        let post_undelegate_handler = create_test_call_handler(escrow_info2);
+
+        let cau = CommitAndUndelegateIntentBuilder::new(&accounts)
+            .add_post_commit_actions([post_commit_handler])
+            .add_post_undelegate_actions([post_undelegate_handler])
+            .build();
+
+        match (&cau.commit_type, &cau.undelegate_type) {
+            (
+                CommitType::WithHandler { call_handlers, .. },
+                UndelegateType::WithHandler(undelegate_handlers),
+            ) => {
+                assert_eq!(call_handlers.len(), 1);
+                assert_eq!(undelegate_handlers.len(), 1);
+            }
+            _ => panic!("Expected WithHandler variants"),
+        }
+    }
+
+    // ----- MagicIntentBundle Normalization Tests -----
+
+    #[test]
+    fn test_bundle_dedup_within_commit_intent() {
+        let shared_key = Pubkey::new_unique();
+        let mut acc1 = TestAccount::with_key(shared_key);
+        let mut acc2 = TestAccount::with_key(shared_key); // duplicate key
+        let mut acc3 = TestAccount::new();
+        let owner = Pubkey::new_unique();
+
+        let info1 = create_mock_account_info(
+            &acc1.key,
+            &mut acc1.lamports,
+            &mut acc1.data,
+            &owner,
+            false,
+            true,
+        );
+        let info2 = create_mock_account_info(
+            &acc2.key,
+            &mut acc2.lamports,
+            &mut acc2.data,
+            &owner,
+            false,
+            true,
+        );
+        let info3 = create_mock_account_info(
+            &acc3.key,
+            &mut acc3.lamports,
+            &mut acc3.data,
+            &owner,
+            false,
+            true,
+        );
+
+        let mut bundle = MagicIntentBundle::default();
+        bundle.add_intent(MagicAction::Commit(CommitType::Standalone(vec![
+            info1, info2, info3,
+        ])));
+
+        bundle.normalize();
+
+        let commit = bundle.commit_intent.expect("commit should exist");
+        let accounts = commit.committed_accounts();
+        assert_eq!(accounts.len(), 2, "Duplicates should be removed");
+    }
+
+    #[test]
+    fn test_bundle_cross_intent_overlap_resolution() {
+        // Accounts in both Commit and CommitAndUndelegate should only be in CommitAndUndelegate
+        let shared_key = Pubkey::new_unique();
+        let mut shared_acc1 = TestAccount::with_key(shared_key);
+        let mut shared_acc2 = TestAccount::with_key(shared_key);
+        let mut unique_acc = TestAccount::new();
+        let owner = Pubkey::new_unique();
+
+        let shared_info1 = create_mock_account_info(
+            &shared_acc1.key,
+            &mut shared_acc1.lamports,
+            &mut shared_acc1.data,
+            &owner,
+            false,
+            true,
+        );
+        let shared_info2 = create_mock_account_info(
+            &shared_acc2.key,
+            &mut shared_acc2.lamports,
+            &mut shared_acc2.data,
+            &owner,
+            false,
+            true,
+        );
+        let unique_info = create_mock_account_info(
+            &unique_acc.key,
+            &mut unique_acc.lamports,
+            &mut unique_acc.data,
+            &owner,
+            false,
+            true,
+        );
+
+        let mut bundle = MagicIntentBundle::default();
+
+        // Add shared account to Commit intent along with a unique one
+        bundle.add_intent(MagicAction::Commit(CommitType::Standalone(vec![
+            shared_info1,
+            unique_info,
+        ])));
+
+        // Add shared account to CommitAndUndelegate intent
+        bundle.add_intent(MagicAction::CommitAndUndelegate(CommitAndUndelegate {
+            commit_type: CommitType::Standalone(vec![shared_info2]),
+            undelegate_type: UndelegateType::Standalone,
+        }));
+
+        bundle.normalize();
+
+        // Commit intent should only have the unique account
+        let commit = bundle.commit_intent.expect("commit should exist");
+        assert_eq!(commit.committed_accounts().len(), 1);
+        assert_eq!(*commit.committed_accounts()[0].key, unique_acc.key);
+
+        // CommitAndUndelegate should have the shared account
+        let cau = bundle
+            .commit_and_undelegate_intent
+            .expect("cau should exist");
+        assert_eq!(cau.commit_type.committed_accounts().len(), 1);
+        assert_eq!(*cau.commit_type.committed_accounts()[0].key, shared_key);
+    }
+
+    #[test]
+    fn test_bundle_commit_becomes_empty_after_overlap() {
+        // When all Commit accounts are in CommitAndUndelegate, Commit is removed
+        // and its handlers are merged into CommitAndUndelegate
+        let shared_key = Pubkey::new_unique();
+        let mut shared_acc1 = TestAccount::with_key(shared_key);
+        let mut shared_acc2 = TestAccount::with_key(shared_key);
+        let mut escrow_acc = TestAccount::new();
+        let owner = Pubkey::new_unique();
+
+        let shared_info1 = create_mock_account_info(
+            &shared_acc1.key,
+            &mut shared_acc1.lamports,
+            &mut shared_acc1.data,
+            &owner,
+            false,
+            true,
+        );
+        let shared_info2 = create_mock_account_info(
+            &shared_acc2.key,
+            &mut shared_acc2.lamports,
+            &mut shared_acc2.data,
+            &owner,
+            false,
+            true,
+        );
+        let escrow_info = create_mock_account_info(
+            &escrow_acc.key,
+            &mut escrow_acc.lamports,
+            &mut escrow_acc.data,
+            &owner,
+            true,
+            false,
+        );
+
+        let handler = create_test_call_handler(escrow_info);
+
+        let mut bundle = MagicIntentBundle::default();
+
+        // Add shared account to Commit intent with a handler
+        bundle.add_intent(MagicAction::Commit(CommitType::WithHandler {
+            commited_accounts: vec![shared_info1],
+            call_handlers: vec![handler],
+        }));
+
+        // Add same account to CommitAndUndelegate
+        bundle.add_intent(MagicAction::CommitAndUndelegate(CommitAndUndelegate {
+            commit_type: CommitType::Standalone(vec![shared_info2]),
+            undelegate_type: UndelegateType::Standalone,
+        }));
+
+        bundle.normalize();
+
+        // Commit intent should be removed (was empty after overlap resolution)
+        assert!(
+            bundle.commit_intent.is_none(),
+            "commit should be removed when empty"
+        );
+
+        // CommitAndUndelegate should have the handler merged
+        let cau = bundle
+            .commit_and_undelegate_intent
+            .expect("cau should exist");
+        match &cau.commit_type {
+            CommitType::WithHandler { call_handlers, .. } => {
+                assert_eq!(call_handlers.len(), 1, "Handler should be merged");
+            }
+            CommitType::Standalone(_) => panic!("Expected WithHandler after merge"),
+        }
+    }
+
+    // ----- MagicIntentBundle Intent Merging Tests -----
+
+    #[test]
+    fn test_bundle_merge_multiple_commit_intents() {
+        let mut acc1 = TestAccount::new();
+        let mut acc2 = TestAccount::new();
+        let owner = Pubkey::new_unique();
+
+        let info1 = create_mock_account_info(
+            &acc1.key,
+            &mut acc1.lamports,
+            &mut acc1.data,
+            &owner,
+            false,
+            true,
+        );
+        let info2 = create_mock_account_info(
+            &acc2.key,
+            &mut acc2.lamports,
+            &mut acc2.data,
+            &owner,
+            false,
+            true,
+        );
+
+        let mut bundle = MagicIntentBundle::default();
+
+        // Add first commit intent
+        bundle.add_intent(MagicAction::Commit(CommitType::Standalone(vec![info1])));
+
+        // Add second commit intent - should merge
+        bundle.add_intent(MagicAction::Commit(CommitType::Standalone(vec![info2])));
+
+        let commit = bundle.commit_intent.expect("commit should exist");
+        assert_eq!(
+            commit.committed_accounts().len(),
+            2,
+            "Accounts should be merged"
+        );
+    }
+
+    #[test]
+    fn test_bundle_merge_base_actions() {
+        let mut escrow_acc1 = TestAccount::new();
+        let mut escrow_acc2 = TestAccount::new();
+        let owner = Pubkey::new_unique();
+
+        let escrow_info1 = create_mock_account_info(
+            &escrow_acc1.key,
+            &mut escrow_acc1.lamports,
+            &mut escrow_acc1.data,
+            &owner,
+            true,
+            false,
+        );
+        let escrow_info2 = create_mock_account_info(
+            &escrow_acc2.key,
+            &mut escrow_acc2.lamports,
+            &mut escrow_acc2.data,
+            &owner,
+            true,
+            false,
+        );
+
+        let handler1 = create_test_call_handler(escrow_info1);
+        let handler2 = create_test_call_handler(escrow_info2);
+
+        let mut bundle = MagicIntentBundle::default();
+
+        bundle.add_intent(MagicAction::BaseActions(vec![handler1]));
+        bundle.add_intent(MagicAction::BaseActions(vec![handler2]));
+
+        assert_eq!(bundle.standalone_actions.len(), 2);
+    }
+
+    // ----- MagicIntentBundleBuilder Tests -----
+
+    #[test]
+    fn test_builder_creates_instruction_with_commit_only() {
+        let mut payer = TestAccount::new();
+        let mut magic_ctx = TestAccount::new();
+        let mut magic_prog = TestAccount::new();
+        let mut acc1 = TestAccount::new();
+        let owner = Pubkey::new_unique();
+
+        let payer_info = create_mock_account_info(
+            &payer.key,
+            &mut payer.lamports,
+            &mut payer.data,
+            &owner,
+            true,
+            true,
+        );
+        let ctx_info = create_mock_account_info(
+            &magic_ctx.key,
+            &mut magic_ctx.lamports,
+            &mut magic_ctx.data,
+            &owner,
+            false,
+            true,
+        );
+        let prog_info = create_mock_account_info(
+            &magic_prog.key,
+            &mut magic_prog.lamports,
+            &mut magic_prog.data,
+            &owner,
+            false,
+            false,
+        );
+        let acc1_info = create_mock_account_info(
+            &acc1.key,
+            &mut acc1.lamports,
+            &mut acc1.data,
+            &owner,
+            false,
+            true,
+        );
+
+        let commit = CommitType::Standalone(vec![acc1_info]);
+
+        let (accounts, ix) = MagicIntentBundleBuilder::new(payer_info, ctx_info, prog_info)
+            .add_commit_intent(commit)
+            .build();
+
+        // Verify accounts: payer, context, acc1
+        assert_eq!(accounts.len(), 3);
+        assert_eq!(*accounts[0].key, payer.key);
+        assert_eq!(*accounts[1].key, magic_ctx.key);
+        assert_eq!(*accounts[2].key, acc1.key);
+
+        // Verify instruction program
+        assert_eq!(ix.program_id, magic_prog.key);
+    }
+
+    #[test]
+    fn test_builder_deduplicates_accounts() {
+        let mut payer = TestAccount::new();
+        let mut magic_ctx = TestAccount::new();
+        let mut magic_prog = TestAccount::new();
+
+        // Same key used multiple times
+        let shared_key = Pubkey::new_unique();
+        let mut acc1 = TestAccount::with_key(shared_key);
+        let mut acc2 = TestAccount::with_key(shared_key);
+        let owner = Pubkey::new_unique();
+
+        let payer_info = create_mock_account_info(
+            &payer.key,
+            &mut payer.lamports,
+            &mut payer.data,
+            &owner,
+            true,
+            true,
+        );
+        let ctx_info = create_mock_account_info(
+            &magic_ctx.key,
+            &mut magic_ctx.lamports,
+            &mut magic_ctx.data,
+            &owner,
+            false,
+            true,
+        );
+        let prog_info = create_mock_account_info(
+            &magic_prog.key,
+            &mut magic_prog.lamports,
+            &mut magic_prog.data,
+            &owner,
+            false,
+            false,
+        );
+        let acc1_info = create_mock_account_info(
+            &acc1.key,
+            &mut acc1.lamports,
+            &mut acc1.data,
+            &owner,
+            false,
+            true,
+        );
+        let acc2_info = create_mock_account_info(
+            &acc2.key,
+            &mut acc2.lamports,
+            &mut acc2.data,
+            &owner,
+            false,
+            true,
+        );
+
+        let commit = CommitType::Standalone(vec![acc1_info, acc2_info]);
+
+        let (accounts, _ix) = MagicIntentBundleBuilder::new(payer_info, ctx_info, prog_info)
+            .add_commit_intent(commit)
+            .build();
+
+        // Should be: payer, context, shared_account (deduplicated)
+        assert_eq!(accounts.len(), 3, "Duplicate accounts should be removed");
+    }
+
+    #[test]
+    fn test_builder_with_all_intent_types() {
+        let mut payer = TestAccount::new();
+        let mut magic_ctx = TestAccount::new();
+        let mut magic_prog = TestAccount::new();
+        let mut commit_acc = TestAccount::new();
+        let mut cau_acc = TestAccount::new();
+        let mut escrow_acc = TestAccount::new();
+        let owner = Pubkey::new_unique();
+
+        let payer_info = create_mock_account_info(
+            &payer.key,
+            &mut payer.lamports,
+            &mut payer.data,
+            &owner,
+            true,
+            true,
+        );
+        let ctx_info = create_mock_account_info(
+            &magic_ctx.key,
+            &mut magic_ctx.lamports,
+            &mut magic_ctx.data,
+            &owner,
+            false,
+            true,
+        );
+        let prog_info = create_mock_account_info(
+            &magic_prog.key,
+            &mut magic_prog.lamports,
+            &mut magic_prog.data,
+            &owner,
+            false,
+            false,
+        );
+        let commit_info = create_mock_account_info(
+            &commit_acc.key,
+            &mut commit_acc.lamports,
+            &mut commit_acc.data,
+            &owner,
+            false,
+            true,
+        );
+        let cau_info = create_mock_account_info(
+            &cau_acc.key,
+            &mut cau_acc.lamports,
+            &mut cau_acc.data,
+            &owner,
+            false,
+            true,
+        );
+        let escrow_info = create_mock_account_info(
+            &escrow_acc.key,
+            &mut escrow_acc.lamports,
+            &mut escrow_acc.data,
+            &owner,
+            true,
+            false,
+        );
+
+        let commit = CommitType::Standalone(vec![commit_info]);
+        let cau = CommitAndUndelegate {
+            commit_type: CommitType::Standalone(vec![cau_info]),
+            undelegate_type: UndelegateType::Standalone,
+        };
+        let handler = create_test_call_handler(escrow_info);
+
+        let (accounts, ix) = MagicIntentBundleBuilder::new(payer_info, ctx_info, prog_info)
+            .add_commit_intent(commit)
+            .add_commit_and_undelegate_intent(cau)
+            .add_base_actions_intent([handler])
+            .build();
+
+        // Should have: payer, context, commit_acc, cau_acc, escrow_acc
+        assert_eq!(accounts.len(), 5);
+
+        // Verify instruction data contains ScheduleIntentBundle
+        assert!(!ix.data.is_empty());
+    }
+
+    #[test]
+    fn test_builder_fluent_api() {
+        let mut payer = TestAccount::new();
+        let mut magic_ctx = TestAccount::new();
+        let mut magic_prog = TestAccount::new();
+        let mut acc1 = TestAccount::new();
+        let owner = Pubkey::new_unique();
+
+        let payer_info = create_mock_account_info(
+            &payer.key,
+            &mut payer.lamports,
+            &mut payer.data,
+            &owner,
+            true,
+            true,
+        );
+        let ctx_info = create_mock_account_info(
+            &magic_ctx.key,
+            &mut magic_ctx.lamports,
+            &mut magic_ctx.data,
+            &owner,
+            false,
+            true,
+        );
+        let prog_info = create_mock_account_info(
+            &magic_prog.key,
+            &mut magic_prog.lamports,
+            &mut magic_prog.data,
+            &owner,
+            false,
+            false,
+        );
+        let acc1_info = create_mock_account_info(
+            &acc1.key,
+            &mut acc1.lamports,
+            &mut acc1.data,
+            &owner,
+            false,
+            true,
+        );
+
+        let accounts_slice = vec![acc1_info];
+
+        // Test that builder methods chain properly
+        let (accounts, _ix) = MagicIntentBundleBuilder::new(payer_info, ctx_info, prog_info)
+            .add_intent(MagicAction::Commit(
+                CommitIntentBuilder::new(&accounts_slice).build(),
+            ))
+            .build();
+
+        assert_eq!(accounts.len(), 3);
+    }
+
+    // ----- Account Collection Tests -----
+
+    #[test]
+    fn test_collect_accounts_from_call_handler() {
+        let mut escrow_acc = TestAccount::new();
+        let owner = Pubkey::new_unique();
+
+        let escrow_info = create_mock_account_info(
+            &escrow_acc.key,
+            &mut escrow_acc.lamports,
+            &mut escrow_acc.data,
+            &owner,
+            true,
+            false,
+        );
+
+        let handler = create_test_call_handler(escrow_info);
+        let mut container = Vec::new();
+        handler.collect_accounts(&mut container);
+
+        assert_eq!(container.len(), 1);
+        assert_eq!(*container[0].key, escrow_acc.key);
+    }
+
+    #[test]
+    fn test_collect_accounts_from_commit_with_handler() {
+        let mut acc1 = TestAccount::new();
+        let mut escrow_acc = TestAccount::new();
+        let owner = Pubkey::new_unique();
+
+        let acc1_info = create_mock_account_info(
+            &acc1.key,
+            &mut acc1.lamports,
+            &mut acc1.data,
+            &owner,
+            false,
+            true,
+        );
+        let escrow_info = create_mock_account_info(
+            &escrow_acc.key,
+            &mut escrow_acc.lamports,
+            &mut escrow_acc.data,
+            &owner,
+            true,
+            false,
+        );
+
+        let handler = create_test_call_handler(escrow_info);
+        let commit = CommitType::WithHandler {
+            commited_accounts: vec![acc1_info],
+            call_handlers: vec![handler],
+        };
+
+        let mut container = Vec::new();
+        commit.collect_accounts(&mut container);
+
+        // Should have both the committed account and escrow from handler
+        assert_eq!(container.len(), 2);
+    }
+}
