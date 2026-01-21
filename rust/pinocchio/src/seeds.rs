@@ -12,7 +12,6 @@ pub enum Seed<'a> {
     EphemeralBalance { payer: &'a Address, index: u8 },
     ProgramConfig(&'a Address),
     FeesVault,
-    Permission(&'a Address),
 }
 
 impl<'a> Seed<'a> {
@@ -75,11 +74,6 @@ impl<'a> Seed<'a> {
                 index_buf[0] = *index;
                 out[2] = &index_buf[..];
                 &out[..3]
-            }
-            Seed::Permission(permissioned_account) => {
-                out[0] = b"permission:";
-                out[1] = permissioned_account.as_ref();
-                &out[..2]
             }
         }
     }

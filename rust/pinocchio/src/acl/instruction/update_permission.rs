@@ -1,7 +1,6 @@
-use pinocchio::{error::ProgramError, AccountView, Address, ProgramResult};
-use pinocchio::cpi::Signer;
+use pinocchio::{cpi::Signer, error::ProgramError, AccountView, Address, ProgramResult};
 
-use crate::{types::MembersArgs, utils::cpi_update_permission};
+use crate::acl::{types::MembersArgs, utils::cpi_update_permission};
 
 /// Update a permission.
 pub fn update_permission(

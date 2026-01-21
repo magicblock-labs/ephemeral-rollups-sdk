@@ -2,6 +2,7 @@
 
 extern crate alloc;
 
+pub mod acl;
 pub mod consts;
 pub mod instruction;
 pub mod pda;

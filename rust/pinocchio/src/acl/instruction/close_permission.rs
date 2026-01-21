@@ -1,29 +1,31 @@
 use pinocchio::{cpi::Signer, error::ProgramError, AccountView, Address, ProgramResult};
 
-use crate::{types::MembersArgs, utils::cpi_create_permission};
+use crate::acl::utils::cpi_close_permission;
 
-/// Create a new permission for a delegated account.
-pub fn create_permission(
+/// Close a permission and recover rent.
+pub fn close_permission(
     accounts: &[&AccountView],
     permission_program: &Address,
-    args: MembersArgs,
+    authority_is_signer: bool,
+    permissioned_account_is_signer: bool,
     signer_seeds: Option<Signer<'_, '_>>,
 ) -> ProgramResult {
-    let [permissioned_account, permission, payer, system_program] = accounts else {
+    let [payer, authority, permissioned_account, permission] = accounts else {
         return Err(ProgramError::NotEnoughAccountKeys);
     };
 
-    if signer_seeds.is_none() && !permissioned_account.is_signer() {
+    if !authority_is_signer && !permissioned_account_is_signer {
         return Err(ProgramError::MissingRequiredSignature);
     }
 
-    cpi_create_permission(
+    cpi_close_permission(
+        payer,
+        authority,
         permissioned_account,
         permission,
-        payer,
-        system_program,
         permission_program,
-        args,
+        authority_is_signer,
+        permissioned_account_is_signer,
         signer_seeds,
     )
 }

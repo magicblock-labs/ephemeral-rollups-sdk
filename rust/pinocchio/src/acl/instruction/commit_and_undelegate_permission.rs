@@ -1,8 +1,7 @@
-use pinocchio::{error::ProgramError, AccountView, Address, ProgramResult};
 use core::mem::MaybeUninit;
 use pinocchio::cpi::{invoke, invoke_signed, Signer, MAX_CPI_ACCOUNTS};
-use pinocchio::instruction::InstructionAccount;
-use pinocchio::instruction::InstructionView;
+use pinocchio::instruction::{InstructionAccount, InstructionView};
+use pinocchio::{error::ProgramError, AccountView, Address, ProgramResult};
 
 /// Commit and undelegate permission from ephemeral rollups.
 pub fn commit_and_undelegate_permission(
@@ -43,7 +42,9 @@ pub fn commit_and_undelegate_permission(
         if permissioned_account_is_signer {
             account_metas
                 .get_unchecked_mut(1)
-                .write(InstructionAccount::writable_signer(permissioned_account.address()));
+                .write(InstructionAccount::writable_signer(
+                    permissioned_account.address(),
+                ));
         } else {
             account_metas
                 .get_unchecked_mut(1)
