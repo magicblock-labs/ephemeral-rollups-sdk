@@ -157,6 +157,34 @@ impl<'info> CommitType<'info> {
             }
         }
     }
+
+    pub(crate) fn merge(&mut self, mut other: Self) {
+        let take = |value: &mut _| -> (Vec<AccountInfo>, Vec<CallHandler>) {
+            use std::mem::take;
+
+            match value {
+                CommitType::Standalone(value) => (take(value), vec![]),
+                CommitType::WithHandler {
+                    commited_accounts,
+                    call_handlers,
+                } => (take(commited_accounts), take(call_handlers)),
+            }
+        };
+
+        let (mut accounts, mut actions) = take(self);
+        let (other1, other2) = take(&mut other);
+        accounts.extend(other1);
+        actions.extend(other2);
+
+        if actions.is_empty() {
+            *self = CommitType::Standalone(accounts)
+        } else {
+            *self = CommitType::WithHandler {
+                commited_accounts: accounts,
+                call_handlers: actions,
+            }
+        };
+    }
 }
 
 /// Type of undelegate, can be whether standalone or with some custom actions on Base layer post commit
@@ -210,6 +238,23 @@ impl<'info> CommitAndUndelegate<'info> {
             commit_type: commit_type_args,
             undelegate_type: undelegate_type_args,
         }
+    }
+
+    pub(crate) fn merge(&mut self, other: Self) {
+        self.commit_type.merge(other.commit_type);
+
+        let this = std::mem::replace(&mut self.undelegate_type, UndelegateType::Standalone);
+        self.undelegate_type = match (this, other.undelegate_type) {
+            (UndelegateType::Standalone, UndelegateType::Standalone) => UndelegateType::Standalone,
+            (UndelegateType::Standalone, UndelegateType::WithHandler(v))
+            | (UndelegateType::WithHandler(v), UndelegateType::Standalone) => {
+                UndelegateType::WithHandler(v)
+            }
+            (UndelegateType::WithHandler(mut a), UndelegateType::WithHandler(b)) => {
+                a.extend(b);
+                UndelegateType::WithHandler(a)
+            }
+        };
     }
 }
 
