@@ -7,7 +7,7 @@ use magicblock_magic_program_api::args::{
     ShortAccountMeta, UndelegateTypeArgs,
 };
 use magicblock_magic_program_api::instruction::MagicBlockInstruction;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 const EXPECTED_KEY_MSG: &str = "Key expected to exist!";
 
@@ -110,7 +110,7 @@ pub enum CommitType<'info> {
 }
 
 impl<'info> CommitType<'info> {
-    pub fn commited_accounts(&self) -> &[AccountInfo<'info>] {
+    pub fn committed_accounts(&self) -> &Vec<AccountInfo<'info>> {
         match self {
             Self::Standalone(commited_accounts) => commited_accounts,
             Self::WithHandler {
@@ -119,7 +119,24 @@ impl<'info> CommitType<'info> {
         }
     }
 
-    fn collect_accounts(&self, accounts_container: &mut Vec<AccountInfo<'info>>) {
+    pub(crate) fn committed_accounts_mut(&mut self) -> &mut Vec<AccountInfo<'info>> {
+        match self {
+            Self::Standalone(commited_accounts) => commited_accounts,
+            Self::WithHandler {
+                commited_accounts, ..
+            } => commited_accounts,
+        }
+    }
+
+    pub(crate) fn dedup(&mut self) -> HashSet<Pubkey> {
+        let committed_accounts = self.committed_accounts_mut();
+        let mut seen = HashSet::with_capacity(committed_accounts.len());
+        committed_accounts.retain(|el| seen.insert(*el.key));
+
+        seen
+    }
+
+    pub(crate) fn collect_accounts(&self, accounts_container: &mut Vec<AccountInfo<'info>>) {
         match self {
             Self::Standalone(accounts) => accounts_container.extend(accounts.clone()),
             Self::WithHandler {
@@ -134,7 +151,7 @@ impl<'info> CommitType<'info> {
         }
     }
 
-    fn into_args(self, indices_map: &HashMap<Pubkey, u8>) -> CommitTypeArgs {
+    pub(crate) fn into_args(self, indices_map: &HashMap<Pubkey, u8>) -> CommitTypeArgs {
         match self {
             Self::Standalone(accounts) => {
                 let accounts_indices = accounts_to_indices(accounts.as_slice(), indices_map);
@@ -226,18 +243,22 @@ pub struct CommitAndUndelegate<'info> {
 }
 
 impl<'info> CommitAndUndelegate<'info> {
-    fn collect_accounts(&self, accounts_container: &mut Vec<AccountInfo<'info>>) {
+    pub(crate) fn collect_accounts(&self, accounts_container: &mut Vec<AccountInfo<'info>>) {
         self.commit_type.collect_accounts(accounts_container);
         self.undelegate_type.collect_accounts(accounts_container);
     }
 
-    fn into_args(self, indices_map: &HashMap<Pubkey, u8>) -> CommitAndUndelegateArgs {
+    pub(crate) fn into_args(self, indices_map: &HashMap<Pubkey, u8>) -> CommitAndUndelegateArgs {
         let commit_type_args = self.commit_type.into_args(indices_map);
         let undelegate_type_args = self.undelegate_type.into_args(indices_map);
         CommitAndUndelegateArgs {
             commit_type: commit_type_args,
             undelegate_type: undelegate_type_args,
         }
+    }
+
+    pub(crate) fn dedup(&mut self) -> HashSet<Pubkey> {
+        self.commit_type.dedup()
     }
 
     pub(crate) fn merge(&mut self, other: Self) {
@@ -271,7 +292,7 @@ impl<'info> CallHandler<'info> {
         container.push(self.escrow_authority.clone());
     }
 
-    fn into_args(self, indices_map: &HashMap<Pubkey, u8>) -> BaseActionArgs {
+    pub(crate) fn into_args(self, indices_map: &HashMap<Pubkey, u8>) -> BaseActionArgs {
         let escrow_authority_index = indices_map
             .get(self.escrow_authority.key)
             .expect(EXPECTED_KEY_MSG);
@@ -286,7 +307,7 @@ impl<'info> CallHandler<'info> {
     }
 }
 
-mod utils {
+pub(crate) mod utils {
     use super::EXPECTED_KEY_MSG;
     use crate::solana_compat::solana::{AccountInfo, Pubkey};
     use std::collections::hash_map::Entry;
