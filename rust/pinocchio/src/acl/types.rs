@@ -38,7 +38,7 @@ impl<'a> Permission<'a> {
             Address::try_from(&data[2..34]).map_err(|_| ProgramError::InvalidArgument)?;
 
         // Check if there are members
-        let members = if data.len() > 34 {
+        let members = if data.len() >= 38 {
             let member_count_bytes: [u8; 4] = data[34..38]
                 .try_into()
                 .map_err(|_| ProgramError::InvalidArgument)?;
@@ -47,10 +47,39 @@ impl<'a> Permission<'a> {
             if member_count == 0 {
                 None
             } else {
-                let members_start = 38;
-                let members_end = members_start + member_count * MAX_MEMBER_SIZE;
-                if members_end > data.len() {
+                if member_count > MAX_MEMBERS_COUNT {
                     return Err(ProgramError::InvalidArgument);
+                }
+                let members_start: usize = 38;
+                let members_len = match member_count.checked_mul(MAX_MEMBER_SIZE) {
+                    Some(len) => len,
+                    None => {
+                        return Ok(Permission {
+                            discriminator,
+                            bump,
+                            permissioned_account,
+                            members: None,
+                        })
+                    }
+                };
+                let members_end = match members_start.checked_add(members_len) {
+                    Some(end) => end,
+                    None => {
+                        return Ok(Permission {
+                            discriminator,
+                            bump,
+                            permissioned_account,
+                            members: None,
+                        })
+                    }
+                };
+                if members_end > data.len() {
+                    return Ok(Permission {
+                        discriminator,
+                        bump,
+                        permissioned_account,
+                        members: None,
+                    });
                 }
 
                 let members_data = &data[members_start..members_end];

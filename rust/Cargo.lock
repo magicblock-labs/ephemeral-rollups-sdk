@@ -1091,6 +1091,7 @@ dependencies = [
  "pinocchio 0.10.1",
  "pinocchio-pubkey",
  "pinocchio-system",
+ "solana-address 2.0.0",
 ]
 
 [[package]]

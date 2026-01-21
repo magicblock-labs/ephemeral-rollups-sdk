@@ -15,6 +15,7 @@ edition = { workspace = true }
 pinocchio = { workspace = true }
 pinocchio-pubkey  = { workspace = true }
 pinocchio-system  = { workspace = true }
+solana-address = { version = ">=2, <3", features = ["curve25519"] }
 
 [features]
 default = []
