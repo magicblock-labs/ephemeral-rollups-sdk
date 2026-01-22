@@ -1,3 +1,5 @@
+#![allow(deprecated)]
+
 use crate::ephem::deprecated::v1::utils::accounts_to_indices;
 use crate::solana_compat::solana::{
     invoke, AccountInfo, AccountMeta, Instruction, ProgramResult, Pubkey,
@@ -12,6 +14,7 @@ use std::collections::{HashMap, HashSet};
 const EXPECTED_KEY_MSG: &str = "Key expected to exist!";
 
 /// Instruction builder for magicprogram
+#[deprecated(since = "0.7.0", note = "Use `MagicIntentBundleBuilder` instead")]
 pub struct MagicInstructionBuilder<'info> {
     pub payer: AccountInfo<'info>,
     pub magic_context: AccountInfo<'info>,
@@ -22,7 +25,7 @@ pub struct MagicInstructionBuilder<'info> {
 impl<'info> MagicInstructionBuilder<'info> {
     /// Build instruction for supplied an action and prepares accounts
     pub fn build(self) -> (Vec<AccountInfo<'info>>, Instruction) {
-        // set those to be firstWith
+        // set those to be first
         let mut all_accounts = vec![self.payer, self.magic_context];
         // collect all accounts to be used in instruction
         self.magic_action.collect_accounts(&mut all_accounts);
@@ -59,6 +62,7 @@ impl<'info> MagicInstructionBuilder<'info> {
 }
 
 /// Action that user wants to perform on base layer
+#[deprecated(since = "0.7.0", note = "Use `MagicIntentBundleBuilder` with `MagicBaseIntent` instead")]
 pub enum MagicAction<'info> {
     BaseActions(Vec<CallHandler<'info>>),
     Commit(CommitType<'info>),
@@ -99,6 +103,7 @@ impl<'info> MagicAction<'info> {
 }
 
 /// Type of commit , can be whether standalone or with some custom actions on Base layer post commit
+#[deprecated(since = "0.7.0", note = "Use `CommitIntentBuilder` instead")]
 pub enum CommitType<'info> {
     /// Regular commit without actions
     Standalone(Vec<AccountInfo<'info>>), // accounts to commit
@@ -206,6 +211,7 @@ impl<'info> CommitType<'info> {
 
 /// Type of undelegate, can be whether standalone or with some custom actions on Base layer post commit
 /// No CommitedAccounts since it is only used with CommitAction.
+#[deprecated(since = "0.7.0", note = "Use `CommitAndUndelegateIntentBuilder` instead")]
 pub enum UndelegateType<'info> {
     Standalone,
     WithHandler(Vec<CallHandler<'info>>),
@@ -237,6 +243,7 @@ impl<'info> UndelegateType<'info> {
     }
 }
 
+#[deprecated(since = "0.7.0", note = "Use `CommitAndUndelegateIntentBuilder` instead")]
 pub struct CommitAndUndelegate<'info> {
     pub commit_type: CommitType<'info>,
     pub undelegate_type: UndelegateType<'info>,

@@ -1,3 +1,5 @@
+#![allow(deprecated)]
+
 pub use crate::ephem::deprecated::v0::{
     commit_accounts, commit_and_undelegate_accounts, create_schedule_commit_ix,
 };
@@ -162,14 +164,14 @@ impl<'info> MagicIntentBundle<'info> {
 
     /// Consumes the bundle and encodes it into `MagicIntentBundleArgs` using a `Pubkey -> u8` indices map.
     fn into_args(self, indices_map: &HashMap<Pubkey, u8>) -> MagicIntentBundleArgs {
-        let commit = self.commit_intent.map(|c| c.into_args(&indices_map));
+        let commit = self.commit_intent.map(|c| c.into_args(indices_map));
         let commit_and_undelegate = self
             .commit_and_undelegate_intent
-            .map(|c| c.into_args(&indices_map));
+            .map(|c| c.into_args(indices_map));
         let standalone_actions = self
             .standalone_actions
             .into_iter()
-            .map(|ch| ch.into_args(&indices_map))
+            .map(|ch| ch.into_args(indices_map))
             .collect::<Vec<_>>();
 
         MagicIntentBundleArgs {
