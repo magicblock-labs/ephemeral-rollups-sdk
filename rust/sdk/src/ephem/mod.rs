@@ -23,7 +23,7 @@ pub mod deprecated;
 /// and executed through the Magic program.
 pub enum MagicIntent<'info> {
     /// Standalone actions to execute on base layer without commit/undelegate semantics.
-    BaseActions(Vec<CallHandler<'info>>),
+    StandaloneActions(Vec<CallHandler<'info>>),
     /// Commit accounts to base layer, optionally with post-commit actions.
     Commit(CommitType<'info>),
     /// Commit accounts and undelegate them, optionally with post-commit and post-undelegate actions.
@@ -81,12 +81,14 @@ impl<'info> MagicIntentBundleBuilder<'info> {
     }
 
     /// Adds standalone base-layer actions to be executed without any commit/undelegate semantics.
-    pub fn add_base_actions(
+    pub fn add_standalone_actions(
         mut self,
         actions: impl IntoIterator<Item = CallHandler<'info>>,
     ) -> Self {
         self.intent_bundle
-            .add_intent(MagicIntent::BaseActions(actions.into_iter().collect()));
+            .add_intent(MagicIntent::StandaloneActions(
+                actions.into_iter().collect(),
+            ));
         self
     }
 
@@ -154,7 +156,7 @@ impl<'info> MagicIntentBundle<'info> {
     /// Inserts an intent into the bundle, merging with any existing intent of the same category.
     fn add_intent(&mut self, intent: MagicIntent<'info>) {
         match intent {
-            MagicIntent::BaseActions(value) => self.standalone_actions.extend(value),
+            MagicIntent::StandaloneActions(value) => self.standalone_actions.extend(value),
             MagicIntent::Commit(value) => {
                 if let Some(ref mut commit_accounts) = self.commit_intent {
                     commit_accounts.merge(value);
@@ -818,8 +820,8 @@ mod tests {
 
         let mut bundle = MagicIntentBundle::default();
 
-        bundle.add_intent(MagicIntent::BaseActions(vec![handler1]));
-        bundle.add_intent(MagicIntent::BaseActions(vec![handler2]));
+        bundle.add_intent(MagicIntent::StandaloneActions(vec![handler1]));
+        bundle.add_intent(MagicIntent::StandaloneActions(vec![handler2]));
 
         assert_eq!(bundle.standalone_actions.len(), 2);
     }
@@ -1015,7 +1017,7 @@ mod tests {
         let (accounts, ix) = MagicIntentBundleBuilder::new(payer_info, ctx_info, prog_info)
             .add_commit(commit)
             .add_commit_and_undelegate(cau)
-            .add_base_actions([handler])
+            .add_standalone_actions([handler])
             .build();
 
         // Should have: payer, context, commit_acc, cau_acc, escrow_acc
