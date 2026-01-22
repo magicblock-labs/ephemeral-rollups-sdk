@@ -125,7 +125,8 @@ pub struct Member {
 
 pub const MAX_MEMBERS_COUNT: usize = 32;
 pub const MAX_MEMBER_SIZE: usize = size_of::<u8>() + size_of::<Address>(); // flags + address = 33 bytes
-pub const MAX_MEMBERS_ARGS_SIZE: usize = size_of::<u32>() // count
+pub const MAX_MEMBERS_ARGS_SIZE: usize = size_of::<u8>() // option flag
+     + size_of::<u32>() // count
      + MAX_MEMBERS_COUNT * MAX_MEMBER_SIZE; // up to 32 members
 
 pub struct MembersArgs<'a> {
@@ -310,12 +311,12 @@ impl MemberFlags {
 
 impl Default for MemberFlags {
     fn default() -> Self {
-        let mut flags = MemberFlags(0);
-        flags.set(MemberFlags::AUTHORITY);
-        flags.set(MemberFlags::TX_LOGS);
-        flags.set(MemberFlags::TX_BALANCES);
-        flags.set(MemberFlags::TX_MESSAGE);
-        flags.set(MemberFlags::ACCOUNT_SIGNATURES);
-        flags
+        MemberFlags(
+            MemberFlags::AUTHORITY
+                | MemberFlags::TX_LOGS
+                | MemberFlags::TX_BALANCES
+                | MemberFlags::TX_MESSAGE
+                | MemberFlags::ACCOUNT_SIGNATURES,
+        )
     }
 }
