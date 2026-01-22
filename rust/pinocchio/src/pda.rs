@@ -1,31 +1,8 @@
 use crate::seeds::Seed;
 use pinocchio::Address;
 
-#[cfg(not(any(
-    target_os = "solana",
-    target_arch = "bpf",
-    feature = "address-find-program-address"
-)))]
-use solana_pubkey::Pubkey;
-
-#[cfg(any(
-    target_os = "solana",
-    target_arch = "bpf",
-    feature = "address-find-program-address"
-))]
 pub(crate) fn find_program_address(seeds: &[&[u8]], program_id: &Address) -> (Address, u8) {
     Address::find_program_address(seeds, program_id)
-}
-
-#[cfg(not(any(
-    target_os = "solana",
-    target_arch = "bpf",
-    feature = "address-find-program-address"
-)))]
-pub(crate) fn find_program_address(seeds: &[&[u8]], program_id: &Address) -> (Address, u8) {
-    let program_pubkey = Pubkey::from(*program_id.as_array());
-    let (pda, bump) = Pubkey::find_program_address(seeds, &program_pubkey);
-    (Address::new_from_array(pda.to_bytes()), bump)
 }
 
 /// Find a PDA from a typed `Seed`
