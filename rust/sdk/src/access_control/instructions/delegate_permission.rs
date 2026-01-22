@@ -1,5 +1,6 @@
 use borsh::{BorshDeserialize, BorshSerialize};
 
+use crate::access_control::structs::PermissionDelegateArgs;
 use crate::consts::PERMISSION_PROGRAM_ID;
 use crate::solana_compat::solana::{
     invoke, invoke_signed, AccountInfo, AccountMeta, Instruction, ProgramResult, Pubkey,
@@ -34,13 +35,14 @@ pub struct DelegatePermission {
 }
 
 impl DelegatePermission {
-    pub fn instruction(&self) -> Instruction {
-        self.instruction_with_remaining_accounts(&[])
+    pub fn instruction(&self, args: DelegatePermissionInstructionArgs) -> Instruction {
+        self.instruction_with_remaining_accounts(args, &[])
     }
     #[allow(clippy::arithmetic_side_effects)]
     #[allow(clippy::vec_init_then_push)]
     pub fn instruction_with_remaining_accounts(
         &self,
+        args: DelegatePermissionInstructionArgs,
         remaining_accounts: &[AccountMeta],
     ) -> Instruction {
         let mut accounts = Vec::with_capacity(11 + remaining_accounts.len());
@@ -62,9 +64,11 @@ impl DelegatePermission {
         accounts.push(AccountMeta::new_readonly(self.delegation_program, false));
         accounts.push(AccountMeta::new_readonly(self.validator, false));
         accounts.extend_from_slice(remaining_accounts);
-        let data = DelegatePermissionInstructionData::new()
+        let mut data = DelegatePermissionInstructionData::new()
             .try_to_vec()
-            .expect("failed to serialize DelegatePermissionInstructionData");
+            .unwrap();
+        let mut args = args.try_to_vec().unwrap();
+        data.append(&mut args);
 
         Instruction {
             program_id: PERMISSION_PROGRAM_ID,
@@ -97,6 +101,18 @@ impl Default for DelegatePermissionInstructionData {
     }
 }
 
+#[derive(BorshSerialize, BorshDeserialize, Clone, Debug, Eq, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct DelegatePermissionInstructionArgs {
+    pub args: PermissionDelegateArgs,
+}
+
+impl DelegatePermissionInstructionArgs {
+    pub(crate) fn try_to_vec(&self) -> Result<Vec<u8>, std::io::Error> {
+        borsh::to_vec(self)
+    }
+}
+
 /// Instruction builder for `DelegatePermission`.
 ///
 /// ### Accounts (auto-derived from permissioned_account):
@@ -125,6 +141,7 @@ pub struct DelegatePermissionBuilder {
     delegation_metadata: Option<Pubkey>,
     delegation_program: Option<Pubkey>,
     validator: Option<Pubkey>,
+    args: Option<PermissionDelegateArgs>,
     __remaining_accounts: Vec<AccountMeta>,
 }
 
@@ -193,6 +210,12 @@ impl DelegatePermissionBuilder {
         self.validator = validator;
         self
     }
+    /// Set the delegate arguments.
+    #[inline(always)]
+    pub fn args(&mut self, args: PermissionDelegateArgs) -> &mut Self {
+        self.args = Some(args);
+        self
+    }
     /// Add an additional account to the instruction.
     #[inline(always)]
     pub fn add_remaining_account(&mut self, account: AccountMeta) -> &mut Self {
@@ -230,8 +253,11 @@ impl DelegatePermissionBuilder {
                 .expect("delegation_program is not set"),
             validator: self.validator.expect("validator is not set"),
         };
+        let args = DelegatePermissionInstructionArgs {
+            args: self.args.clone().expect("args is not set"),
+        };
 
-        accounts.instruction_with_remaining_accounts(&self.__remaining_accounts)
+        accounts.instruction_with_remaining_accounts(args, &self.__remaining_accounts)
     }
 }
 
@@ -286,12 +312,15 @@ pub struct DelegatePermissionCpi<'a, 'b> {
     pub delegation_program: &'b AccountInfo<'a>,
 
     pub validator: Option<&'b AccountInfo<'a>>,
+    /// The arguments for the instruction.
+    pub __args: DelegatePermissionInstructionArgs,
 }
 
 impl<'a, 'b> DelegatePermissionCpi<'a, 'b> {
     pub fn new(
         program: &'b AccountInfo<'a>,
         accounts: DelegatePermissionCpiAccounts<'a, 'b>,
+        args: DelegatePermissionInstructionArgs,
     ) -> Self {
         Self {
             __program: program,
@@ -306,6 +335,7 @@ impl<'a, 'b> DelegatePermissionCpi<'a, 'b> {
             delegation_metadata: accounts.delegation_metadata,
             delegation_program: accounts.delegation_program,
             validator: accounts.validator,
+            __args: args,
         }
     }
     #[inline(always)]
@@ -361,9 +391,11 @@ impl<'a, 'b> DelegatePermissionCpi<'a, 'b> {
                 is_writable: remaining_account.1,
             })
         });
-        let data = DelegatePermissionInstructionData::new()
+        let mut data = DelegatePermissionInstructionData::new()
             .try_to_vec()
-            .expect("failed to serialize DelegatePermissionInstructionData");
+            .unwrap();
+        let mut args = self.__args.try_to_vec().unwrap();
+        data.append(&mut args);
 
         let instruction = Instruction {
             program_id: PERMISSION_PROGRAM_ID,
@@ -436,6 +468,7 @@ impl<'a, 'b> DelegatePermissionCpiBuilder<'a, 'b> {
             delegation_metadata: None,
             delegation_program: None,
             validator: None,
+            args: None,
             __remaining_accounts: Vec::new(),
         });
         Self { instruction }
@@ -500,6 +533,11 @@ impl<'a, 'b> DelegatePermissionCpiBuilder<'a, 'b> {
         self.instruction.validator = validator;
         self
     }
+    #[inline(always)]
+    pub fn args(&mut self, args: PermissionDelegateArgs) -> &mut Self {
+        self.instruction.args = Some(args);
+        self
+    }
     /// Add an additional account to the instruction.
     #[inline(always)]
     pub fn add_remaining_account(
@@ -534,6 +572,9 @@ impl<'a, 'b> DelegatePermissionCpiBuilder<'a, 'b> {
     #[allow(clippy::clone_on_copy)]
     #[allow(clippy::vec_init_then_push)]
     pub fn invoke_signed(&self, signers_seeds: &[&[&[u8]]]) -> ProgramResult {
+        let args = DelegatePermissionInstructionArgs {
+            args: self.instruction.args.clone().expect("args is not set"),
+        };
         let instruction = DelegatePermissionCpi {
             __program: self.instruction.__program,
 
@@ -579,6 +620,8 @@ impl<'a, 'b> DelegatePermissionCpiBuilder<'a, 'b> {
                 .expect("delegation_program is not set"),
 
             validator: Some(self.instruction.validator.expect("validator is not set")),
+
+            __args: args,
         };
         instruction.invoke_signed_with_remaining_accounts(
             signers_seeds,
@@ -601,6 +644,7 @@ struct DelegatePermissionCpiBuilderInstruction<'a, 'b> {
     delegation_metadata: Option<&'b AccountInfo<'a>>,
     delegation_program: Option<&'b AccountInfo<'a>>,
     validator: Option<&'b AccountInfo<'a>>,
+    args: Option<PermissionDelegateArgs>,
     /// Additional instruction accounts `(AccountInfo, is_writable, is_signer)`.
     __remaining_accounts: Vec<(&'b AccountInfo<'a>, bool, bool)>,
 }
