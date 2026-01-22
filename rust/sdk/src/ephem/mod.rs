@@ -17,8 +17,18 @@ use std::collections::HashMap;
 
 pub mod deprecated;
 
-/// Describes types of Base Intents
-pub type MagicBaseIntent<'info> = MagicAction<'info>;
+/// Intent to be scheduled for execution on the base layer.
+///
+/// This enum represents the different types of operations that can be bundled
+/// and executed through the Magic program.
+pub enum MagicIntent<'info> {
+    /// Standalone actions to execute on base layer without commit/undelegate semantics.
+    BaseActions(Vec<CallHandler<'info>>),
+    /// Commit accounts to base layer, optionally with post-commit actions.
+    Commit(CommitType<'info>),
+    /// Commit accounts and undelegate them, optionally with post-commit and post-undelegate actions.
+    CommitAndUndelegate(CommitAndUndelegate<'info>),
+}
 
 /// Builds a single `MagicBlockInstruction::ScheduleIntentBundle` instruction by aggregating
 /// multiple independent intents (base actions, commits, commit+undelegate), normalizing them,
@@ -44,7 +54,7 @@ impl<'info> MagicIntentBundleBuilder<'info> {
         }
     }
 
-    /// Adds a base intent to the bundle.
+    /// Adds an intent to the bundle.
     ///
     /// If an intent of the same category already exists in the bundle:
     /// - base actions are appended
@@ -52,31 +62,31 @@ impl<'info> MagicIntentBundleBuilder<'info> {
     /// - commit+undelegate intents are merged (accounts/actions appended)
     ///
     /// See `MagicIntentBundle::add_intent` for merge semantics.
-    pub fn add_intent(mut self, intent: MagicBaseIntent<'info>) -> Self {
+    pub fn add_intent(mut self, intent: MagicIntent<'info>) -> Self {
         self.intent_bundle.add_intent(intent);
         self
     }
 
     /// Adds (or merges) a `Commit` intent into the bundle.
-    pub fn add_commit_intent(mut self, commit: CommitType<'info>) -> Self {
-        self.intent_bundle.add_intent(MagicBaseIntent::Commit(commit));
+    pub fn add_commit(mut self, commit: CommitType<'info>) -> Self {
+        self.intent_bundle.add_intent(MagicIntent::Commit(commit));
         self
     }
 
     /// Adds (or merges) a `CommitAndUndelegate` intent into the bundle.
-    pub fn add_commit_and_undelegate_intent(mut self, value: CommitAndUndelegate<'info>) -> Self {
+    pub fn add_commit_and_undelegate(mut self, value: CommitAndUndelegate<'info>) -> Self {
         self.intent_bundle
-            .add_intent(MagicBaseIntent::CommitAndUndelegate(value));
+            .add_intent(MagicIntent::CommitAndUndelegate(value));
         self
     }
 
     /// Adds standalone base-layer actions to be executed without any commit/undelegate semantics.
-    pub fn add_base_actions_intent(
+    pub fn add_base_actions(
         mut self,
         actions: impl IntoIterator<Item = CallHandler<'info>>,
     ) -> Self {
         self.intent_bundle
-            .add_intent(MagicBaseIntent::BaseActions(actions.into_iter().collect()));
+            .add_intent(MagicIntent::BaseActions(actions.into_iter().collect()));
         self
     }
 
@@ -142,17 +152,17 @@ struct MagicIntentBundle<'info> {
 
 impl<'info> MagicIntentBundle<'info> {
     /// Inserts an intent into the bundle, merging with any existing intent of the same category.
-    fn add_intent(&mut self, intent: MagicBaseIntent<'info>) {
+    fn add_intent(&mut self, intent: MagicIntent<'info>) {
         match intent {
-            MagicBaseIntent::BaseActions(value) => self.standalone_actions.extend(value),
-            MagicBaseIntent::Commit(value) => {
+            MagicIntent::BaseActions(value) => self.standalone_actions.extend(value),
+            MagicIntent::Commit(value) => {
                 if let Some(ref mut commit_accounts) = self.commit_intent {
                     commit_accounts.merge(value);
                 } else {
                     self.commit_intent = Some(value);
                 }
             }
-            MagicBaseIntent::CommitAndUndelegate(value) => {
+            MagicIntent::CommitAndUndelegate(value) => {
                 if let Some(ref mut commit_and_undelegate) = self.commit_and_undelegate_intent {
                     commit_and_undelegate.merge(value);
                 } else {
@@ -594,7 +604,7 @@ mod tests {
         );
 
         let mut bundle = MagicIntentBundle::default();
-        bundle.add_intent(MagicBaseIntent::Commit(CommitType::Standalone(vec![
+        bundle.add_intent(MagicIntent::Commit(CommitType::Standalone(vec![
             info1, info2, info3,
         ])));
 
@@ -642,13 +652,13 @@ mod tests {
         let mut bundle = MagicIntentBundle::default();
 
         // Add shared account to Commit intent along with a unique one
-        bundle.add_intent(MagicBaseIntent::Commit(CommitType::Standalone(vec![
+        bundle.add_intent(MagicIntent::Commit(CommitType::Standalone(vec![
             shared_info1,
             unique_info,
         ])));
 
         // Add shared account to CommitAndUndelegate intent
-        bundle.add_intent(MagicBaseIntent::CommitAndUndelegate(CommitAndUndelegate {
+        bundle.add_intent(MagicIntent::CommitAndUndelegate(CommitAndUndelegate {
             commit_type: CommitType::Standalone(vec![shared_info2]),
             undelegate_type: UndelegateType::Standalone,
         }));
@@ -708,13 +718,13 @@ mod tests {
         let mut bundle = MagicIntentBundle::default();
 
         // Add shared account to Commit intent with a handler
-        bundle.add_intent(MagicBaseIntent::Commit(CommitType::WithHandler {
+        bundle.add_intent(MagicIntent::Commit(CommitType::WithHandler {
             commited_accounts: vec![shared_info1],
             call_handlers: vec![handler],
         }));
 
         // Add same account to CommitAndUndelegate
-        bundle.add_intent(MagicBaseIntent::CommitAndUndelegate(CommitAndUndelegate {
+        bundle.add_intent(MagicIntent::CommitAndUndelegate(CommitAndUndelegate {
             commit_type: CommitType::Standalone(vec![shared_info2]),
             undelegate_type: UndelegateType::Standalone,
         }));
@@ -767,10 +777,10 @@ mod tests {
         let mut bundle = MagicIntentBundle::default();
 
         // Add first commit intent
-        bundle.add_intent(MagicBaseIntent::Commit(CommitType::Standalone(vec![info1])));
+        bundle.add_intent(MagicIntent::Commit(CommitType::Standalone(vec![info1])));
 
         // Add second commit intent - should merge
-        bundle.add_intent(MagicBaseIntent::Commit(CommitType::Standalone(vec![info2])));
+        bundle.add_intent(MagicIntent::Commit(CommitType::Standalone(vec![info2])));
 
         let commit = bundle.commit_intent.expect("commit should exist");
         assert_eq!(
@@ -808,8 +818,8 @@ mod tests {
 
         let mut bundle = MagicIntentBundle::default();
 
-        bundle.add_intent(MagicBaseIntent::BaseActions(vec![handler1]));
-        bundle.add_intent(MagicBaseIntent::BaseActions(vec![handler2]));
+        bundle.add_intent(MagicIntent::BaseActions(vec![handler1]));
+        bundle.add_intent(MagicIntent::BaseActions(vec![handler2]));
 
         assert_eq!(bundle.standalone_actions.len(), 2);
     }
@@ -860,7 +870,7 @@ mod tests {
         let commit = CommitType::Standalone(vec![acc1_info]);
 
         let (accounts, ix) = MagicIntentBundleBuilder::new(payer_info, ctx_info, prog_info)
-            .add_commit_intent(commit)
+            .add_commit(commit)
             .build();
 
         // Verify accounts: payer, context, acc1
@@ -929,7 +939,7 @@ mod tests {
         let commit = CommitType::Standalone(vec![acc1_info, acc2_info]);
 
         let (accounts, _ix) = MagicIntentBundleBuilder::new(payer_info, ctx_info, prog_info)
-            .add_commit_intent(commit)
+            .add_commit(commit)
             .build();
 
         // Should be: payer, context, shared_account (deduplicated)
@@ -1003,9 +1013,9 @@ mod tests {
         let handler = create_test_call_handler(escrow_info);
 
         let (accounts, ix) = MagicIntentBundleBuilder::new(payer_info, ctx_info, prog_info)
-            .add_commit_intent(commit)
-            .add_commit_and_undelegate_intent(cau)
-            .add_base_actions_intent([handler])
+            .add_commit(commit)
+            .add_commit_and_undelegate(cau)
+            .add_base_actions([handler])
             .build();
 
         // Should have: payer, context, commit_acc, cau_acc, escrow_acc
@@ -1060,7 +1070,7 @@ mod tests {
 
         // Test that builder methods chain properly
         let (accounts, _ix) = MagicIntentBundleBuilder::new(payer_info, ctx_info, prog_info)
-            .add_intent(MagicBaseIntent::Commit(
+            .add_intent(MagicIntent::Commit(
                 CommitIntentBuilder::new(&accounts_slice).build(),
             ))
             .build();

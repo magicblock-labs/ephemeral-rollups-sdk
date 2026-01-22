@@ -62,7 +62,10 @@ impl<'info> MagicInstructionBuilder<'info> {
 }
 
 /// Action that user wants to perform on base layer
-#[deprecated(since = "0.7.0", note = "Use `MagicIntentBundleBuilder` with `MagicBaseIntent` instead")]
+#[deprecated(
+    since = "0.7.0",
+    note = "Use `MagicIntentBundleBuilder` with `MagicBaseIntent` instead"
+)]
 pub enum MagicAction<'info> {
     BaseActions(Vec<CallHandler<'info>>),
     Commit(CommitType<'info>),
@@ -211,7 +214,10 @@ impl<'info> CommitType<'info> {
 
 /// Type of undelegate, can be whether standalone or with some custom actions on Base layer post commit
 /// No CommitedAccounts since it is only used with CommitAction.
-#[deprecated(since = "0.7.0", note = "Use `CommitAndUndelegateIntentBuilder` instead")]
+#[deprecated(
+    since = "0.7.0",
+    note = "Use `CommitAndUndelegateIntentBuilder` instead"
+)]
 pub enum UndelegateType<'info> {
     Standalone,
     WithHandler(Vec<CallHandler<'info>>),
@@ -243,7 +249,10 @@ impl<'info> UndelegateType<'info> {
     }
 }
 
-#[deprecated(since = "0.7.0", note = "Use `CommitAndUndelegateIntentBuilder` instead")]
+#[deprecated(
+    since = "0.7.0",
+    note = "Use `CommitAndUndelegateIntentBuilder` instead"
+)]
 pub struct CommitAndUndelegate<'info> {
     pub commit_type: CommitType<'info>,
     pub undelegate_type: UndelegateType<'info>,
