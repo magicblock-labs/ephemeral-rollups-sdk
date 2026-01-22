@@ -59,14 +59,14 @@ impl<'info> MagicIntentBundleBuilder<'info> {
 
     /// Adds (or merges) a `Commit` intent into the bundle.
     pub fn add_commit_intent(mut self, commit: CommitType<'info>) -> Self {
-        self.intent_bundle.add_intent(MagicAction::Commit(commit));
+        self.intent_bundle.add_intent(MagicBaseIntent::Commit(commit));
         self
     }
 
     /// Adds (or merges) a `CommitAndUndelegate` intent into the bundle.
     pub fn add_commit_and_undelegate_intent(mut self, value: CommitAndUndelegate<'info>) -> Self {
         self.intent_bundle
-            .add_intent(MagicAction::CommitAndUndelegate(value));
+            .add_intent(MagicBaseIntent::CommitAndUndelegate(value));
         self
     }
 
@@ -76,7 +76,7 @@ impl<'info> MagicIntentBundleBuilder<'info> {
         actions: impl IntoIterator<Item = CallHandler<'info>>,
     ) -> Self {
         self.intent_bundle
-            .add_intent(MagicAction::BaseActions(actions.into_iter().collect()));
+            .add_intent(MagicBaseIntent::BaseActions(actions.into_iter().collect()));
         self
     }
 
@@ -594,7 +594,7 @@ mod tests {
         );
 
         let mut bundle = MagicIntentBundle::default();
-        bundle.add_intent(MagicAction::Commit(CommitType::Standalone(vec![
+        bundle.add_intent(MagicBaseIntent::Commit(CommitType::Standalone(vec![
             info1, info2, info3,
         ])));
 
@@ -642,13 +642,13 @@ mod tests {
         let mut bundle = MagicIntentBundle::default();
 
         // Add shared account to Commit intent along with a unique one
-        bundle.add_intent(MagicAction::Commit(CommitType::Standalone(vec![
+        bundle.add_intent(MagicBaseIntent::Commit(CommitType::Standalone(vec![
             shared_info1,
             unique_info,
         ])));
 
         // Add shared account to CommitAndUndelegate intent
-        bundle.add_intent(MagicAction::CommitAndUndelegate(CommitAndUndelegate {
+        bundle.add_intent(MagicBaseIntent::CommitAndUndelegate(CommitAndUndelegate {
             commit_type: CommitType::Standalone(vec![shared_info2]),
             undelegate_type: UndelegateType::Standalone,
         }));
@@ -708,13 +708,13 @@ mod tests {
         let mut bundle = MagicIntentBundle::default();
 
         // Add shared account to Commit intent with a handler
-        bundle.add_intent(MagicAction::Commit(CommitType::WithHandler {
+        bundle.add_intent(MagicBaseIntent::Commit(CommitType::WithHandler {
             commited_accounts: vec![shared_info1],
             call_handlers: vec![handler],
         }));
 
         // Add same account to CommitAndUndelegate
-        bundle.add_intent(MagicAction::CommitAndUndelegate(CommitAndUndelegate {
+        bundle.add_intent(MagicBaseIntent::CommitAndUndelegate(CommitAndUndelegate {
             commit_type: CommitType::Standalone(vec![shared_info2]),
             undelegate_type: UndelegateType::Standalone,
         }));
@@ -767,10 +767,10 @@ mod tests {
         let mut bundle = MagicIntentBundle::default();
 
         // Add first commit intent
-        bundle.add_intent(MagicAction::Commit(CommitType::Standalone(vec![info1])));
+        bundle.add_intent(MagicBaseIntent::Commit(CommitType::Standalone(vec![info1])));
 
         // Add second commit intent - should merge
-        bundle.add_intent(MagicAction::Commit(CommitType::Standalone(vec![info2])));
+        bundle.add_intent(MagicBaseIntent::Commit(CommitType::Standalone(vec![info2])));
 
         let commit = bundle.commit_intent.expect("commit should exist");
         assert_eq!(
@@ -808,8 +808,8 @@ mod tests {
 
         let mut bundle = MagicIntentBundle::default();
 
-        bundle.add_intent(MagicAction::BaseActions(vec![handler1]));
-        bundle.add_intent(MagicAction::BaseActions(vec![handler2]));
+        bundle.add_intent(MagicBaseIntent::BaseActions(vec![handler1]));
+        bundle.add_intent(MagicBaseIntent::BaseActions(vec![handler2]));
 
         assert_eq!(bundle.standalone_actions.len(), 2);
     }
@@ -1060,7 +1060,7 @@ mod tests {
 
         // Test that builder methods chain properly
         let (accounts, _ix) = MagicIntentBundleBuilder::new(payer_info, ctx_info, prog_info)
-            .add_intent(MagicAction::Commit(
+            .add_intent(MagicBaseIntent::Commit(
                 CommitIntentBuilder::new(&accounts_slice).build(),
             ))
             .build();
