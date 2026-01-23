@@ -339,6 +339,11 @@
   resolved "https://registry.yarnpkg.com/@solana-program/system/-/system-0.9.0.tgz#ae18325200b6e4d8a6bc757dea99cf9da5679f2f"
   integrity sha512-yu+i0SZ+c+0E9Cy+btoMiCbxRnP/FLQuv/Ba8l2klZApAiOX1Ja/2IGkctFV36fglsI7PwD9czkSkHm8og+QeA==
 
+"@solana-program/token@^0.9.0":
+  version "0.9.0"
+  resolved "https://registry.yarnpkg.com/@solana-program/token/-/token-0.9.0.tgz#9582068c6053b1600472eedb3fe084b262cbc1c7"
+  integrity sha512-vnZxndd4ED4Fc56sw93cWZ2djEeeOFxtaPS8SPf5+a+JZjKA/EnKqzbE1y04FuMhIVrLERQ8uR8H2h72eZzlsA==
+
 "@solana/accounts@4.0.0":
   version "4.0.0"
   resolved "https://registry.yarnpkg.com/@solana/accounts/-/accounts-4.0.0.tgz#55b3b2a9186aceb444872adcde76786c0c40dc1e"

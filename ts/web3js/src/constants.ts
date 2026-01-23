@@ -14,3 +14,7 @@ export const MAGIC_CONTEXT_ID = new PublicKey(
 export const PERMISSION_PROGRAM_ID = new PublicKey(
   "ACLseoPoyC3cBqoUtkbjZ4aDrkurZW86v19pXz2XQnp1",
 );
+
+export const EATA_PROGRAM_ID = new PublicKey(
+  "SPLxh1LVZzEkX99H6rqYizhytLWPZVV296zyYDPagv2",
+);

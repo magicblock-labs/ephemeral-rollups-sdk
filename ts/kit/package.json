@@ -42,6 +42,7 @@
   "dependencies": {
     "@phala/dcap-qvl-web": "^0.2.7",
     "@solana-program/system": "^0.9.0",
+    "@solana-program/token": "^0.9.0",
     "@solana/kit": "^4.0.0",
     "@solana/transaction-confirmation": "^4.0.0",
     "bs58": "^6.0.0",

@@ -3,7 +3,11 @@ import {
   getAddressEncoder,
   getProgramDerivedAddress,
 } from "@solana/kit";
-import { DELEGATION_PROGRAM_ID, PERMISSION_PROGRAM_ID } from "./constants";
+import {
+  DELEGATION_PROGRAM_ID,
+  PERMISSION_PROGRAM_ID,
+  EATA_PROGRAM_ID,
+} from "./constants";
 
 // ============================================================================
 // Delegation Program PDAs
@@ -186,4 +190,66 @@ export async function permissionPdaFromAccount(permissionedAccount: Address) {
     seeds: [PERMISSION_SEED, addressEncoder.encode(permissionedAccount)],
   });
   return permissionPda;
+}
+
+// ============================================================================
+// EATA Program PDAs
+// ============================================================================
+
+/**
+ * Derives the ephemeral ATA PDA for a given owner and mint
+ * @param owner - The owner address
+ * @param mint - The mint address
+ * @returns The ephemeral ATA PDA and bump
+ */
+export async function ephemeralAtaPdaWithBumpFromOwnerAndMint(
+  owner: Address,
+  mint: Address,
+): Promise<[Address, number]> {
+  const addressEncoder = getAddressEncoder();
+  const [pda, bump] = await getProgramDerivedAddress({
+    programAddress: EATA_PROGRAM_ID,
+    seeds: [addressEncoder.encode(owner), addressEncoder.encode(mint)],
+  });
+  return [pda, bump];
+}
+
+/**
+ * Derives the ephemeral ATA PDA for a given owner and mint
+ * @param owner - The owner address
+ * @param mint - The mint address
+ * @returns The ephemeral ATA PDA
+ */
+export async function ephemeralAtaPdaFromOwnerAndMint(
+  owner: Address,
+  mint: Address,
+): Promise<Address> {
+  const [pda] = await ephemeralAtaPdaWithBumpFromOwnerAndMint(owner, mint);
+  return pda;
+}
+
+/**
+ * Derives the global vault PDA for a given mint
+ * @param mint - The mint address
+ * @returns The global vault PDA and bump
+ */
+export async function globalVaultPdaWithBumpFromMint(
+  mint: Address,
+): Promise<[Address, number]> {
+  const addressEncoder = getAddressEncoder();
+  const [pda, bump] = await getProgramDerivedAddress({
+    programAddress: EATA_PROGRAM_ID,
+    seeds: [addressEncoder.encode(mint)],
+  });
+  return [pda, bump];
+}
+
+/**
+ * Derives the global vault PDA for a given mint
+ * @param mint - The mint address
+ * @returns The global vault PDA
+ */
+export async function globalVaultPdaFromMint(mint: Address): Promise<Address> {
+  const [pda] = await globalVaultPdaWithBumpFromMint(mint);
+  return pda;
 }

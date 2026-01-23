@@ -1,6 +1,10 @@
 import { PublicKey } from "@solana/web3.js";
 
-import { DELEGATION_PROGRAM_ID, PERMISSION_PROGRAM_ID } from "./constants.js";
+import {
+  DELEGATION_PROGRAM_ID,
+  PERMISSION_PROGRAM_ID,
+  EATA_PROGRAM_ID,
+} from "./constants.js";
 
 // ============================================================================
 // Delegation Program PDAs
@@ -150,4 +154,57 @@ export function permissionPdaFromAccount(account: PublicKey) {
     [PERMISSION_SEED, account.toBuffer()],
     PERMISSION_PROGRAM_ID,
   )[0];
+}
+
+// ============================================================================
+// EATA Program PDAs
+// ============================================================================
+
+/**
+ * Derives the ephemeral ATA PDA for a given owner and mint
+ * @param owner - The owner address
+ * @param mint - The mint address
+ * @returns The ephemeral ATA PDA and bump
+ */
+export function ephemeralAtaPdaWithBumpFromOwnerAndMint(
+  owner: PublicKey,
+  mint: PublicKey,
+): [PublicKey, number] {
+  return PublicKey.findProgramAddressSync(
+    [owner.toBuffer(), mint.toBuffer()],
+    EATA_PROGRAM_ID,
+  );
+}
+
+/**
+ * Derives the ephemeral ATA PDA for a given owner and mint
+ * @param owner - The owner address
+ * @param mint - The mint address
+ * @returns The ephemeral ATA PDA
+ */
+export function ephemeralAtaPdaFromOwnerAndMint(
+  owner: PublicKey,
+  mint: PublicKey,
+): PublicKey {
+  return ephemeralAtaPdaWithBumpFromOwnerAndMint(owner, mint)[0];
+}
+
+/**
+ * Derives the global vault PDA for a given mint
+ * @param mint - The mint address
+ * @returns The global vault PDA and bump
+ */
+export function globalVaultPdaWithBumpFromMint(
+  mint: PublicKey,
+): [PublicKey, number] {
+  return PublicKey.findProgramAddressSync([mint.toBuffer()], EATA_PROGRAM_ID);
+}
+
+/**
+ * Derives the global vault PDA for a given mint
+ * @param mint - The mint address
+ * @returns The global vault PDA
+ */
+export function globalVaultPdaFromMint(mint: PublicKey): PublicKey {
+  return globalVaultPdaWithBumpFromMint(mint)[0];
 }

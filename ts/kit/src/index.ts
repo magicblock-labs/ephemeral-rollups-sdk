@@ -6,3 +6,4 @@ export * from "./connection.js";
 export * from "./confirmation.js";
 export * from "./instructions/index.js";
 export * from "./access-control/index.js";
+export * from "./instructions/eata/index.js";
