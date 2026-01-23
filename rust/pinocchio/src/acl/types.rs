@@ -230,6 +230,7 @@ impl MembersArgs<'_> {
     }
 }
 
+#[derive(Default)]
 #[repr(transparent)]
 pub struct MemberFlags(u8);
 
@@ -260,63 +261,40 @@ impl MemberFlags {
         self.0
     }
 
-    /// Build flags from the 5-byte boolean layout used by CreateAtaPermission.
-    pub fn from_acl_flags_bytes(bytes: [u8; 5]) -> Self {
+    /// Build flags from a single-byte bitfield.
+    pub fn from_acl_flag_byte(byte: u8) -> Self {
+        MemberFlags(byte)
+    }
+
+    /// Convert flags into a single-byte bitfield.
+    pub fn to_acl_flag_byte(&self) -> u8 {
+        self.0
+    }
+
+    /// Build flags from individual boolean values.
+    pub fn from_acl_flags(
+        authority: bool,
+        tx_logs: bool,
+        tx_balances: bool,
+        tx_message: bool,
+        account_signatures: bool,
+    ) -> Self {
         let mut flags = MemberFlags::new();
-        if bytes[0] != 0 {
+        if authority {
             flags.set(MemberFlags::AUTHORITY);
         }
-        if bytes[1] != 0 {
+        if tx_logs {
             flags.set(MemberFlags::TX_LOGS);
         }
-        if bytes[2] != 0 {
+        if tx_balances {
             flags.set(MemberFlags::TX_BALANCES);
         }
-        if bytes[3] != 0 {
+        if tx_message {
             flags.set(MemberFlags::TX_MESSAGE);
         }
-        if bytes[4] != 0 {
+        if account_signatures {
             flags.set(MemberFlags::ACCOUNT_SIGNATURES);
         }
         flags
-    }
-
-    /// Convert flags into the 5-byte boolean layout used by CreateAtaPermission.
-    pub fn to_acl_flags_bytes(&self) -> [u8; 5] {
-        [
-            if self.has(MemberFlags::AUTHORITY) {
-                1
-            } else {
-                0
-            },
-            if self.has(MemberFlags::TX_LOGS) { 1 } else { 0 },
-            if self.has(MemberFlags::TX_BALANCES) {
-                1
-            } else {
-                0
-            },
-            if self.has(MemberFlags::TX_MESSAGE) {
-                1
-            } else {
-                0
-            },
-            if self.has(MemberFlags::ACCOUNT_SIGNATURES) {
-                1
-            } else {
-                0
-            },
-        ]
-    }
-}
-
-impl Default for MemberFlags {
-    fn default() -> Self {
-        MemberFlags(
-            MemberFlags::AUTHORITY
-                | MemberFlags::TX_LOGS
-                | MemberFlags::TX_BALANCES
-                | MemberFlags::TX_MESSAGE
-                | MemberFlags::ACCOUNT_SIGNATURES,
-        )
     }
 }
