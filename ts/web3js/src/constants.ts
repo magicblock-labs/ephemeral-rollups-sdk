@@ -18,3 +18,7 @@ export const PERMISSION_PROGRAM_ID = new PublicKey(
 export const DEFAULT_VALIDATOR = new PublicKey(
   "MAS1Dt9qreoRMQ14YQuhg8UTZMMzDdKhmkZMECCzk57",
 );
+
+export const DEFAULT_PRIVATE_VALIDATOR = new PublicKey(
+  "FnE6VJT5QNZdedZPnCoLsARgBwoE6DeJNjBs2H1gySXA",
+);

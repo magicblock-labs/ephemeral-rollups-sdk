@@ -5,6 +5,7 @@ import {
 } from "@solana/web3.js";
 
 import {
+  DEFAULT_PRIVATE_VALIDATOR,
   DEFAULT_VALIDATOR,
   DELEGATION_PROGRAM_ID,
   MAGIC_CONTEXT_ID,
@@ -451,7 +452,7 @@ export async function delegatePrivateSpl(
   },
 ): Promise<TransactionInstruction[]> {
   const payer = opts?.payer ?? owner;
-  const validator = opts?.validator ?? DEFAULT_VALIDATOR;
+  const validator = opts?.validator ?? DEFAULT_PRIVATE_VALIDATOR;
   const initIfMissing = opts?.initIfMissing ?? true;
   const permissionFlags = opts?.permissionFlags ?? 0;
   const delegatePermission = opts?.delegatePermission ?? false;
