@@ -5,14 +5,17 @@ import {
 } from "@solana/web3.js";
 
 import {
+  DEFAULT_VALIDATOR,
   DELEGATION_PROGRAM_ID,
   MAGIC_CONTEXT_ID,
   MAGIC_PROGRAM_ID,
+  PERMISSION_PROGRAM_ID,
 } from "../constants.js";
 import {
   delegateBufferPdaFromDelegatedAccountAndOwnerProgram,
   delegationRecordPdaFromDelegatedAccount,
   delegationMetadataPdaFromDelegatedAccount,
+  permissionPdaFromAccount,
 } from "../pda.js";
 // Minimal SPL Token helpers (vendored) to avoid importing @solana/spl-token.
 // This prevents bundlers from pulling transitive deps like spl-token-group and
@@ -299,8 +302,93 @@ export function undelegateIx(
   });
 }
 
+// Create EATA permission
+export function createEataPermissionIx(
+  ephemeralAta: PublicKey,
+  payer: PublicKey,
+  bump: number,
+  flags: number = 0,
+): TransactionInstruction {
+  const permission = permissionPdaFromAccount(ephemeralAta);
+
+  return new TransactionInstruction({
+    programId: EATA_PROGRAM_ID,
+    keys: [
+      { pubkey: ephemeralAta, isSigner: false, isWritable: true },
+      { pubkey: permission, isSigner: false, isWritable: true },
+      { pubkey: payer, isSigner: true, isWritable: true },
+      { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+      { pubkey: PERMISSION_PROGRAM_ID, isSigner: false, isWritable: false },
+    ],
+    data: Buffer.from([6, bump, flags]),
+  });
+}
+
+// Delegate EATA permission
+export function delegateEataPermissionIx(
+  payer: PublicKey,
+  ephemeralAta: PublicKey,
+  bump: number,
+  validator: PublicKey,
+): TransactionInstruction {
+  const permission = permissionPdaFromAccount(ephemeralAta);
+
+  return new TransactionInstruction({
+    programId: EATA_PROGRAM_ID,
+    keys: [
+      { pubkey: payer, isSigner: true, isWritable: true },
+      { pubkey: ephemeralAta, isSigner: false, isWritable: true },
+      { pubkey: PERMISSION_PROGRAM_ID, isSigner: false, isWritable: false },
+      { pubkey: permission, isSigner: false, isWritable: true },
+      { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+      {
+        pubkey: delegateBufferPdaFromDelegatedAccountAndOwnerProgram(
+          permission,
+          PERMISSION_PROGRAM_ID,
+        ),
+        isSigner: false,
+        isWritable: true,
+      },
+      {
+        pubkey: delegationRecordPdaFromDelegatedAccount(permission),
+        isSigner: false,
+        isWritable: true,
+      },
+      {
+        pubkey: delegationMetadataPdaFromDelegatedAccount(permission),
+        isSigner: false,
+        isWritable: true,
+      },
+      { pubkey: DELEGATION_PROGRAM_ID, isSigner: false, isWritable: false },
+      { pubkey: validator, isSigner: false, isWritable: false },
+    ],
+    data: Buffer.from([7, bump]),
+  });
+}
+
+// Undelegate EATA permission
+export function undelegateEataPermissionIx(
+  owner: PublicKey,
+  ephemeralAta: PublicKey,
+): TransactionInstruction {
+  const permission = permissionPdaFromAccount(ephemeralAta);
+
+  return new TransactionInstruction({
+    programId: EATA_PROGRAM_ID,
+    keys: [
+      { pubkey: owner, isSigner: true, isWritable: false },
+      { pubkey: ephemeralAta, isSigner: false, isWritable: true },
+      { pubkey: permission, isSigner: false, isWritable: true },
+      { pubkey: PERMISSION_PROGRAM_ID, isSigner: false, isWritable: false },
+      { pubkey: MAGIC_PROGRAM_ID, isSigner: false, isWritable: false },
+      { pubkey: MAGIC_CONTEXT_ID, isSigner: false, isWritable: true },
+    ],
+    data: Buffer.from([8]),
+  });
+}
+
 // ---------------------------------------------------------------------------
-// High-level SDK method
+// High-level SDK methods
 // ---------------------------------------------------------------------------
 
 export async function delegateSpl(
@@ -346,6 +434,69 @@ export async function delegateSpl(
   );
 
   instructions.push(delegateIx(payer, ephemeralAta, eataBump, validator));
+
+  return instructions;
+}
+
+export async function delegatePrivateSpl(
+  owner: PublicKey,
+  mint: PublicKey,
+  amount: bigint,
+  opts?: {
+    payer?: PublicKey;
+    validator?: PublicKey;
+    initIfMissing?: boolean;
+    permissionFlags?: number;
+    delegatePermission?: boolean;
+  },
+): Promise<TransactionInstruction[]> {
+  const payer = opts?.payer ?? owner;
+  const validator = opts?.validator ?? DEFAULT_VALIDATOR;
+  const initIfMissing = opts?.initIfMissing ?? true;
+  const permissionFlags = opts?.permissionFlags ?? 0;
+  const delegatePermission = opts?.delegatePermission ?? false;
+
+  const instructions: TransactionInstruction[] = [];
+
+  const [ephemeralAta, eataBump] = deriveEphemeralAta(owner, mint);
+  const [vault, vaultBump] = deriveVault(mint);
+  const vaultAta = deriveVaultAta(mint, vault);
+
+  const ownerAta = getAssociatedTokenAddressSync(mint, owner);
+
+  if (initIfMissing) {
+    instructions.push(
+      initEphemeralAtaIx(ephemeralAta, owner, mint, payer, eataBump),
+      initVaultAtaIx(payer, vaultAta, vault, mint),
+      initVaultIx(vault, mint, payer, vaultBump),
+    );
+  }
+
+  instructions.push(
+    transferToVaultIx(
+      ephemeralAta,
+      vault,
+      mint,
+      ownerAta,
+      vaultAta,
+      owner,
+      amount,
+    ),
+  );
+
+  instructions.push(delegateIx(payer, ephemeralAta, eataBump, validator));
+
+  // Create the EATA permission
+  instructions.push(
+    createEataPermissionIx(ephemeralAta, payer, eataBump, permissionFlags),
+  );
+
+  // Optionally delegate the permission
+  if (delegatePermission) {
+    instructions.push(
+      delegateEataPermissionIx(payer, ephemeralAta, eataBump, validator),
+    );
+  }
 
   return instructions;
 }

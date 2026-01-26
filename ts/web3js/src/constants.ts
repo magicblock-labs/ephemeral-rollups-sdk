@@ -14,3 +14,7 @@ export const MAGIC_CONTEXT_ID = new PublicKey(
 export const PERMISSION_PROGRAM_ID = new PublicKey(
   "ACLseoPoyC3cBqoUtkbjZ4aDrkurZW86v19pXz2XQnp1",
 );
+
+export const DEFAULT_VALIDATOR = new PublicKey(
+  "MAS1Dt9qreoRMQ14YQuhg8UTZMMzDdKhmkZMECCzk57",
+);
