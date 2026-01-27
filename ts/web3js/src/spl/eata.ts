@@ -102,6 +102,9 @@ export interface EphemeralAta {
 }
 
 export function decodeEphemeralAta(info: AccountInfo<Buffer>): EphemeralAta {
+  if (info.data.length < 72) {
+    throw new Error("Invalid EphemeralAta account data length");
+  }
   const owner = new PublicKey(info.data.subarray(0, 32));
   const mint = new PublicKey(info.data.subarray(32, 64));
   const amount = BigInt(info.data.readBigUInt64LE(64));
