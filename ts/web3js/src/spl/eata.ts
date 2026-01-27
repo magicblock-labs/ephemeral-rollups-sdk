@@ -2,11 +2,11 @@ import {
   PublicKey,
   TransactionInstruction,
   SystemProgram,
+  AccountInfo,
 } from "@solana/web3.js";
 
 import {
   DEFAULT_PRIVATE_VALIDATOR,
-  DEFAULT_VALIDATOR,
   DELEGATION_PROGRAM_ID,
   MAGIC_CONTEXT_ID,
   MAGIC_PROGRAM_ID,
@@ -18,6 +18,7 @@ import {
   delegationMetadataPdaFromDelegatedAccount,
   permissionPdaFromAccount,
 } from "../pda.js";
+
 // Minimal SPL Token helpers (vendored) to avoid importing @solana/spl-token.
 // This prevents bundlers from pulling transitive deps like spl-token-group and
 // also avoids package.exports issues when targeting browsers.
@@ -86,6 +87,30 @@ function createAssociatedTokenAccountIdempotentInstruction(
 export const EATA_PROGRAM_ID = new PublicKey(
   "SPLxh1LVZzEkX99H6rqYizhytLWPZVV296zyYDPagv2",
 );
+
+// ---------------------------------------------------------------------------
+// Accounts
+// ---------------------------------------------------------------------------
+
+export interface EphemeralAta {
+  /// The owner of the eata
+  owner: PublicKey;
+  /// The mint associated with this account
+  mint: PublicKey;
+  /// The amount of tokens this account holds.
+  amount: bigint;
+}
+
+export function decodeEphemeralAta(info: AccountInfo<Buffer>): EphemeralAta {
+  const owner = new PublicKey(info.data.subarray(0, 32));
+  const mint = new PublicKey(info.data.subarray(32, 64));
+  const amount = BigInt(info.data.readBigUInt64LE(64));
+  return {
+    owner,
+    mint,
+    amount,
+  };
+}
 
 // ---------------------------------------------------------------------------
 // PDA derivation helpers
