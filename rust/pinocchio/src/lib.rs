@@ -5,6 +5,7 @@ extern crate alloc;
 
 pub mod consts;
 pub mod instruction;
+pub mod intent_bundle;
 pub mod pda;
 pub mod seeds;
 pub mod types;
