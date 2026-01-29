@@ -54,6 +54,36 @@ impl<'info> MagicIntentBundleBuilder<'info> {
         }
     }
 
+    /// Starts building a Commit intent. Returns a [`CommitIntentBuilder`] that owns this parent.
+    ///
+    /// The returned builder lets you chain `.add_post_commit_actions()`, transition to other
+    /// intents via `.commit_and_undelegate()`, or finalize via `.build()` / `.build_and_invoke()`.
+    pub fn commit(self, accounts: &[AccountInfo<'info>]) -> CommitIntentBuilder<'info> {
+        CommitIntentBuilder {
+            parent: self,
+            accounts: accounts.to_vec(),
+            actions: vec![],
+        }
+    }
+
+    /// Starts building a CommitAndUndelegate intent. Returns a [`CommitAndUndelegateIntentBuilder`]
+    /// that owns this parent.
+    ///
+    /// The returned builder lets you chain `.add_post_commit_actions()`,
+    /// `.add_post_undelegate_actions()`, transition to other intents via `.commit()`,
+    /// or finalize via `.build()` / `.build_and_invoke()`.
+    pub fn commit_and_undelegate(
+        self,
+        accounts: &[AccountInfo<'info>],
+    ) -> CommitAndUndelegateIntentBuilder<'info> {
+        CommitAndUndelegateIntentBuilder {
+            parent: self,
+            accounts: accounts.to_vec(),
+            post_commit_actions: vec![],
+            post_undelegate_actions: vec![],
+        }
+    }
+
     /// Adds an intent to the bundle.
     ///
     /// If an intent of the same category already exists in the bundle:
@@ -257,58 +287,86 @@ impl<'info> MagicIntentBundle<'info> {
     }
 }
 
-/// Builder of Commit Intent
-pub struct CommitIntentBuilder<'a, 'info> {
-    accounts: &'a [AccountInfo<'info>],
+/// Builder of Commit Intent.
+///
+/// Created via [`MagicIntentBundleBuilder::commit()`]. Owns the parent builder
+/// and returns it (or a sibling sub-builder) on every transition/terminal call.
+pub struct CommitIntentBuilder<'info> {
+    parent: MagicIntentBundleBuilder<'info>,
+    accounts: Vec<AccountInfo<'info>>,
     actions: Vec<CallHandler<'info>>,
 }
 
-impl<'a, 'info> CommitIntentBuilder<'a, 'info> {
-    pub fn new(accounts: &'a [AccountInfo<'info>]) -> Self {
-        Self {
-            accounts,
-            actions: vec![],
-        }
-    }
-
+impl<'info> CommitIntentBuilder<'info> {
+    /// Adds post-commit actions. Chainable.
     pub fn add_post_commit_actions(
         mut self,
         actions: impl IntoIterator<Item = CallHandler<'info>>,
-    ) -> CommitIntentBuilder<'a, 'info> {
+    ) -> Self {
         self.actions.extend(actions);
         self
     }
 
-    /// Builds and returns Commit Intent Type
-    pub fn build(self) -> CommitType<'info> {
-        let commited_accounts = self.accounts.to_vec();
-        if self.actions.is_empty() {
-            CommitType::Standalone(commited_accounts)
+    /// Transition: finalizes this commit intent and starts a commit-and-undelegate intent.
+    pub fn commit_and_undelegate(
+        self,
+        accounts: &[AccountInfo<'info>],
+    ) -> CommitAndUndelegateIntentBuilder<'info> {
+        self.done().commit_and_undelegate(accounts)
+    }
+
+    /// Transition: finalizes this commit intent and adds standalone base-layer actions.
+    pub fn add_standalone_actions(
+        self,
+        actions: impl IntoIterator<Item = CallHandler<'info>>,
+    ) -> MagicIntentBundleBuilder<'info> {
+        self.done().add_standalone_actions(actions)
+    }
+
+    /// Terminal: finalizes this commit intent and builds the full instruction.
+    pub fn build(self) -> (Vec<AccountInfo<'info>>, Instruction) {
+        self.done().build()
+    }
+
+    /// Terminal: finalizes this commit intent, builds the instruction and invokes it.
+    pub fn build_and_invoke(self) -> ProgramResult {
+        self.done().build_and_invoke()
+    }
+
+    /// Finalizes this commit intent and folds it into the parent bundle.
+    fn done(self) -> MagicIntentBundleBuilder<'info> {
+        let Self {
+            mut parent,
+            accounts,
+            actions,
+        } = self;
+        let commit = if actions.is_empty() {
+            CommitType::Standalone(accounts)
         } else {
             CommitType::WithHandler {
-                commited_accounts,
-                call_handlers: self.actions,
+                commited_accounts: accounts,
+                call_handlers: actions,
             }
-        }
+        };
+        parent.intent_bundle.add_intent(MagicIntent::Commit(commit));
+        parent
     }
 }
 
-/// Builder of CommitAndUndelegate Intent
-pub struct CommitAndUndelegateIntentBuilder<'a, 'info> {
-    accounts: &'a [AccountInfo<'info>],
+/// Builder of CommitAndUndelegate Intent.
+///
+/// Created via [`MagicIntentBundleBuilder::commit_and_undelegate()`] or
+/// [`CommitIntentBuilder::commit_and_undelegate()`]. Owns the parent builder
+/// and returns it (or a sibling sub-builder) on every transition/terminal call.
+pub struct CommitAndUndelegateIntentBuilder<'info> {
+    parent: MagicIntentBundleBuilder<'info>,
+    accounts: Vec<AccountInfo<'info>>,
     post_commit_actions: Vec<CallHandler<'info>>,
     post_undelegate_actions: Vec<CallHandler<'info>>,
 }
 
-impl<'a, 'info> CommitAndUndelegateIntentBuilder<'a, 'info> {
-    pub fn new(accounts: &'a [AccountInfo<'info>]) -> Self {
-        Self {
-            accounts,
-            post_commit_actions: vec![],
-            post_undelegate_actions: vec![],
-        }
-    }
-
+impl<'info> CommitAndUndelegateIntentBuilder<'info> {
+    /// Adds post-commit actions. Chainable.
     pub fn add_post_commit_actions(
         mut self,
         actions: impl IntoIterator<Item = CallHandler<'info>>,
@@ -317,6 +375,7 @@ impl<'a, 'info> CommitAndUndelegateIntentBuilder<'a, 'info> {
         self
     }
 
+    /// Adds post-undelegate actions. Chainable.
     pub fn add_post_undelegate_actions(
         mut self,
         actions: impl IntoIterator<Item = CallHandler<'info>>,
@@ -325,20 +384,58 @@ impl<'a, 'info> CommitAndUndelegateIntentBuilder<'a, 'info> {
         self
     }
 
-    pub fn build(self) -> CommitAndUndelegate<'info> {
-        let commit_type = CommitIntentBuilder::new(self.accounts)
-            .add_post_commit_actions(self.post_commit_actions)
-            .build();
-        let undelegate_type = if self.post_undelegate_actions.is_empty() {
+    /// Transition: finalizes this commit-and-undelegate intent and starts a new commit intent.
+    pub fn commit(self, accounts: &[AccountInfo<'info>]) -> CommitIntentBuilder<'info> {
+        self.done().commit(accounts)
+    }
+
+    /// Transition: finalizes this commit-and-undelegate intent and adds standalone base-layer actions.
+    pub fn add_standalone_actions(
+        self,
+        actions: impl IntoIterator<Item = CallHandler<'info>>,
+    ) -> MagicIntentBundleBuilder<'info> {
+        self.done().add_standalone_actions(actions)
+    }
+
+    /// Terminal: finalizes this intent and builds the full instruction.
+    pub fn build(self) -> (Vec<AccountInfo<'info>>, Instruction) {
+        self.done().build()
+    }
+
+    /// Terminal: finalizes this intent, builds the instruction and invokes it.
+    pub fn build_and_invoke(self) -> ProgramResult {
+        self.done().build_and_invoke()
+    }
+
+    /// Finalizes this commit-and-undelegate intent and folds it into the parent bundle.
+    fn done(self) -> MagicIntentBundleBuilder<'info> {
+        let Self {
+            mut parent,
+            accounts,
+            post_commit_actions,
+            post_undelegate_actions,
+        } = self;
+        let commit_type = if post_commit_actions.is_empty() {
+            CommitType::Standalone(accounts)
+        } else {
+            CommitType::WithHandler {
+                commited_accounts: accounts,
+                call_handlers: post_commit_actions,
+            }
+        };
+        let undelegate_type = if post_undelegate_actions.is_empty() {
             UndelegateType::Standalone
         } else {
-            UndelegateType::WithHandler(self.post_undelegate_actions)
+            UndelegateType::WithHandler(post_undelegate_actions)
         };
-
-        CommitAndUndelegate {
+        let cau = CommitAndUndelegate {
             commit_type,
             undelegate_type,
-        }
+        };
+        parent
+            .intent_bundle
+            .add_intent(MagicIntent::CommitAndUndelegate(cau));
+        parent
     }
 }
 
@@ -411,14 +508,57 @@ mod tests {
         }
     }
 
-    // ----- CommitIntentBuilder Tests -----
+    // ----- Fluent CommitIntentBuilder Tests -----
+
+    /// Helper to create a MagicIntentBundleBuilder for testing.
+    fn create_test_builder<'a>(
+        payer: &'a mut TestAccount,
+        magic_ctx: &'a mut TestAccount,
+        magic_prog: &'a mut TestAccount,
+        owner: &'a Pubkey,
+    ) -> (MagicIntentBundleBuilder<'a>, Pubkey) {
+        let payer_info = create_mock_account_info(
+            &payer.key,
+            &mut payer.lamports,
+            &mut payer.data,
+            owner,
+            true,
+            true,
+        );
+        let ctx_info = create_mock_account_info(
+            &magic_ctx.key,
+            &mut magic_ctx.lamports,
+            &mut magic_ctx.data,
+            owner,
+            false,
+            true,
+        );
+        let prog_info = create_mock_account_info(
+            &magic_prog.key,
+            &mut magic_prog.lamports,
+            &mut magic_prog.data,
+            owner,
+            false,
+            false,
+        );
+        let prog_key = magic_prog.key;
+        (
+            MagicIntentBundleBuilder::new(payer_info, ctx_info, prog_info),
+            prog_key,
+        )
+    }
 
     #[test]
-    fn test_commit_intent_builder_standalone() {
+    fn test_fluent_commit_standalone() {
+        let owner = Pubkey::new_unique();
+        let mut payer = TestAccount::new();
+        let mut magic_ctx = TestAccount::new();
+        let mut magic_prog = TestAccount::new();
         let mut acc1 = TestAccount::new();
         let mut acc2 = TestAccount::new();
-        let owner = Pubkey::new_unique();
 
+        let (builder, prog_key) =
+            create_test_builder(&mut payer, &mut magic_ctx, &mut magic_prog, &owner);
         let info1 = create_mock_account_info(
             &acc1.key,
             &mut acc1.lamports,
@@ -436,25 +576,25 @@ mod tests {
             true,
         );
 
-        let accounts = vec![info1, info2];
-        let commit = CommitIntentBuilder::new(&accounts).build();
+        let (accounts, ix) = builder.commit(&[info1, info2]).build();
 
-        match commit {
-            CommitType::Standalone(accs) => {
-                assert_eq!(accs.len(), 2);
-                assert_eq!(*accs[0].key, acc1.key);
-                assert_eq!(*accs[1].key, acc2.key);
-            }
-            CommitType::WithHandler { .. } => panic!("Expected Standalone variant"),
-        }
+        // payer + magic_ctx + 2 committed accounts
+        assert_eq!(accounts.len(), 4);
+        assert_eq!(*accounts[2].key, acc1.key);
+        assert_eq!(*accounts[3].key, acc2.key);
+        assert_eq!(ix.program_id, prog_key);
     }
 
     #[test]
-    fn test_commit_intent_builder_with_handler() {
+    fn test_fluent_commit_with_handler() {
+        let owner = Pubkey::new_unique();
+        let mut payer = TestAccount::new();
+        let mut magic_ctx = TestAccount::new();
+        let mut magic_prog = TestAccount::new();
         let mut acc1 = TestAccount::new();
         let mut escrow_acc = TestAccount::new();
-        let owner = Pubkey::new_unique();
 
+        let (builder, _) = create_test_builder(&mut payer, &mut magic_ctx, &mut magic_prog, &owner);
         let info1 = create_mock_account_info(
             &acc1.key,
             &mut acc1.lamports,
@@ -471,32 +611,28 @@ mod tests {
             true,
             false,
         );
-
-        let accounts = vec![info1];
         let handler = create_test_call_handler(escrow_info);
-        let commit = CommitIntentBuilder::new(&accounts)
+
+        let (accounts, _ix) = builder
+            .commit(&[info1])
             .add_post_commit_actions([handler])
             .build();
 
-        match commit {
-            CommitType::WithHandler {
-                commited_accounts,
-                call_handlers,
-            } => {
-                assert_eq!(commited_accounts.len(), 1);
-                assert_eq!(call_handlers.len(), 1);
-            }
-            CommitType::Standalone(_) => panic!("Expected WithHandler variant"),
-        }
+        // payer + magic_ctx + committed acc + escrow
+        assert_eq!(accounts.len(), 4);
     }
 
-    // ----- CommitAndUndelegateIntentBuilder Tests -----
+    // ----- Fluent CommitAndUndelegateIntentBuilder Tests -----
 
     #[test]
-    fn test_commit_and_undelegate_builder_standalone() {
-        let mut acc1 = TestAccount::new();
+    fn test_fluent_commit_and_undelegate_standalone() {
         let owner = Pubkey::new_unique();
+        let mut payer = TestAccount::new();
+        let mut magic_ctx = TestAccount::new();
+        let mut magic_prog = TestAccount::new();
+        let mut acc1 = TestAccount::new();
 
+        let (builder, _) = create_test_builder(&mut payer, &mut magic_ctx, &mut magic_prog, &owner);
         let info1 = create_mock_account_info(
             &acc1.key,
             &mut acc1.lamports,
@@ -506,24 +642,23 @@ mod tests {
             true,
         );
 
-        let accounts = vec![info1];
-        let cau = CommitAndUndelegateIntentBuilder::new(&accounts).build();
+        let (accounts, _ix) = builder.commit_and_undelegate(&[info1]).build();
 
-        match (&cau.commit_type, &cau.undelegate_type) {
-            (CommitType::Standalone(accs), UndelegateType::Standalone) => {
-                assert_eq!(accs.len(), 1);
-            }
-            _ => panic!("Expected Standalone variants"),
-        }
+        // payer + magic_ctx + committed acc
+        assert_eq!(accounts.len(), 3);
     }
 
     #[test]
-    fn test_commit_and_undelegate_builder_with_actions() {
+    fn test_fluent_commit_and_undelegate_with_actions() {
+        let owner = Pubkey::new_unique();
+        let mut payer = TestAccount::new();
+        let mut magic_ctx = TestAccount::new();
+        let mut magic_prog = TestAccount::new();
         let mut acc1 = TestAccount::new();
         let mut escrow_acc1 = TestAccount::new();
         let mut escrow_acc2 = TestAccount::new();
-        let owner = Pubkey::new_unique();
 
+        let (builder, _) = create_test_builder(&mut payer, &mut magic_ctx, &mut magic_prog, &owner);
         let info1 = create_mock_account_info(
             &acc1.key,
             &mut acc1.lamports,
@@ -548,26 +683,153 @@ mod tests {
             true,
             false,
         );
-
-        let accounts = vec![info1];
         let post_commit_handler = create_test_call_handler(escrow_info1);
         let post_undelegate_handler = create_test_call_handler(escrow_info2);
 
-        let cau = CommitAndUndelegateIntentBuilder::new(&accounts)
+        let (accounts, _ix) = builder
+            .commit_and_undelegate(&[info1])
             .add_post_commit_actions([post_commit_handler])
             .add_post_undelegate_actions([post_undelegate_handler])
             .build();
 
-        match (&cau.commit_type, &cau.undelegate_type) {
-            (
-                CommitType::WithHandler { call_handlers, .. },
-                UndelegateType::WithHandler(undelegate_handlers),
-            ) => {
-                assert_eq!(call_handlers.len(), 1);
-                assert_eq!(undelegate_handlers.len(), 1);
-            }
-            _ => panic!("Expected WithHandler variants"),
-        }
+        // payer + magic_ctx + committed acc + 2 escrows
+        assert_eq!(accounts.len(), 5);
+    }
+
+    // ----- Fluent Transition Tests -----
+
+    #[test]
+    fn test_fluent_commit_then_commit_and_undelegate() {
+        let owner = Pubkey::new_unique();
+        let mut payer = TestAccount::new();
+        let mut magic_ctx = TestAccount::new();
+        let mut magic_prog = TestAccount::new();
+        let mut acc1 = TestAccount::new();
+        let mut acc2 = TestAccount::new();
+
+        let (builder, _) = create_test_builder(&mut payer, &mut magic_ctx, &mut magic_prog, &owner);
+        let info1 = create_mock_account_info(
+            &acc1.key,
+            &mut acc1.lamports,
+            &mut acc1.data,
+            &owner,
+            false,
+            true,
+        );
+        let info2 = create_mock_account_info(
+            &acc2.key,
+            &mut acc2.lamports,
+            &mut acc2.data,
+            &owner,
+            false,
+            true,
+        );
+
+        // Transition from commit to commit_and_undelegate
+        let (accounts, _ix) = builder
+            .commit(&[info1])
+            .commit_and_undelegate(&[info2])
+            .build();
+
+        // payer + magic_ctx + commit_acc + cau_acc
+        assert_eq!(accounts.len(), 4);
+    }
+
+    #[test]
+    fn test_fluent_commit_and_undelegate_then_commit() {
+        let owner = Pubkey::new_unique();
+        let mut payer = TestAccount::new();
+        let mut magic_ctx = TestAccount::new();
+        let mut magic_prog = TestAccount::new();
+        let mut acc1 = TestAccount::new();
+        let mut acc2 = TestAccount::new();
+
+        let (builder, _) = create_test_builder(&mut payer, &mut magic_ctx, &mut magic_prog, &owner);
+        let info1 = create_mock_account_info(
+            &acc1.key,
+            &mut acc1.lamports,
+            &mut acc1.data,
+            &owner,
+            false,
+            true,
+        );
+        let info2 = create_mock_account_info(
+            &acc2.key,
+            &mut acc2.lamports,
+            &mut acc2.data,
+            &owner,
+            false,
+            true,
+        );
+
+        // Transition from commit_and_undelegate to commit
+        let (accounts, _ix) = builder
+            .commit_and_undelegate(&[info1])
+            .commit(&[info2])
+            .build();
+
+        // payer + magic_ctx + cau_acc + commit_acc
+        assert_eq!(accounts.len(), 4);
+    }
+
+    #[test]
+    fn test_fluent_full_chain_with_actions() {
+        let owner = Pubkey::new_unique();
+        let mut payer = TestAccount::new();
+        let mut magic_ctx = TestAccount::new();
+        let mut magic_prog = TestAccount::new();
+        let mut acc1 = TestAccount::new();
+        let mut acc2 = TestAccount::new();
+        let mut escrow_acc1 = TestAccount::new();
+        let mut escrow_acc2 = TestAccount::new();
+
+        let (builder, _) = create_test_builder(&mut payer, &mut magic_ctx, &mut magic_prog, &owner);
+        let info1 = create_mock_account_info(
+            &acc1.key,
+            &mut acc1.lamports,
+            &mut acc1.data,
+            &owner,
+            false,
+            true,
+        );
+        let info2 = create_mock_account_info(
+            &acc2.key,
+            &mut acc2.lamports,
+            &mut acc2.data,
+            &owner,
+            false,
+            true,
+        );
+        let escrow_info1 = create_mock_account_info(
+            &escrow_acc1.key,
+            &mut escrow_acc1.lamports,
+            &mut escrow_acc1.data,
+            &owner,
+            true,
+            false,
+        );
+        let escrow_info2 = create_mock_account_info(
+            &escrow_acc2.key,
+            &mut escrow_acc2.lamports,
+            &mut escrow_acc2.data,
+            &owner,
+            true,
+            false,
+        );
+        let handler1 = create_test_call_handler(escrow_info1);
+        let handler2 = create_test_call_handler(escrow_info2);
+
+        // Full chain: commit with action -> transition to commit_and_undelegate with actions
+        let (accounts, ix) = builder
+            .commit(&[info1])
+            .add_post_commit_actions([handler1])
+            .commit_and_undelegate(&[info2])
+            .add_post_commit_actions([handler2])
+            .build();
+
+        // payer + magic_ctx + commit_acc + escrow1 + cau_acc + escrow2
+        assert_eq!(accounts.len(), 6);
+        assert!(!ix.data.is_empty());
     }
 
     // ----- MagicIntentBundle Normalization Tests -----
@@ -1068,13 +1330,9 @@ mod tests {
             true,
         );
 
-        let accounts_slice = vec![acc1_info];
-
-        // Test that builder methods chain properly
+        // Test that fluent builder methods chain properly
         let (accounts, _ix) = MagicIntentBundleBuilder::new(payer_info, ctx_info, prog_info)
-            .add_intent(MagicIntent::Commit(
-                CommitIntentBuilder::new(&accounts_slice).build(),
-            ))
+            .commit(&[acc1_info])
             .build();
 
         assert_eq!(accounts.len(), 3);
