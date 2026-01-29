@@ -23,28 +23,28 @@ interface AuthLoginResponse {
 export async function getAuthToken(
   rpcUrl: string,
   publicKey: PublicKey,
-  signMessage: (message: Uint8Array) => Promise<Uint8Array>
+  signMessage: (message: Uint8Array) => Promise<Uint8Array>,
 ): Promise<{ token: string; expiresAt: number }> {
   // Import this way because bs58 is an ECMAScript module
   const bs58 = (await import("bs58")).default;
 
   // Getting the challenge from the RPC
   const challengeResponse = await fetch(
-    `${rpcUrl}/auth/challenge?pubkey=${publicKey.toString()}`
+    `${rpcUrl}/auth/challenge?pubkey=${publicKey.toString()}`,
   );
   const { challenge, error }: AuthChallengeResponse =
     await challengeResponse.json();
 
-  if (error) {
+  if (typeof error === "string" && error.length > 0) {
     throw new Error(`Failed to get challenge: ${error}`);
   }
-  if (!challenge) {
+  if (typeof challenge !== "string" || challenge.length === 0) {
     throw new Error("No challenge received");
   }
 
   // Signing the challenge
   const signature = await signMessage(
-    new Uint8Array(Buffer.from(challenge, "utf-8"))
+    new Uint8Array(Buffer.from(challenge, "utf-8")),
   );
   const signatureString = bs58.encode(signature);
 
@@ -63,7 +63,7 @@ export async function getAuthToken(
   if (authResponse.status !== 200) {
     throw new Error(`Failed to authenticate: ${authJson.error}`);
   }
-  if (!authJson.token) {
+  if (typeof authJson.token !== "string" || authJson.token.length === 0) {
     throw new Error("No token received");
   }
 

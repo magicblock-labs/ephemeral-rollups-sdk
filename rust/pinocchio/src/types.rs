@@ -1,20 +1,16 @@
 use core::mem::size_of;
-use pinocchio::{
-    program_error::ProgramError,
-    pubkey::Pubkey,
-    pubkey::{MAX_SEEDS, MAX_SEED_LEN},
-};
+use pinocchio::{address::MAX_SEEDS, address::MAX_SEED_LEN, error::ProgramError, Address};
 
 pub const MAX_DELEGATE_ACCOUNT_ARGS_SIZE: usize = size_of::<u32>() // commit_frequency_ms
     + size_of::<u32>() // seeds length
     + MAX_SEEDS * (size_of::<u32>() + MAX_SEED_LEN) // seeds
-    + 1 + size_of::<Pubkey>(); // validator
+    + 1 + size_of::<Address>(); // validator
 
 #[derive(Debug)]
 pub struct DelegateAccountArgs<'a> {
     pub commit_frequency_ms: u32,
     pub seeds: &'a [&'a [u8]],
-    pub validator: Option<Pubkey>,
+    pub validator: Option<Address>,
 }
 
 impl Default for DelegateAccountArgs<'_> {
@@ -80,7 +76,7 @@ impl DelegateAccountArgs<'_> {
 
 pub struct DelegateConfig {
     pub commit_frequency_ms: u32,
-    pub validator: Option<Pubkey>,
+    pub validator: Option<Address>,
 }
 
 impl Default for DelegateConfig {

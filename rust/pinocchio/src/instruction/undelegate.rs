@@ -1,29 +1,26 @@
 use core::mem::MaybeUninit;
-use pinocchio::pubkey::{Pubkey, MAX_SEEDS};
 use pinocchio::{
-    account_info::AccountInfo,
-    instruction::{Seed, Signer},
-    program_error::ProgramError,
-    pubkey::find_program_address,
+    address::MAX_SEEDS,
+    cpi::{Seed, Signer},
+    error::ProgramError,
     sysvars::{rent::Rent, Sysvar},
-    ProgramResult,
+    AccountView, Address, ProgramResult,
 };
 use pinocchio_system::instructions::CreateAccount;
 
+use crate::pda::find_program_address;
+
 #[inline(always)]
 pub fn undelegate(
-    delegated_account: &AccountInfo,
-    owner_program: &Pubkey,
-    buffer: &AccountInfo,
-    payer: &AccountInfo,
+    delegated_account: &AccountView,
+    owner_program: &Address,
+    buffer: &AccountView,
+    payer: &AccountView,
     mut callback_args: &[u8],
 ) -> ProgramResult {
     if !buffer.is_signer() {
         return Err(ProgramError::MissingRequiredSignature);
     }
-
-    // Parse PDA seeds from instruction data: Borsh-serialized Vec<Vec<u8>>.
-    // Format: u32 vec_len, then for each: u32 elem_len, then elem_len bytes.
 
     // fast u32 reader (inlined to avoid closure)
     #[inline(always)]
@@ -79,7 +76,7 @@ pub fn undelegate(
 
     // create delegated account and copy buffer data
     let space = buffer.data_len() as u64;
-    let lamports = Rent::get()?.minimum_balance(space as usize);
+    let lamports = Rent::get()?.try_minimum_balance(space as usize)?;
 
     CreateAccount {
         from: payer,
@@ -90,8 +87,8 @@ pub fn undelegate(
     }
     .invoke_signed(&[signer])?;
 
-    let mut data = delegated_account.try_borrow_mut_data()?;
-    let buffer_data = buffer.try_borrow_data()?;
+    let mut data = delegated_account.try_borrow_mut()?;
+    let buffer_data = buffer.try_borrow()?;
     (*data).copy_from_slice(&buffer_data);
 
     Ok(())
