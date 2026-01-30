@@ -12,9 +12,7 @@ export interface Member {
   pubkey: PublicKey;
 }
 
-export type MemberArgs = Member;
-
-export function serializeMember(member: MemberArgs): Buffer {
+export function serializeMember(member: Member): Buffer {
   const buffer = Buffer.alloc(33); // 1 byte for flags + 32 bytes for pubkey
   let offset = 0;
 
