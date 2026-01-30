@@ -10,9 +10,7 @@ use alloc::{vec, vec::Vec};
 use std::{vec, vec::Vec};
 
 use core::mem::MaybeUninit;
-use pinocchio::{
-    ProgramResult,
-};
+use pinocchio::ProgramResult;
 use serde::{Deserialize, Serialize};
 use solana_address::Address;
 // ---------------------------------------------------------
@@ -34,62 +32,44 @@ impl<'a> ActionArgs<'a> {
         }
     }
 
+    pub fn escrow_index(&self) -> u8 {
+        self.escrow_index
+    }
+
+    pub fn data(&self) -> &'a [u8] {
+        &self.data
+    }
+
     pub fn with_escrow_index(mut self, index: u8) -> Self {
         self.escrow_index = index;
         self
     }
-
-    // fn serialize(&self, buf: &mut Vec<u8>) {
-    //     buf.push(self.escrow_index);
-    //     buf.extend_from_slice(&(self.data.len() as u64).to_le_bytes());
-    //     buf.extend_from_slice(&self.data);
-    // }
 }
 
 /// Base action arguments for serialization.
 #[derive(Clone, Serialize, Debug, PartialEq, Eq)]
-pub struct BaseActionArgs<'a> {
-    pub args: ActionArgs<'a>,
+pub struct BaseActionArgs<'act, 'acc> {
+    pub args: ActionArgs<'act>,
     pub compute_units: u32,
     pub escrow_authority: u8,
     pub destination_program: Address,
-    pub accounts: Vec<ShortAccountMeta>,
+    pub accounts: &'acc [ShortAccountMeta],
 }
-
-// impl<'a> BaseActionArgs<'a> {
-//     fn serialize(&self, buf: &mut Vec<u8>) {
-//         self.args.serialize(buf);
-//         buf.extend_from_slice(&self.compute_units.to_le_bytes());
-//         buf.push(self.escrow_authority);
-//         buf.extend_from_slice(self.destination_program.as_ref());
-//         buf.extend_from_slice(&(self.accounts.len() as u64).to_le_bytes());
-//         for account in &self.accounts {
-//             account.serialize(buf);
-//         }
-//     }
-// }
-
 
 /// A compact account meta used for base-layer actions.
 ///
 /// Unlike `solana_instruction::AccountMeta`, this type **does not** carry an
 /// `is_signer` flag. Users cannot request signatures: the only signer available
 /// is the validator.
-#[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, PartialEq, Eq, Serialize)]
 pub struct ShortAccountMeta {
     pub pubkey: Address,
     pub is_writable: bool,
 }
 
-// impl ShortAccountMeta {
-//     fn serialize(&self, buf: &mut Vec<u8>) {
-//         buf.extend_from_slice(self.pubkey.as_ref());
-//         buf.push(self.is_writable as u8);
-//     }
-// }
-
 /// Commit type arguments for serialization.
 pub enum CommitTypeArgs {
+    // we generate it
     Standalone(Vec<u8>),
     WithBaseActions {
         committed_accounts: Vec<u8>,
@@ -208,10 +188,7 @@ fn serialize_schedule_intent_bundle(args: &MagicIntentBundleArgs) -> Vec<u8> {
 /// Gets the index of a pubkey in the deduplicated pubkey list.
 /// Returns None if the pubkey is not found.
 fn get_index(pubkeys: &[Pubkey], needle: &Pubkey) -> Option<u8> {
-    pubkeys
-        .iter()
-        .position(|k| k == needle)
-        .map(|i| i as u8)
+    pubkeys.iter().position(|k| k == needle).map(|i| i as u8)
 }
 
 /// Removes duplicates from array by pubkey.
@@ -412,10 +389,7 @@ impl<'a> CommitAndUndelegate<'a> {
         self.undelegate_type.collect_accounts(container);
     }
 
-    fn into_args(
-        self,
-        pubkeys: &[Pubkey],
-    ) -> Result<CommitAndUndelegateArgs, ProgramError> {
+    fn into_args(self, pubkeys: &[Pubkey]) -> Result<CommitAndUndelegateArgs, ProgramError> {
         let commit_type = self.commit_type.into_args(pubkeys)?;
         let undelegate_type = self.undelegate_type.into_args(pubkeys)?;
         Ok(CommitAndUndelegateArgs {
@@ -600,10 +574,7 @@ impl<'a> MagicIntentBundle<'a> {
         }
     }
 
-    fn into_args(
-        self,
-        pubkeys: &[Pubkey],
-    ) -> Result<MagicIntentBundleArgs, ProgramError> {
+    fn into_args(self, pubkeys: &[Pubkey]) -> Result<MagicIntentBundleArgs, ProgramError> {
         let commit = self
             .commit_intent
             .map(|c| c.into_args(pubkeys))
@@ -717,7 +688,9 @@ impl<'a> MagicIntentBundleBuilder<'a> {
         actions: impl IntoIterator<Item = BaseAction<'a>>,
     ) -> Self {
         self.intent_bundle
-            .add_intent(MagicIntent::StandaloneActions(actions.into_iter().collect()));
+            .add_intent(MagicIntent::StandaloneActions(
+                actions.into_iter().collect(),
+            ));
         self
     }
 
