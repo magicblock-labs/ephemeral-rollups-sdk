@@ -353,6 +353,28 @@ export function createEataPermissionIx(
   });
 }
 
+
+// Reset EATA permission
+export function resetEataPermissionIx(
+  ephemeralAta: PublicKey,
+  payer: PublicKey,
+  bump: number,
+  flags: number = 0,
+): TransactionInstruction {
+  const permission = permissionPdaFromAccount(ephemeralAta);
+
+  return new TransactionInstruction({
+    programId: EATA_PROGRAM_ID,
+    keys: [
+      { pubkey: ephemeralAta, isSigner: false, isWritable: false },
+      { pubkey: permission, isSigner: false, isWritable: true },
+      { pubkey: payer, isSigner: true, isWritable: false },
+      { pubkey: PERMISSION_PROGRAM_ID, isSigner: false, isWritable: false },
+    ],
+    data: Buffer.from([9, bump, flags]),
+  });
+}
+
 // Delegate EATA permission
 export function delegateEataPermissionIx(
   payer: PublicKey,
