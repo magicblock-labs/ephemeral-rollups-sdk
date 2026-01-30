@@ -11,26 +11,23 @@ use std::{vec, vec::Vec};
 
 use core::mem::MaybeUninit;
 use pinocchio::{
-    account_info::AccountInfo,
-    cpi::{slice_invoke, MAX_CPI_ACCOUNTS},
-    instruction::{AccountMeta, Instruction},
-    program_error::ProgramError,
-    pubkey::Pubkey,
     ProgramResult,
 };
-
+use serde::{Deserialize, Serialize};
+use solana_address::Address;
 // ---------------------------------------------------------
 // Args types for serialization
 // ---------------------------------------------------------
 
 /// Action arguments containing escrow index and instruction data.
-pub struct ActionArgs {
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct ActionArgs<'a> {
     pub escrow_index: u8,
-    pub data: Vec<u8>,
+    pub data: &'a [u8],
 }
 
-impl ActionArgs {
-    pub fn new(data: Vec<u8>) -> Self {
+impl<'a> ActionArgs<'a> {
+    pub fn new(data: &'a [u8]) -> Self {
         Self {
             escrow_index: 255,
             data,
@@ -42,47 +39,54 @@ impl ActionArgs {
         self
     }
 
-    fn serialize(&self, buf: &mut Vec<u8>) {
-        buf.push(self.escrow_index);
-        buf.extend_from_slice(&(self.data.len() as u64).to_le_bytes());
-        buf.extend_from_slice(&self.data);
-    }
-}
-
-/// A compact account meta (pubkey + is_writable).
-pub struct ShortAccountMeta {
-    pub pubkey: Pubkey,
-    pub is_writable: bool,
-}
-
-impl ShortAccountMeta {
-    fn serialize(&self, buf: &mut Vec<u8>) {
-        buf.extend_from_slice(self.pubkey.as_ref());
-        buf.push(self.is_writable as u8);
-    }
+    // fn serialize(&self, buf: &mut Vec<u8>) {
+    //     buf.push(self.escrow_index);
+    //     buf.extend_from_slice(&(self.data.len() as u64).to_le_bytes());
+    //     buf.extend_from_slice(&self.data);
+    // }
 }
 
 /// Base action arguments for serialization.
-pub struct BaseActionArgs {
-    pub args: ActionArgs,
+#[derive(Clone, Serialize, Debug, PartialEq, Eq)]
+pub struct BaseActionArgs<'a> {
+    pub args: ActionArgs<'a>,
     pub compute_units: u32,
     pub escrow_authority: u8,
-    pub destination_program: Pubkey,
+    pub destination_program: Address,
     pub accounts: Vec<ShortAccountMeta>,
 }
 
-impl BaseActionArgs {
-    fn serialize(&self, buf: &mut Vec<u8>) {
-        self.args.serialize(buf);
-        buf.extend_from_slice(&self.compute_units.to_le_bytes());
-        buf.push(self.escrow_authority);
-        buf.extend_from_slice(self.destination_program.as_ref());
-        buf.extend_from_slice(&(self.accounts.len() as u64).to_le_bytes());
-        for account in &self.accounts {
-            account.serialize(buf);
-        }
-    }
+// impl<'a> BaseActionArgs<'a> {
+//     fn serialize(&self, buf: &mut Vec<u8>) {
+//         self.args.serialize(buf);
+//         buf.extend_from_slice(&self.compute_units.to_le_bytes());
+//         buf.push(self.escrow_authority);
+//         buf.extend_from_slice(self.destination_program.as_ref());
+//         buf.extend_from_slice(&(self.accounts.len() as u64).to_le_bytes());
+//         for account in &self.accounts {
+//             account.serialize(buf);
+//         }
+//     }
+// }
+
+
+/// A compact account meta used for base-layer actions.
+///
+/// Unlike `solana_instruction::AccountMeta`, this type **does not** carry an
+/// `is_signer` flag. Users cannot request signatures: the only signer available
+/// is the validator.
+#[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ShortAccountMeta {
+    pub pubkey: Address,
+    pub is_writable: bool,
 }
+
+// impl ShortAccountMeta {
+//     fn serialize(&self, buf: &mut Vec<u8>) {
+//         buf.extend_from_slice(self.pubkey.as_ref());
+//         buf.push(self.is_writable as u8);
+//     }
+// }
 
 /// Commit type arguments for serialization.
 pub enum CommitTypeArgs {
