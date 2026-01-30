@@ -1,5 +1,10 @@
 import { PublicKey } from "@solana/web3.js";
-import { deserializeMember, Member } from "./member";
+import {
+  deserializeMember,
+  Member,
+  MEMBER_SIZE,
+  serializeMember,
+} from "./member";
 
 export interface Permission {
   discriminator: number;
@@ -23,8 +28,9 @@ export function serializePermission(permission: Permission): Buffer {
     buffer.writeUInt32LE(permission.members?.length ?? 0, offset);
     offset += 4;
     for (const member of permission.members ?? []) {
-      buffer.set(member.pubkey.toBuffer(), offset);
-      offset += 32;
+      const memberBuffer = serializeMember(member);
+      buffer.set(memberBuffer, offset);
+      offset += MEMBER_SIZE;
     }
   } else {
     buffer[offset++] = 0;

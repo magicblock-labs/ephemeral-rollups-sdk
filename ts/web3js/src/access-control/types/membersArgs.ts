@@ -1,7 +1,9 @@
-import { deserializeMember, serializeMember, type Member } from "./member";
-
-// Member size: 1 byte flags + 32 bytes pubkey
-const MEMBER_SIZE = 33;
+import {
+  deserializeMember,
+  MEMBER_SIZE,
+  serializeMember,
+  type Member,
+} from "./member";
 
 export interface MembersArgs {
   members: Member[] | null;

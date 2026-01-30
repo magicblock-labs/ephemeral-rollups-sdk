@@ -1,5 +1,8 @@
 import { PublicKey } from "@solana/web3.js";
 
+// Member size: 1 byte flags + 32 bytes pubkey
+export const MEMBER_SIZE = 33;
+
 // Flags for Member
 export const AUTHORITY_FLAG: number = 1 << 0; // Member has authority privileges
 export const TX_LOGS_FLAG: number = 1 << 1; // Member can see transaction logs
@@ -13,7 +16,7 @@ export interface Member {
 }
 
 export function serializeMember(member: Member): Buffer {
-  const buffer = Buffer.alloc(33); // 1 byte for flags + 32 bytes for pubkey
+  const buffer = Buffer.alloc(MEMBER_SIZE); // 1 byte for flags + 32 bytes for pubkey
   let offset = 0;
 
   // Write flags (u8)
