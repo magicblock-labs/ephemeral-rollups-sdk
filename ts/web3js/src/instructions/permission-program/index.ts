@@ -1,9 +1,5 @@
-export {
-  createCreatePermissionInstruction,
-} from "./createPermission";
-export {
-  createUpdatePermissionInstruction,
-} from "./updatePermission";
+export { createCreatePermissionInstruction } from "./createPermission";
+export { createUpdatePermissionInstruction } from "./updatePermission";
 export { createClosePermissionInstruction } from "./closePermission";
 export {
   createDelegatePermissionInstruction,

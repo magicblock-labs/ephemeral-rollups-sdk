@@ -25,17 +25,17 @@ export async function createClosePermissionInstruction(accounts: {
   );
 
   const accountsMeta: AccountMeta[] = [
-    { address: accounts.payer, role: AccountRole.WRITABLE_SIGNER },
+    { address: accounts.payer, role: AccountRole.WRITABLE },
     {
       address: accounts.authority[0],
       role: accounts.authority[1]
-        ? AccountRole.WRITABLE_SIGNER
+        ? AccountRole.READONLY_SIGNER
         : AccountRole.READONLY,
     },
     {
       address: accounts.permissionedAccount[0],
       role: accounts.permissionedAccount[1]
-        ? AccountRole.WRITABLE_SIGNER
+        ? AccountRole.READONLY_SIGNER
         : AccountRole.READONLY,
     },
     { address: permission, role: AccountRole.WRITABLE },

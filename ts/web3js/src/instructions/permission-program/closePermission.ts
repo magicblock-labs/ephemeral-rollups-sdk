@@ -27,15 +27,15 @@ export function createClosePermissionInstruction(accounts: {
   const permission = permissionPdaFromAccount(accounts.permissionedAccount[0]);
 
   const keys: AccountMeta[] = [
-    { pubkey: accounts.payer, isWritable: true, isSigner: true },
+    { pubkey: accounts.payer, isWritable: true, isSigner: false },
     {
       pubkey: accounts.authority[0],
-      isWritable: accounts.authority[1],
+      isWritable: false,
       isSigner: accounts.authority[1],
     },
     {
       pubkey: accounts.permissionedAccount[0],
-      isWritable: accounts.permissionedAccount[1],
+      isWritable: false,
       isSigner: accounts.permissionedAccount[1],
     },
     { pubkey: permission, isWritable: true, isSigner: false },

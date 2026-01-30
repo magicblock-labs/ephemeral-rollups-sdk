@@ -353,7 +353,6 @@ export function createEataPermissionIx(
   });
 }
 
-
 // Reset EATA permission
 export function resetEataPermissionIx(
   ephemeralAta: PublicKey,

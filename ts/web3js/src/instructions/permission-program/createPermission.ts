@@ -34,7 +34,10 @@ export function createCreatePermissionInstruction(
   ];
 
   const argsBuffer = serializeMembersArgs(args);
-  const instructionData = Buffer.from([...CREATE_PERMISSION_DISCRIMINATOR, ...argsBuffer]);
+  const instructionData = Buffer.from([
+    ...CREATE_PERMISSION_DISCRIMINATOR,
+    ...argsBuffer,
+  ]);
 
   return new TransactionInstruction({
     programId: PERMISSION_PROGRAM_ID,
