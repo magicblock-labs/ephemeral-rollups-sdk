@@ -6,14 +6,12 @@ import {
 } from "@solana/web3.js";
 import { PERMISSION_PROGRAM_ID } from "../../constants";
 import { permissionPdaFromAccount } from "../../pda";
-import type { Member } from "../../access-control/types";
+import {
+  serializeMembersArgs,
+  type MembersArgs,
+} from "../../access-control/types";
 
-/**
- * Create permission instruction arguments
- */
-export interface CreatePermissionInstructionArgs {
-  members?: Member[];
-}
+export const CREATE_PERMISSION_DISCRIMINATOR = [0, 0, 0, 0, 0, 0, 0, 0];
 
 /**
  * Instruction: CreatePermission
@@ -24,7 +22,7 @@ export function createCreatePermissionInstruction(
     permissionedAccount: PublicKey;
     payer: PublicKey;
   },
-  args?: CreatePermissionInstructionArgs,
+  args: MembersArgs,
 ): TransactionInstruction {
   const permission = permissionPdaFromAccount(accounts.permissionedAccount);
 
@@ -35,59 +33,15 @@ export function createCreatePermissionInstruction(
     { pubkey: SystemProgram.programId, isWritable: false, isSigner: false },
   ];
 
-  const instructionData = serializeCreatePermissionInstructionData(args);
+  const argsBuffer = serializeMembersArgs(args);
+  const instructionData = Buffer.from([
+    ...CREATE_PERMISSION_DISCRIMINATOR,
+    ...argsBuffer,
+  ]);
 
   return new TransactionInstruction({
     programId: PERMISSION_PROGRAM_ID,
     keys,
     data: instructionData,
   });
-}
-
-export function serializeCreatePermissionInstructionData(
-  args?: CreatePermissionInstructionArgs,
-): Buffer {
-  const MAX_BUFFER_SIZE = 2048;
-  const discriminator = [0, 0, 0, 0, 0, 0, 0, 0];
-  const members = args?.members ?? [];
-  const buffer = Buffer.alloc(MAX_BUFFER_SIZE);
-  let offset = 0;
-
-  // Write discriminator (u64)
-  for (let i = 0; i < 8; i++) {
-    buffer[offset++] = discriminator[i];
-  }
-
-  // Write option discriminant (u8) - 1 if members are present
-  if (offset + 1 > MAX_BUFFER_SIZE) {
-    throw new Error(
-      `Serialized data exceeds buffer size (${MAX_BUFFER_SIZE} bytes)`,
-    );
-  }
-  buffer[offset++] = members.length > 0 ? 1 : 0;
-
-  // Write members count (u32)
-  if (offset + 4 > MAX_BUFFER_SIZE) {
-    throw new Error(
-      `Serialized data exceeds buffer size (${MAX_BUFFER_SIZE} bytes)`,
-    );
-  }
-  buffer.writeUInt32LE(members.length, offset);
-  offset += 4;
-
-  // Write members
-  for (const member of members) {
-    if (offset + 33 > MAX_BUFFER_SIZE) {
-      throw new Error(
-        `Serialized data exceeds buffer size (${MAX_BUFFER_SIZE} bytes)`,
-      );
-    }
-    // Write flags (u8)
-    buffer[offset++] = member.flags;
-
-    buffer.set(member.pubkey.toBuffer(), offset);
-    offset += 32;
-  }
-
-  return buffer.subarray(0, offset);
 }
