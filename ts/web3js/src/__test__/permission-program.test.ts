@@ -253,7 +253,7 @@ describe("Permission Program Instructions (web3.js)", () => {
       expect(authorityAccount?.isSigner).toBe(true);
     });
 
-    it("should not include permissionedAccount as writable signer", () => {
+    it("should not include permissionedAccount as signer", () => {
       const permissionedAddress = new PublicKey(
         "11111111111111111111111111111114",
       );
