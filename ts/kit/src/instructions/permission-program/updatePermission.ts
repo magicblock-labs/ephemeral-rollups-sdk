@@ -1,20 +1,9 @@
-import {
-  Address,
-  Instruction,
-  AccountMeta,
-  AccountRole,
-  getAddressEncoder,
-} from "@solana/kit";
+import { Address, Instruction, AccountMeta, AccountRole } from "@solana/kit";
 import { PERMISSION_PROGRAM_ID } from "../../constants";
 import { permissionPdaFromAccount } from "../../pda";
-import type { Member } from "../../access-control/types";
+import { getMembersArgsEncoder, MembersArgs } from "../../access-control/types";
 
-/**
- * Update permission instruction arguments
- */
-export interface UpdatePermissionInstructionArgs {
-  members?: Member[];
-}
+export const UPDATE_PERMISSION_DISCRIMINATOR = [1, 0, 0, 0, 0, 0, 0, 0];
 
 /**
  * Instruction: UpdatePermission
@@ -33,7 +22,7 @@ export async function createUpdatePermissionInstruction(
     authority: [Address, boolean];
     permissionedAccount: [Address, boolean];
   },
-  args?: UpdatePermissionInstructionArgs,
+  args: MembersArgs,
 ): Promise<Instruction> {
   const permission = await permissionPdaFromAccount(
     accounts.permissionedAccount[0],
@@ -55,52 +44,15 @@ export async function createUpdatePermissionInstruction(
     { address: permission, role: AccountRole.WRITABLE },
   ];
 
-  const [instructionData] = serializeUpdatePermissionInstructionData(args);
+  const argsBuffer = getMembersArgsEncoder().encode(args);
+  const instructionData = Buffer.from([
+    ...UPDATE_PERMISSION_DISCRIMINATOR,
+    ...argsBuffer,
+  ]);
 
   return {
     accounts: accountsMeta,
     data: instructionData,
     programAddress: PERMISSION_PROGRAM_ID,
   };
-}
-
-export function serializeUpdatePermissionInstructionData(
-  args?: UpdatePermissionInstructionArgs,
-): [Uint8Array] {
-  const discriminator = [1, 0, 0, 0, 0, 0, 0, 0];
-  const members = args?.members ?? [];
-
-  // Calculate exact buffer size needed:
-  // 8 bytes (discriminator) + 4 bytes (members count) + (32 bytes + 1 byte) per member
-  let requiredSize = 8 + 4;
-  for (let i = 0; i < members.length; i++) {
-    requiredSize += 32 + 1;
-  }
-
-  const buffer = new ArrayBuffer(requiredSize);
-  const view = new DataView(buffer);
-  let offset = 0;
-
-  // Write discriminator (u64)
-  for (let i = 0; i < 8; i++) {
-    view.setUint8(offset++, discriminator[i]);
-  }
-
-  // Write members count (u32)
-  view.setUint32(offset, members.length, true);
-  offset += 4;
-
-  // Write members
-  const addressEncoder = getAddressEncoder();
-  for (const member of members) {
-    // Write flags (u8)
-    view.setUint8(offset++, member.flags);
-
-    const addressBytes = addressEncoder.encode(member.pubkey);
-    const memberBytes = new Uint8Array(buffer, offset, 32);
-    memberBytes.set(addressBytes);
-    offset += 32;
-  }
-
-  return [new Uint8Array(buffer, 0, offset)];
 }

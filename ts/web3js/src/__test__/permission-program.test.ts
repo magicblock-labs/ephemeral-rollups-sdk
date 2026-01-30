@@ -52,7 +52,7 @@ describe("Permission Program Instructions (web3.js)", () => {
       const instruction = createCreatePermissionInstruction({
         permissionedAccount: testAuthority,
         payer: testMember,
-      });
+      }, { members: null });
 
       const permissionedAccount = instruction.keys.find((key) =>
         key.pubkey.equals(testAuthority),
@@ -67,7 +67,7 @@ describe("Permission Program Instructions (web3.js)", () => {
       const instruction = createCreatePermissionInstruction({
         permissionedAccount: testAuthority,
         payer: payerAddress,
-      });
+      }, { members: null });
 
       const payerAccount = instruction.keys.find((key) =>
         key.pubkey.equals(payerAddress),
@@ -84,7 +84,7 @@ describe("Permission Program Instructions (web3.js)", () => {
       const instruction = createCreatePermissionInstruction({
         permissionedAccount: permissionedAccountAddress,
         payer: testMember,
-      });
+      }, { members: null });
 
       const expectedPda = permissionPdaFromAccount(permissionedAccountAddress);
 
@@ -100,7 +100,7 @@ describe("Permission Program Instructions (web3.js)", () => {
       const instruction = createCreatePermissionInstruction({
         permissionedAccount: testAuthority,
         payer: testAuthority,
-      });
+      }, { members: null });
 
       const systemProgram = instruction.keys.find(
         (key) => key.pubkey.toBase58() === "11111111111111111111111111111111",
@@ -152,7 +152,7 @@ describe("Permission Program Instructions (web3.js)", () => {
       const instruction = createCreatePermissionInstruction({
         permissionedAccount: testAuthority,
         payer: testAuthority,
-      });
+      }, { members: null });
 
       // First 8 bytes should be discriminator
       expect(instruction.data[0]).toBe(0);
@@ -218,37 +218,37 @@ describe("Permission Program Instructions (web3.js)", () => {
       expect(instruction.data).toBeDefined();
     });
 
-    it("should include authority as writable signer", () => {
+    it("should include authority as signer", () => {
       const authorityAddress = new PublicKey(
         "11111111111111111111111111111113",
       );
       const instruction = createUpdatePermissionInstruction({
         authority: [authorityAddress, true],
         permissionedAccount: [testAuthority, false],
-      });
+      }, { members: null });
 
       const authorityAccount = instruction.keys.find((key) =>
         key.pubkey.equals(authorityAddress),
       );
       expect(authorityAccount).toBeDefined();
-      expect(authorityAccount?.isWritable).toBe(true);
+      expect(authorityAccount?.isWritable).toBe(false);
       expect(authorityAccount?.isSigner).toBe(true);
     });
 
-    it("should include permissionedAccount as writable signer", () => {
+    it("should not include permissionedAccount as writable signer", () => {
       const permissionedAddress = new PublicKey(
         "11111111111111111111111111111114",
       );
       const instruction = createUpdatePermissionInstruction({
         authority: [testAuthority, false],
         permissionedAccount: [permissionedAddress, true],
-      });
+      }, { members: null });
 
       const permissionedAccount = instruction.keys.find((key) =>
         key.pubkey.equals(permissionedAddress),
       );
       expect(permissionedAccount).toBeDefined();
-      expect(permissionedAccount?.isWritable).toBe(true);
+      expect(permissionedAccount?.isWritable).toBe(false);
       expect(permissionedAccount?.isSigner).toBe(true);
     });
 
@@ -259,7 +259,7 @@ describe("Permission Program Instructions (web3.js)", () => {
       const instruction = createUpdatePermissionInstruction({
         authority: [testAuthority, false],
         permissionedAccount: [permissionedAccountAddress, true],
-      });
+      }, { members: null });
 
       const expectedPda = permissionPdaFromAccount(permissionedAccountAddress);
 
@@ -275,7 +275,7 @@ describe("Permission Program Instructions (web3.js)", () => {
       const instruction = createUpdatePermissionInstruction({
         authority: [testAuthority, true],
         permissionedAccount: [testAuthority, true],
-      });
+      }, { members: null });
 
       // First byte should be discriminator 1
       expect(instruction.data[0]).toBe(1);
@@ -332,12 +332,12 @@ describe("Permission Program Instructions (web3.js)", () => {
       const createPermissionInstr = createCreatePermissionInstruction({
         permissionedAccount: testAuthority,
         payer: testAuthority,
-      });
+      }, { members: null });
 
       const updatePermissionInstr = createUpdatePermissionInstruction({
         authority: [testAuthority, true],
         permissionedAccount: [testAuthority, true],
-      });
+      }, { members: null });
 
       expect(
         createPermissionInstr.programId.equals(PERMISSION_PROGRAM_ID),
@@ -351,12 +351,12 @@ describe("Permission Program Instructions (web3.js)", () => {
       const createPermissionInstr = createCreatePermissionInstruction({
         permissionedAccount: testAuthority,
         payer: testAuthority,
-      });
+      }, { members: null });
 
       const updatePermissionInstr = createUpdatePermissionInstruction({
         authority: [testAuthority, true],
         permissionedAccount: [testAuthority, true],
-      });
+      }, { members: null });
 
       const disc1 = createPermissionInstr.data[0];
       const disc2 = updatePermissionInstr.data[0];

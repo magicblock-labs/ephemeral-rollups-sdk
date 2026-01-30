@@ -47,10 +47,13 @@ describe("Permission Program Instructions (@solana/kit)", () => {
     });
 
     it("should include permissionedAccount as readonly signer", async () => {
-      const instruction = await createCreatePermissionInstruction({
-        permissionedAccount: mockAddress,
-        payer: differentAddress,
-      });
+      const instruction = await createCreatePermissionInstruction(
+        {
+          permissionedAccount: mockAddress,
+          payer: differentAddress,
+        },
+        { members: null },
+      );
 
       const permissionedAccount = instruction.accounts?.find(
         (acc) => acc.address === mockAddress,
@@ -61,10 +64,13 @@ describe("Permission Program Instructions (@solana/kit)", () => {
 
     it("should include payer as writable signer", async () => {
       const payerAddress = address("11111111111111111111111111111115");
-      const instruction = await createCreatePermissionInstruction({
-        permissionedAccount: mockAddress,
-        payer: payerAddress,
-      });
+      const instruction = await createCreatePermissionInstruction(
+        {
+          permissionedAccount: mockAddress,
+          payer: payerAddress,
+        },
+        { members: null },
+      );
 
       const payerAccount = instruction.accounts?.find(
         (acc) => acc.address === payerAddress,
@@ -74,10 +80,13 @@ describe("Permission Program Instructions (@solana/kit)", () => {
     });
 
     it("should include permission PDA as writable", async () => {
-      const instruction = await createCreatePermissionInstruction({
-        permissionedAccount: mockAddress,
-        payer: mockAddress,
-      });
+      const instruction = await createCreatePermissionInstruction(
+        {
+          permissionedAccount: mockAddress,
+          payer: mockAddress,
+        },
+        { members: null },
+      );
 
       expect(instruction.accounts).toBeDefined();
       expect(instruction.accounts?.length).toBe(4);
@@ -125,10 +134,13 @@ describe("Permission Program Instructions (@solana/kit)", () => {
     });
 
     it("should use discriminator [0, 0, 0, 0, 0, 0, 0, 0]", async () => {
-      const instruction = await createCreatePermissionInstruction({
-        permissionedAccount: mockAddress,
-        payer: mockAddress,
-      });
+      const instruction = await createCreatePermissionInstruction(
+        {
+          permissionedAccount: mockAddress,
+          payer: mockAddress,
+        },
+        { members: null },
+      );
 
       // First 8 bytes should be discriminator
       expect(instruction.data?.[0]).toBe(0);
@@ -193,10 +205,13 @@ describe("Permission Program Instructions (@solana/kit)", () => {
 
     it("should include authority as writable signer", async () => {
       const authorityAddress = address("11111111111111111111111111111113");
-      const instruction = await createUpdatePermissionInstruction({
-        authority: [authorityAddress, true],
-        permissionedAccount: [mockAddress, false],
-      });
+      const instruction = await createUpdatePermissionInstruction(
+        {
+          authority: [authorityAddress, true],
+          permissionedAccount: [mockAddress, false],
+        },
+        { members: null },
+      );
 
       const authorityAccount = instruction.accounts?.find(
         (acc) => acc.address === authorityAddress,
@@ -207,10 +222,13 @@ describe("Permission Program Instructions (@solana/kit)", () => {
 
     it("should include permissionedAccount as writable signer", async () => {
       const permissionedAddress = address("11111111111111111111111111111114");
-      const instruction = await createUpdatePermissionInstruction({
-        authority: [mockAddress, false],
-        permissionedAccount: [permissionedAddress, true],
-      });
+      const instruction = await createUpdatePermissionInstruction(
+        {
+          authority: [mockAddress, false],
+          permissionedAccount: [permissionedAddress, true],
+        },
+        { members: null },
+      );
 
       const permissionedAccount = instruction.accounts?.find(
         (acc) => acc.address === permissionedAddress,
@@ -220,10 +238,13 @@ describe("Permission Program Instructions (@solana/kit)", () => {
     });
 
     it("should include permission PDA as writable", async () => {
-      const instruction = await createUpdatePermissionInstruction({
-        authority: [mockAddress, false],
-        permissionedAccount: [mockAddress, true],
-      });
+      const instruction = await createUpdatePermissionInstruction(
+        {
+          authority: [mockAddress, false],
+          permissionedAccount: [mockAddress, true],
+        },
+        { members: null },
+      );
 
       expect(instruction.accounts).toBeDefined();
       expect(instruction.accounts?.length).toBe(3);
@@ -233,10 +254,13 @@ describe("Permission Program Instructions (@solana/kit)", () => {
     });
 
     it("should use discriminator [1, 0, 0, 0, 0, 0, 0, 0]", async () => {
-      const instruction = await createUpdatePermissionInstruction({
-        authority: [mockAddress, true],
-        permissionedAccount: [mockAddress, true],
-      });
+      const instruction = await createUpdatePermissionInstruction(
+        {
+          authority: [mockAddress, true],
+          permissionedAccount: [mockAddress, true],
+        },
+        { members: null },
+      );
 
       // First byte should be discriminator 1
       expect(instruction.data?.[0]).toBe(1);
@@ -290,30 +314,42 @@ describe("Permission Program Instructions (@solana/kit)", () => {
 
   describe("Cross-instruction consistency", () => {
     it("should all target the same permission program", async () => {
-      const createPermissionInstr = await createCreatePermissionInstruction({
-        permissionedAccount: mockAddress,
-        payer: mockAddress,
-      });
+      const createPermissionInstr = await createCreatePermissionInstruction(
+        {
+          permissionedAccount: mockAddress,
+          payer: mockAddress,
+        },
+        { members: null },
+      );
 
-      const updatePermissionInstr = await createUpdatePermissionInstruction({
-        authority: [mockAddress, true],
-        permissionedAccount: [mockAddress, true],
-      });
+      const updatePermissionInstr = await createUpdatePermissionInstruction(
+        {
+          authority: [mockAddress, true],
+          permissionedAccount: [mockAddress, true],
+        },
+        { members: null },
+      );
 
       expect(createPermissionInstr.programAddress).toBe(PERMISSION_PROGRAM_ID);
       expect(updatePermissionInstr.programAddress).toBe(PERMISSION_PROGRAM_ID);
     });
 
     it("should have unique discriminators", async () => {
-      const createPermissionInstr = await createCreatePermissionInstruction({
-        permissionedAccount: mockAddress,
-        payer: mockAddress,
-      });
+      const createPermissionInstr = await createCreatePermissionInstruction(
+        {
+          permissionedAccount: mockAddress,
+          payer: mockAddress,
+        },
+        { members: null },
+      );
 
-      const updatePermissionInstr = await createUpdatePermissionInstruction({
-        authority: [mockAddress, true],
-        permissionedAccount: [mockAddress, true],
-      });
+      const updatePermissionInstr = await createUpdatePermissionInstruction(
+        {
+          authority: [mockAddress, true],
+          permissionedAccount: [mockAddress, true],
+        },
+        { members: null },
+      );
 
       const disc1 = createPermissionInstr.data?.[0];
       const disc2 = updatePermissionInstr.data?.[0];
