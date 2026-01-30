@@ -1,11 +1,11 @@
 {
   "name": "@magicblock-labs/ephemeral-rollups-sdk",
-  "version": "0.8.4",
+  "version": "0.8.5",
   "author": "MagicBlock Labs",
   "license": "MIT",
   "publishConfig": {
     "access": "public",
-    "registry": "https://registry.npmjs.org/"
+    "registry": "https://registry.  npmjs.org/"
   },
   "main": "lib/index.js",
   "exports": {
