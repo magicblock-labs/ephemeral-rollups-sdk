@@ -30,6 +30,8 @@ pub mod solana {
 
 #[cfg(all(feature = "modular-sdk", not(feature = "anchor")))]
 pub mod solana {
+    #![allow(unused_imports)]
+
     pub use solana_account_info::AccountInfo;
     pub use solana_cpi::invoke;
     pub use solana_cpi::invoke_signed;
