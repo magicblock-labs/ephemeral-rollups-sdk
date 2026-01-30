@@ -30,11 +30,12 @@ modular-sdk = [
 custom-heap = []
 custom-panic = []
 anchor-debug = []
+serde = []
 
 
 [dependencies]
 anchor-lang = { workspace = true, optional = true }
-borsh = { workspace = true }
+borsh = "0.10.4"
 ephemeral-rollups-sdk-attribute-delegate = { workspace = true }
 ephemeral-rollups-sdk-attribute-ephemeral = { workspace = true }
 ephemeral-rollups-sdk-attribute-commit = { workspace = true }
@@ -70,6 +71,7 @@ path = "../tests/unit_test.rs"
 [[test]]
 name = "access_control_test"
 path = "../tests/access_control_test.rs"
+required-features = ["access-control", "modular-sdk"]
 
 [[test]]
 name = "pinocchio_test"
