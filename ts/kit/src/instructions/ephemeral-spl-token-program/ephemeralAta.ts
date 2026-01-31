@@ -4,6 +4,7 @@ import {
   AccountRole,
   getAddressEncoder,
   address,
+  getProgramDerivedAddress,
 } from "@solana/kit";
 import { SYSTEM_PROGRAM_ADDRESS } from "@solana-program/system";
 
@@ -32,17 +33,29 @@ const TOKEN_PROGRAM_ADDRESS =
 const ASSOCIATED_TOKEN_PROGRAM_ADDRESS =
   "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL" as const;
 
-// Derive the Associated Token Account for a given mint/owner pair
+/**
+ * Derive the Associated Token Account for a given mint/owner pair.
+ * Mirrors the behavior of @solana/spl-token's getAssociatedTokenAddressSync.
+ * @param mint - The mint account address
+ * @param owner - The owner account address
+ * @param allowOwnerOffCurve - Whether to allow off-curve owner (for PDAs)
+ * @returns The Associated Token Account address
+ */
 async function getAssociatedTokenAddressSync(
   mint: Address,
   owner: Address,
   allowOwnerOffCurve: boolean = false,
 ): Promise<Address> {
-  // In Kit, we would use getProgramDerivedAddress
-  // For now, we return a placeholder - the actual implementation would need
-  // to properly derive using Kit's PDA functions
-  // This matches the web3.js API pattern where it's derived deterministically
-  return owner;
+  const addressEncoder = getAddressEncoder();
+  const [ata] = await getProgramDerivedAddress({
+    programAddress: ASSOCIATED_TOKEN_PROGRAM_ADDRESS as Address,
+    seeds: [
+      addressEncoder.encode(owner),
+      addressEncoder.encode(TOKEN_PROGRAM_ADDRESS as Address),
+      addressEncoder.encode(mint),
+    ],
+  });
+  return ata;
 }
 
 // ---------------------------------------------------------------------------
@@ -71,16 +84,15 @@ export interface EphemeralAta {
  * @param mint - The mint account
  * @returns The ephemeral ATA account and bump
  */
-export function deriveEphemeralAta(
+export async function deriveEphemeralAta(
   owner: Address,
   mint: Address,
-): [Address, number] {
-  const [ata, bump] = (() => {
-    // Simplified: In a real implementation, this would use getProgramDerivedAddress
-    // and extract bump. For now, we use a placeholder approach.
-    // The web3js version uses PublicKey.findProgramAddressSync
-    return [owner, 255] as const;
-  })();
+): Promise<[Address, number]> {
+  const addressEncoder = getAddressEncoder();
+  const [ata, bump] = await getProgramDerivedAddress({
+    programAddress: EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
+    seeds: [addressEncoder.encode(owner), addressEncoder.encode(mint)],
+  });
   return [ata, bump];
 }
 
@@ -89,9 +101,13 @@ export function deriveEphemeralAta(
  * @param mint - The mint account
  * @returns The vault account and bump
  */
-export function deriveVault(mint: Address): [Address, number] {
-  // Simplified: In a real implementation, this would use getProgramDerivedAddress
-  return [mint, 255];
+export async function deriveVault(mint: Address): Promise<[Address, number]> {
+  const addressEncoder = getAddressEncoder();
+  const [vault, bump] = await getProgramDerivedAddress({
+    programAddress: EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
+    seeds: [addressEncoder.encode(mint)],
+  });
+  return [vault, bump];
 }
 
 /**
@@ -298,8 +314,8 @@ export async function withdrawSplIx(
   mint: Address,
   amount: bigint,
 ): Promise<Instruction> {
-  const [ephemeralAta] = deriveEphemeralAta(owner, mint);
-  const [vault, vaultBump] = deriveVault(mint);
+  const [ephemeralAta] = await deriveEphemeralAta(owner, mint);
+  const [vault, vaultBump] = await deriveVault(mint);
   const vaultAta = await deriveVaultAta(mint, vault);
   const userDestAta = await getAssociatedTokenAddressSync(mint, owner);
 
@@ -329,7 +345,7 @@ export async function undelegateIx(
   mint: Address,
 ): Promise<Instruction> {
   const userAta = await getAssociatedTokenAddressSync(mint, owner);
-  const [ephemeralAta] = deriveEphemeralAta(owner, mint);
+  const [ephemeralAta] = await deriveEphemeralAta(owner, mint);
 
   return {
     accounts: [
@@ -516,8 +532,8 @@ export async function delegateSpl(
 
   const instructions: Instruction[] = [];
 
-  const [ephemeralAta, eataBump] = deriveEphemeralAta(owner, mint);
-  const [vault, vaultBump] = deriveVault(mint);
+  const [ephemeralAta, eataBump] = await deriveEphemeralAta(owner, mint);
+  const [vault, vaultBump] = await deriveVault(mint);
   const vaultAta = await deriveVaultAta(mint, vault);
 
   const ownerAta = await getAssociatedTokenAddressSync(mint, owner);
@@ -575,8 +591,8 @@ export async function delegatePrivateSpl(
 
   const instructions: Instruction[] = [];
 
-  const [ephemeralAta, eataBump] = deriveEphemeralAta(owner, mint);
-  const [vault, vaultBump] = deriveVault(mint);
+  const [ephemeralAta, eataBump] = await deriveEphemeralAta(owner, mint);
+  const [vault, vaultBump] = await deriveVault(mint);
   const vaultAta = await deriveVaultAta(mint, vault);
 
   const ownerAta = await getAssociatedTokenAddressSync(mint, owner);
