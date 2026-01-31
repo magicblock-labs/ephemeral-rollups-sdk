@@ -14,3 +14,7 @@ export const MAGIC_CONTEXT_ID = address(
 export const PERMISSION_PROGRAM_ID = address(
   "ACLseoPoyC3cBqoUtkbjZ4aDrkurZW86v19pXz2XQnp1",
 );
+
+export const EPHEMERAL_SPL_TOKEN_PROGRAM_ID = address(
+  "SPLxh1LVZzEkX99H6rqYizhytLWPZVV296zyYDPagv2",
+);

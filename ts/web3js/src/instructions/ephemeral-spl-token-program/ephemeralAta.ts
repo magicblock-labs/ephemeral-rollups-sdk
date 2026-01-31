@@ -6,18 +6,23 @@ import {
 } from "@solana/web3.js";
 
 import {
-  DEFAULT_PRIVATE_VALIDATOR,
   DELEGATION_PROGRAM_ID,
   MAGIC_CONTEXT_ID,
   MAGIC_PROGRAM_ID,
   PERMISSION_PROGRAM_ID,
-} from "../constants.js";
+  EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
+} from "../../constants.js";
 import {
   delegateBufferPdaFromDelegatedAccountAndOwnerProgram,
   delegationRecordPdaFromDelegatedAccount,
   delegationMetadataPdaFromDelegatedAccount,
   permissionPdaFromAccount,
-} from "../pda.js";
+} from "../../pda.js";
+
+// Default validator for private delegation
+const DEFAULT_PRIVATE_VALIDATOR = new PublicKey(
+  "FnE6VJT5QNZdedZPnCoLsARgBwoE6DeJNjBs2H1gySXA",
+);
 
 // Minimal SPL Token helpers (vendored) to avoid importing @solana/spl-token.
 // This prevents bundlers from pulling transitive deps like spl-token-group and
@@ -81,14 +86,6 @@ function createAssociatedTokenAccountIdempotentInstruction(
 }
 
 // ---------------------------------------------------------------------------
-// Constants
-// ---------------------------------------------------------------------------
-
-export const EATA_PROGRAM_ID = new PublicKey(
-  "SPLxh1LVZzEkX99H6rqYizhytLWPZVV296zyYDPagv2",
-);
-
-// ---------------------------------------------------------------------------
 // Accounts
 // ---------------------------------------------------------------------------
 
@@ -139,7 +136,7 @@ export function deriveEphemeralAta(
 ): [PublicKey, number] {
   return PublicKey.findProgramAddressSync(
     [owner.toBuffer(), mint.toBuffer()],
-    EATA_PROGRAM_ID,
+    EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
   );
 }
 
@@ -149,7 +146,10 @@ export function deriveEphemeralAta(
  * @returns The vault account and bump
  */
 export function deriveVault(mint: PublicKey): [PublicKey, number] {
-  return PublicKey.findProgramAddressSync([mint.toBuffer()], EATA_PROGRAM_ID);
+  return PublicKey.findProgramAddressSync(
+    [mint.toBuffer()],
+    EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
+  );
 }
 
 /**
@@ -183,7 +183,7 @@ export function initEphemeralAtaIx(
   bump: number,
 ): TransactionInstruction {
   return new TransactionInstruction({
-    programId: EATA_PROGRAM_ID,
+    programId: EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
     keys: [
       { pubkey: ephemeralAta, isSigner: false, isWritable: true },
       { pubkey: payer, isSigner: true, isWritable: true },
@@ -232,7 +232,7 @@ export function initVaultIx(
   bump: number,
 ): TransactionInstruction {
   return new TransactionInstruction({
-    programId: EATA_PROGRAM_ID,
+    programId: EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
     keys: [
       { pubkey: vault, isSigner: false, isWritable: true },
       { pubkey: payer, isSigner: true, isWritable: true },
@@ -264,7 +264,7 @@ export function transferToVaultIx(
   amount: bigint,
 ): TransactionInstruction {
   return new TransactionInstruction({
-    programId: EATA_PROGRAM_ID,
+    programId: EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
     keys: [
       { pubkey: ephemeralAta, isSigner: false, isWritable: true },
       { pubkey: vault, isSigner: false, isWritable: false },
@@ -296,15 +296,19 @@ export function delegateIx(
     ? Buffer.concat([Buffer.from([4, bump]), validator.toBuffer()])
     : Buffer.from([4, bump]);
   return new TransactionInstruction({
-    programId: EATA_PROGRAM_ID,
+    programId: EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
     keys: [
       { pubkey: payer, isSigner: true, isWritable: true },
       { pubkey: ephemeralAta, isSigner: false, isWritable: true },
-      { pubkey: EATA_PROGRAM_ID, isSigner: false, isWritable: false },
+      {
+        pubkey: EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
+        isSigner: false,
+        isWritable: false,
+      },
       {
         pubkey: delegateBufferPdaFromDelegatedAccountAndOwnerProgram(
           ephemeralAta,
-          EATA_PROGRAM_ID,
+          EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
         ),
         isSigner: false,
         isWritable: true,
@@ -344,7 +348,7 @@ export function withdrawSplIx(
   const userDestAta = getAssociatedTokenAddressSync(mint, owner);
 
   return new TransactionInstruction({
-    programId: EATA_PROGRAM_ID,
+    programId: EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
     keys: [
       { pubkey: owner, isSigner: true, isWritable: false },
       { pubkey: ephemeralAta, isSigner: false, isWritable: true },
@@ -373,7 +377,7 @@ export function undelegateIx(
   const [ephemeralAta] = deriveEphemeralAta(owner, mint);
 
   return new TransactionInstruction({
-    programId: EATA_PROGRAM_ID,
+    programId: EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
     keys: [
       {
         pubkey: owner,
@@ -422,7 +426,7 @@ export function createEataPermissionIx(
   const permission = permissionPdaFromAccount(ephemeralAta);
 
   return new TransactionInstruction({
-    programId: EATA_PROGRAM_ID,
+    programId: EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
     keys: [
       { pubkey: ephemeralAta, isSigner: false, isWritable: true },
       { pubkey: permission, isSigner: false, isWritable: true },
@@ -451,7 +455,7 @@ export function resetEataPermissionIx(
   const permission = permissionPdaFromAccount(ephemeralAta);
 
   return new TransactionInstruction({
-    programId: EATA_PROGRAM_ID,
+    programId: EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
     keys: [
       { pubkey: ephemeralAta, isSigner: false, isWritable: false },
       { pubkey: permission, isSigner: false, isWritable: true },
@@ -479,7 +483,7 @@ export function delegateEataPermissionIx(
   const permission = permissionPdaFromAccount(ephemeralAta);
 
   return new TransactionInstruction({
-    programId: EATA_PROGRAM_ID,
+    programId: EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
     keys: [
       { pubkey: payer, isSigner: true, isWritable: true },
       { pubkey: ephemeralAta, isSigner: false, isWritable: true },
@@ -524,7 +528,7 @@ export function undelegateEataPermissionIx(
   const permission = permissionPdaFromAccount(ephemeralAta);
 
   return new TransactionInstruction({
-    programId: EATA_PROGRAM_ID,
+    programId: EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
     keys: [
       { pubkey: owner, isSigner: true, isWritable: false },
       { pubkey: ephemeralAta, isSigner: false, isWritable: true },

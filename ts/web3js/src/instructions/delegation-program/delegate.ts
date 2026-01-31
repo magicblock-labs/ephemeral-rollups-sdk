@@ -11,6 +11,11 @@ import {
   delegationMetadataPdaFromDelegatedAccount,
 } from "../../pda";
 
+// Default validator for delegation
+const DEFAULT_VALIDATOR = new PublicKey(
+  "MAS1Dt9qreoRMQ14YQuhg8UTZMMzDdKhmkZMECCzk57",
+);
+
 /**
  * Delegate instruction arguments
  */
@@ -72,7 +77,10 @@ export function serializeDelegateInstructionData(
   const delegateInstructionDiscriminator = [0, 0, 0, 0, 0, 0, 0, 0];
   const commitFrequencyMs = args?.commitFrequencyMs ?? 0xffffffff;
   const seeds = args?.seeds ?? [];
-  const validator = args?.validator;
+  const validator =
+    args?.validator !== null && args?.validator !== undefined
+      ? args.validator
+      : DEFAULT_VALIDATOR;
   const buffer = Buffer.alloc(1024);
   let offset = 0;
 
@@ -97,7 +105,7 @@ export function serializeDelegateInstructionData(
   }
 
   // Write validator (Option<Pubkey>)
-  if (validator) {
+  if (validator !== null) {
     buffer[offset++] = 1; // Some discriminant
     buffer.set(validator.toBuffer(), offset);
     offset += 32;

@@ -4,6 +4,7 @@ import {
   AccountMeta,
   AccountRole,
   getAddressEncoder,
+  address,
 } from "@solana/kit";
 import { SYSTEM_PROGRAM_ADDRESS } from "@solana-program/system";
 import { DELEGATION_PROGRAM_ID } from "../../constants";
@@ -12,6 +13,11 @@ import {
   delegationRecordPdaFromDelegatedAccount,
   delegationMetadataPdaFromDelegatedAccount,
 } from "../../pda";
+
+// Default validator for delegation
+const DEFAULT_VALIDATOR = address(
+  "MAS1Dt9qreoRMQ14YQuhg8UTZMMzDdKhmkZMECCzk57",
+);
 
 /**
  * Delegate instruction arguments
@@ -75,7 +81,10 @@ export function serializeDelegateInstructionData(
   const delegateInstructionDiscriminator = [0, 0, 0, 0, 0, 0, 0, 0];
   const commitFrequencyMs = args?.commitFrequencyMs ?? 0xffffffff;
   const seeds = args?.seeds ?? [];
-  const validator = args?.validator;
+  const validator =
+    args?.validator !== null && args?.validator !== undefined
+      ? args.validator
+      : DEFAULT_VALIDATOR;
   let offset = 0;
   const buffer = new ArrayBuffer(1024);
   const view = new DataView(buffer);
@@ -102,7 +111,7 @@ export function serializeDelegateInstructionData(
   }
 
   // Write validator (Option<Address>)
-  if (validator) {
+  if (validator !== null) {
     view.setUint8(offset++, 1); // Some discriminant
     const validatorBytes = new Uint8Array(buffer, offset, 32);
     const addressEncoder = getAddressEncoder();
