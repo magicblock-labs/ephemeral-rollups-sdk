@@ -120,6 +120,51 @@ export function decodeEphemeralAta(info: AccountInfo<Buffer>): EphemeralAta {
   };
 }
 
+/**
+ * Encode ephemeral ATA to bytes
+ * @param eata - The ephemeral ATA to encode
+ * @returns The encoded bytes
+ */
+export function encodeEphemeralAta(eata: EphemeralAta): Buffer {
+  const buffer = Buffer.alloc(72);
+  buffer.set(eata.owner.toBytes(), 0);
+  buffer.set(eata.mint.toBytes(), 32);
+  buffer.writeBigUInt64LE(eata.amount, 64);
+  return buffer;
+}
+
+/**
+ * Global Vault
+ */
+export interface GlobalVault {
+  /// The mint associated with this vault
+  mint: PublicKey;
+}
+
+/**
+ * Decode global vault
+ * @param info - The account info
+ * @returns The decoded global vault
+ */
+export function decodeGlobalVault(info: AccountInfo<Buffer>): GlobalVault {
+  if (info.data.length < 32) {
+    throw new Error("Invalid GlobalVault account data length");
+  }
+  const mint = new PublicKey(info.data.subarray(0, 32));
+  return { mint };
+}
+
+/**
+ * Encode global vault to bytes
+ * @param vault - The global vault to encode
+ * @returns The encoded bytes
+ */
+export function encodeGlobalVault(vault: GlobalVault): Buffer {
+  const buffer = Buffer.alloc(32);
+  buffer.set(vault.mint.toBytes(), 0);
+  return buffer;
+}
+
 // ---------------------------------------------------------------------------
 // PDA derivation helpers
 // ---------------------------------------------------------------------------

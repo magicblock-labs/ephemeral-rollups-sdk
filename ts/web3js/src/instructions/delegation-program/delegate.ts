@@ -77,10 +77,8 @@ export function serializeDelegateInstructionData(
   const delegateInstructionDiscriminator = [0, 0, 0, 0, 0, 0, 0, 0];
   const commitFrequencyMs = args?.commitFrequencyMs ?? 0xffffffff;
   const seeds = args?.seeds ?? [];
-  const validator =
-    args?.validator !== null && args?.validator !== undefined
-      ? args.validator
-      : DEFAULT_VALIDATOR;
+  // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
+  const validator = args?.validator || DEFAULT_VALIDATOR;
   const buffer = Buffer.alloc(1024);
   let offset = 0;
 
@@ -105,7 +103,8 @@ export function serializeDelegateInstructionData(
   }
 
   // Write validator (Option<Pubkey>)
-  if (validator !== null) {
+  // eslint-disable-next-line @typescript-eslint/strict-boolean-expressions
+  if (validator) {
     buffer[offset++] = 1; // Some discriminant
     buffer.set(validator.toBuffer(), offset);
     offset += 32;

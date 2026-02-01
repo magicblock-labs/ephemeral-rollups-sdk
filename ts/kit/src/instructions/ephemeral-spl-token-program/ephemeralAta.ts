@@ -5,6 +5,17 @@ import {
   getAddressEncoder,
   address,
   getProgramDerivedAddress,
+  getAddressDecoder,
+  getU64Encoder,
+  getU64Decoder,
+  getStructEncoder,
+  getStructDecoder,
+  combineCodec,
+  Encoder,
+  Decoder,
+  Codec,
+  AccountInfoWithBase64EncodedData,
+  AccountInfoBase,
 } from "@solana/kit";
 import { SYSTEM_PROGRAM_ADDRESS } from "@solana-program/system";
 
@@ -72,6 +83,88 @@ export interface EphemeralAta {
   mint: Address;
   /// The amount of tokens this account holds.
   amount: bigint;
+}
+
+/**
+ * Get encoder for Ephemeral ATA
+ */
+export function getEphemeralAtaEncoder(): Encoder<EphemeralAta> {
+  return getStructEncoder([
+    ["owner", getAddressEncoder()],
+    ["mint", getAddressEncoder()],
+    ["amount", getU64Encoder()],
+  ]);
+}
+
+/**
+ * Get decoder for Ephemeral ATA
+ */
+export function getEphemeralAtaDecoder(): Decoder<EphemeralAta> {
+  return getStructDecoder([
+    ["owner", getAddressDecoder()],
+    ["mint", getAddressDecoder()],
+    ["amount", getU64Decoder()],
+  ]);
+}
+
+/**
+ * Get codec for Ephemeral ATA
+ */
+export function getEphemeralAtaCodec(): Codec<EphemeralAta> {
+  return combineCodec(getEphemeralAtaEncoder(), getEphemeralAtaDecoder());
+}
+
+/**
+ * Decode ephemeral ATA from account data
+ * @param account - The account info with base64 encoded data
+ * @returns The decoded ephemeral ATA
+ */
+export function decodeEphemeralAta(
+  account: AccountInfoBase & AccountInfoWithBase64EncodedData,
+): EphemeralAta {
+  const codec = getEphemeralAtaCodec();
+  return codec.decode(Buffer.from(account.data[0], "base64"));
+}
+
+/**
+ * Global Vault
+ */
+export interface GlobalVault {
+  /// The mint associated with this vault
+  mint: Address;
+}
+
+/**
+ * Get encoder for Global Vault
+ */
+export function getGlobalVaultEncoder(): Encoder<GlobalVault> {
+  return getStructEncoder([["mint", getAddressEncoder()]]);
+}
+
+/**
+ * Get decoder for Global Vault
+ */
+export function getGlobalVaultDecoder(): Decoder<GlobalVault> {
+  return getStructDecoder([["mint", getAddressDecoder()]]);
+}
+
+/**
+ * Get codec for Global Vault
+ */
+export function getGlobalVaultCodec(): Codec<GlobalVault> {
+  return combineCodec(getGlobalVaultEncoder(), getGlobalVaultDecoder());
+}
+
+/**
+ * Decode global vault from account data
+ * @param account - The account info with base64 encoded data
+ * @returns The decoded global vault
+ */
+export function decodeGlobalVault(
+  account: AccountInfoBase & AccountInfoWithBase64EncodedData,
+): GlobalVault {
+  const codec = getGlobalVaultCodec();
+  return codec.decode(Buffer.from(account.data[0], "base64"));
 }
 
 // ---------------------------------------------------------------------------
