@@ -100,7 +100,7 @@ pub fn cpi_update_permission(
         if authority_is_signer {
             account_metas
                 .get_unchecked_mut(0)
-                .write(InstructionAccount::writable_signer(authority.address()));
+                .write(InstructionAccount::readonly_signer(authority.address()));
         } else {
             account_metas
                 .get_unchecked_mut(0)
@@ -111,7 +111,7 @@ pub fn cpi_update_permission(
         if permissioned_account_is_signer {
             account_metas
                 .get_unchecked_mut(1)
-                .write(InstructionAccount::writable_signer(
+                .write(InstructionAccount::readonly_signer(
                     permissioned_account.address(),
                 ));
         } else {
@@ -185,7 +185,7 @@ pub fn cpi_close_permission(
         if authority_is_signer {
             account_metas
                 .get_unchecked_mut(1)
-                .write(InstructionAccount::writable_signer(authority.address()));
+                .write(InstructionAccount::readonly_signer(authority.address()));
         } else {
             account_metas
                 .get_unchecked_mut(1)
@@ -196,7 +196,7 @@ pub fn cpi_close_permission(
         if permissioned_account_is_signer {
             account_metas
                 .get_unchecked_mut(2)
-                .write(InstructionAccount::writable_signer(
+                .write(InstructionAccount::readonly_signer(
                     permissioned_account.address(),
                 ));
         } else {

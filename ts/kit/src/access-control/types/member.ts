@@ -32,9 +32,7 @@ export interface Member {
   pubkey: Address;
 }
 
-export type MemberArgs = Member;
-
-export function getMemberEncoder(): FixedSizeEncoder<MemberArgs> {
+export function getMemberEncoder(): FixedSizeEncoder<Member> {
   return getStructEncoder([
     ["flags", getU8Encoder()],
     ["pubkey", getAddressEncoder()],
@@ -48,7 +46,7 @@ export function getMemberDecoder(): FixedSizeDecoder<Member> {
   ]);
 }
 
-export function getMemberCodec(): FixedSizeCodec<MemberArgs, Member> {
+export function getMemberCodec(): FixedSizeCodec<Member, Member> {
   return combineCodec(getMemberEncoder(), getMemberDecoder());
 }
 
