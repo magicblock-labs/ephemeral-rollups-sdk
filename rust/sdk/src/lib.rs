@@ -4,6 +4,7 @@ pub mod consts;
 pub mod cpi;
 pub mod delegate_args;
 pub mod ephem;
+pub mod ephemeral_accounts;
 mod solana_compat;
 pub mod types;
 pub mod utils;
