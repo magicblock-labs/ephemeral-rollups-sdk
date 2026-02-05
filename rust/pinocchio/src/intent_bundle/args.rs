@@ -1,7 +1,5 @@
 use crate::intent_bundle::no_vec::NoVec;
-use core::mem::MaybeUninit;
-use pinocchio::{AccountView, ProgramResult};
-use serde::{Deserialize, Serialize};
+use serde::{Serialize};
 use solana_address::Address;
 // ---------------------------------------------------------
 // Args types for serialization
@@ -46,6 +44,7 @@ pub struct BaseActionArgs<'args> {
     pub args: ActionArgs<'args>,
     pub compute_units: u32,
     pub escrow_authority: u8,
+    #[bincode(with_serde)]
     pub destination_program: Address,
     pub accounts: NoVec<ShortAccountMeta, MAX_ACTIONS_NUM>,
 }
@@ -57,6 +56,7 @@ pub struct BaseActionArgs<'args> {
 /// is the validator.
 #[derive(Debug, Default, Clone, Serialize, bincode::Encode)]
 pub struct ShortAccountMeta {
+    #[bincode(with_serde)]
     pub pubkey: Address,
     pub is_writable: bool,
 }
@@ -94,63 +94,4 @@ pub struct MagicIntentBundleArgs<'args> {
     pub commit: Option<CommitTypeArgs<'args>>,
     pub commit_and_undelegate: Option<CommitAndUndelegateArgs<'args>>,
     pub standalone_actions: NoVec<BaseActionArgs<'args>, MAX_ACTIONS_NUM>,
-}
-
-fn filter_duplicates(container: &mut Vec<&AccountInfo>) -> Vec<Pubkey> {
-    let mut seen: Vec<Pubkey> = Vec::new();
-    container.retain(|el| {
-        if seen.contains(el.key()) {
-            false
-        } else {
-            seen.push(*el.key());
-            true
-        }
-    });
-    seen
-}
-
-// ---------------------------------------------------------
-// Types
-// ---------------------------------------------------------
-
-/// Intent to be scheduled for execution on the base layer.
-pub enum MagicIntent<'a> {
-    /// Standalone actions to execute on base layer without commit/undelegate semantics.
-    StandaloneActions(Vec<BaseAction<'a>>),
-    /// Commit accounts to base layer, optionally with post-commit actions.
-    Commit(CommitType<'a>),
-    /// Commit accounts and undelegate them, optionally with post-commit and post-undelegate actions.
-    CommitAndUndelegate(CommitAndUndelegate<'a>),
-}
-
-/// Type of undelegate, can be standalone or with post-undelegate actions.
-pub enum UndelegateType<'a> {
-    Standalone,
-    WithHandler(Vec<BaseAction<'a>>),
-}
-
-impl<'a> UndelegateType<'a> {
-    fn collect_accounts(&self, container: &mut Vec<&'a AccountInfo>) {
-        match self {
-            Self::Standalone => {}
-            Self::WithHandler(handlers) => {
-                for handler in handlers {
-                    handler.collect_accounts(container);
-                }
-            }
-        }
-    }
-
-    fn into_args(self, pubkeys: &[Pubkey]) -> Result<UndelegateTypeArgs, ProgramError> {
-        match self {
-            Self::Standalone => Ok(UndelegateTypeArgs::Standalone),
-            Self::WithHandler(handlers) => {
-                let mut base_actions = Vec::with_capacity(handlers.len());
-                for handler in handlers {
-                    base_actions.push(handler.into_args(pubkeys)?);
-                }
-                Ok(UndelegateTypeArgs::WithBaseActions { base_actions })
-            }
-        }
-    }
 }

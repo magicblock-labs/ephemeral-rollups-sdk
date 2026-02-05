@@ -1,5 +1,3 @@
-use alloc::vec;
-use alloc::vec::Vec;
 use bincode::enc::Encoder;
 use bincode::error::EncodeError;
 use core::mem::{ManuallyDrop, MaybeUninit};
