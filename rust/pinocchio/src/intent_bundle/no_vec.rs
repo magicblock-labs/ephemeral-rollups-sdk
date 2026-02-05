@@ -1,0 +1,289 @@
+use alloc::vec;
+use alloc::vec::Vec;
+use core::mem::{ManuallyDrop, MaybeUninit};
+use core::{mem, ptr, slice};
+
+#[derive(Debug)]
+pub struct NoVec<T, const N: usize> {
+    inner: [MaybeUninit<T>; N],
+    len: usize,
+}
+
+impl<T, const N: usize> NoVec<T, N> {
+    pub fn new() -> Self {
+        Self {
+            inner: core::array::from_fn(|_| MaybeUninit::<T>::uninit()),
+            len: 0,
+        }
+    }
+
+    pub fn push(&mut self, el: T) {
+        // Check capacity
+        if self.len >= N {
+            panic!("")
+        }
+
+        self.inner[self.len].write(el);
+        self.len += 1;
+    }
+
+    fn append_slice_moved(&mut self, other: &[T]) {
+        let other_len = other.len();
+        if self.len + other_len > N {
+            panic!("");
+        }
+
+        // bit-copy array to our array
+        // We use ManuallyDrop in order not to free memory twice
+        let other = ManuallyDrop::new(other);
+        let dst = unsafe { mem::transmute::<_, *mut T>(self.inner.as_mut_ptr().add(self.len)) };
+        unsafe { ptr::copy_nonoverlapping(other.as_ptr(), dst, other_len) };
+
+        // Increase
+        self.len += other_len;
+    }
+
+    pub fn append<const M: usize>(&mut self, other: [T; M]) {
+        if self.len + M > N {
+            panic!("");
+        }
+
+        // bit-copy array to our array
+        // We use ManuallyDrop in order not to free memory twice
+        let other: ManuallyDrop<[_; M]> = ManuallyDrop::new(other);
+        let dst = unsafe { mem::transmute::<_, *mut T>(self.inner.as_mut_ptr().add(self.len)) };
+        unsafe { ptr::copy_nonoverlapping(other.as_ptr(), dst, M) };
+
+        // Increase
+        self.len += M;
+    }
+
+    /// Retains only the elements specified by the predicate.
+    ///
+    /// In other words, remove all elements `e` such that `f(&mut e)` returns false.
+    /// This method operates in place and preserves the order of the retained
+    /// elements.
+    pub fn retain<F>(&mut self, mut f: F)
+    where
+        F: FnMut(&mut T) -> bool,
+    {
+        // Check the implementation of
+        // https://doc.rust-lang.org/std/vec/struct.Vec.html#method.retain
+        // for safety arguments (especially regarding panics in f and when
+        // dropping elements). Implementation closely mirrored here.
+
+        let original_len = self.len;
+        self.len = 0;
+
+        struct BackshiftOnDrop<'a, T, const CAP: usize> {
+            v: &'a mut NoVec<T, CAP>,
+            processed_len: usize,
+            deleted_cnt: usize,
+            original_len: usize,
+        }
+
+        impl<T, const CAP: usize> Drop for BackshiftOnDrop<'_, T, CAP> {
+            fn drop(&mut self) {
+                if self.deleted_cnt > 0 {
+                    unsafe {
+                        ptr::copy(
+                            self.v.as_ptr().add(self.processed_len),
+                            self.v
+                                .as_mut_ptr()
+                                .add(self.processed_len - self.deleted_cnt),
+                            self.original_len - self.processed_len,
+                        );
+                    }
+                }
+                self.v.len = self.original_len - self.deleted_cnt;
+            }
+        }
+
+        let mut g = BackshiftOnDrop {
+            v: self,
+            processed_len: 0,
+            deleted_cnt: 0,
+            original_len,
+        };
+
+        #[inline(always)]
+        fn process_one<F: FnMut(&mut T) -> bool, T, const CAP: usize, const DELETED: bool>(
+            f: &mut F,
+            g: &mut BackshiftOnDrop<'_, T, CAP>,
+        ) -> bool {
+            let cur = unsafe { g.v.as_mut_ptr().add(g.processed_len) };
+            if !f(unsafe { &mut *cur }) {
+                g.processed_len += 1;
+                g.deleted_cnt += 1;
+                unsafe { ptr::drop_in_place(cur) };
+                return false;
+            }
+            if DELETED {
+                unsafe {
+                    let hole_slot = cur.sub(g.deleted_cnt);
+                    ptr::copy_nonoverlapping(cur, hole_slot, 1);
+                }
+            }
+            g.processed_len += 1;
+            true
+        }
+
+        // Stage 1: Nothing was deleted.
+        while g.processed_len != original_len {
+            if !process_one::<F, T, N, false>(&mut f, &mut g) {
+                break;
+            }
+        }
+
+        // Stage 2: Some elements were deleted.
+        while g.processed_len != original_len {
+            process_one::<F, T, N, true>(&mut f, &mut g);
+        }
+
+        drop(g);
+    }
+
+    pub fn as_slice(&self) -> &[T] {
+        // SAFETY: `slice::from_raw_parts` requires pointee is a contiguous, aligned buffer of size
+        // `len` containing properly-initialized `T`s. Data must not be mutated for the returned
+        // lifetime. Further, `len * mem::size_of::<T>` <= `ISIZE::MAX`, and allocation does not
+        // "wrap" through overflowing memory addresses.
+        //
+        // * Vec API guarantees that self.buf:
+        //      * contains only properly-initialized items within 0..len
+        //      * is aligned, contiguous, and valid for `len` reads
+        //      * obeys size and address-wrapping constraints
+        let inited = self.inner.as_ptr() as *const T;
+        unsafe { slice::from_raw_parts(inited, self.len) }
+    }
+
+    pub fn as_mut_slice(&mut self) -> &mut [T] {
+        let inited = self.inner.as_mut_ptr() as *mut T;
+        unsafe { slice::from_raw_parts_mut(inited, self.len) }
+    }
+
+    pub unsafe fn as_ptr(&self) -> *const T {
+        self.inner.as_ptr() as _
+    }
+
+    pub unsafe fn as_mut_ptr(&mut self) -> *mut T {
+        self.inner.as_mut_ptr() as _
+    }
+
+    pub fn len(&self) -> usize {
+        self.len
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.len == 0
+    }
+}
+
+impl<T: Clone, const N: usize> NoVec<T, N> {
+    pub fn append_slice(&mut self, other: &[T]) {
+        if self.len + other.len() > N {
+            panic!("");
+        }
+
+        for (uninit, el) in self.inner[self.len..].iter_mut().zip(other.iter()) {
+            uninit.write(el.clone());
+        }
+
+        self.len += other.len();
+    }
+
+    pub fn append_slice_shadowed<'a, 'new>(&'a mut self, other: &'new [T])
+    where
+        'a: 'new,
+    {
+        if self.len + other.len() > N {
+            panic!("");
+        }
+    }
+}
+
+impl<T: Ord, const N: usize> NoVec<T, N> {
+    pub fn sort(&mut self) {
+        self.as_mut_slice().sort();
+    }
+
+    pub fn contains(&self, x: &T) -> bool {
+        self.as_slice().contains(x)
+    }
+}
+
+impl<T, const N: usize> Default for NoVec<T, N> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl<T: Clone, const N: usize> Clone for NoVec<T, N> {
+    fn clone(&self) -> Self {
+        let mut this = Self::new();
+        this.append_slice(self.as_slice());
+        this
+    }
+}
+
+pub struct IntoIter<T, const N: usize> {
+    cur: usize,
+    inner: NoVec<T, N>,
+}
+
+impl<T, const N: usize> IntoIter<T, N> {
+    pub fn new(inner: NoVec<T, N>) -> Self {
+        Self { cur: 0, inner }
+    }
+}
+
+impl<T, const N: usize> Iterator for IntoIter<T, N> {
+    type Item = T;
+
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.cur == self.inner.len {
+            None
+        } else {
+            let index = self.cur;
+            self.cur += 1;
+            unsafe { Some(ptr::read(self.inner.as_ptr().add(index))) }
+        }
+    }
+}
+
+impl<T, const N: usize> Drop for IntoIter<T, N> {
+    fn drop(&mut self) {
+        unsafe {
+            ptr::drop_in_place(slice::from_raw_parts_mut(
+                self.inner.as_mut_ptr().add(self.cur),
+                self.inner.len - self.cur,
+            ));
+        }
+    }
+}
+
+impl<T, const N: usize> IntoIterator for NoVec<T, N> {
+    type Item = T;
+    type IntoIter = IntoIter<T, N>;
+    fn into_iter(self) -> Self::IntoIter {
+        IntoIter::new(self)
+    }
+}
+
+impl<T, const N: usize> Drop for NoVec<T, N> {
+    fn drop(&mut self) {
+        unsafe {
+            ptr::drop_in_place(self.as_mut_slice());
+        }
+    }
+}
+
+impl<T: serde::Serialize, const N: usize> serde::Serialize for NoVec<T, N> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serde::Serialize::serialize(self.as_slice(), serializer)
+    }
+}
