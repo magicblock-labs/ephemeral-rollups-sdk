@@ -5,8 +5,9 @@ use crate::intent_bundle::args::{
 use crate::intent_bundle::no_vec::NoVec;
 use alloc::vec;
 use alloc::vec::Vec;
+use pinocchio::cpi::invoke;
 use pinocchio::error::ProgramError;
-use pinocchio::instruction::InstructionView;
+use pinocchio::instruction::{InstructionAccount, InstructionView};
 use pinocchio::{AccountView, ProgramResult};
 use solana_address::Address;
 
@@ -16,7 +17,8 @@ mod types;
 
 const MAX_ACTIONS_NUM: usize = 10u8 as usize;
 const MAX_COMMITTED_ACCOUNTS_NUM: usize = 64u8 as usize;
-const MAX_ACCOUNTS: usize = u8::MAX as usize;
+const MAX_ACCOUNTS: usize = pinocchio::cpi::MAX_CPI_ACCOUNTS;
+
 // TODO: switch to err
 const EXPECTED_KEY_MSG: &str = "Key expected to exist!";
 
@@ -141,21 +143,22 @@ impl<'args> MagicIntentBundleBuilder<'args> {
         self.intent_bundle.normalize();
 
         // Collect all accounts used by the bundle, then dedup them + create index map.
-        let mut all_accounts = NoVec::<AccountView, MAX_ACTIONS_NUM>::new();
+        let mut all_accounts = NoVec::new();
         all_accounts.append([self.payer, self.magic_context]);
-        self.intent_bundle.collect_accounts(&mut all_accounts);
-        let indices_map = utils::filter_duplicates_with_map(&mut all_accounts);
+        self.intent_bundle
+            .collect_unique_accounts(&mut all_accounts);
 
         // Create data for instruction
         let args = self.intent_bundle.into_args(&indices_map);
         let metas = all_accounts
             .iter()
-            .map(|ai| AccountMeta {
-                pubkey: *ai.key,
-                is_signer: ai.is_signer,
-                is_writable: ai.is_writable,
+            .map(|el| InstructionAccount {
+                address: el.address(),
+                is_signer: el.is_signer(),
+                is_writable: el.is_writable(),
             })
             .collect();
+
         let ix = Instruction::new_with_bincode(
             *self.magic_program.key,
             &MagicBlockInstruction::ScheduleIntentBundle(args),
@@ -172,9 +175,35 @@ impl<'args> MagicIntentBundleBuilder<'args> {
     /// let (accounts, ix) = builder.build();
     /// invoke(&ix, &accounts)
     /// ```
-    pub fn build_and_invoke(self) -> ProgramResult {
-        let (accounts, ix) = self.build();
-        invo(&ix, &accounts)
+    pub fn build_and_invoke(self, data: &mut [u8]) -> ProgramResult {
+        // Dedup Intent Bundle
+        self.intent_bundle.normalize();
+
+        // Collect all accounts used by the bundle, then dedup them + create index map.
+        let mut all_accounts = NoVec::new();
+        all_accounts.append([self.payer, self.magic_context]);
+        self.intent_bundle
+            .collect_unique_accounts(&mut all_accounts);
+
+        // Create data for instruction
+        let args = self.intent_bundle.into_args(&indices_map);
+        let metas = all_accounts
+            .iter()
+            .map(|el| InstructionAccount {
+                address: el.address(),
+                is_signer: el.is_signer(),
+                is_writable: el.is_writable(),
+            })
+            .collect();
+
+        bincode::encode_into_slice(args, data, bincode::config::legacy())?;
+        let ix = InstructionView {
+            program_id: self.magic_program.address(),
+            data: ction::ScheduleIntentBundle(args),
+            metas,
+        };
+
+        invoke()
     }
 }
 
@@ -192,14 +221,9 @@ struct MagicIntentBundle<'args> {
     commit_and_undelegate_intent: Option<CommitAndUndelegate<'args>>,
 }
 
-#[test]
-pub fn test() {
-    let bundle = MagicIntentBundle::default();
-}
-
-impl<'info> MagicIntentBundle<'info> {
+impl<'args> MagicIntentBundle<'args> {
     /// Inserts an intent into the bundle, merging with any existing intent of the same category.
-    fn add_intent(&mut self, intent: MagicIntent<'info>) {
+    fn add_intent(&mut self, intent: MagicIntent<'args>) {
         match intent {
             MagicIntent::StandaloneActions(value) => self.standalone_actions.extend(value),
             MagicIntent::Commit(value) => {
@@ -220,7 +244,7 @@ impl<'info> MagicIntentBundle<'info> {
     }
 
     /// Consumes the bundle and encodes it into `MagicIntentBundleArgs` using a `Pubkey -> u8` indices map.
-    fn into_args(self, indices_map: &[Address]) -> MagicIntentBundleArgs {
+    fn into_args(self, indices_map: &[Address]) -> MagicIntentBundleArgs<'args> {
         let commit = self.commit_intent.map(|c| c.into_args(indices_map));
         let commit_and_undelegate = self
             .commit_and_undelegate_intent
@@ -229,7 +253,7 @@ impl<'info> MagicIntentBundle<'info> {
             .standalone_actions
             .into_iter()
             .map(|ch| ch.into_args(indices_map))
-            .collect::<Vec<_>>();
+            .collect::<NoVec<BaseActionArgs<'args>, MAX_ACTIONS_NUM>>();
 
         MagicIntentBundleArgs {
             commit,
@@ -239,15 +263,15 @@ impl<'info> MagicIntentBundle<'info> {
     }
 
     /// Collects all accounts referenced by intents in this bundle.
-    fn collect_accounts(&self, all_accounts: &mut Vec<AccountInfo<'info>>) {
+    fn collect_unique_accounts(&self, unique_accounts: &mut NoVec<AccountView, MAX_ACCOUNTS>) {
         for el in &self.standalone_actions {
-            el.collect_accounts(all_accounts);
+            el.collect_unique_accounts(unique_accounts);
         }
         if let Some(commit) = &self.commit_intent {
-            commit.collect_accounts(all_accounts);
+            commit.collect_unique_accounts(unique_accounts);
         }
         if let Some(cau) = &self.commit_and_undelegate_intent {
-            cau.collect_accounts(all_accounts);
+            cau.collect_unique_accounts(unique_accounts);
         }
     }
 
@@ -508,14 +532,20 @@ impl<'args> CallHandler<'args> {
         self.accounts.append(accounts);
     }
 
-    pub(crate) fn into_args(self, indices_map: &[Address]) -> BaseActionArgs {
+    fn collect_unique_accounts(&self, container: &mut NoVec<AccountView, MAX_ACCOUNTS>) {
+        if !container.contains(&self.escrow_authority) {
+            container.push(self.escrow_authority.clone());
+        }
+    }
+
+    pub(crate) fn into_args(self, indices_map: &[Address]) -> BaseActionArgs<'args> {
         let escrow_authority_index =
             get_index(indices_map, self.escrow_authority.address()).expect(EXPECTED_KEY_MSG);
         BaseActionArgs {
             args: self.args,
             compute_units: self.compute_units,
-            destination_program: self.destination_program.to_bytes().into(),
-            escrow_authority: *escrow_authority_index,
+            destination_program: self.destination_program,
+            escrow_authority: escrow_authority_index,
             accounts: self.accounts,
         }
     }
@@ -547,19 +577,27 @@ impl<'args> CommitIntent<'args> {
         });
     }
 
-    fn collect_accounts(&self, container: &mut NoVec<AccountView, MAX_ACCOUNTS>) {
-        container.append_slice(self.accounts.as_slice());
+    fn collect_unique_accounts(&self, container: &mut NoVec<AccountView, MAX_ACCOUNTS>) {
+        for el in self.accounts.iter() {
+            if !container.contains(el) {
+                container.push(el.clone());
+            }
+        }
+
+        for el in self.actions.iter() {
+            el.collect_unique_accounts(container);
+        }
     }
 
-    fn into_args(self, indices_map: &[Address]) -> Result<CommitTypeArgs, ProgramError> {
+    fn into_args(self, indices_map: &[Address]) -> CommitTypeArgs {
         let mut indices = NoVec::<_, MAX_ACCOUNTS>::new();
         for account in self.accounts {
-            let idx = get_index(indices_map, account.address())
-                .ok_or(ProgramError::InvalidAccountData)?;
+            let idx = get_index(indices_map, account.address()).unwrap();
+            // .ok_or(ProgramError::InvalidAccountData)?;
             indices.push(idx);
         }
 
-        let res = if self.actions.is_empty() {
+        if self.actions.is_empty() {
             CommitTypeArgs::Standalone(indices)
         } else {
             let mut base_actions = NoVec::<_, MAX_ACTIONS_NUM>::new();
@@ -570,9 +608,7 @@ impl<'args> CommitIntent<'args> {
                 committed_accounts: indices,
                 base_actions,
             }
-        };
-
-        Ok(res)
+        }
     }
 
     fn merge(&mut self, other: Self) {
@@ -616,9 +652,18 @@ pub struct CommitAndUndelegate<'args> {
 }
 
 impl<'a> CommitAndUndelegate<'a> {
-    fn collect_accounts(&self, container: &mut Vec<AccountView>) {
-        self.commit_type.collect_accounts(container);
-        self.undelegate_type.collect_accounts(container);
+    fn collect_unique_accounts(&self, container: &mut NoVec<AccountView, MAX_ACCOUNTS>) {
+        for el in self.accounts.iter() {
+            if !container.contains(el) {
+                container.push(el.clone());
+            }
+        }
+        for el in self.post_commit_actions.iter() {
+            el.collect_unique_accounts(container);
+        }
+        for el in self.post_undelegate_actions.iter() {
+            el.collect_unique_accounts(container);
+        }
     }
 
     fn into_args(self, pubkeys: &[Address]) -> Result<CommitAndUndelegateArgs, ProgramError> {

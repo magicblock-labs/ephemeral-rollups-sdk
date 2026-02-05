@@ -9,10 +9,10 @@ use solana_address::Address;
 
 const MAX_ACTIONS_NUM: usize = 10u8 as usize;
 const MAX_COMMITTED_ACCOUNTS_NUM: usize = 64u8 as usize;
-const MAX_ACCOUNTS: usize = u8::MAX as usize;
+const MAX_ACCOUNTS: usize = pinocchio::cpi::MAX_CPI_ACCOUNTS;
 
 /// Action arguments containing escrow index and instruction data.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, bincode::Encode)]
 pub struct ActionArgs<'a> {
     pub escrow_index: u8,
     pub data: &'a [u8],
@@ -41,7 +41,7 @@ impl<'a> ActionArgs<'a> {
 }
 
 /// Base action arguments for serialization.
-#[derive(Clone, Serialize, Debug)]
+#[derive(Clone, Debug, Serialize, bincode::Encode)]
 pub struct BaseActionArgs<'args> {
     pub args: ActionArgs<'args>,
     pub compute_units: u32,
@@ -55,7 +55,7 @@ pub struct BaseActionArgs<'args> {
 /// Unlike `solana_instruction::AccountMeta`, this type **does not** carry an
 /// `is_signer` flag. Users cannot request signatures: the only signer available
 /// is the validator.
-#[derive(Debug, Default, Clone, Serialize)]
+#[derive(Debug, Default, Clone, Serialize, bincode::Encode)]
 pub struct ShortAccountMeta {
     pub pubkey: Address,
     pub is_writable: bool,
@@ -76,7 +76,9 @@ pub enum CommitTypeArgs<'args> {
 #[derive(Serialize)]
 pub enum UndelegateTypeArgs<'args> {
     Standalone,
-    WithBaseActions { base_actions: NoVec<BaseActionArgs<'args>, MAX_ACTIONS_NUM> },
+    WithBaseActions {
+        base_actions: NoVec<BaseActionArgs<'args>, MAX_ACTIONS_NUM>,
+    },
 }
 
 /// Commit and undelegate arguments for serialization.

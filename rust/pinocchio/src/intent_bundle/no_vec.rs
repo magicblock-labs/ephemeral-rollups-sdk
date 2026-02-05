@@ -1,6 +1,9 @@
 use alloc::vec;
 use alloc::vec::Vec;
+use bincode::enc::Encoder;
+use bincode::error::EncodeError;
 use core::mem::{ManuallyDrop, MaybeUninit};
+use core::ops::Index;
 use core::{mem, ptr, slice};
 
 #[derive(Debug)]
@@ -56,6 +59,10 @@ impl<T, const N: usize> NoVec<T, N> {
 
         // Increase
         self.len += M;
+    }
+
+    pub fn iter(&self) -> slice::Iter<T> {
+        self.as_slice().iter()
     }
 
     /// Retains only the elements specified by the predicate.
@@ -206,7 +213,9 @@ impl<T: Ord, const N: usize> NoVec<T, N> {
     pub fn sort(&mut self) {
         self.as_mut_slice().sort();
     }
+}
 
+impl<T: PartialEq, const N: usize> NoVec<T, N> {
     pub fn contains(&self, x: &T) -> bool {
         self.as_slice().contains(x)
     }
@@ -263,11 +272,62 @@ impl<T, const N: usize> Drop for IntoIter<T, N> {
     }
 }
 
+impl<T, const N: usize> FromIterator<T> for NoVec<T, N> {
+    fn from_iter<I: IntoIterator<Item = T>>(iter: I) -> Self {
+        let mut this = Self::new();
+        for el in iter {
+            this.push(el);
+        }
+
+        this
+    }
+}
+
 impl<T, const N: usize> IntoIterator for NoVec<T, N> {
     type Item = T;
     type IntoIter = IntoIter<T, N>;
     fn into_iter(self) -> Self::IntoIter {
         IntoIter::new(self)
+    }
+}
+
+impl<T, const N: usize> Index<usize> for NoVec<T, N> {
+    type Output = T;
+
+    fn index(&self, index: usize) -> &Self::Output {
+        if index >= self.len {
+            panic!("")
+        }
+
+        unsafe { self.inner[index].assume_init_ref() }
+    }
+}
+
+impl<'a, T, const N: usize> IntoIterator for &'a NoVec<T, N> {
+    type Item = &'a T;
+    type IntoIter = slice::Iter<'a, T>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
+    }
+}
+
+pub struct Iter<'a, T, const N: usize> {
+    cur: usize,
+    inner: &'a NoVec<T, N>,
+}
+
+impl<'a, T, const N: usize> Iterator for Iter<'a, T, N> {
+    type Item = &'a T;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.inner.len == self.cur {
+            None
+        } else {
+            let index = self.cur;
+            self.cur += 1;
+            Some(&self.inner[index])
+        }
     }
 }
 
@@ -285,5 +345,11 @@ impl<T: serde::Serialize, const N: usize> serde::Serialize for NoVec<T, N> {
         S: serde::Serializer,
     {
         serde::Serialize::serialize(self.as_slice(), serializer)
+    }
+}
+
+impl<T: bincode::Encode, const N: usize> bincode::Encode for NoVec<T, N> {
+    fn encode<E: Encoder>(&self, encoder: &mut E) -> Result<(), EncodeError> {
+        bincode::Encode::encode(self.as_slice(), encoder)
     }
 }
