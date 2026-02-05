@@ -62,7 +62,7 @@ pub struct ShortAccountMeta {
 }
 
 /// Commit type arguments for serialization.
-#[derive(Serialize)]
+#[derive(Serialize, bincode::Encode)]
 pub enum CommitTypeArgs<'args> {
     // we generate it
     Standalone(NoVec<u8, MAX_COMMITTED_ACCOUNTS_NUM>), // slice or NoVec
@@ -73,7 +73,7 @@ pub enum CommitTypeArgs<'args> {
 }
 
 /// Undelegate type arguments for serialization.
-#[derive(Serialize)]
+#[derive(Serialize, bincode::Encode)]
 pub enum UndelegateTypeArgs<'args> {
     Standalone,
     WithBaseActions {
@@ -82,14 +82,14 @@ pub enum UndelegateTypeArgs<'args> {
 }
 
 /// Commit and undelegate arguments for serialization.
-#[derive(Serialize)]
+#[derive(Serialize, bincode::Encode)]
 pub struct CommitAndUndelegateArgs<'args> {
     pub commit_type: CommitTypeArgs<'args>,
     pub undelegate_type: UndelegateTypeArgs<'args>,
 }
 
 /// Magic intent bundle arguments for serialization.
-#[derive(Serialize)]
+#[derive(Serialize, bincode::Encode)]
 pub struct MagicIntentBundleArgs<'args> {
     pub commit: Option<CommitTypeArgs<'args>>,
     pub commit_and_undelegate: Option<CommitAndUndelegateArgs<'args>>,

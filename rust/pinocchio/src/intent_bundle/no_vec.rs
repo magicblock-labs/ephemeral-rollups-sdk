@@ -281,6 +281,14 @@ impl<T, const N: usize> FromIterator<T> for NoVec<T, N> {
     }
 }
 
+impl<T, const N: usize> Extend<T> for NoVec<T, N> {
+    fn extend<I: IntoIterator<Item = T>>(&mut self, iter: I) {
+        for el in iter {
+            self.push(el);
+        }
+    }
+}
+
 impl<T, const N: usize> IntoIterator for NoVec<T, N> {
     type Item = T;
     type IntoIter = IntoIter<T, N>;
