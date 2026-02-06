@@ -4,6 +4,9 @@ use core::mem::{ManuallyDrop, MaybeUninit};
 use core::ops::Index;
 use core::{mem, ptr, slice};
 
+const CAPACITY_OVERFLOW_MSG: &str = "capacity overflow";
+const INDEX_OUT_OF_BOUNDS_MSG: &str = "index out of bounds";
+
 #[derive(Debug)]
 pub struct NoVec<T, const N: usize> {
     inner: [MaybeUninit<T>; N],
@@ -18,21 +21,25 @@ impl<T, const N: usize> NoVec<T, N> {
         }
     }
 
-    pub fn push(&mut self, el: T) {
-        // Check capacity
+    pub fn try_push(&mut self, el: T) -> Result<(), CapacityError<T>> {
         if self.len >= N {
-            panic!("")
+            return Err(CapacityError::new(el));
         }
-
         self.inner[self.len].write(el);
         self.len += 1;
+        Ok(())
     }
 
-    pub fn append<const M: usize>(&mut self, other: [T; M]) {
-        if self.len + M > N {
-            panic!("");
+    pub fn push(&mut self, el: T) {
+        if self.try_push(el).is_err() {
+            panic!("{}", CAPACITY_OVERFLOW_MSG)
         }
+    }
 
+    pub fn try_append<const M: usize>(&mut self, other: [T; M]) -> Result<(), CapacityError<[T; M]>> {
+        if self.len + M > N {
+            return Err(CapacityError::new(other));
+        }
         // bit-copy array to our array
         // We use ManuallyDrop in order not to free memory twice
         let other: ManuallyDrop<[_; M]> = ManuallyDrop::new(other);
@@ -40,9 +47,14 @@ impl<T, const N: usize> NoVec<T, N> {
             mem::transmute::<*mut MaybeUninit<T>, *mut T>(self.inner.as_mut_ptr().add(self.len))
         };
         unsafe { ptr::copy_nonoverlapping(other.as_ptr(), dst, M) };
-
-        // Increase
         self.len += M;
+        Ok(())
+    }
+
+    pub fn append<const M: usize>(&mut self, other: [T; M]) {
+        if self.try_append(other).is_err() {
+            panic!("{}", CAPACITY_OVERFLOW_MSG);
+        }
     }
 
     pub fn iter(&self) -> slice::Iter<T> {
@@ -171,16 +183,21 @@ impl<T, const N: usize> NoVec<T, N> {
 }
 
 impl<T: Clone, const N: usize> NoVec<T, N> {
-    pub fn append_slice(&mut self, other: &[T]) {
+    pub fn try_append_slice(&mut self, other: &[T]) -> Result<(), CapacityError> {
         if self.len + other.len() > N {
-            panic!("");
+            return Err(CapacityError::new(()));
         }
-
         for (uninit, el) in self.inner[self.len..].iter_mut().zip(other.iter()) {
             uninit.write(el.clone());
         }
-
         self.len += other.len();
+        Ok(())
+    }
+
+    pub fn append_slice(&mut self, other: &[T]) {
+        if self.try_append_slice(other).is_err() {
+            panic!("{}", CAPACITY_OVERFLOW_MSG);
+        }
     }
 
     pub fn append_slice_shadowed<'a, 'new>(&'a mut self, other: &'new [T])
@@ -188,7 +205,7 @@ impl<T: Clone, const N: usize> NoVec<T, N> {
         'a: 'new,
     {
         if self.len + other.len() > N {
-            panic!("");
+            panic!("{}", CAPACITY_OVERFLOW_MSG);
         }
     }
 }
@@ -288,7 +305,7 @@ impl<T, const N: usize> Index<usize> for NoVec<T, N> {
 
     fn index(&self, index: usize) -> &Self::Output {
         if index >= self.len {
-            panic!("")
+            panic!("{}", INDEX_OUT_OF_BOUNDS_MSG)
         }
 
         unsafe { self.inner[index].assume_init_ref() }
@@ -343,6 +360,17 @@ impl<T: serde::Serialize, const N: usize> serde::Serialize for NoVec<T, N> {
 impl<T: bincode::Encode, const N: usize> bincode::Encode for NoVec<T, N> {
     fn encode<E: Encoder>(&self, encoder: &mut E) -> Result<(), EncodeError> {
         bincode::Encode::encode(self.as_slice(), encoder)
+    }
+}
+
+#[derive(Debug)]
+pub struct CapacityError<T = ()> {
+    pub element: T,
+}
+
+impl<T> CapacityError<T> {
+    fn new(element: T) -> Self {
+        Self { element }
     }
 }
 
