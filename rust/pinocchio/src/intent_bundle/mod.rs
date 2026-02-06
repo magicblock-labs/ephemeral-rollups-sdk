@@ -248,7 +248,6 @@ pub struct CommitAndUndelegateIntentBuilder<'a, 'args> {
 }
 
 impl<'a, 'args> CommitAndUndelegateIntentBuilder<'a, 'args> {
-    // TODO: have slice & fixed-array version
     /// Adds post-commit actions. Chainable.
     pub fn add_post_commit_actions<'new_args>(
         self,
