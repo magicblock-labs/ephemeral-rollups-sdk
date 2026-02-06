@@ -14,7 +14,9 @@ use types::MagicIntentBundle;
 pub use types::*;
 
 const MAX_ACTIONS_NUM: usize = 10u8 as usize;
-;
+
+/// Bincode 1.x u32 LE discriminant for `MagicBlockInstruction::ScheduleIntentBundle` (variant index 11).
+const SCHEDULE_INTENT_BUNDLE_DISCRIMINANT: [u8; 4] = 11u32.to_le_bytes();
 
 /// Builds a single `MagicBlockInstruction::ScheduleIntentBundle` instruction by aggregating
 /// multiple independent intents (base actions, commits, commit+undelegate), normalizing them,
@@ -27,9 +29,6 @@ pub struct MagicIntentBundleBuilder<'args> {
 }
 
 impl<'args> MagicIntentBundleBuilder<'args> {
-    /// Bincode 1.x u32 LE discriminant for `MagicBlockInstruction::ScheduleIntentBundle` (variant index 11).
-    const DISCRIMINANT: [u8; 4] = 11u32.to_le_bytes();
-
     pub fn new(payer: AccountView, magic_context: AccountView, magic_program: AccountView) -> Self {
         Self {
             payer,
