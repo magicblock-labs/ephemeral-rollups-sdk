@@ -1,5 +1,5 @@
 use crate::intent_bundle::no_vec::NoVec;
-use serde::{Serialize};
+use serde::Serialize;
 use solana_address::Address;
 // ---------------------------------------------------------
 // Args types for serialization
@@ -264,12 +264,9 @@ mod tests {
 
         let pino_standalone = UndelegateTypeArgs::Standalone;
         let mut pino_buf = [0u8; 256];
-        let pino_len = bincode::encode_into_slice(
-            &pino_standalone,
-            &mut pino_buf,
-            bincode::config::legacy(),
-        )
-        .unwrap();
+        let pino_len =
+            bincode::encode_into_slice(&pino_standalone, &mut pino_buf, bincode::config::legacy())
+                .unwrap();
 
         assert_eq!(
             &pino_buf[..pino_len],
@@ -321,7 +318,6 @@ mod tests {
             "UndelegateTypeArgs::WithBaseActions mismatch"
         );
     }
-
 
     /// Test MagicIntentBundleArgs serialization compatibility (full bundle)
     #[test]

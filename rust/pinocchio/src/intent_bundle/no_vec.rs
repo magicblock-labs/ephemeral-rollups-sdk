@@ -36,7 +36,9 @@ impl<T, const N: usize> NoVec<T, N> {
         // bit-copy array to our array
         // We use ManuallyDrop in order not to free memory twice
         let other: ManuallyDrop<[_; M]> = ManuallyDrop::new(other);
-        let dst = unsafe { mem::transmute::<*mut MaybeUninit<T>, *mut T>(self.inner.as_mut_ptr().add(self.len)) };
+        let dst = unsafe {
+            mem::transmute::<*mut MaybeUninit<T>, *mut T>(self.inner.as_mut_ptr().add(self.len))
+        };
         unsafe { ptr::copy_nonoverlapping(other.as_ptr(), dst, M) };
 
         // Increase
