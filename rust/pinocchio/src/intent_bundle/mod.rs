@@ -1,11 +1,9 @@
 use crate::intent_bundle::args::{
-    ActionArgs, BaseActionArgs, CommitAndUndelegateArgs, CommitType, CommitTypeArgs,
-    MagicIntentBundleArgs, ShortAccountMeta, UndelegateType,
+    ActionArgs, BaseActionArgs, CommitAndUndelegateArgs, CommitTypeArgs, MagicIntentBundleArgs,
+    ShortAccountMeta, UndelegateTypeArgs,
 };
 use crate::intent_bundle::no_vec::NoVec;
-use alloc::vec;
-use alloc::vec::Vec;
-use pinocchio::cpi::invoke;
+use pinocchio::cpi::invoke_with_bounds;
 use pinocchio::error::ProgramError;
 use pinocchio::instruction::{InstructionAccount, InstructionView};
 use pinocchio::{AccountView, ProgramResult};
@@ -32,7 +30,7 @@ pub enum MagicIntent<'args> {
     /// Commit accounts to base layer, optionally with post-commit actions.
     Commit(CommitIntent<'args>),
     /// Commit accounts and undelegate them, optionally with post-commit and post-undelegate actions.
-    CommitAndUndelegate(CommitAndUndelegate<'args>),
+    CommitAndUndelegate(CommitAndUndelegateIntent<'args>),
 }
 
 /// Builds a single `MagicBlockInstruction::ScheduleIntentBundle` instruction by aggregating
@@ -57,8 +55,8 @@ impl<'args> MagicIntentBundleBuilder<'args> {
 
     /// Starts building a Commit intent. Returns a [`CommitIntentBuilder`] that owns this parent.
     ///
-    /// The returned builder lets you chain `.t_commit_actions()`, transition to other
-    /// intents via `.commit_and_undelegate()`, or finalize via `.build()` / `.build_and_invoke()`.
+    /// The returned builder lets you chain `.add_post_commit_actions()`, transition to other
+    /// intents via `.commit_and_undelegate()`, or finalize via `.build_and_invoke()`.
     pub fn commit<'a>(self, accounts: &'a [AccountView]) -> CommitIntentBuilder<'a, 'args> {
         CommitIntentBuilder {
             parent: self,
@@ -72,7 +70,7 @@ impl<'args> MagicIntentBundleBuilder<'args> {
     ///
     /// The returned builder lets you chain `.add_post_commit_actions()`,
     /// `.add_post_undelegate_actions()`, transition to other intents via `.commit()`,
-    /// or finalize via `.build()` / `.build_and_invoke()`.
+    /// or finalize via `.build_and_invoke()`.
     pub fn commit_and_undelegate<'a>(
         self,
         accounts: &'a [AccountView],
@@ -89,8 +87,8 @@ impl<'args> MagicIntentBundleBuilder<'args> {
     ///
     /// If an intent of the same category already exists in the bundle:
     /// - base actions are appended
-    /// - commit intents are merged (accounts/actions appended; variant upgraded to handler if needed)
-    /// - commit+undelegate intents are merged (accounts/actions appended)
+    /// - commit intents are merged (unique accounts/actions appended)
+    /// - commit+undelegate intents are merged (unique accounts/actions appended)
     ///
     /// See `MagicIntentBundle::add_intent` for merge semantics.
     pub fn add_intent(mut self, intent: MagicIntent<'args>) -> Self {
@@ -105,7 +103,7 @@ impl<'args> MagicIntentBundleBuilder<'args> {
     }
 
     /// Adds (or merges) a `CommitAndUndelegate` intent into the bundle.
-    pub fn add_commit_and_undelegate(mut self, value: CommitAndUndelegate<'args>) -> Self {
+    pub fn add_commit_and_undelegate(mut self, value: CommitAndUndelegateIntent<'args>) -> Self {
         self.intent_bundle
             .add_intent(MagicIntent::CommitAndUndelegate(value));
         self
@@ -133,79 +131,63 @@ impl<'args> MagicIntentBundleBuilder<'args> {
         this
     }
 
-    /// Builds the deduplicated account list and the CPI `Instruction` that schedules this bundle.
+    /// Normalizes the bundle, serializes it with bincode into `data_buf`, builds the
+    /// CPI instruction, and invokes the magic program.
     ///
-    /// # Returns
-    /// - `Vec<AccountInfo>`: the full, deduplicated account list to pass to CPI (payer/context first).
-    /// - `Instruction`: the instruction to invoke against the magic program.
-    pub fn build(mut self) -> (NoVec<AccountView, MAX_ACCOUNTS>, InstructionView) {
-        // Dedup Intent Bundle
+    /// `data_buf` must be large enough to hold the serialized `MagicIntentBundleArgs`.
+    pub fn build_and_invoke(mut self, data_buf: &mut [u8]) -> ProgramResult {
+        // 1. Normalize: dedup within intents, resolve cross-intent overlaps
         self.intent_bundle.normalize();
 
-        // Collect all accounts used by the bundle, then dedup them + create index map.
-        let mut all_accounts = NoVec::new();
+        // 2. Collect all unique accounts (payer + context first, then from intents)
+        let mut all_accounts = NoVec::<AccountView, MAX_ACCOUNTS>::new();
         all_accounts.append([self.payer, self.magic_context]);
         self.intent_bundle
             .collect_unique_accounts(&mut all_accounts);
 
-        // Create data for instruction
-        let args = self.intent_bundle.into_args(&indices_map);
-        let metas = all_accounts
-            .iter()
-            .map(|el| InstructionAccount {
-                address: el.address(),
-                is_signer: el.is_signer(),
-                is_writable: el.is_writable(),
-            })
-            .collect();
+        // 3. Build the natural indices map: indices_map[i] = address of account at position i
+        let mut indices_map = NoVec::<Address, MAX_ACCOUNTS>::new();
+        for account in all_accounts.iter() {
+            indices_map.push(account.address().clone());
+        }
 
-        let ix = Instruction::new_with_bincode(
-            *self.magic_program.key,
-            &MagicBlockInstruction::ScheduleIntentBundle(args),
-            metas,
-        );
+        // 4. Convert intents to serializable args
+        let args = self.intent_bundle.into_args(indices_map.as_slice());
 
-        (all_accounts, ix)
-    }
+        // 5. Serialize with bincode (legacy config for bincode 1.x wire compat)
+        let bytes_written =
+            bincode::encode_into_slice(&args, data_buf, bincode::config::legacy())
+                .map_err(|_| ProgramError::InvalidInstructionData)?;
 
-    /// Convenience wrapper that builds the instruction and immediately invokes it.
-    ///
-    /// Equivalent to:
-    /// ```ignore
-    /// let (accounts, ix) = builder.build();
-    /// invoke(&ix, &accounts)
-    /// ```
-    pub fn build_and_invoke(self, data: &mut [u8]) -> ProgramResult {
-        // Dedup Intent Bundle
-        self.intent_bundle.normalize();
+        // 6. Build instruction account metas
+        let mut instruction_accounts = NoVec::<InstructionAccount, MAX_ACCOUNTS>::new();
+        for account in all_accounts.iter() {
+            instruction_accounts.push(InstructionAccount::from(account));
+        }
 
-        // Collect all accounts used by the bundle, then dedup them + create index map.
-        let mut all_accounts = NoVec::new();
-        all_accounts.append([self.payer, self.magic_context]);
-        self.intent_bundle
-            .collect_unique_accounts(&mut all_accounts);
-
-        // Create data for instruction
-        let args = self.intent_bundle.into_args(&indices_map);
-        let metas = all_accounts
-            .iter()
-            .map(|el| InstructionAccount {
-                address: el.address(),
-                is_signer: el.is_signer(),
-                is_writable: el.is_writable(),
-            })
-            .collect();
-
-        bincode::encode_into_slice(args, data, bincode::config::legacy())?;
+        // 7. Build instruction view
         let ix = InstructionView {
             program_id: self.magic_program.address(),
-            data: ction::ScheduleIntentBundle(args),
-            metas,
+            data: &data_buf[..bytes_written],
+            accounts: instruction_accounts.as_slice(),
         };
 
-        invoke()
+        // 8. Build account refs for invoke
+        let mut account_refs = NoVec::<&AccountView, MAX_ACCOUNTS>::new();
+        for account in all_accounts.iter() {
+            account_refs.push(account);
+        }
+
+        // 9. Invoke CPI
+        // NOTE: MAX_STATIC_CPI_ACCOUNTS = 64; if you need > 64 accounts,
+        // enable `slice-cpi` feature and use `invoke_with_slice` instead.
+        invoke_with_bounds::<64>(&ix, account_refs.as_slice())
     }
 }
+
+// ---------------------------------------------------------------------------
+// Bundle of Intents
+// ---------------------------------------------------------------------------
 
 /// Bundle of Intents
 ///
@@ -218,7 +200,7 @@ impl<'args> MagicIntentBundleBuilder<'args> {
 struct MagicIntentBundle<'args> {
     standalone_actions: NoVec<CallHandler<'args>, MAX_ACTIONS_NUM>,
     commit_intent: Option<CommitIntent<'args>>,
-    commit_and_undelegate_intent: Option<CommitAndUndelegate<'args>>,
+    commit_and_undelegate_intent: Option<CommitAndUndelegateIntent<'args>>,
 }
 
 impl<'args> MagicIntentBundle<'args> {
@@ -227,15 +209,15 @@ impl<'args> MagicIntentBundle<'args> {
         match intent {
             MagicIntent::StandaloneActions(value) => self.standalone_actions.extend(value),
             MagicIntent::Commit(value) => {
-                if let Some(ref mut commit_accounts) = self.commit_intent {
-                    commit_accounts.merge(value);
+                if let Some(ref mut existing) = self.commit_intent {
+                    existing.merge(value);
                 } else {
                     self.commit_intent = Some(value);
                 }
             }
             MagicIntent::CommitAndUndelegate(value) => {
-                if let Some(ref mut commit_and_undelegate) = self.commit_and_undelegate_intent {
-                    commit_and_undelegate.merge(value);
+                if let Some(ref mut existing) = self.commit_and_undelegate_intent {
+                    existing.merge(value);
                 } else {
                     self.commit_and_undelegate_intent = Some(value);
                 }
@@ -243,7 +225,9 @@ impl<'args> MagicIntentBundle<'args> {
         }
     }
 
-    /// Consumes the bundle and encodes it into `MagicIntentBundleArgs` using a `Pubkey -> u8` indices map.
+    /// Consumes the bundle and encodes it into `MagicIntentBundleArgs` using an indices map.
+    ///
+    /// `indices_map` is a natural map: `indices_map[i]` is the address at index `i`.
     fn into_args(self, indices_map: &[Address]) -> MagicIntentBundleArgs<'args> {
         let commit = self.commit_intent.map(|c| c.into_args(indices_map));
         let commit_and_undelegate = self
@@ -278,49 +262,34 @@ impl<'args> MagicIntentBundle<'args> {
     /// Normalizes the bundle into a valid, canonical form.
     ///
     /// Effects:
-    /// - Deduplicates committed accounts within each intent by pubkey (stable; first occurrence wins).
+    /// - Deduplicates committed accounts within each intent by address (stable; first occurrence wins).
     /// - Resolves overlap between `Commit` and `CommitAndUndelegate`:
     ///   any account present in both will be removed from `Commit` and kept in `CommitAndUndelegate`.
     /// - If `Commit` becomes empty after overlap removal, it is removed from the bundle, and any
-    ///   post-commit handlers from the commit intent are merged into the commit-side handlers
+    ///   post-commit actions from the commit intent are merged into the commit-side actions
     ///   of `CommitAndUndelegate`.
     fn normalize(&mut self) {
-        // Remove duplicates inside individual intents
-        if let Some(ref mut value) = self.commit_intent {
-            value.dedup();
-        }
-        let cau = self.commit_and_undelegate_intent.as_mut().map(|value| {
-            let seen = value.dedup();
-            (seen, value)
-        });
-
-        // Remove cross intent duplicates
-        // Only proceed if both intents exist; otherwise no cross-intent dedup needed
-        let (mut commit, cau, cau_pubkeys) = match (self.commit_intent.take(), cau) {
-            (Some(commit), Some((cau_pubkeys, cau))) => (commit, cau, cau_pubkeys),
-            // In case only one Intent exists, put commit_intent back if it was taken
-            (Some(commit), None) => {
-                self.commit_intent = Some(commit);
-                return;
-            }
-            // No commit_intent or neither intent exists - nothing to restore
-            _ => return,
+        let cau_seen = self
+            .commit_and_undelegate_intent
+            .as_mut()
+            .map(|cau| cau.dedup());
+        let Some(mut commit) = self.commit_intent.take() else {
+            return; // No commit intent, nothing more to normalize
         };
 
-        // If accounts in CommitAndUndelegate and Commit intents overlap
-        // we keep them only in CommitAndUndelegate Intent and remove from Commit
-        commit
-            .committed_accounts_mut()
-            .retain(|el| !cau_pubkeys.contains(el.key));
+        let mut seen = cau_seen.unwrap_or_default();
+        commit.dedup(&mut seen);
 
-        // edge case
-        if commit.committed_accounts().is_empty() {
-            // if after dedup Commit intent becomes empty
-            // 1. remove it from bundle
-            // 2. if it has action - move them in CommitAndUndelegate intent
-            cau.commit_type.merge(commit);
+        // If commit lost all its accounts to CAU overlap, move its actions
+        // into CAU's post-commit actions and drop the empty commit intent.
+        if commit.accounts.is_empty() {
+            if let Some(ref mut cau) = self.commit_and_undelegate_intent {
+                for action in commit.actions {
+                    cau.post_commit_actions.push(action);
+                }
+            }
+            // commit intent is not put back — it's effectively removed
         } else {
-            // set deduped intent
             self.commit_intent = Some(commit);
         }
     }
@@ -339,7 +308,7 @@ pub struct CommitIntentBuilder<'a, 'args> {
 impl<'a, 'args> CommitIntentBuilder<'a, 'args> {
     /// Adds post-commit actions. Chainable.
     pub fn add_post_commit_actions<'new_args>(
-        mut self,
+        self,
         actions: &[CallHandler<'new_args>],
     ) -> CommitIntentBuilder<'a, 'new_args>
     where
@@ -373,14 +342,9 @@ impl<'a, 'args> CommitIntentBuilder<'a, 'args> {
         self.done().add_standalone_actions(actions)
     }
 
-    /// Terminal: finalizes this commit intent and builds the full instruction.
-    pub fn build(self) -> (Vec<AccountInfo<'info>>, Instruction) {
-        self.done().build()
-    }
-
     /// Terminal: finalizes this commit intent, builds the instruction and invokes it.
-    pub fn build_and_invoke(self) -> ProgramResult {
-        self.done().build_and_invoke()
+    pub fn build_and_invoke(self, data_buf: &mut [u8]) -> ProgramResult {
+        self.done().build_and_invoke(data_buf)
     }
 
     /// Finalizes this commit intent and folds it into the parent bundle.
@@ -405,18 +369,18 @@ impl<'a, 'args> CommitIntentBuilder<'a, 'args> {
 /// Created via [`MagicIntentBundleBuilder::commit_and_undelegate()`] or
 /// [`CommitIntentBuilder::commit_and_undelegate()`]. Owns the parent builder
 /// and returns it (or a sibling sub-builder) on every transition/terminal call.
-pub struct CommitAndUndelegateIntentBuilder<'a, 'info> {
-    parent: MagicIntentBundleBuilder<'info>,
+pub struct CommitAndUndelegateIntentBuilder<'a, 'args> {
+    parent: MagicIntentBundleBuilder<'args>,
     accounts: &'a [AccountView],
-    post_commit_actions: NoVec<CallHandler<'info>, MAX_ACTIONS_NUM>,
-    post_undelegate_actions: NoVec<CallHandler<'info>, MAX_ACTIONS_NUM>,
+    post_commit_actions: NoVec<CallHandler<'args>, MAX_ACTIONS_NUM>,
+    post_undelegate_actions: NoVec<CallHandler<'args>, MAX_ACTIONS_NUM>,
 }
 
 impl<'a, 'args> CommitAndUndelegateIntentBuilder<'a, 'args> {
     // TODO: have slice & fixed-array version
     /// Adds post-commit actions. Chainable.
     pub fn add_post_commit_actions<'new_args>(
-        mut self,
+        self,
         actions: &[CallHandler<'new_args>],
     ) -> CommitAndUndelegateIntentBuilder<'a, 'new_args>
     where
@@ -434,8 +398,8 @@ impl<'a, 'args> CommitAndUndelegateIntentBuilder<'a, 'args> {
 
     /// Adds post-undelegate actions. Chainable.
     pub fn add_post_undelegate_actions<'new_args>(
-        mut self,
-        actions: &[CallHandler<'args>],
+        self,
+        actions: &[CallHandler<'new_args>],
     ) -> CommitAndUndelegateIntentBuilder<'a, 'new_args>
     where
         'args: 'new_args,
@@ -466,14 +430,9 @@ impl<'a, 'args> CommitAndUndelegateIntentBuilder<'a, 'args> {
         self.done().add_standalone_actions(actions)
     }
 
-    /// Terminal: finalizes this intent and builds the full instruction.
-    pub fn build(self) -> (Vec<AccountInfo<'info>>, Instruction) {
-        self.done().build()
-    }
-
     /// Terminal: finalizes this intent, builds the instruction and invokes it.
-    pub fn build_and_invoke(self) -> ProgramResult {
-        self.done().build_and_invoke()
+    pub fn build_and_invoke(self, data_buf: &mut [u8]) -> ProgramResult {
+        self.done().build_and_invoke(data_buf)
     }
 
     /// Finalizes this commit-and-undelegate intent and folds it into the parent bundle.
@@ -487,7 +446,7 @@ impl<'a, 'args> CommitAndUndelegateIntentBuilder<'a, 'args> {
 
         let mut accounts = NoVec::<_, MAX_COMMITTED_ACCOUNTS_NUM>::new();
         accounts.append_slice(committed_accounts);
-        let cau = CommitAndUndelegate {
+        let cau = CommitAndUndelegateIntent {
             accounts,
             post_commit_actions,
             post_undelegate_actions,
@@ -498,6 +457,10 @@ impl<'a, 'args> CommitAndUndelegateIntentBuilder<'a, 'args> {
         parent
     }
 }
+
+// ---------------------------------------------------------------------------
+// Intent Types
+// ---------------------------------------------------------------------------
 
 #[derive(Clone)]
 pub struct CallHandler<'args> {
@@ -524,11 +487,11 @@ impl<'args> CallHandler<'args> {
         }
     }
 
-    fn add_accounts_slice(&mut self, accounts: &[ShortAccountMeta]) {
+    pub fn add_accounts_slice(&mut self, accounts: &[ShortAccountMeta]) {
         self.accounts.append_slice(accounts);
     }
 
-    fn add_accounts<const N: usize>(&mut self, accounts: [ShortAccountMeta; N]) {
+    pub fn add_accounts<const N: usize>(&mut self, accounts: [ShortAccountMeta; N]) {
         self.accounts.append(accounts);
     }
 
@@ -565,16 +528,31 @@ impl<'args> CommitIntent<'args> {
         &mut self.accounts
     }
 
+    /// Deduplicates committed accounts by address. Accounts whose address is
+    /// already in `seen` are removed. Newly seen addresses are added to `seen`.
     fn dedup(&mut self, seen: &mut NoVec<Address, MAX_ACCOUNTS>) {
-        let committed_accounts = self.committed_accounts_mut();
-        committed_accounts.retain(|el| {
-            if seen.contains(el.key()) {
+        self.accounts.retain(|el| {
+            let addr = el.address();
+            if seen.contains(addr) {
                 false
             } else {
-                seen.push(*el.key());
+                seen.push(addr.clone());
                 true
             }
         });
+    }
+
+    /// Merges another CommitIntent into this one. Only inserts accounts
+    /// whose address is not already present (dedup on merge).
+    fn merge(&mut self, other: Self) {
+        for account in other.accounts {
+            if !self.accounts.as_slice().iter().any(|a| a.address() == account.address()) {
+                self.accounts.push(account);
+            }
+        }
+        for action in other.actions {
+            self.actions.push(action);
+        }
     }
 
     fn collect_unique_accounts(&self, container: &mut NoVec<AccountView, MAX_ACCOUNTS>) {
@@ -583,17 +561,15 @@ impl<'args> CommitIntent<'args> {
                 container.push(el.clone());
             }
         }
-
         for el in self.actions.iter() {
             el.collect_unique_accounts(container);
         }
     }
 
-    fn into_args(self, indices_map: &[Address]) -> CommitTypeArgs {
-        let mut indices = NoVec::<_, MAX_ACCOUNTS>::new();
+    fn into_args(self, indices_map: &[Address]) -> CommitTypeArgs<'args> {
+        let mut indices = NoVec::<u8, MAX_COMMITTED_ACCOUNTS_NUM>::new();
         for account in self.accounts {
-            let idx = get_index(indices_map, account.address()).unwrap();
-            // .ok_or(ProgramError::InvalidAccountData)?;
+            let idx = get_index(indices_map, account.address()).expect(EXPECTED_KEY_MSG);
             indices.push(idx);
         }
 
@@ -602,7 +578,7 @@ impl<'args> CommitIntent<'args> {
         } else {
             let mut base_actions = NoVec::<_, MAX_ACTIONS_NUM>::new();
             for handler in self.actions {
-                base_actions.push(handler.into_args(indices_map)?);
+                base_actions.push(handler.into_args(indices_map));
             }
             CommitTypeArgs::WithBaseActions {
                 committed_accounts: indices,
@@ -610,48 +586,48 @@ impl<'args> CommitIntent<'args> {
             }
         }
     }
-
-    fn merge(&mut self, other: Self) {
-        let take = |value: &mut Self| -> (Vec<&'a AccountInfo>, Vec<BaseAction<'a>>) {
-            match value {
-                CommitType::Standalone(accounts) => (core::mem::take(accounts), vec![]),
-                CommitType::WithHandler {
-                    committed_accounts,
-                    call_handlers,
-                } => (
-                    core::mem::take(committed_accounts),
-                    core::mem::take(call_handlers),
-                ),
-            }
-        };
-
-        let (mut accounts, mut actions) = take(self);
-        let (other_accounts, other_actions) = {
-            let mut other = other;
-            take(&mut other)
-        };
-        accounts.extend(other_accounts);
-        actions.extend(other_actions);
-
-        if actions.is_empty() {
-            *self = CommitType::Standalone(accounts);
-        } else {
-            *self = CommitType::WithHandler {
-                committed_accounts: accounts,
-                call_handlers: actions,
-            };
-        }
-    }
 }
 
 // TODO: rename to CommitAndUndelegateIntent
-pub struct CommitAndUndelegate<'args> {
+pub struct CommitAndUndelegateIntent<'args> {
     accounts: NoVec<AccountView, MAX_COMMITTED_ACCOUNTS_NUM>,
     post_commit_actions: NoVec<CallHandler<'args>, MAX_ACTIONS_NUM>,
     post_undelegate_actions: NoVec<CallHandler<'args>, MAX_ACTIONS_NUM>,
 }
 
-impl<'a> CommitAndUndelegate<'a> {
+impl<'args> CommitAndUndelegateIntent<'args> {
+    /// Deduplicates committed accounts by address and returns the set of
+    /// unique addresses (for cross-intent overlap detection).
+    fn dedup(&mut self) -> NoVec<Address, MAX_ACCOUNTS> {
+        let mut seen = NoVec::<Address, MAX_ACCOUNTS>::new();
+        self.accounts.retain(|el| {
+            let addr = el.address();
+            if seen.contains(addr) {
+                false
+            } else {
+                seen.push(addr.clone());
+                true
+            }
+        });
+        seen
+    }
+
+    /// Merges another CommitAndUndelegateIntent into this one. Only inserts
+    /// accounts whose address is not already present (dedup on merge).
+    fn merge(&mut self, other: Self) {
+        for account in other.accounts {
+            if !self.accounts.as_slice().iter().any(|a| a.address() == account.address()) {
+                self.accounts.push(account);
+            }
+        }
+        for action in other.post_commit_actions {
+            self.post_commit_actions.push(action);
+        }
+        for action in other.post_undelegate_actions {
+            self.post_undelegate_actions.push(action);
+        }
+    }
+
     fn collect_unique_accounts(&self, container: &mut NoVec<AccountView, MAX_ACCOUNTS>) {
         for el in self.accounts.iter() {
             if !container.contains(el) {
@@ -666,36 +642,49 @@ impl<'a> CommitAndUndelegate<'a> {
         }
     }
 
-    fn into_args(self, pubkeys: &[Address]) -> Result<CommitAndUndelegateArgs, ProgramError> {
-        let commit_type = self.commit_type.into_args(pubkeys)?;
-        let undelegate_type = self.undelegate_type.into_args(pubkeys)?;
-        Ok(CommitAndUndelegateArgs {
-            commit_type,
-            undelegate_type,
-        })
-    }
+    fn into_args(self, indices_map: &[Address]) -> CommitAndUndelegateArgs<'args> {
+        // Build account indices
+        let mut indices = NoVec::<u8, MAX_COMMITTED_ACCOUNTS_NUM>::new();
+        for account in self.accounts {
+            let idx = get_index(indices_map, account.address()).expect(EXPECTED_KEY_MSG);
+            indices.push(idx);
+        }
 
-    fn dedup(&mut self) -> Vec<Address> {
-        self.commit_type.dedup()
-    }
-
-    fn merge(&mut self, other: Self) {
-        self.commit_type.merge(other.commit_type);
-
-        let this = core::mem::replace(&mut self.undelegate_type, UndelegateType::Standalone);
-        self.undelegate_type = match (this, other.undelegate_type) {
-            (UndelegateType::Standalone, UndelegateType::Standalone) => UndelegateType::Standalone,
-            (UndelegateType::Standalone, UndelegateType::WithHandler(v))
-            | (UndelegateType::WithHandler(v), UndelegateType::Standalone) => {
-                UndelegateType::WithHandler(v)
+        // Build commit type
+        let commit_type = if self.post_commit_actions.is_empty() {
+            CommitTypeArgs::Standalone(indices)
+        } else {
+            let mut base_actions = NoVec::<_, MAX_ACTIONS_NUM>::new();
+            for handler in self.post_commit_actions {
+                base_actions.push(handler.into_args(indices_map));
             }
-            (UndelegateType::WithHandler(mut a), UndelegateType::WithHandler(b)) => {
-                a.extend(b);
-                UndelegateType::WithHandler(a)
+            CommitTypeArgs::WithBaseActions {
+                committed_accounts: indices,
+                base_actions,
             }
         };
+
+        // Build undelegate type
+        let undelegate_type = if self.post_undelegate_actions.is_empty() {
+            UndelegateTypeArgs::Standalone
+        } else {
+            let mut base_actions = NoVec::<_, MAX_ACTIONS_NUM>::new();
+            for handler in self.post_undelegate_actions {
+                base_actions.push(handler.into_args(indices_map));
+            }
+            UndelegateTypeArgs::WithBaseActions { base_actions }
+        };
+
+        CommitAndUndelegateArgs {
+            commit_type,
+            undelegate_type,
+        }
     }
 }
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
 
 /// Gets the index of a pubkey in the deduplicated pubkey list.
 /// Returns None if the pubkey is not found.
