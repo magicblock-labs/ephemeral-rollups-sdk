@@ -36,7 +36,10 @@ impl<T, const N: usize> NoVec<T, N> {
         }
     }
 
-    pub fn try_append<const M: usize>(&mut self, other: [T; M]) -> Result<(), CapacityError<[T; M]>> {
+    pub fn try_append<const M: usize>(
+        &mut self,
+        other: [T; M],
+    ) -> Result<(), CapacityError<[T; M]>> {
         if self.len + M > N {
             return Err(CapacityError::new(other));
         }

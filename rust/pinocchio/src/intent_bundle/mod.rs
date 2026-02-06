@@ -1,4 +1,4 @@
-use crate::intent_bundle::no_vec::NoVec;
+use crate::intent_bundle::no_vec::{CapacityError, NoVec};
 use pinocchio::cpi::{invoke_with_bounds, MAX_STATIC_CPI_ACCOUNTS};
 use pinocchio::error::ProgramError;
 use pinocchio::instruction::{InstructionAccount, InstructionView};
@@ -73,29 +73,32 @@ impl<'args> MagicIntentBundleBuilder<'args> {
     /// - commit+undelegate intents are merged (unique accounts/actions appended)
     ///
     /// See `MagicIntentBundle::add_intent` for merge semantics.
-    pub fn add_intent(mut self, intent: MagicIntent<'args>) -> Self {
-        self.intent_bundle.add_intent(intent);
-        self
+    pub fn add_intent(mut self, intent: MagicIntent<'args>) -> Result<Self, ProgramError> {
+        self.intent_bundle.add_intent(intent)?;
+        Ok(self)
     }
 
     /// Adds (or merges) a `Commit` intent into the bundle.
-    pub fn add_commit(mut self, commit: CommitIntent<'args>) -> Self {
-        self.intent_bundle.add_intent(MagicIntent::Commit(commit));
-        self
+    pub fn add_commit(mut self, commit: CommitIntent<'args>) -> Result<Self, ProgramError> {
+        self.intent_bundle.add_intent(MagicIntent::Commit(commit))?;
+        Ok(self)
     }
 
     /// Adds (or merges) a `CommitAndUndelegate` intent into the bundle.
-    pub fn add_commit_and_undelegate(mut self, value: CommitAndUndelegateIntent<'args>) -> Self {
+    pub fn add_commit_and_undelegate(
+        mut self,
+        value: CommitAndUndelegateIntent<'args>,
+    ) -> Result<Self, ProgramError> {
         self.intent_bundle
-            .add_intent(MagicIntent::CommitAndUndelegate(value));
-        self
+            .add_intent(MagicIntent::CommitAndUndelegate(value))?;
+        Ok(self)
     }
 
     /// Adds standalone base-layer actions to be executed without any commit/undelegate semantics.
     pub fn add_standalone_actions<'newargs>(
         self,
         actions: &[CallHandler<'newargs>],
-    ) -> MagicIntentBundleBuilder<'newargs>
+    ) -> Result<MagicIntentBundleBuilder<'newargs>, ProgramError>
     where
         'args: 'newargs,
     {
@@ -107,10 +110,10 @@ impl<'args> MagicIntentBundleBuilder<'args> {
         };
 
         let mut standalone_actions = NoVec::<CallHandler<'newargs>, MAX_ACTIONS_NUM>::new();
-        standalone_actions.append_slice(actions);
+        standalone_actions.try_append_slice(actions)?;
         this.intent_bundle
-            .add_intent(MagicIntent::StandaloneActions(standalone_actions));
-        this
+            .add_intent(MagicIntent::StandaloneActions(standalone_actions))?;
+        Ok(this)
     }
 
     /// Normalizes the bundle, serializes it with bincode into `data_buf`, builds the
@@ -119,22 +122,22 @@ impl<'args> MagicIntentBundleBuilder<'args> {
     /// `data_buf` must be large enough to hold the serialized `MagicIntentBundleArgs`.
     pub fn build_and_invoke(mut self, data_buf: &mut [u8]) -> ProgramResult {
         // 1. Normalize: dedup within intents, resolve cross-intent overlaps
-        self.intent_bundle.normalize();
+        self.intent_bundle.normalize()?;
 
         // 2. Collect all unique accounts (payer + context first, then from intents)
         let mut all_accounts = NoVec::<AccountView, MAX_STATIC_CPI_ACCOUNTS>::new();
-        all_accounts.append([self.payer, self.magic_context]);
+        all_accounts.try_append([self.payer, self.magic_context])?;
         self.intent_bundle
-            .collect_unique_accounts(&mut all_accounts);
+            .collect_unique_accounts(&mut all_accounts)?;
 
         // 3. Build the natural indices map: indices_map[i] = address of account at position i
         let mut indices_map = NoVec::<Address, MAX_STATIC_CPI_ACCOUNTS>::new();
         for account in all_accounts.iter() {
-            indices_map.push(account.address().clone());
+            indices_map.try_push(account.address().clone())?;
         }
 
         // 4. Convert intents to serializable args
-        let args = self.intent_bundle.into_args(indices_map.as_slice());
+        let args = self.intent_bundle.into_args(indices_map.as_slice())?;
 
         // 5. Serialize with bincode (legacy config for bincode 1.x wire compat)
         let bytes_written = bincode::encode_into_slice(&args, data_buf, bincode::config::legacy())
@@ -143,7 +146,7 @@ impl<'args> MagicIntentBundleBuilder<'args> {
         // 6. Build instruction account metas
         let mut instruction_accounts = NoVec::<InstructionAccount, MAX_STATIC_CPI_ACCOUNTS>::new();
         for account in all_accounts.iter() {
-            instruction_accounts.push(InstructionAccount::from(account));
+            instruction_accounts.try_push(InstructionAccount::from(account))?;
         }
 
         // 7. Build instruction view
@@ -156,7 +159,7 @@ impl<'args> MagicIntentBundleBuilder<'args> {
         // 8. Build account refs for invoke
         let mut account_refs = NoVec::<&AccountView, MAX_STATIC_CPI_ACCOUNTS>::new();
         for account in all_accounts.iter() {
-            account_refs.push(account);
+            account_refs.try_push(account)?;
         }
 
         // 9. Invoke CPI
@@ -181,7 +184,7 @@ impl<'a, 'args> CommitIntentBuilder<'a, 'args> {
     pub fn add_post_commit_actions<'new_args>(
         self,
         actions: &[CallHandler<'new_args>],
-    ) -> CommitIntentBuilder<'a, 'new_args>
+    ) -> Result<CommitIntentBuilder<'a, 'new_args>, ProgramError>
     where
         'args: 'new_args,
     {
@@ -190,36 +193,36 @@ impl<'a, 'args> CommitIntentBuilder<'a, 'args> {
             accounts: self.accounts,
             actions: self.actions,
         };
-        this.actions.append_slice(actions);
-        this
+        this.actions.try_append_slice(actions)?;
+        Ok(this)
     }
 
     /// Transition: finalizes this commit intent and starts a commit-and-undelegate intent.
     pub fn commit_and_undelegate<'cau>(
         self,
         accounts: &'cau [AccountView],
-    ) -> CommitAndUndelegateIntentBuilder<'cau, 'args> {
-        self.done().commit_and_undelegate(accounts)
+    ) -> Result<CommitAndUndelegateIntentBuilder<'cau, 'args>, ProgramError> {
+        Ok(self.done()?.commit_and_undelegate(accounts))
     }
 
     /// Transition: finalizes this commit intent and adds standalone base-layer actions.
     pub fn add_standalone_actions<'newargs>(
         self,
         actions: &[CallHandler<'newargs>],
-    ) -> MagicIntentBundleBuilder<'newargs>
+    ) -> Result<MagicIntentBundleBuilder<'newargs>, ProgramError>
     where
         'args: 'newargs,
     {
-        self.done().add_standalone_actions(actions)
+        self.done()?.add_standalone_actions(actions)
     }
 
     /// Terminal: finalizes this commit intent, builds the instruction and invokes it.
     pub fn build_and_invoke(self, data_buf: &mut [u8]) -> ProgramResult {
-        self.done().build_and_invoke(data_buf)
+        self.done()?.build_and_invoke(data_buf)
     }
 
     /// Finalizes this commit intent and folds it into the parent bundle.
-    fn done(self) -> MagicIntentBundleBuilder<'args> {
+    fn done(self) -> Result<MagicIntentBundleBuilder<'args>, ProgramError> {
         let Self {
             mut parent,
             accounts: committed_accounts,
@@ -227,11 +230,13 @@ impl<'a, 'args> CommitIntentBuilder<'a, 'args> {
         } = self;
 
         let mut accounts = NoVec::<AccountView, MAX_STATIC_CPI_ACCOUNTS>::new();
-        accounts.append_slice(committed_accounts);
+        accounts.try_append_slice(committed_accounts)?;
         let commit = CommitIntent { accounts, actions };
 
-        parent.intent_bundle.add_intent(MagicIntent::Commit(commit));
         parent
+            .intent_bundle
+            .add_intent(MagicIntent::Commit(commit))?;
+        Ok(parent)
     }
 }
 
@@ -252,7 +257,7 @@ impl<'a, 'args> CommitAndUndelegateIntentBuilder<'a, 'args> {
     pub fn add_post_commit_actions<'new_args>(
         self,
         actions: &[CallHandler<'new_args>],
-    ) -> CommitAndUndelegateIntentBuilder<'a, 'new_args>
+    ) -> Result<CommitAndUndelegateIntentBuilder<'a, 'new_args>, ProgramError>
     where
         'args: 'new_args,
     {
@@ -262,15 +267,15 @@ impl<'a, 'args> CommitAndUndelegateIntentBuilder<'a, 'args> {
             post_commit_actions: self.post_commit_actions,
             post_undelegate_actions: self.post_undelegate_actions,
         };
-        this.post_commit_actions.append_slice(actions);
-        this
+        this.post_commit_actions.try_append_slice(actions)?;
+        Ok(this)
     }
 
     /// Adds post-undelegate actions. Chainable.
     pub fn add_post_undelegate_actions<'new_args>(
         self,
         actions: &[CallHandler<'new_args>],
-    ) -> CommitAndUndelegateIntentBuilder<'a, 'new_args>
+    ) -> Result<CommitAndUndelegateIntentBuilder<'a, 'new_args>, ProgramError>
     where
         'args: 'new_args,
     {
@@ -280,33 +285,36 @@ impl<'a, 'args> CommitAndUndelegateIntentBuilder<'a, 'args> {
             post_commit_actions: self.post_commit_actions,
             post_undelegate_actions: self.post_undelegate_actions,
         };
-        this.post_undelegate_actions.append_slice(actions);
-        this
+        this.post_undelegate_actions.try_append_slice(actions)?;
+        Ok(this)
     }
 
     /// Transition: finalizes this commit-and-undelegate intent and starts a new commit intent.
-    pub fn commit<'b>(self, accounts: &'b [AccountView]) -> CommitIntentBuilder<'b, 'args> {
-        self.done().commit(accounts)
+    pub fn commit<'b>(
+        self,
+        accounts: &'b [AccountView],
+    ) -> Result<CommitIntentBuilder<'b, 'args>, ProgramError> {
+        Ok(self.done()?.commit(accounts))
     }
 
     /// Transition: finalizes this commit-and-undelegate intent and adds standalone base-layer actions.
     pub fn add_standalone_actions<'newargs>(
         self,
         actions: &[CallHandler<'newargs>],
-    ) -> MagicIntentBundleBuilder<'newargs>
+    ) -> Result<MagicIntentBundleBuilder<'newargs>, ProgramError>
     where
         'args: 'newargs,
     {
-        self.done().add_standalone_actions(actions)
+        self.done()?.add_standalone_actions(actions)
     }
 
     /// Terminal: finalizes this intent, builds the instruction and invokes it.
     pub fn build_and_invoke(self, data_buf: &mut [u8]) -> ProgramResult {
-        self.done().build_and_invoke(data_buf)
+        self.done()?.build_and_invoke(data_buf)
     }
 
     /// Finalizes this commit-and-undelegate intent and folds it into the parent bundle.
-    fn done(self) -> MagicIntentBundleBuilder<'args> {
+    fn done(self) -> Result<MagicIntentBundleBuilder<'args>, ProgramError> {
         let Self {
             mut parent,
             accounts: committed_accounts,
@@ -315,7 +323,7 @@ impl<'a, 'args> CommitAndUndelegateIntentBuilder<'a, 'args> {
         } = self;
 
         let mut accounts = NoVec::<_, MAX_STATIC_CPI_ACCOUNTS>::new();
-        accounts.append_slice(committed_accounts);
+        accounts.try_append_slice(committed_accounts)?;
         let cau = CommitAndUndelegateIntent {
             accounts,
             post_commit_actions,
@@ -323,8 +331,14 @@ impl<'a, 'args> CommitAndUndelegateIntentBuilder<'a, 'args> {
         };
         parent
             .intent_bundle
-            .add_intent(MagicIntent::CommitAndUndelegate(cau));
-        parent
+            .add_intent(MagicIntent::CommitAndUndelegate(cau))?;
+        Ok(parent)
+    }
+}
+
+impl<T> From<CapacityError<T>> for ProgramError {
+    fn from(_: CapacityError<T>) -> Self {
+        ProgramError::InvalidArgument
     }
 }
 
@@ -338,19 +352,23 @@ impl MagicIntentBundleBuilder<'_> {
     /// `MagicIntentBundleArgs` into the provided buffer instead of invoking CPI.
     /// Returns the number of bytes written.
     fn build_serialized(mut self, buf: &mut [u8]) -> usize {
-        self.intent_bundle.normalize();
+        self.intent_bundle.normalize().unwrap();
 
         let mut all_accounts = NoVec::<AccountView, MAX_STATIC_CPI_ACCOUNTS>::new();
         all_accounts.append([self.payer, self.magic_context]);
         self.intent_bundle
-            .collect_unique_accounts(&mut all_accounts);
+            .collect_unique_accounts(&mut all_accounts)
+            .unwrap();
 
         let mut indices_map = NoVec::<Address, MAX_STATIC_CPI_ACCOUNTS>::new();
         for account in all_accounts.iter() {
             indices_map.push(account.address().clone());
         }
 
-        let args = self.intent_bundle.into_args(indices_map.as_slice());
+        let args = self
+            .intent_bundle
+            .into_args(indices_map.as_slice())
+            .unwrap();
         bincode::encode_into_slice(&args, buf, bincode::config::legacy()).unwrap()
     }
 }
@@ -358,14 +376,14 @@ impl MagicIntentBundleBuilder<'_> {
 #[cfg(test)]
 impl CommitIntentBuilder<'_, '_> {
     fn build_serialized(self, buf: &mut [u8]) -> usize {
-        self.done().build_serialized(buf)
+        self.done().unwrap().build_serialized(buf)
     }
 }
 
 #[cfg(test)]
 impl CommitAndUndelegateIntentBuilder<'_, '_> {
     fn build_serialized(self, buf: &mut [u8]) -> usize {
-        self.done().build_serialized(buf)
+        self.done().unwrap().build_serialized(buf)
     }
 }
 
@@ -582,6 +600,7 @@ mod tests {
         )
         .commit(&commit_accs)
         .add_post_commit_actions(&[handler])
+        .unwrap()
         .build_serialized(&mut buf);
 
         // --- SDK ---
@@ -704,7 +723,9 @@ mod tests {
         )
         .commit_and_undelegate(&cau_accs)
         .add_post_commit_actions(&[post_commit])
+        .unwrap()
         .add_post_undelegate_actions(&[post_undelegate])
+        .unwrap()
         .build_serialized(&mut buf);
 
         // --- SDK ---
@@ -770,10 +791,12 @@ mod tests {
             ActionArgs::new(&data),
             100_000,
         );
-        handler.add_accounts_slice(&[ShortAccountMeta {
-            pubkey: Address::new_from_array(extra_addr),
-            is_writable: true,
-        }]);
+        handler
+            .add_accounts_slice(&[ShortAccountMeta {
+                pubkey: Address::new_from_array(extra_addr),
+                is_writable: true,
+            }])
+            .unwrap();
         let mut buf = [0u8; CPI_DATA_BUF_SIZE];
         let pino_len = MagicIntentBundleBuilder::new(
             p_payer.as_account_view(),
@@ -781,6 +804,7 @@ mod tests {
             p_prog.as_account_view(),
         )
         .add_standalone_actions(&[handler])
+        .unwrap()
         .build_serialized(&mut buf);
 
         // --- SDK ---
@@ -841,6 +865,7 @@ mod tests {
         )
         .commit(&commit_accs)
         .commit_and_undelegate(&cau_accs)
+        .unwrap()
         .build_serialized(&mut buf);
 
         // --- SDK ---
@@ -903,7 +928,9 @@ mod tests {
         )
         .commit(&commit_accs)
         .commit_and_undelegate(&cau_accs)
+        .unwrap()
         .add_standalone_actions(&[handler])
+        .unwrap()
         .build_serialized(&mut buf);
 
         // --- SDK ---
@@ -985,8 +1012,11 @@ mod tests {
         )
         .commit(&commit_accs)
         .add_post_commit_actions(&[commit_handler])
+        .unwrap()
         .commit_and_undelegate(&cau_accs)
+        .unwrap()
         .add_post_undelegate_actions(&[undelegate_handler])
+        .unwrap()
         .build_serialized(&mut buf);
 
         // --- SDK ---
