@@ -24,6 +24,7 @@ const EXPECTED_KEY_MSG: &str = "Key expected to exist!";
 ///
 /// This enum represents the different types of operations that can be bundled
 /// and executed through the Magic program.
+#[allow(clippy::large_enum_variant)]
 pub enum MagicIntent<'args> {
     /// Standalone actions to execute on base layer without commit/undelegate semantics.
     StandaloneActions(NoVec<CallHandler<'args>, MAX_ACTIONS_NUM>),
@@ -520,14 +521,6 @@ pub struct CommitIntent<'args> {
 }
 
 impl<'args> CommitIntent<'args> {
-    fn committed_accounts(&self) -> &NoVec<AccountView, MAX_COMMITTED_ACCOUNTS_NUM> {
-        &self.accounts
-    }
-
-    fn committed_accounts_mut(&mut self) -> &mut NoVec<AccountView, MAX_COMMITTED_ACCOUNTS_NUM> {
-        &mut self.accounts
-    }
-
     /// Deduplicates committed accounts by address. Accounts whose address is
     /// already in `seen` are removed. Newly seen addresses are added to `seen`.
     fn dedup(&mut self, seen: &mut NoVec<Address, MAX_ACCOUNTS>) {
@@ -697,10 +690,11 @@ fn get_index(pubkeys: &[Address], needle: &Address) -> Option<u8> {
 // ---------------------------------------------------------------------------
 
 #[cfg(test)]
-impl<'args> MagicIntentBundleBuilder<'args> {
-    /// Reproduces the logic of `build_and_invoke` but returns the serialized
-    /// `MagicIntentBundleArgs` bytes instead of invoking CPI.
-    fn build_serialized(mut self) -> alloc::vec::Vec<u8> {
+impl MagicIntentBundleBuilder<'_> {
+    /// Reproduces the logic of `build_and_invoke` but serializes the
+    /// `MagicIntentBundleArgs` into the provided buffer instead of invoking CPI.
+    /// Returns the number of bytes written.
+    fn build_serialized(mut self, buf: &mut [u8]) -> usize {
         self.intent_bundle.normalize();
 
         let mut all_accounts = NoVec::<AccountView, MAX_ACCOUNTS>::new();
@@ -714,25 +708,21 @@ impl<'args> MagicIntentBundleBuilder<'args> {
         }
 
         let args = self.intent_bundle.into_args(indices_map.as_slice());
-        let mut buf = alloc::vec![0u8; 4096];
-        let len =
-            bincode::encode_into_slice(&args, &mut buf, bincode::config::legacy()).unwrap();
-        buf.truncate(len);
-        buf
+        bincode::encode_into_slice(&args, buf, bincode::config::legacy()).unwrap()
     }
 }
 
 #[cfg(test)]
-impl<'a, 'args> CommitIntentBuilder<'a, 'args> {
-    fn build_serialized(self) -> alloc::vec::Vec<u8> {
-        self.done().build_serialized()
+impl CommitIntentBuilder<'_, '_> {
+    fn build_serialized(self, buf: &mut [u8]) -> usize {
+        self.done().build_serialized(buf)
     }
 }
 
 #[cfg(test)]
-impl<'a, 'args> CommitAndUndelegateIntentBuilder<'a, 'args> {
-    fn build_serialized(self) -> alloc::vec::Vec<u8> {
-        self.done().build_serialized()
+impl CommitAndUndelegateIntentBuilder<'_, '_> {
+    fn build_serialized(self, buf: &mut [u8]) -> usize {
+        self.done().build_serialized(buf)
     }
 }
 
@@ -748,6 +738,9 @@ mod tests {
     use std::rc::Rc;
     use std::vec;
     use std::vec::Vec;
+
+    /// Solana CPI instruction data limit (1280 bytes).
+    const CPI_DATA_BUF_SIZE: usize = 1280;
 
     use super::*;
     use crate::intent_bundle::args::ShortAccountMeta;
@@ -880,13 +873,14 @@ mod tests {
         let mut p_prog = MockRuntimeAccount::new(prog_addr);
 
         let commit_accs = [p_acc1.as_account_view(), p_acc2.as_account_view()];
-        let pino_bytes = MagicIntentBundleBuilder::new(
+        let mut buf = [0u8; CPI_DATA_BUF_SIZE];
+        let pino_len = MagicIntentBundleBuilder::new(
             p_payer.as_account_view(),
             p_ctx.as_account_view(),
             p_prog.as_account_view(),
         )
         .commit(&commit_accs)
-        .build_serialized();
+        .build_serialized(&mut buf);
 
         // --- SDK builder ---
         let mut s_payer = SdkTestAccount::new(payer_addr);
@@ -905,7 +899,7 @@ mod tests {
         drop(accounts);
 
         assert_eq!(
-            pino_bytes.as_slice(),
+            &buf[..pino_len],
             extract_sdk_args(&ix.data),
             "commit standalone mismatch"
         );
@@ -937,14 +931,15 @@ mod tests {
             200_000,
         );
         let commit_accs = [p_acc1.as_account_view()];
-        let pino_bytes = MagicIntentBundleBuilder::new(
+        let mut buf = [0u8; CPI_DATA_BUF_SIZE];
+        let pino_len = MagicIntentBundleBuilder::new(
             p_payer.as_account_view(),
             p_ctx.as_account_view(),
             p_prog.as_account_view(),
         )
         .commit(&commit_accs)
         .add_post_commit_actions(&[handler])
-        .build_serialized();
+        .build_serialized(&mut buf);
 
         // --- SDK ---
         let mut s_payer = SdkTestAccount::new(payer_addr);
@@ -971,7 +966,7 @@ mod tests {
         drop(accounts);
 
         assert_eq!(
-            pino_bytes.as_slice(),
+            &buf[..pino_len],
             extract_sdk_args(&ix.data),
             "commit with handler mismatch"
         );
@@ -992,13 +987,14 @@ mod tests {
         let mut p_prog = MockRuntimeAccount::new(prog_addr);
 
         let cau_accs = [p_acc1.as_account_view()];
-        let pino_bytes = MagicIntentBundleBuilder::new(
+        let mut buf = [0u8; CPI_DATA_BUF_SIZE];
+        let pino_len = MagicIntentBundleBuilder::new(
             p_payer.as_account_view(),
             p_ctx.as_account_view(),
             p_prog.as_account_view(),
         )
         .commit_and_undelegate(&cau_accs)
-        .build_serialized();
+        .build_serialized(&mut buf);
 
         // --- SDK ---
         let mut s_payer = SdkTestAccount::new(payer_addr);
@@ -1016,7 +1012,7 @@ mod tests {
         drop(accounts);
 
         assert_eq!(
-            pino_bytes.as_slice(),
+            &buf[..pino_len],
             extract_sdk_args(&ix.data),
             "commit_and_undelegate standalone mismatch"
         );
@@ -1057,7 +1053,8 @@ mod tests {
             50_000,
         );
         let cau_accs = [p_acc1.as_account_view()];
-        let pino_bytes = MagicIntentBundleBuilder::new(
+        let mut buf = [0u8; CPI_DATA_BUF_SIZE];
+        let pino_len = MagicIntentBundleBuilder::new(
             p_payer.as_account_view(),
             p_ctx.as_account_view(),
             p_prog.as_account_view(),
@@ -1065,7 +1062,7 @@ mod tests {
         .commit_and_undelegate(&cau_accs)
         .add_post_commit_actions(&[post_commit])
         .add_post_undelegate_actions(&[post_undelegate])
-        .build_serialized();
+        .build_serialized(&mut buf);
 
         // --- SDK ---
         let mut s_payer = SdkTestAccount::new(payer_addr);
@@ -1101,7 +1098,7 @@ mod tests {
         drop(accounts);
 
         assert_eq!(
-            pino_bytes.as_slice(),
+            &buf[..pino_len],
             extract_sdk_args(&ix.data),
             "commit_and_undelegate with actions mismatch"
         );
@@ -1134,13 +1131,14 @@ mod tests {
             pubkey: Address::new_from_array(extra_addr),
             is_writable: true,
         }]);
-        let pino_bytes = MagicIntentBundleBuilder::new(
+        let mut buf = [0u8; CPI_DATA_BUF_SIZE];
+        let pino_len = MagicIntentBundleBuilder::new(
             p_payer.as_account_view(),
             p_ctx.as_account_view(),
             p_prog.as_account_view(),
         )
         .add_standalone_actions(&[handler])
-        .build_serialized();
+        .build_serialized(&mut buf);
 
         // --- SDK ---
         let mut s_payer = SdkTestAccount::new(payer_addr);
@@ -1168,7 +1166,7 @@ mod tests {
         drop(accounts);
 
         assert_eq!(
-            pino_bytes.as_slice(),
+            &buf[..pino_len],
             extract_sdk_args(&ix.data),
             "standalone actions mismatch"
         );
@@ -1192,14 +1190,15 @@ mod tests {
 
         let commit_accs = [p_acc1.as_account_view()];
         let cau_accs = [p_acc2.as_account_view()];
-        let pino_bytes = MagicIntentBundleBuilder::new(
+        let mut buf = [0u8; CPI_DATA_BUF_SIZE];
+        let pino_len = MagicIntentBundleBuilder::new(
             p_payer.as_account_view(),
             p_ctx.as_account_view(),
             p_prog.as_account_view(),
         )
         .commit(&commit_accs)
         .commit_and_undelegate(&cau_accs)
-        .build_serialized();
+        .build_serialized(&mut buf);
 
         // --- SDK ---
         let mut s_payer = SdkTestAccount::new(payer_addr);
@@ -1219,7 +1218,7 @@ mod tests {
         drop(accounts);
 
         assert_eq!(
-            pino_bytes.as_slice(),
+            &buf[..pino_len],
             extract_sdk_args(&ix.data),
             "commit then commit_and_undelegate mismatch"
         );
@@ -1253,7 +1252,8 @@ mod tests {
         );
         let commit_accs = [p_commit.as_account_view()];
         let cau_accs = [p_cau.as_account_view()];
-        let pino_bytes = MagicIntentBundleBuilder::new(
+        let mut buf = [0u8; CPI_DATA_BUF_SIZE];
+        let pino_len = MagicIntentBundleBuilder::new(
             p_payer.as_account_view(),
             p_ctx.as_account_view(),
             p_prog.as_account_view(),
@@ -1261,7 +1261,7 @@ mod tests {
         .commit(&commit_accs)
         .commit_and_undelegate(&cau_accs)
         .add_standalone_actions(&[handler])
-        .build_serialized();
+        .build_serialized(&mut buf);
 
         // --- SDK ---
         let mut s_payer = SdkTestAccount::new(payer_addr);
@@ -1290,7 +1290,7 @@ mod tests {
         drop(accounts);
 
         assert_eq!(
-            pino_bytes.as_slice(),
+            &buf[..pino_len],
             extract_sdk_args(&ix.data),
             "all intents combined mismatch"
         );
@@ -1334,7 +1334,8 @@ mod tests {
         );
         let commit_accs = [p_commit.as_account_view()];
         let cau_accs = [p_cau.as_account_view()];
-        let pino_bytes = MagicIntentBundleBuilder::new(
+        let mut buf = [0u8; CPI_DATA_BUF_SIZE];
+        let pino_len = MagicIntentBundleBuilder::new(
             p_payer.as_account_view(),
             p_ctx.as_account_view(),
             p_prog.as_account_view(),
@@ -1343,7 +1344,7 @@ mod tests {
         .add_post_commit_actions(&[commit_handler])
         .commit_and_undelegate(&cau_accs)
         .add_post_undelegate_actions(&[undelegate_handler])
-        .build_serialized();
+        .build_serialized(&mut buf);
 
         // --- SDK ---
         let mut s_payer = SdkTestAccount::new(payer_addr);
@@ -1381,7 +1382,7 @@ mod tests {
         drop(accounts);
 
         assert_eq!(
-            pino_bytes.as_slice(),
+            &buf[..pino_len],
             extract_sdk_args(&ix.data),
             "full chain with actions mismatch"
         );

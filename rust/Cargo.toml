@@ -85,7 +85,7 @@ rpc = { package = "solana-rpc-client", version = ">=1.16, <3" }
 rpc-api = { package = "solana-rpc-client-api", version = ">=1.16, <3" }
 
 # serialization/parsing
-serde = { version = "1.0", features = ["derive"] }
+serde = { version = "1.0", default-features = false, features = ["derive"] }
 serde_with = { version = "3.16" }
 serde_json = { version = "1.0" }
 json = { package = "sonic-rs", version = "0.3" }

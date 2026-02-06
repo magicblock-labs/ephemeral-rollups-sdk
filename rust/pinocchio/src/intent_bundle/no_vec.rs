@@ -28,22 +28,6 @@ impl<T, const N: usize> NoVec<T, N> {
         self.len += 1;
     }
 
-    fn append_slice_moved(&mut self, other: &[T]) {
-        let other_len = other.len();
-        if self.len + other_len > N {
-            panic!("");
-        }
-
-        // bit-copy array to our array
-        // We use ManuallyDrop in order not to free memory twice
-        let other = ManuallyDrop::new(other);
-        let dst = unsafe { mem::transmute::<_, *mut T>(self.inner.as_mut_ptr().add(self.len)) };
-        unsafe { ptr::copy_nonoverlapping(other.as_ptr(), dst, other_len) };
-
-        // Increase
-        self.len += other_len;
-    }
-
     pub fn append<const M: usize>(&mut self, other: [T; M]) {
         if self.len + M > N {
             panic!("");
@@ -52,7 +36,7 @@ impl<T, const N: usize> NoVec<T, N> {
         // bit-copy array to our array
         // We use ManuallyDrop in order not to free memory twice
         let other: ManuallyDrop<[_; M]> = ManuallyDrop::new(other);
-        let dst = unsafe { mem::transmute::<_, *mut T>(self.inner.as_mut_ptr().add(self.len)) };
+        let dst = unsafe { mem::transmute::<*mut MaybeUninit<T>, *mut T>(self.inner.as_mut_ptr().add(self.len)) };
         unsafe { ptr::copy_nonoverlapping(other.as_ptr(), dst, M) };
 
         // Increase

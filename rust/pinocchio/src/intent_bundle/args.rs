@@ -7,7 +7,6 @@ use solana_address::Address;
 
 const MAX_ACTIONS_NUM: usize = 10u8 as usize;
 const MAX_COMMITTED_ACCOUNTS_NUM: usize = 64u8 as usize;
-const MAX_ACCOUNTS: usize = pinocchio::cpi::MAX_CPI_ACCOUNTS;
 
 /// Action arguments containing escrow index and instruction data.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, bincode::Encode)]
@@ -29,7 +28,7 @@ impl<'a> ActionArgs<'a> {
     }
 
     pub fn data(&self) -> &'a [u8] {
-        &self.data
+        self.data
     }
 
     pub fn with_escrow_index(mut self, index: u8) -> Self {
@@ -63,6 +62,7 @@ pub struct ShortAccountMeta {
 
 /// Commit type arguments for serialization.
 #[derive(Serialize, bincode::Encode)]
+#[allow(clippy::large_enum_variant)]
 pub enum CommitTypeArgs<'args> {
     // we generate it
     Standalone(NoVec<u8, MAX_COMMITTED_ACCOUNTS_NUM>), // slice or NoVec
@@ -74,6 +74,7 @@ pub enum CommitTypeArgs<'args> {
 
 /// Undelegate type arguments for serialization.
 #[derive(Serialize, bincode::Encode)]
+#[allow(clippy::large_enum_variant)]
 pub enum UndelegateTypeArgs<'args> {
     Standalone,
     WithBaseActions {
