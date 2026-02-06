@@ -691,3 +691,699 @@ impl<'args> CommitAndUndelegateIntent<'args> {
 fn get_index(pubkeys: &[Address], needle: &Address) -> Option<u8> {
     pubkeys.iter().position(|k| k == needle).map(|i| i as u8)
 }
+
+// ---------------------------------------------------------------------------
+// Test-only: serialize builder output without CPI
+// ---------------------------------------------------------------------------
+
+#[cfg(test)]
+impl<'args> MagicIntentBundleBuilder<'args> {
+    /// Reproduces the logic of `build_and_invoke` but returns the serialized
+    /// `MagicIntentBundleArgs` bytes instead of invoking CPI.
+    fn build_serialized(mut self) -> alloc::vec::Vec<u8> {
+        self.intent_bundle.normalize();
+
+        let mut all_accounts = NoVec::<AccountView, MAX_ACCOUNTS>::new();
+        all_accounts.append([self.payer, self.magic_context]);
+        self.intent_bundle
+            .collect_unique_accounts(&mut all_accounts);
+
+        let mut indices_map = NoVec::<Address, MAX_ACCOUNTS>::new();
+        for account in all_accounts.iter() {
+            indices_map.push(account.address().clone());
+        }
+
+        let args = self.intent_bundle.into_args(indices_map.as_slice());
+        let mut buf = alloc::vec![0u8; 4096];
+        let len =
+            bincode::encode_into_slice(&args, &mut buf, bincode::config::legacy()).unwrap();
+        buf.truncate(len);
+        buf
+    }
+}
+
+#[cfg(test)]
+impl<'a, 'args> CommitIntentBuilder<'a, 'args> {
+    fn build_serialized(self) -> alloc::vec::Vec<u8> {
+        self.done().build_serialized()
+    }
+}
+
+#[cfg(test)]
+impl<'a, 'args> CommitAndUndelegateIntentBuilder<'a, 'args> {
+    fn build_serialized(self) -> alloc::vec::Vec<u8> {
+        self.done().build_serialized()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Tests: builder compatibility between pinocchio and SDK
+// ---------------------------------------------------------------------------
+
+#[cfg(test)]
+mod tests {
+    extern crate std;
+
+    use std::cell::RefCell;
+    use std::rc::Rc;
+    use std::vec;
+    use std::vec::Vec;
+
+    use super::*;
+    use crate::intent_bundle::args::ShortAccountMeta;
+
+    // SDK builder
+    use ephemeral_rollups_sdk::ephem::{
+        CallHandler as SdkCallHandler, MagicIntentBundleBuilder as SdkBuilder,
+    };
+    use magicblock_magic_program_api::args::{
+        ActionArgs as SdkActionArgs, ShortAccountMeta as SdkShortAccountMeta,
+    };
+    use magicblock_magic_program_api::Pubkey;
+    use solana_program::account_info::AccountInfo;
+
+    // -----------------------------------------------------------------
+    // Mock helpers
+    // -----------------------------------------------------------------
+
+    /// Memory layout matching `RuntimeAccount` from `solana-account-view`.
+    /// Used to back a pinocchio `AccountView` in tests.
+    #[repr(C)]
+    struct MockRuntimeAccount {
+        borrow_state: u8,
+        is_signer: u8,
+        is_writable: u8,
+        executable: u8,
+        resize_delta: i32,
+        address: [u8; 32],
+        owner: [u8; 32],
+        lamports: u64,
+        data_len: u64,
+    }
+
+    impl MockRuntimeAccount {
+        fn new(address: [u8; 32]) -> Self {
+            Self {
+                borrow_state: 0xFF, // NOT_BORROWED
+                is_signer: 0,
+                is_writable: 1,
+                executable: 0,
+                resize_delta: 0,
+                address,
+                owner: [0; 32],
+                lamports: 1_000_000,
+                data_len: 0,
+            }
+        }
+
+        fn as_account_view(&mut self) -> AccountView {
+            // SAFETY: MockRuntimeAccount has the same #[repr(C)] layout as
+            // RuntimeAccount from solana-account-view. AccountView is a
+            // #[repr(C)] wrapper around *mut RuntimeAccount.
+            unsafe { core::mem::transmute(self as *mut Self) }
+        }
+    }
+
+    /// Helper to hold owned data for an SDK `AccountInfo`.
+    struct SdkTestAccount {
+        key: Pubkey,
+        lamports: u64,
+        data: Vec<u8>,
+        owner: Pubkey,
+    }
+
+    impl SdkTestAccount {
+        fn new(address: [u8; 32]) -> Self {
+            Self {
+                key: Pubkey::new_from_array(address),
+                lamports: 1_000_000,
+                data: vec![],
+                owner: Pubkey::new_from_array([0; 32]),
+            }
+        }
+
+        fn as_account_info(&mut self) -> AccountInfo<'_> {
+            AccountInfo {
+                key: &self.key,
+                is_signer: false,
+                is_writable: true,
+                lamports: Rc::new(RefCell::new(&mut self.lamports)),
+                data: Rc::new(RefCell::new(&mut self.data)),
+                owner: &self.owner,
+                executable: false,
+                rent_epoch: 0,
+            }
+        }
+
+        fn as_signer_info(&mut self) -> AccountInfo<'_> {
+            AccountInfo {
+                key: &self.key,
+                is_signer: true,
+                is_writable: false,
+                lamports: Rc::new(RefCell::new(&mut self.lamports)),
+                data: Rc::new(RefCell::new(&mut self.data)),
+                owner: &self.owner,
+                executable: false,
+                rent_epoch: 0,
+            }
+        }
+    }
+
+    /// Extract the `MagicIntentBundleArgs` bytes from SDK instruction data.
+    ///
+    /// The SDK wraps args in `MagicBlockInstruction::ScheduleIntentBundle(args)`,
+    /// adding a 4-byte u32 LE enum discriminant prefix.
+    fn extract_sdk_args(ix_data: &[u8]) -> &[u8] {
+        &ix_data[4..]
+    }
+
+    // -----------------------------------------------------------------
+    // Builder compatibility tests
+    // -----------------------------------------------------------------
+
+    /// Commit standalone (no actions).
+    ///
+    /// Both builders: `builder.commit(&[acc1, acc2]).build()`
+    #[test]
+    fn test_compat_commit_standalone() {
+        let payer_addr = [0x01; 32];
+        let ctx_addr = [0x02; 32];
+        let acc1_addr = [0x03; 32];
+        let acc2_addr = [0x04; 32];
+        let prog_addr = [0xFF; 32];
+
+        // --- Pinocchio builder ---
+        let mut p_payer = MockRuntimeAccount::new(payer_addr);
+        let mut p_ctx = MockRuntimeAccount::new(ctx_addr);
+        let mut p_acc1 = MockRuntimeAccount::new(acc1_addr);
+        let mut p_acc2 = MockRuntimeAccount::new(acc2_addr);
+        let mut p_prog = MockRuntimeAccount::new(prog_addr);
+
+        let commit_accs = [p_acc1.as_account_view(), p_acc2.as_account_view()];
+        let pino_bytes = MagicIntentBundleBuilder::new(
+            p_payer.as_account_view(),
+            p_ctx.as_account_view(),
+            p_prog.as_account_view(),
+        )
+        .commit(&commit_accs)
+        .build_serialized();
+
+        // --- SDK builder ---
+        let mut s_payer = SdkTestAccount::new(payer_addr);
+        let mut s_ctx = SdkTestAccount::new(ctx_addr);
+        let mut s_acc1 = SdkTestAccount::new(acc1_addr);
+        let mut s_acc2 = SdkTestAccount::new(acc2_addr);
+        let mut s_prog = SdkTestAccount::new(prog_addr);
+
+        let (accounts, ix) = SdkBuilder::new(
+            s_payer.as_account_info(),
+            s_ctx.as_account_info(),
+            s_prog.as_account_info(),
+        )
+        .commit(&[s_acc1.as_account_info(), s_acc2.as_account_info()])
+        .build();
+        drop(accounts);
+
+        assert_eq!(
+            pino_bytes.as_slice(),
+            extract_sdk_args(&ix.data),
+            "commit standalone mismatch"
+        );
+    }
+
+    /// Commit with a post-commit action (handler).
+    #[test]
+    fn test_compat_commit_with_handler() {
+        let payer_addr = [0x01; 32];
+        let ctx_addr = [0x02; 32];
+        let acc1_addr = [0x03; 32];
+        let escrow_addr = [0x04; 32];
+        let dest_addr = [0xDD; 32];
+        let prog_addr = [0xFF; 32];
+        let action_data = [0xAA, 0xBB, 0xCC];
+
+        // --- Pinocchio ---
+        let mut p_payer = MockRuntimeAccount::new(payer_addr);
+        let mut p_ctx = MockRuntimeAccount::new(ctx_addr);
+        let mut p_acc1 = MockRuntimeAccount::new(acc1_addr);
+        let mut p_escrow = MockRuntimeAccount::new(escrow_addr);
+        let mut p_prog = MockRuntimeAccount::new(prog_addr);
+
+        let escrow_view = p_escrow.as_account_view();
+        let handler = CallHandler::new(
+            Address::new_from_array(dest_addr),
+            escrow_view,
+            ActionArgs::new(&action_data),
+            200_000,
+        );
+        let commit_accs = [p_acc1.as_account_view()];
+        let pino_bytes = MagicIntentBundleBuilder::new(
+            p_payer.as_account_view(),
+            p_ctx.as_account_view(),
+            p_prog.as_account_view(),
+        )
+        .commit(&commit_accs)
+        .add_post_commit_actions(&[handler])
+        .build_serialized();
+
+        // --- SDK ---
+        let mut s_payer = SdkTestAccount::new(payer_addr);
+        let mut s_ctx = SdkTestAccount::new(ctx_addr);
+        let mut s_acc1 = SdkTestAccount::new(acc1_addr);
+        let mut s_escrow = SdkTestAccount::new(escrow_addr);
+        let mut s_prog = SdkTestAccount::new(prog_addr);
+
+        let sdk_handler = SdkCallHandler {
+            args: SdkActionArgs::new(action_data.to_vec()),
+            compute_units: 200_000,
+            escrow_authority: s_escrow.as_signer_info(),
+            destination_program: Pubkey::new_from_array(dest_addr),
+            accounts: vec![],
+        };
+        let (accounts, ix) = SdkBuilder::new(
+            s_payer.as_account_info(),
+            s_ctx.as_account_info(),
+            s_prog.as_account_info(),
+        )
+        .commit(&[s_acc1.as_account_info()])
+        .add_post_commit_actions([sdk_handler])
+        .build();
+        drop(accounts);
+
+        assert_eq!(
+            pino_bytes.as_slice(),
+            extract_sdk_args(&ix.data),
+            "commit with handler mismatch"
+        );
+    }
+
+    /// CommitAndUndelegate standalone (no actions).
+    #[test]
+    fn test_compat_commit_and_undelegate_standalone() {
+        let payer_addr = [0x01; 32];
+        let ctx_addr = [0x02; 32];
+        let acc1_addr = [0x03; 32];
+        let prog_addr = [0xFF; 32];
+
+        // --- Pinocchio ---
+        let mut p_payer = MockRuntimeAccount::new(payer_addr);
+        let mut p_ctx = MockRuntimeAccount::new(ctx_addr);
+        let mut p_acc1 = MockRuntimeAccount::new(acc1_addr);
+        let mut p_prog = MockRuntimeAccount::new(prog_addr);
+
+        let cau_accs = [p_acc1.as_account_view()];
+        let pino_bytes = MagicIntentBundleBuilder::new(
+            p_payer.as_account_view(),
+            p_ctx.as_account_view(),
+            p_prog.as_account_view(),
+        )
+        .commit_and_undelegate(&cau_accs)
+        .build_serialized();
+
+        // --- SDK ---
+        let mut s_payer = SdkTestAccount::new(payer_addr);
+        let mut s_ctx = SdkTestAccount::new(ctx_addr);
+        let mut s_acc1 = SdkTestAccount::new(acc1_addr);
+        let mut s_prog = SdkTestAccount::new(prog_addr);
+
+        let (accounts, ix) = SdkBuilder::new(
+            s_payer.as_account_info(),
+            s_ctx.as_account_info(),
+            s_prog.as_account_info(),
+        )
+        .commit_and_undelegate(&[s_acc1.as_account_info()])
+        .build();
+        drop(accounts);
+
+        assert_eq!(
+            pino_bytes.as_slice(),
+            extract_sdk_args(&ix.data),
+            "commit_and_undelegate standalone mismatch"
+        );
+    }
+
+    /// CommitAndUndelegate with post-commit and post-undelegate actions.
+    #[test]
+    fn test_compat_commit_and_undelegate_with_actions() {
+        let payer_addr = [0x01; 32];
+        let ctx_addr = [0x02; 32];
+        let acc1_addr = [0x03; 32];
+        let escrow1_addr = [0x04; 32];
+        let escrow2_addr = [0x05; 32];
+        let dest1_addr = [0xAA; 32];
+        let dest2_addr = [0xBB; 32];
+        let prog_addr = [0xFF; 32];
+        let commit_data = [1u8, 2, 3];
+        let undelegate_data = [4u8, 5, 6];
+
+        // --- Pinocchio ---
+        let mut p_payer = MockRuntimeAccount::new(payer_addr);
+        let mut p_ctx = MockRuntimeAccount::new(ctx_addr);
+        let mut p_acc1 = MockRuntimeAccount::new(acc1_addr);
+        let mut p_escrow1 = MockRuntimeAccount::new(escrow1_addr);
+        let mut p_escrow2 = MockRuntimeAccount::new(escrow2_addr);
+        let mut p_prog = MockRuntimeAccount::new(prog_addr);
+
+        let post_commit = CallHandler::new(
+            Address::new_from_array(dest1_addr),
+            p_escrow1.as_account_view(),
+            ActionArgs::new(&commit_data),
+            100_000,
+        );
+        let post_undelegate = CallHandler::new(
+            Address::new_from_array(dest2_addr),
+            p_escrow2.as_account_view(),
+            ActionArgs::new(&undelegate_data),
+            50_000,
+        );
+        let cau_accs = [p_acc1.as_account_view()];
+        let pino_bytes = MagicIntentBundleBuilder::new(
+            p_payer.as_account_view(),
+            p_ctx.as_account_view(),
+            p_prog.as_account_view(),
+        )
+        .commit_and_undelegate(&cau_accs)
+        .add_post_commit_actions(&[post_commit])
+        .add_post_undelegate_actions(&[post_undelegate])
+        .build_serialized();
+
+        // --- SDK ---
+        let mut s_payer = SdkTestAccount::new(payer_addr);
+        let mut s_ctx = SdkTestAccount::new(ctx_addr);
+        let mut s_acc1 = SdkTestAccount::new(acc1_addr);
+        let mut s_escrow1 = SdkTestAccount::new(escrow1_addr);
+        let mut s_escrow2 = SdkTestAccount::new(escrow2_addr);
+        let mut s_prog = SdkTestAccount::new(prog_addr);
+
+        let sdk_post_commit = SdkCallHandler {
+            args: SdkActionArgs::new(commit_data.to_vec()),
+            compute_units: 100_000,
+            escrow_authority: s_escrow1.as_signer_info(),
+            destination_program: Pubkey::new_from_array(dest1_addr),
+            accounts: vec![],
+        };
+        let sdk_post_undelegate = SdkCallHandler {
+            args: SdkActionArgs::new(undelegate_data.to_vec()),
+            compute_units: 50_000,
+            escrow_authority: s_escrow2.as_signer_info(),
+            destination_program: Pubkey::new_from_array(dest2_addr),
+            accounts: vec![],
+        };
+        let (accounts, ix) = SdkBuilder::new(
+            s_payer.as_account_info(),
+            s_ctx.as_account_info(),
+            s_prog.as_account_info(),
+        )
+        .commit_and_undelegate(&[s_acc1.as_account_info()])
+        .add_post_commit_actions([sdk_post_commit])
+        .add_post_undelegate_actions([sdk_post_undelegate])
+        .build();
+        drop(accounts);
+
+        assert_eq!(
+            pino_bytes.as_slice(),
+            extract_sdk_args(&ix.data),
+            "commit_and_undelegate with actions mismatch"
+        );
+    }
+
+    /// Standalone actions only (no commit / undelegate).
+    #[test]
+    fn test_compat_standalone_actions() {
+        let payer_addr = [0x01; 32];
+        let ctx_addr = [0x02; 32];
+        let escrow_addr = [0x04; 32];
+        let dest_addr = [0xA1; 32];
+        let extra_addr = [0xB1; 32];
+        let prog_addr = [0xFF; 32];
+        let data = [0x10u8, 0x20];
+
+        // --- Pinocchio ---
+        let mut p_payer = MockRuntimeAccount::new(payer_addr);
+        let mut p_ctx = MockRuntimeAccount::new(ctx_addr);
+        let mut p_escrow = MockRuntimeAccount::new(escrow_addr);
+        let mut p_prog = MockRuntimeAccount::new(prog_addr);
+
+        let mut handler = CallHandler::new(
+            Address::new_from_array(dest_addr),
+            p_escrow.as_account_view(),
+            ActionArgs::new(&data),
+            100_000,
+        );
+        handler.add_accounts_slice(&[ShortAccountMeta {
+            pubkey: Address::new_from_array(extra_addr),
+            is_writable: true,
+        }]);
+        let pino_bytes = MagicIntentBundleBuilder::new(
+            p_payer.as_account_view(),
+            p_ctx.as_account_view(),
+            p_prog.as_account_view(),
+        )
+        .add_standalone_actions(&[handler])
+        .build_serialized();
+
+        // --- SDK ---
+        let mut s_payer = SdkTestAccount::new(payer_addr);
+        let mut s_ctx = SdkTestAccount::new(ctx_addr);
+        let mut s_escrow = SdkTestAccount::new(escrow_addr);
+        let mut s_prog = SdkTestAccount::new(prog_addr);
+
+        let sdk_handler = SdkCallHandler {
+            args: SdkActionArgs::new(data.to_vec()),
+            compute_units: 100_000,
+            escrow_authority: s_escrow.as_signer_info(),
+            destination_program: Pubkey::new_from_array(dest_addr),
+            accounts: vec![SdkShortAccountMeta {
+                pubkey: Pubkey::new_from_array(extra_addr),
+                is_writable: true,
+            }],
+        };
+        let (accounts, ix) = SdkBuilder::new(
+            s_payer.as_account_info(),
+            s_ctx.as_account_info(),
+            s_prog.as_account_info(),
+        )
+        .add_standalone_actions([sdk_handler])
+        .build();
+        drop(accounts);
+
+        assert_eq!(
+            pino_bytes.as_slice(),
+            extract_sdk_args(&ix.data),
+            "standalone actions mismatch"
+        );
+    }
+
+    /// Chained: commit then commit_and_undelegate.
+    #[test]
+    fn test_compat_commit_then_commit_and_undelegate() {
+        let payer_addr = [0x01; 32];
+        let ctx_addr = [0x02; 32];
+        let acc1_addr = [0x03; 32];
+        let acc2_addr = [0x04; 32];
+        let prog_addr = [0xFF; 32];
+
+        // --- Pinocchio ---
+        let mut p_payer = MockRuntimeAccount::new(payer_addr);
+        let mut p_ctx = MockRuntimeAccount::new(ctx_addr);
+        let mut p_acc1 = MockRuntimeAccount::new(acc1_addr);
+        let mut p_acc2 = MockRuntimeAccount::new(acc2_addr);
+        let mut p_prog = MockRuntimeAccount::new(prog_addr);
+
+        let commit_accs = [p_acc1.as_account_view()];
+        let cau_accs = [p_acc2.as_account_view()];
+        let pino_bytes = MagicIntentBundleBuilder::new(
+            p_payer.as_account_view(),
+            p_ctx.as_account_view(),
+            p_prog.as_account_view(),
+        )
+        .commit(&commit_accs)
+        .commit_and_undelegate(&cau_accs)
+        .build_serialized();
+
+        // --- SDK ---
+        let mut s_payer = SdkTestAccount::new(payer_addr);
+        let mut s_ctx = SdkTestAccount::new(ctx_addr);
+        let mut s_acc1 = SdkTestAccount::new(acc1_addr);
+        let mut s_acc2 = SdkTestAccount::new(acc2_addr);
+        let mut s_prog = SdkTestAccount::new(prog_addr);
+
+        let (accounts, ix) = SdkBuilder::new(
+            s_payer.as_account_info(),
+            s_ctx.as_account_info(),
+            s_prog.as_account_info(),
+        )
+        .commit(&[s_acc1.as_account_info()])
+        .commit_and_undelegate(&[s_acc2.as_account_info()])
+        .build();
+        drop(accounts);
+
+        assert_eq!(
+            pino_bytes.as_slice(),
+            extract_sdk_args(&ix.data),
+            "commit then commit_and_undelegate mismatch"
+        );
+    }
+
+    /// All intent types combined: commit + commit_and_undelegate + standalone actions.
+    #[test]
+    fn test_compat_all_intents_combined() {
+        let payer_addr = [0x01; 32];
+        let ctx_addr = [0x02; 32];
+        let commit_acc_addr = [0x03; 32];
+        let cau_acc_addr = [0x04; 32];
+        let escrow_addr = [0x05; 32];
+        let dest_addr = [0xE1; 32];
+        let prog_addr = [0xFF; 32];
+        let standalone_data = [0xE0u8];
+
+        // --- Pinocchio ---
+        let mut p_payer = MockRuntimeAccount::new(payer_addr);
+        let mut p_ctx = MockRuntimeAccount::new(ctx_addr);
+        let mut p_commit = MockRuntimeAccount::new(commit_acc_addr);
+        let mut p_cau = MockRuntimeAccount::new(cau_acc_addr);
+        let mut p_escrow = MockRuntimeAccount::new(escrow_addr);
+        let mut p_prog = MockRuntimeAccount::new(prog_addr);
+
+        let handler = CallHandler::new(
+            Address::new_from_array(dest_addr),
+            p_escrow.as_account_view(),
+            ActionArgs::new(&standalone_data),
+            150_000,
+        );
+        let commit_accs = [p_commit.as_account_view()];
+        let cau_accs = [p_cau.as_account_view()];
+        let pino_bytes = MagicIntentBundleBuilder::new(
+            p_payer.as_account_view(),
+            p_ctx.as_account_view(),
+            p_prog.as_account_view(),
+        )
+        .commit(&commit_accs)
+        .commit_and_undelegate(&cau_accs)
+        .add_standalone_actions(&[handler])
+        .build_serialized();
+
+        // --- SDK ---
+        let mut s_payer = SdkTestAccount::new(payer_addr);
+        let mut s_ctx = SdkTestAccount::new(ctx_addr);
+        let mut s_commit = SdkTestAccount::new(commit_acc_addr);
+        let mut s_cau = SdkTestAccount::new(cau_acc_addr);
+        let mut s_escrow = SdkTestAccount::new(escrow_addr);
+        let mut s_prog = SdkTestAccount::new(prog_addr);
+
+        let sdk_handler = SdkCallHandler {
+            args: SdkActionArgs::new(standalone_data.to_vec()),
+            compute_units: 150_000,
+            escrow_authority: s_escrow.as_signer_info(),
+            destination_program: Pubkey::new_from_array(dest_addr),
+            accounts: vec![],
+        };
+        let (accounts, ix) = SdkBuilder::new(
+            s_payer.as_account_info(),
+            s_ctx.as_account_info(),
+            s_prog.as_account_info(),
+        )
+        .commit(&[s_commit.as_account_info()])
+        .commit_and_undelegate(&[s_cau.as_account_info()])
+        .add_standalone_actions([sdk_handler])
+        .build();
+        drop(accounts);
+
+        assert_eq!(
+            pino_bytes.as_slice(),
+            extract_sdk_args(&ix.data),
+            "all intents combined mismatch"
+        );
+    }
+
+    /// Full chain with actions on all intents.
+    #[test]
+    fn test_compat_full_chain_with_actions() {
+        let payer_addr = [0x01; 32];
+        let ctx_addr = [0x02; 32];
+        let commit_acc_addr = [0x03; 32];
+        let cau_acc_addr = [0x04; 32];
+        let escrow1_addr = [0x05; 32];
+        let escrow2_addr = [0x06; 32];
+        let dest1_addr = [0xC1; 32];
+        let dest2_addr = [0xD1; 32];
+        let prog_addr = [0xFF; 32];
+        let commit_data = [0xC0u8];
+        let undelegate_data = [0xD0u8];
+
+        // --- Pinocchio ---
+        let mut p_payer = MockRuntimeAccount::new(payer_addr);
+        let mut p_ctx = MockRuntimeAccount::new(ctx_addr);
+        let mut p_commit = MockRuntimeAccount::new(commit_acc_addr);
+        let mut p_cau = MockRuntimeAccount::new(cau_acc_addr);
+        let mut p_escrow1 = MockRuntimeAccount::new(escrow1_addr);
+        let mut p_escrow2 = MockRuntimeAccount::new(escrow2_addr);
+        let mut p_prog = MockRuntimeAccount::new(prog_addr);
+
+        let commit_handler = CallHandler::new(
+            Address::new_from_array(dest1_addr),
+            p_escrow1.as_account_view(),
+            ActionArgs::new(&commit_data),
+            100_000,
+        );
+        let undelegate_handler = CallHandler::new(
+            Address::new_from_array(dest2_addr),
+            p_escrow2.as_account_view(),
+            ActionArgs::new(&undelegate_data),
+            50_000,
+        );
+        let commit_accs = [p_commit.as_account_view()];
+        let cau_accs = [p_cau.as_account_view()];
+        let pino_bytes = MagicIntentBundleBuilder::new(
+            p_payer.as_account_view(),
+            p_ctx.as_account_view(),
+            p_prog.as_account_view(),
+        )
+        .commit(&commit_accs)
+        .add_post_commit_actions(&[commit_handler])
+        .commit_and_undelegate(&cau_accs)
+        .add_post_undelegate_actions(&[undelegate_handler])
+        .build_serialized();
+
+        // --- SDK ---
+        let mut s_payer = SdkTestAccount::new(payer_addr);
+        let mut s_ctx = SdkTestAccount::new(ctx_addr);
+        let mut s_commit = SdkTestAccount::new(commit_acc_addr);
+        let mut s_cau = SdkTestAccount::new(cau_acc_addr);
+        let mut s_escrow1 = SdkTestAccount::new(escrow1_addr);
+        let mut s_escrow2 = SdkTestAccount::new(escrow2_addr);
+        let mut s_prog = SdkTestAccount::new(prog_addr);
+
+        let sdk_commit_handler = SdkCallHandler {
+            args: SdkActionArgs::new(commit_data.to_vec()),
+            compute_units: 100_000,
+            escrow_authority: s_escrow1.as_signer_info(),
+            destination_program: Pubkey::new_from_array(dest1_addr),
+            accounts: vec![],
+        };
+        let sdk_undelegate_handler = SdkCallHandler {
+            args: SdkActionArgs::new(undelegate_data.to_vec()),
+            compute_units: 50_000,
+            escrow_authority: s_escrow2.as_signer_info(),
+            destination_program: Pubkey::new_from_array(dest2_addr),
+            accounts: vec![],
+        };
+        let (accounts, ix) = SdkBuilder::new(
+            s_payer.as_account_info(),
+            s_ctx.as_account_info(),
+            s_prog.as_account_info(),
+        )
+        .commit(&[s_commit.as_account_info()])
+        .add_post_commit_actions([sdk_commit_handler])
+        .commit_and_undelegate(&[s_cau.as_account_info()])
+        .add_post_undelegate_actions([sdk_undelegate_handler])
+        .build();
+        drop(accounts);
+
+        assert_eq!(
+            pino_bytes.as_slice(),
+            extract_sdk_args(&ix.data),
+            "full chain with actions mismatch"
+        );
+    }
+}

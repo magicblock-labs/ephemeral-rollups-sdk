@@ -359,3 +359,125 @@ impl<T: bincode::Encode, const N: usize> bincode::Encode for NoVec<T, N> {
         bincode::Encode::encode(self.as_slice(), encoder)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_push_and_len() {
+        let mut v: NoVec<i32, 5> = NoVec::new();
+
+        v.push(1);
+        assert_eq!(v.len(), 1);
+        assert!(!v.is_empty());
+
+        v.push(2);
+        v.push(3);
+        assert_eq!(v.len(), 3);
+
+        assert_eq!(v[0], 1);
+        assert_eq!(v[1], 2);
+        assert_eq!(v[2], 3);
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_push_overflow() {
+        let mut v: NoVec<i32, 2> = NoVec::new();
+        v.push(1);
+        v.push(2);
+        v.push(3); // should panic
+    }
+
+    #[test]
+    fn test_append_fixed_array() {
+        let mut v: NoVec<i32, 10> = NoVec::new();
+        v.push(0);
+        v.append([1, 2, 3]);
+
+        assert_eq!(v.len(), 4);
+        assert_eq!(v.as_slice(), &[0, 1, 2, 3]);
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_append_overflow() {
+        let mut v: NoVec<i32, 3> = NoVec::new();
+        v.push(0);
+        v.append([1, 2, 3]);
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_index_out_of_bounds() {
+        let mut v: NoVec<i32, 5> = NoVec::new();
+        v.push(1);
+        let _ = v[1]; // should panic
+    }
+
+    #[test]
+    fn test_into_iter() {
+        let mut v: NoVec<i32, 5> = NoVec::new();
+        v.push(10);
+        v.push(20);
+        v.push(30);
+
+        let mut iter = v.into_iter();
+        assert_eq!(iter.next(), Some(10));
+        assert_eq!(iter.next(), Some(20));
+        assert_eq!(iter.next(), Some(30));
+        assert_eq!(iter.next(), None);
+    }
+
+    #[test]
+    fn test_extend() {
+        let mut v: NoVec<i32, 10> = NoVec::new();
+        v.push(0);
+        v.extend([1, 2, 3]);
+
+        assert_eq!(v.len(), 4);
+        assert_eq!(v.as_slice(), &[0, 1, 2, 3]);
+    }
+
+    #[test]
+    fn test_retain_filter_evens() {
+        let mut v: NoVec<i32, 10> = NoVec::new();
+        v.push(1);
+        v.push(2);
+        v.push(3);
+        v.push(4);
+        v.push(5);
+
+        v.retain(|x| *x % 2 == 0);
+        assert_eq!(v.as_slice(), &[2, 4]);
+    }
+
+    #[test]
+    fn test_zero_capacity_iter() {
+        let v: NoVec<i32, 0> = NoVec::new();
+        let mut iter = v.iter();
+        assert_eq!(iter.next(), None);
+    }
+
+    #[test]
+    fn test_zero_capacity_retain() {
+        let mut v: NoVec<i32, 0> = NoVec::new();
+        v.retain(|_| true);
+        assert!(v.is_empty());
+    }
+
+    #[test]
+    fn test_zero_capacity_extend_empty() {
+        let mut v: NoVec<i32, 0> = NoVec::new();
+        v.extend(core::iter::empty());
+        assert!(v.is_empty());
+    }
+
+    #[test]
+    fn test_empty_append_empty_slice() {
+        let mut v: NoVec<i32, 10> = NoVec::new();
+        v.append_slice(&[]);
+        assert!(v.is_empty());
+    }
+}
