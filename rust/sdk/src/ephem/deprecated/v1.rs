@@ -1,4 +1,6 @@
-use crate::ephem::utils::accounts_to_indices;
+#![allow(deprecated)]
+
+use crate::ephem::deprecated::v1::utils::accounts_to_indices;
 use crate::solana_compat::solana::{
     invoke, AccountInfo, AccountMeta, Instruction, ProgramResult, Pubkey,
 };
@@ -7,11 +9,12 @@ use magicblock_magic_program_api::args::{
     ShortAccountMeta, UndelegateTypeArgs,
 };
 use magicblock_magic_program_api::instruction::MagicBlockInstruction;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 const EXPECTED_KEY_MSG: &str = "Key expected to exist!";
 
 /// Instruction builder for magicprogram
+#[deprecated(since = "0.7.0", note = "Use `MagicIntentBundleBuilder` instead")]
 pub struct MagicInstructionBuilder<'info> {
     pub payer: AccountInfo<'info>,
     pub magic_context: AccountInfo<'info>,
@@ -59,6 +62,10 @@ impl<'info> MagicInstructionBuilder<'info> {
 }
 
 /// Action that user wants to perform on base layer
+#[deprecated(
+    since = "0.7.0",
+    note = "Use `MagicIntentBundleBuilder` with `MagicBaseIntent` instead"
+)]
 pub enum MagicAction<'info> {
     BaseActions(Vec<CallHandler<'info>>),
     Commit(CommitType<'info>),
@@ -99,6 +106,7 @@ impl<'info> MagicAction<'info> {
 }
 
 /// Type of commit , can be whether standalone or with some custom actions on Base layer post commit
+#[deprecated(since = "0.7.0", note = "Use `CommitIntentBuilder` instead")]
 pub enum CommitType<'info> {
     /// Regular commit without actions
     Standalone(Vec<AccountInfo<'info>>), // accounts to commit
@@ -110,7 +118,7 @@ pub enum CommitType<'info> {
 }
 
 impl<'info> CommitType<'info> {
-    pub fn commited_accounts(&self) -> &[AccountInfo<'info>] {
+    pub fn committed_accounts(&self) -> &Vec<AccountInfo<'info>> {
         match self {
             Self::Standalone(commited_accounts) => commited_accounts,
             Self::WithHandler {
@@ -119,7 +127,24 @@ impl<'info> CommitType<'info> {
         }
     }
 
-    fn collect_accounts(&self, accounts_container: &mut Vec<AccountInfo<'info>>) {
+    pub(crate) fn committed_accounts_mut(&mut self) -> &mut Vec<AccountInfo<'info>> {
+        match self {
+            Self::Standalone(commited_accounts) => commited_accounts,
+            Self::WithHandler {
+                commited_accounts, ..
+            } => commited_accounts,
+        }
+    }
+
+    pub(crate) fn dedup(&mut self) -> HashSet<Pubkey> {
+        let committed_accounts = self.committed_accounts_mut();
+        let mut seen = HashSet::with_capacity(committed_accounts.len());
+        committed_accounts.retain(|el| seen.insert(*el.key));
+
+        seen
+    }
+
+    pub(crate) fn collect_accounts(&self, accounts_container: &mut Vec<AccountInfo<'info>>) {
         match self {
             Self::Standalone(accounts) => accounts_container.extend(accounts.clone()),
             Self::WithHandler {
@@ -134,7 +159,7 @@ impl<'info> CommitType<'info> {
         }
     }
 
-    fn into_args(self, indices_map: &HashMap<Pubkey, u8>) -> CommitTypeArgs {
+    pub(crate) fn into_args(self, indices_map: &HashMap<Pubkey, u8>) -> CommitTypeArgs {
         match self {
             Self::Standalone(accounts) => {
                 let accounts_indices = accounts_to_indices(accounts.as_slice(), indices_map);
@@ -157,10 +182,42 @@ impl<'info> CommitType<'info> {
             }
         }
     }
+
+    pub(crate) fn merge(&mut self, mut other: Self) {
+        let take = |value: &mut _| -> (Vec<AccountInfo>, Vec<CallHandler>) {
+            use std::mem::take;
+
+            match value {
+                CommitType::Standalone(value) => (take(value), vec![]),
+                CommitType::WithHandler {
+                    commited_accounts,
+                    call_handlers,
+                } => (take(commited_accounts), take(call_handlers)),
+            }
+        };
+
+        let (mut accounts, mut actions) = take(self);
+        let (other1, other2) = take(&mut other);
+        accounts.extend(other1);
+        actions.extend(other2);
+
+        if actions.is_empty() {
+            *self = CommitType::Standalone(accounts)
+        } else {
+            *self = CommitType::WithHandler {
+                commited_accounts: accounts,
+                call_handlers: actions,
+            }
+        };
+    }
 }
 
 /// Type of undelegate, can be whether standalone or with some custom actions on Base layer post commit
 /// No CommitedAccounts since it is only used with CommitAction.
+#[deprecated(
+    since = "0.7.0",
+    note = "Use `CommitAndUndelegateIntentBuilder` instead"
+)]
 pub enum UndelegateType<'info> {
     Standalone,
     WithHandler(Vec<CallHandler<'info>>),
@@ -192,24 +249,49 @@ impl<'info> UndelegateType<'info> {
     }
 }
 
+#[deprecated(
+    since = "0.7.0",
+    note = "Use `CommitAndUndelegateIntentBuilder` instead"
+)]
 pub struct CommitAndUndelegate<'info> {
     pub commit_type: CommitType<'info>,
     pub undelegate_type: UndelegateType<'info>,
 }
 
 impl<'info> CommitAndUndelegate<'info> {
-    fn collect_accounts(&self, accounts_container: &mut Vec<AccountInfo<'info>>) {
+    pub(crate) fn collect_accounts(&self, accounts_container: &mut Vec<AccountInfo<'info>>) {
         self.commit_type.collect_accounts(accounts_container);
         self.undelegate_type.collect_accounts(accounts_container);
     }
 
-    fn into_args(self, indices_map: &HashMap<Pubkey, u8>) -> CommitAndUndelegateArgs {
+    pub(crate) fn into_args(self, indices_map: &HashMap<Pubkey, u8>) -> CommitAndUndelegateArgs {
         let commit_type_args = self.commit_type.into_args(indices_map);
         let undelegate_type_args = self.undelegate_type.into_args(indices_map);
         CommitAndUndelegateArgs {
             commit_type: commit_type_args,
             undelegate_type: undelegate_type_args,
         }
+    }
+
+    pub(crate) fn dedup(&mut self) -> HashSet<Pubkey> {
+        self.commit_type.dedup()
+    }
+
+    pub(crate) fn merge(&mut self, other: Self) {
+        self.commit_type.merge(other.commit_type);
+
+        let this = std::mem::replace(&mut self.undelegate_type, UndelegateType::Standalone);
+        self.undelegate_type = match (this, other.undelegate_type) {
+            (UndelegateType::Standalone, UndelegateType::Standalone) => UndelegateType::Standalone,
+            (UndelegateType::Standalone, UndelegateType::WithHandler(v))
+            | (UndelegateType::WithHandler(v), UndelegateType::Standalone) => {
+                UndelegateType::WithHandler(v)
+            }
+            (UndelegateType::WithHandler(mut a), UndelegateType::WithHandler(b)) => {
+                a.extend(b);
+                UndelegateType::WithHandler(a)
+            }
+        };
     }
 }
 
@@ -222,11 +304,11 @@ pub struct CallHandler<'info> {
 }
 
 impl<'info> CallHandler<'info> {
-    fn collect_accounts(&self, container: &mut Vec<AccountInfo<'info>>) {
+    pub(crate) fn collect_accounts(&self, container: &mut Vec<AccountInfo<'info>>) {
         container.push(self.escrow_authority.clone());
     }
 
-    fn into_args(self, indices_map: &HashMap<Pubkey, u8>) -> BaseActionArgs {
+    pub(crate) fn into_args(self, indices_map: &HashMap<Pubkey, u8>) -> BaseActionArgs {
         let escrow_authority_index = indices_map
             .get(self.escrow_authority.key)
             .expect(EXPECTED_KEY_MSG);
@@ -241,68 +323,8 @@ impl<'info> CallHandler<'info> {
     }
 }
 
-/// CPI to trigger a commit for one or more accounts in the ER
-#[inline(always)]
-pub fn commit_accounts<'a, 'info>(
-    payer: &'a AccountInfo<'info>,
-    account_infos: Vec<&'a AccountInfo<'info>>,
-    magic_context: &'a AccountInfo<'info>,
-    magic_program: &'a AccountInfo<'info>,
-) -> ProgramResult {
-    let ix = create_schedule_commit_ix(payer, &account_infos, magic_context, magic_program, false);
-    let mut all_accounts = vec![payer.clone(), magic_context.clone()];
-    all_accounts.extend(account_infos.into_iter().cloned());
-    invoke(&ix, &all_accounts)
-}
-
-/// CPI to trigger a commit and undelegate one or more accounts in the ER
-#[inline(always)]
-pub fn commit_and_undelegate_accounts<'a, 'info>(
-    payer: &'a AccountInfo<'info>,
-    account_infos: Vec<&'a AccountInfo<'info>>,
-    magic_context: &'a AccountInfo<'info>,
-    magic_program: &'a AccountInfo<'info>,
-) -> ProgramResult {
-    let ix = create_schedule_commit_ix(payer, &account_infos, magic_context, magic_program, true);
-    let mut all_accounts = vec![payer.clone(), magic_context.clone()];
-    all_accounts.extend(account_infos.into_iter().cloned());
-    invoke(&ix, &all_accounts)
-}
-
-pub fn create_schedule_commit_ix<'a, 'info>(
-    payer: &'a AccountInfo<'info>,
-    account_infos: &[&'a AccountInfo<'info>],
-    magic_context: &'a AccountInfo<'info>,
-    magic_program: &'a AccountInfo<'info>,
-    allow_undelegation: bool,
-) -> Instruction {
-    let instruction = if allow_undelegation {
-        MagicBlockInstruction::ScheduleCommitAndUndelegate
-    } else {
-        MagicBlockInstruction::ScheduleCommit
-    };
-    let mut account_metas = vec![
-        AccountMeta {
-            pubkey: *payer.key,
-            is_signer: true,
-            is_writable: true,
-        },
-        AccountMeta {
-            pubkey: *magic_context.key,
-            is_signer: false,
-            is_writable: true,
-        },
-    ];
-    account_metas.extend(account_infos.iter().map(|x| AccountMeta {
-        pubkey: *x.key,
-        is_signer: x.is_signer,
-        is_writable: x.is_writable,
-    }));
-    Instruction::new_with_bincode(*magic_program.key, &instruction, account_metas)
-}
-
-mod utils {
-    use crate::ephem::EXPECTED_KEY_MSG;
+pub(crate) mod utils {
+    use super::EXPECTED_KEY_MSG;
     use crate::solana_compat::solana::{AccountInfo, Pubkey};
     use std::collections::hash_map::Entry;
     use std::collections::HashMap;
