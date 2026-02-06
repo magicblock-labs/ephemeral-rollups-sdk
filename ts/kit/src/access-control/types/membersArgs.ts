@@ -17,25 +17,15 @@ import {
   type Codec,
   type Decoder,
   type Encoder,
-  type Option,
   type OptionOrNullable,
 } from "@solana/kit";
-import {
-  getMemberDecoder,
-  getMemberEncoder,
-  type Member,
-  type MemberArgs,
-} from ".";
+import { getMemberDecoder, getMemberEncoder, type Member } from ".";
 
 export interface MembersArgs {
-  members: Option<Member[]>;
+  members: OptionOrNullable<Member[]>;
 }
 
-export interface MembersArgsArgs {
-  members: OptionOrNullable<MemberArgs[]>;
-}
-
-export function getMembersArgsEncoder(): Encoder<MembersArgsArgs> {
+export function getMembersArgsEncoder(): Encoder<MembersArgs> {
   return getStructEncoder([
     ["members", getOptionEncoder(getArrayEncoder(getMemberEncoder()))],
   ]);
@@ -47,6 +37,6 @@ export function getMembersArgsDecoder(): Decoder<MembersArgs> {
   ]);
 }
 
-export function getMembersArgsCodec(): Codec<MembersArgsArgs, MembersArgs> {
+export function getMembersArgsCodec(): Codec<MembersArgs, MembersArgs> {
   return combineCodec(getMembersArgsEncoder(), getMembersArgsDecoder());
 }

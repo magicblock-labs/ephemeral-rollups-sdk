@@ -12,7 +12,7 @@ members = [
 resolver = "2"
 
 [workspace.package]
-version = "0.8.4"
+version = "0.8.5"
 authors = ["Magicblock Labs <dev@magicblock.gg>"]
 edition = "2021"
 license = "MIT"
@@ -23,11 +23,11 @@ readme = "README.md"
 keywords = ["solana", "crypto", "delegation", "ephemeral-rollups", "magicblock"]
 
 [workspace.dependencies]
-ephemeral-rollups-sdk = { path = "sdk", version = "=0.8.4" }
-ephemeral-rollups-sdk-attribute-ephemeral = { path = "ephemeral", version = "=0.8.4" }
-ephemeral-rollups-sdk-attribute-delegate = { path = "delegate", version = "=0.8.4" }
-ephemeral-rollups-sdk-attribute-commit = { path = "commit-attribute", version = "=0.8.4" }
-ephemeral-rollups-sdk-attribute-action = { path = "action-attribute", version = "=0.8.4" }
+ephemeral-rollups-sdk = { path = "sdk", version = "=0.8.5" }
+ephemeral-rollups-sdk-attribute-ephemeral = { path = "ephemeral", version = "=0.8.5" }
+ephemeral-rollups-sdk-attribute-delegate = { path = "delegate", version = "=0.8.5" }
+ephemeral-rollups-sdk-attribute-commit = { path = "commit-attribute", version = "=0.8.5" }
+ephemeral-rollups-sdk-attribute-action = { path = "action-attribute", version = "=0.8.5" }
 
 
 # Magicblock
@@ -35,8 +35,7 @@ magicblock-delegation-program = { version = "1.1.3", features = [
 	"no-entrypoint",
 	"core",
 ], default-features = false }
-#magicblock-magic-program-api = { version = "0.3.1", default-features = false }
-magicblock-magic-program-api = { git = "https://github.com/magicblock-labs/magicblock-validator.git", rev = "4d8cded9d", default-features = false }
+magicblock-magic-program-api = { version = "0.6.2", default-features = false }
 
 ## External crates
 anchor-lang = { version = ">=0.28.0" }

@@ -6,18 +6,23 @@ import {
 } from "@solana/web3.js";
 
 import {
-  DEFAULT_PRIVATE_VALIDATOR,
   DELEGATION_PROGRAM_ID,
   MAGIC_CONTEXT_ID,
   MAGIC_PROGRAM_ID,
   PERMISSION_PROGRAM_ID,
-} from "../constants.js";
+  EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
+} from "../../constants.js";
 import {
   delegateBufferPdaFromDelegatedAccountAndOwnerProgram,
   delegationRecordPdaFromDelegatedAccount,
   delegationMetadataPdaFromDelegatedAccount,
   permissionPdaFromAccount,
-} from "../pda.js";
+} from "../../pda.js";
+
+// Default validator for private delegation
+const DEFAULT_PRIVATE_VALIDATOR = new PublicKey(
+  "FnE6VJT5QNZdedZPnCoLsARgBwoE6DeJNjBs2H1gySXA",
+);
 
 // Minimal SPL Token helpers (vendored) to avoid importing @solana/spl-token.
 // This prevents bundlers from pulling transitive deps like spl-token-group and
@@ -81,17 +86,12 @@ function createAssociatedTokenAccountIdempotentInstruction(
 }
 
 // ---------------------------------------------------------------------------
-// Constants
-// ---------------------------------------------------------------------------
-
-export const EATA_PROGRAM_ID = new PublicKey(
-  "SPLxh1LVZzEkX99H6rqYizhytLWPZVV296zyYDPagv2",
-);
-
-// ---------------------------------------------------------------------------
 // Accounts
 // ---------------------------------------------------------------------------
 
+/**
+ * Ephemeral ATA
+ */
 export interface EphemeralAta {
   /// The owner of the eata
   owner: PublicKey;
@@ -101,6 +101,11 @@ export interface EphemeralAta {
   amount: bigint;
 }
 
+/**
+ * Decode ephemeral ATA
+ * @param info - The account info
+ * @returns The decoded ephemeral ATA
+ */
 export function decodeEphemeralAta(info: AccountInfo<Buffer>): EphemeralAta {
   if (info.data.length < 72) {
     throw new Error("Invalid EphemeralAta account data length");
@@ -115,24 +120,89 @@ export function decodeEphemeralAta(info: AccountInfo<Buffer>): EphemeralAta {
   };
 }
 
+/**
+ * Encode ephemeral ATA to bytes
+ * @param eata - The ephemeral ATA to encode
+ * @returns The encoded bytes
+ */
+export function encodeEphemeralAta(eata: EphemeralAta): Buffer {
+  const buffer = Buffer.alloc(72);
+  buffer.set(eata.owner.toBytes(), 0);
+  buffer.set(eata.mint.toBytes(), 32);
+  buffer.writeBigUInt64LE(eata.amount, 64);
+  return buffer;
+}
+
+/**
+ * Global Vault
+ */
+export interface GlobalVault {
+  /// The mint associated with this vault
+  mint: PublicKey;
+}
+
+/**
+ * Decode global vault
+ * @param info - The account info
+ * @returns The decoded global vault
+ */
+export function decodeGlobalVault(info: AccountInfo<Buffer>): GlobalVault {
+  if (info.data.length < 32) {
+    throw new Error("Invalid GlobalVault account data length");
+  }
+  const mint = new PublicKey(info.data.subarray(0, 32));
+  return { mint };
+}
+
+/**
+ * Encode global vault to bytes
+ * @param vault - The global vault to encode
+ * @returns The encoded bytes
+ */
+export function encodeGlobalVault(vault: GlobalVault): Buffer {
+  const buffer = Buffer.alloc(32);
+  buffer.set(vault.mint.toBytes(), 0);
+  return buffer;
+}
+
 // ---------------------------------------------------------------------------
 // PDA derivation helpers
 // ---------------------------------------------------------------------------
 
+/**
+ * Derive ephemeral ATA
+ * @param owner - The owner account
+ * @param mint - The mint account
+ * @returns The ephemeral ATA account and bump
+ */
 export function deriveEphemeralAta(
   owner: PublicKey,
   mint: PublicKey,
 ): [PublicKey, number] {
   return PublicKey.findProgramAddressSync(
     [owner.toBuffer(), mint.toBuffer()],
-    EATA_PROGRAM_ID,
+    EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
   );
 }
 
+/**
+ * Derive vault
+ * @param mint - The mint account
+ * @returns The vault account and bump
+ */
 export function deriveVault(mint: PublicKey): [PublicKey, number] {
-  return PublicKey.findProgramAddressSync([mint.toBuffer()], EATA_PROGRAM_ID);
+  return PublicKey.findProgramAddressSync(
+    [mint.toBuffer()],
+    EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
+  );
 }
 
+/**
+ * Derive vault ATA
+ * @param mint - The mint account
+ * @param vault - The vault account
+ * @returns The vault ATA account
+ */
 export function deriveVaultAta(mint: PublicKey, vault: PublicKey): PublicKey {
   return getAssociatedTokenAddressSync(mint, vault, true);
 }
@@ -141,7 +211,15 @@ export function deriveVaultAta(mint: PublicKey, vault: PublicKey): PublicKey {
 // Instruction builders
 // ---------------------------------------------------------------------------
 
-// Init ephemeral ATA
+/**
+ * Init ephemeral ATA
+ * @param ephemeralAta - The ephemeral ATA account
+ * @param owner - The owner account
+ * @param mint - The mint account
+ * @param payer - The payer account
+ * @param bump - The bump
+ * @returns The init ephemeral ATA instruction
+ */
 export function initEphemeralAtaIx(
   ephemeralAta: PublicKey,
   owner: PublicKey,
@@ -150,7 +228,7 @@ export function initEphemeralAtaIx(
   bump: number,
 ): TransactionInstruction {
   return new TransactionInstruction({
-    programId: EATA_PROGRAM_ID,
+    programId: EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
     keys: [
       { pubkey: ephemeralAta, isSigner: false, isWritable: true },
       { pubkey: payer, isSigner: true, isWritable: true },
@@ -162,7 +240,14 @@ export function initEphemeralAtaIx(
   });
 }
 
-// Init vault ATA
+/**
+ * Init vault ATA
+ * @param payer - The payer account
+ * @param vaultAta - The vault ATA account
+ * @param vault - The vault account
+ * @param mint - The mint account
+ * @returns The init vault ATA instruction
+ */
 export function initVaultAtaIx(
   payer: PublicKey,
   vaultAta: PublicKey,
@@ -177,7 +262,14 @@ export function initVaultAtaIx(
   );
 }
 
-// Init vault account
+/**
+ * Init vault account
+ * @param vault - The vault account
+ * @param mint - The mint account
+ * @param payer - The payer account
+ * @param bump - The bump
+ * @returns The init vault account instruction
+ */
 export function initVaultIx(
   vault: PublicKey,
   mint: PublicKey,
@@ -185,7 +277,7 @@ export function initVaultIx(
   bump: number,
 ): TransactionInstruction {
   return new TransactionInstruction({
-    programId: EATA_PROGRAM_ID,
+    programId: EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
     keys: [
       { pubkey: vault, isSigner: false, isWritable: true },
       { pubkey: payer, isSigner: true, isWritable: true },
@@ -196,7 +288,17 @@ export function initVaultIx(
   });
 }
 
-// Transfer tokens to vault
+/**
+ * Transfer tokens to vault
+ * @param ephemeralAta - The ephemeral ATA account
+ * @param vault - The vault account
+ * @param mint - The mint account
+ * @param sourceAta - The source ATA account
+ * @param vaultAta - The vault ATA account
+ * @param owner - The owner account
+ * @param amount - The amount of tokens to transfer
+ * @returns The transfer tokens to vault instruction
+ */
 export function transferToVaultIx(
   ephemeralAta: PublicKey,
   vault: PublicKey,
@@ -207,7 +309,7 @@ export function transferToVaultIx(
   amount: bigint,
 ): TransactionInstruction {
   return new TransactionInstruction({
-    programId: EATA_PROGRAM_ID,
+    programId: EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
     keys: [
       { pubkey: ephemeralAta, isSigner: false, isWritable: true },
       { pubkey: vault, isSigner: false, isWritable: false },
@@ -221,7 +323,14 @@ export function transferToVaultIx(
   });
 }
 
-// Delegate instruction
+/**
+ * Delegate instruction
+ * @param payer - The payer account
+ * @param ephemeralAta - The ephemeral ATA account
+ * @param bump - The bump
+ * @param validator - The validator account
+ * @returns The delegate instruction
+ */
 export function delegateIx(
   payer: PublicKey,
   ephemeralAta: PublicKey,
@@ -232,15 +341,19 @@ export function delegateIx(
     ? Buffer.concat([Buffer.from([4, bump]), validator.toBuffer()])
     : Buffer.from([4, bump]);
   return new TransactionInstruction({
-    programId: EATA_PROGRAM_ID,
+    programId: EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
     keys: [
       { pubkey: payer, isSigner: true, isWritable: true },
       { pubkey: ephemeralAta, isSigner: false, isWritable: true },
-      { pubkey: EATA_PROGRAM_ID, isSigner: false, isWritable: false },
+      {
+        pubkey: EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
+        isSigner: false,
+        isWritable: false,
+      },
       {
         pubkey: delegateBufferPdaFromDelegatedAccountAndOwnerProgram(
           ephemeralAta,
-          EATA_PROGRAM_ID,
+          EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
         ),
         isSigner: false,
         isWritable: true,
@@ -262,8 +375,13 @@ export function delegateIx(
   });
 }
 
-// Withdraw SPL tokens from vault to user destination
-// Now derives all required accounts from the provided owner + mint
+/**
+ * Withdraw SPL tokens from vault to user destination
+ * @param owner - The owner account
+ * @param mint - The mint account
+ * @param amount - The amount of tokens to withdraw
+ * @returns The withdraw SPL tokens instruction
+ */
 export function withdrawSplIx(
   owner: PublicKey,
   mint: PublicKey,
@@ -275,7 +393,7 @@ export function withdrawSplIx(
   const userDestAta = getAssociatedTokenAddressSync(mint, owner);
 
   return new TransactionInstruction({
-    programId: EATA_PROGRAM_ID,
+    programId: EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
     keys: [
       { pubkey: owner, isSigner: true, isWritable: false },
       { pubkey: ephemeralAta, isSigner: false, isWritable: true },
@@ -290,7 +408,12 @@ export function withdrawSplIx(
   });
 }
 
-// Undelegate instruction
+/**
+ * Undelegate instruction
+ * @param owner - The owner account
+ * @param mint - The mint account
+ * @returns The undelegate instruction
+ */
 export function undelegateIx(
   owner: PublicKey,
   mint: PublicKey,
@@ -299,7 +422,7 @@ export function undelegateIx(
   const [ephemeralAta] = deriveEphemeralAta(owner, mint);
 
   return new TransactionInstruction({
-    programId: EATA_PROGRAM_ID,
+    programId: EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
     keys: [
       {
         pubkey: owner,
@@ -331,7 +454,14 @@ export function undelegateIx(
   });
 }
 
-// Create EATA permission
+/**
+ * Create EATA permission
+ * @param ephemeralAta - The ephemeral ATA account
+ * @param payer - The payer account
+ * @param bump - The bump
+ * @param flags - The flags
+ * @returns The create EATA permission instruction
+ */
 export function createEataPermissionIx(
   ephemeralAta: PublicKey,
   payer: PublicKey,
@@ -341,7 +471,7 @@ export function createEataPermissionIx(
   const permission = permissionPdaFromAccount(ephemeralAta);
 
   return new TransactionInstruction({
-    programId: EATA_PROGRAM_ID,
+    programId: EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
     keys: [
       { pubkey: ephemeralAta, isSigner: false, isWritable: true },
       { pubkey: permission, isSigner: false, isWritable: true },
@@ -353,7 +483,42 @@ export function createEataPermissionIx(
   });
 }
 
-// Delegate EATA permission
+/**
+ * Reset EATA permission
+ * @param ephemeralAta - The ephemeral ATA account
+ * @param payer - The payer account
+ * @param bump - The bump
+ * @param flags - The flags
+ * @returns The reset EATA permission instruction
+ */
+export function resetEataPermissionIx(
+  ephemeralAta: PublicKey,
+  payer: PublicKey,
+  bump: number,
+  flags: number = 0,
+): TransactionInstruction {
+  const permission = permissionPdaFromAccount(ephemeralAta);
+
+  return new TransactionInstruction({
+    programId: EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
+    keys: [
+      { pubkey: ephemeralAta, isSigner: false, isWritable: false },
+      { pubkey: permission, isSigner: false, isWritable: true },
+      { pubkey: payer, isSigner: true, isWritable: false },
+      { pubkey: PERMISSION_PROGRAM_ID, isSigner: false, isWritable: false },
+    ],
+    data: Buffer.from([9, bump, flags]),
+  });
+}
+
+/**
+ * Delegate EATA permission
+ * @param payer - The payer account
+ * @param ephemeralAta - The ephemeral ATA account
+ * @param bump - The bump
+ * @param validator - The validator account
+ * @returns The delegate EATA permission instruction
+ */
 export function delegateEataPermissionIx(
   payer: PublicKey,
   ephemeralAta: PublicKey,
@@ -363,7 +528,7 @@ export function delegateEataPermissionIx(
   const permission = permissionPdaFromAccount(ephemeralAta);
 
   return new TransactionInstruction({
-    programId: EATA_PROGRAM_ID,
+    programId: EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
     keys: [
       { pubkey: payer, isSigner: true, isWritable: true },
       { pubkey: ephemeralAta, isSigner: false, isWritable: true },
@@ -395,7 +560,12 @@ export function delegateEataPermissionIx(
   });
 }
 
-// Undelegate EATA permission
+/**
+ * Undelegate EATA permission
+ * @param owner - The owner account
+ * @param ephemeralAta - The ephemeral ATA account
+ * @returns The undelegate EATA permission instruction
+ */
 export function undelegateEataPermissionIx(
   owner: PublicKey,
   ephemeralAta: PublicKey,
@@ -403,7 +573,7 @@ export function undelegateEataPermissionIx(
   const permission = permissionPdaFromAccount(ephemeralAta);
 
   return new TransactionInstruction({
-    programId: EATA_PROGRAM_ID,
+    programId: EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
     keys: [
       { pubkey: owner, isSigner: true, isWritable: false },
       { pubkey: ephemeralAta, isSigner: false, isWritable: true },
@@ -420,6 +590,14 @@ export function undelegateEataPermissionIx(
 // High-level SDK methods
 // ---------------------------------------------------------------------------
 
+/**
+ * High-level method to delegate SPL tokens
+ * @param owner - The owner account
+ * @param mint - The mint account
+ * @param amount - The amount of tokens to delegate
+ * @param opts - The options
+ * @returns The instructions to delegate SPL tokens
+ */
 export async function delegateSpl(
   owner: PublicKey,
   mint: PublicKey,
@@ -467,6 +645,14 @@ export async function delegateSpl(
   return instructions;
 }
 
+/**
+ * High-level method to delegate private SPL tokens
+ * @param owner - The owner account
+ * @param mint - The mint account
+ * @param amount - The amount of tokens to delegate
+ * @param opts - The options
+ * @returns The instructions to delegate private SPL tokens
+ */
 export async function delegatePrivateSpl(
   owner: PublicKey,
   mint: PublicKey,

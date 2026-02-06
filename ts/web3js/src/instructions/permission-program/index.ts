@@ -1,11 +1,5 @@
-export {
-  createCreatePermissionInstruction,
-  type CreatePermissionInstructionArgs,
-} from "./createPermission";
-export {
-  createUpdatePermissionInstruction,
-  type UpdatePermissionInstructionArgs,
-} from "./updatePermission";
+export { createCreatePermissionInstruction } from "./createPermission";
+export { createUpdatePermissionInstruction } from "./updatePermission";
 export { createClosePermissionInstruction } from "./closePermission";
 export {
   createDelegatePermissionInstruction,

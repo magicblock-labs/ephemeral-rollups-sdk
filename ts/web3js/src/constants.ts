@@ -15,10 +15,6 @@ export const PERMISSION_PROGRAM_ID = new PublicKey(
   "ACLseoPoyC3cBqoUtkbjZ4aDrkurZW86v19pXz2XQnp1",
 );
 
-export const DEFAULT_VALIDATOR = new PublicKey(
-  "MAS1Dt9qreoRMQ14YQuhg8UTZMMzDdKhmkZMECCzk57",
-);
-
-export const DEFAULT_PRIVATE_VALIDATOR = new PublicKey(
-  "FnE6VJT5QNZdedZPnCoLsARgBwoE6DeJNjBs2H1gySXA",
+export const EPHEMERAL_SPL_TOKEN_PROGRAM_ID = new PublicKey(
+  "SPLxh1LVZzEkX99H6rqYizhytLWPZVV296zyYDPagv2",
 );
