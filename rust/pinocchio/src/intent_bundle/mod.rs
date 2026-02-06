@@ -14,6 +14,7 @@ use types::MagicIntentBundle;
 pub use types::*;
 
 const MAX_ACTIONS_NUM: usize = 10u8 as usize;
+;
 
 /// Builds a single `MagicBlockInstruction::ScheduleIntentBundle` instruction by aggregating
 /// multiple independent intents (base actions, commits, commit+undelegate), normalizing them,
@@ -26,6 +27,9 @@ pub struct MagicIntentBundleBuilder<'args> {
 }
 
 impl<'args> MagicIntentBundleBuilder<'args> {
+    /// Bincode 1.x u32 LE discriminant for `MagicBlockInstruction::ScheduleIntentBundle` (variant index 11).
+    const DISCRIMINANT: [u8; 4] = 11u32.to_le_bytes();
+
     pub fn new(payer: AccountView, magic_context: AccountView, magic_program: AccountView) -> Self {
         Self {
             payer,
@@ -121,10 +125,12 @@ impl<'args> MagicIntentBundleBuilder<'args> {
     ///
     /// `data_buf` must be large enough to hold the serialized `MagicIntentBundleArgs`.
     pub fn build_and_invoke(mut self, data_buf: &mut [u8]) -> ProgramResult {
-        // 1. Normalize: dedup within intents, resolve cross-intent overlaps
+        const OFFSET: usize = SCHEDULE_INTENT_BUNDLE_DISCRIMINANT.len();
+
+        // Normalize: dedup within intents, resolve cross-intent overlaps
         self.intent_bundle.normalize()?;
 
-        // 2. Collect all unique accounts (payer + context first, then from intents)
+        // Collect all unique accounts (payer + context first, then from intents)
         let mut all_accounts = NoVec::<AccountView, MAX_STATIC_CPI_ACCOUNTS>::new();
         all_accounts.try_append([self.payer, self.magic_context])?;
         self.intent_bundle
@@ -139,9 +145,12 @@ impl<'args> MagicIntentBundleBuilder<'args> {
         // 4. Convert intents to serializable args
         let args = self.intent_bundle.into_args(indices_map.as_slice())?;
 
-        // 5. Serialize with bincode (legacy config for bincode 1.x wire compat)
-        let bytes_written = bincode::encode_into_slice(&args, data_buf, bincode::config::legacy())
-            .map_err(|_| ProgramError::InvalidInstructionData)?;
+        // 5. Write instruction discriminant + serialize args (bincode 1.x wire compat)
+        data_buf[..OFFSET].copy_from_slice(&SCHEDULE_INTENT_BUNDLE_DISCRIMINANT);
+        let args_len =
+            bincode::encode_into_slice(&args, &mut data_buf[OFFSET..], bincode::config::legacy())
+                .map_err(|_| ProgramError::InvalidInstructionData)?;
+        let data_len = OFFSET + args_len;
 
         // 6. Build instruction account metas
         let mut instruction_accounts = NoVec::<InstructionAccount, MAX_STATIC_CPI_ACCOUNTS>::new();
@@ -152,7 +161,7 @@ impl<'args> MagicIntentBundleBuilder<'args> {
         // 7. Build instruction view
         let ix = InstructionView {
             program_id: self.magic_program.address(),
-            data: &data_buf[..bytes_written],
+            data: &data_buf[..data_len],
             accounts: instruction_accounts.as_slice(),
         };
 
@@ -162,10 +171,7 @@ impl<'args> MagicIntentBundleBuilder<'args> {
             account_refs.try_push(account)?;
         }
 
-        // 9. Invoke CPI
-        // NOTE: MAX_STATIC_CPI_ACCOUNTS = 64; if you need > 64 accounts,
-        // enable `slice-cpi` feature and use `invoke_with_slice` instead.
-        invoke_with_bounds::<64>(&ix, account_refs.as_slice())
+        invoke_with_bounds::<MAX_STATIC_CPI_ACCOUNTS>(&ix, account_refs.as_slice())
     }
 }
 
@@ -369,7 +375,10 @@ impl MagicIntentBundleBuilder<'_> {
             .intent_bundle
             .into_args(indices_map.as_slice())
             .unwrap();
-        bincode::encode_into_slice(&args, buf, bincode::config::legacy()).unwrap()
+        buf[..4].copy_from_slice(&SCHEDULE_INTENT_BUNDLE_DISCRIMINANT);
+        let args_len =
+            bincode::encode_into_slice(&args, &mut buf[4..], bincode::config::legacy()).unwrap();
+        4 + args_len
     }
 }
 
@@ -503,14 +512,6 @@ mod tests {
         }
     }
 
-    /// Extract the `MagicIntentBundleArgs` bytes from SDK instruction data.
-    ///
-    /// The SDK wraps args in `MagicBlockInstruction::ScheduleIntentBundle(args)`,
-    /// adding a 4-byte u32 LE enum discriminant prefix.
-    fn extract_sdk_args(ix_data: &[u8]) -> &[u8] {
-        &ix_data[4..]
-    }
-
     // -----------------------------------------------------------------
     // Builder compatibility tests
     // -----------------------------------------------------------------
@@ -559,11 +560,7 @@ mod tests {
         .build();
         drop(accounts);
 
-        assert_eq!(
-            &buf[..pino_len],
-            extract_sdk_args(&ix.data),
-            "commit standalone mismatch"
-        );
+        assert_eq!(&buf[..pino_len], &ix.data, "commit standalone mismatch");
     }
 
     /// Commit with a post-commit action (handler).
@@ -627,11 +624,7 @@ mod tests {
         .build();
         drop(accounts);
 
-        assert_eq!(
-            &buf[..pino_len],
-            extract_sdk_args(&ix.data),
-            "commit with handler mismatch"
-        );
+        assert_eq!(&buf[..pino_len], &ix.data, "commit with handler mismatch");
     }
 
     /// CommitAndUndelegate standalone (no actions).
@@ -675,7 +668,7 @@ mod tests {
 
         assert_eq!(
             &buf[..pino_len],
-            extract_sdk_args(&ix.data),
+            &ix.data,
             "commit_and_undelegate standalone mismatch"
         );
     }
@@ -763,7 +756,7 @@ mod tests {
 
         assert_eq!(
             &buf[..pino_len],
-            extract_sdk_args(&ix.data),
+            &ix.data,
             "commit_and_undelegate with actions mismatch"
         );
     }
@@ -832,11 +825,7 @@ mod tests {
         .build();
         drop(accounts);
 
-        assert_eq!(
-            &buf[..pino_len],
-            extract_sdk_args(&ix.data),
-            "standalone actions mismatch"
-        );
+        assert_eq!(&buf[..pino_len], &ix.data, "standalone actions mismatch");
     }
 
     /// Chained: commit then commit_and_undelegate.
@@ -887,7 +876,7 @@ mod tests {
 
         assert_eq!(
             &buf[..pino_len],
-            extract_sdk_args(&ix.data),
+            &ix.data,
             "commit then commit_and_undelegate mismatch"
         );
     }
@@ -959,11 +948,7 @@ mod tests {
         .build();
         drop(accounts);
 
-        assert_eq!(
-            &buf[..pino_len],
-            extract_sdk_args(&ix.data),
-            "all intents combined mismatch"
-        );
+        assert_eq!(&buf[..pino_len], &ix.data, "all intents combined mismatch");
     }
 
     /// Full chain with actions on all intents.
@@ -1056,7 +1041,7 @@ mod tests {
 
         assert_eq!(
             &buf[..pino_len],
-            extract_sdk_args(&ix.data),
+            &ix.data,
             "full chain with actions mismatch"
         );
     }
