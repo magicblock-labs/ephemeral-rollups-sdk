@@ -1,12 +1,12 @@
 use crate::intent_bundle::no_vec::NoVec;
+use crate::intent_bundle::MAX_ACTIONS_NUM;
+use pinocchio::cpi::MAX_STATIC_CPI_ACCOUNTS;
 use serde::Serialize;
 use solana_address::Address;
+
 // ---------------------------------------------------------
 // Args types for serialization
 // ---------------------------------------------------------
-
-const MAX_ACTIONS_NUM: usize = 10u8 as usize;
-const MAX_COMMITTED_ACCOUNTS_NUM: usize = 64u8 as usize;
 
 /// Action arguments containing escrow index and instruction data.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, bincode::Encode)]
@@ -65,9 +65,9 @@ pub struct ShortAccountMeta {
 #[allow(clippy::large_enum_variant)]
 pub enum CommitTypeArgs<'args> {
     // we generate it
-    Standalone(NoVec<u8, MAX_COMMITTED_ACCOUNTS_NUM>), // slice or NoVec
+    Standalone(NoVec<u8, MAX_STATIC_CPI_ACCOUNTS>), // slice or NoVec
     WithBaseActions {
-        committed_accounts: NoVec<u8, MAX_COMMITTED_ACCOUNTS_NUM>,
+        committed_accounts: NoVec<u8, MAX_STATIC_CPI_ACCOUNTS>,
         base_actions: NoVec<BaseActionArgs<'args>, MAX_ACTIONS_NUM>,
     },
 }
@@ -224,7 +224,7 @@ mod tests {
         let sdk_bytes = bincode1::serialize(&sdk_commit).unwrap();
 
         // Pinocchio type
-        let mut pino_indices = NoVec::<u8, MAX_COMMITTED_ACCOUNTS_NUM>::new();
+        let mut pino_indices = NoVec::<u8, MAX_STATIC_CPI_ACCOUNTS>::new();
         for i in &indices {
             pino_indices.push(*i);
         }
@@ -350,12 +350,12 @@ mod tests {
         let sdk_bytes = bincode1::serialize(&sdk_bundle).unwrap();
 
         // Pinocchio type
-        let mut pino_commit_indices = NoVec::<u8, MAX_COMMITTED_ACCOUNTS_NUM>::new();
+        let mut pino_commit_indices = NoVec::<u8, MAX_STATIC_CPI_ACCOUNTS>::new();
         for i in &commit_indices {
             pino_commit_indices.push(*i);
         }
 
-        let mut pino_cau_indices = NoVec::<u8, MAX_COMMITTED_ACCOUNTS_NUM>::new();
+        let mut pino_cau_indices = NoVec::<u8, MAX_STATIC_CPI_ACCOUNTS>::new();
         for i in &cau_indices {
             pino_cau_indices.push(*i);
         }

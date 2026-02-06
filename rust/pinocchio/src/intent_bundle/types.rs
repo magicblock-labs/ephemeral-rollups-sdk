@@ -3,10 +3,11 @@ use crate::intent_bundle::args::{
     ShortAccountMeta, UndelegateTypeArgs,
 };
 use crate::intent_bundle::no_vec::NoVec;
+use pinocchio::cpi::MAX_STATIC_CPI_ACCOUNTS;
 use pinocchio::AccountView;
 use solana_address::Address;
 
-use super::{MAX_ACCOUNTS, MAX_ACTIONS_NUM, MAX_COMMITTED_ACCOUNTS_NUM};
+use super::MAX_ACTIONS_NUM;
 
 // TODO: switch to err
 const EXPECTED_KEY_MSG: &str = "Key expected to exist!";
@@ -85,7 +86,7 @@ impl<'args> MagicIntentBundle<'args> {
     /// Collects all accounts referenced by intents in this bundle.
     pub(super) fn collect_unique_accounts(
         &self,
-        unique_accounts: &mut NoVec<AccountView, MAX_ACCOUNTS>,
+        unique_accounts: &mut NoVec<AccountView, MAX_STATIC_CPI_ACCOUNTS>,
     ) {
         for el in &self.standalone_actions {
             el.collect_unique_accounts(unique_accounts);
@@ -171,7 +172,10 @@ impl<'args> CallHandler<'args> {
         self.accounts.append(accounts);
     }
 
-    pub(super) fn collect_unique_accounts(&self, container: &mut NoVec<AccountView, MAX_ACCOUNTS>) {
+    pub(super) fn collect_unique_accounts(
+        &self,
+        container: &mut NoVec<AccountView, MAX_STATIC_CPI_ACCOUNTS>,
+    ) {
         if !container.contains(&self.escrow_authority) {
             container.push(self.escrow_authority.clone());
         }
@@ -191,14 +195,14 @@ impl<'args> CallHandler<'args> {
 }
 
 pub struct CommitIntent<'args> {
-    pub(super) accounts: NoVec<AccountView, MAX_COMMITTED_ACCOUNTS_NUM>,
+    pub(super) accounts: NoVec<AccountView, MAX_STATIC_CPI_ACCOUNTS>,
     pub(super) actions: NoVec<CallHandler<'args>, MAX_ACTIONS_NUM>,
 }
 
 impl<'args> CommitIntent<'args> {
     /// Deduplicates committed accounts by address. Accounts whose address is
     /// already in `seen` are removed. Newly seen addresses are added to `seen`.
-    fn dedup(&mut self, seen: &mut NoVec<Address, MAX_ACCOUNTS>) {
+    fn dedup(&mut self, seen: &mut NoVec<Address, MAX_STATIC_CPI_ACCOUNTS>) {
         self.accounts.retain(|el| {
             let addr = el.address();
             if seen.contains(addr) {
@@ -228,7 +232,7 @@ impl<'args> CommitIntent<'args> {
         }
     }
 
-    fn collect_unique_accounts(&self, container: &mut NoVec<AccountView, MAX_ACCOUNTS>) {
+    fn collect_unique_accounts(&self, container: &mut NoVec<AccountView, MAX_STATIC_CPI_ACCOUNTS>) {
         for el in self.accounts.iter() {
             if !container.contains(el) {
                 container.push(el.clone());
@@ -240,7 +244,7 @@ impl<'args> CommitIntent<'args> {
     }
 
     fn into_args(self, indices_map: &[Address]) -> CommitTypeArgs<'args> {
-        let mut indices = NoVec::<u8, MAX_COMMITTED_ACCOUNTS_NUM>::new();
+        let mut indices = NoVec::<u8, MAX_STATIC_CPI_ACCOUNTS>::new();
         for account in self.accounts {
             let idx = get_index(indices_map, account.address()).expect(EXPECTED_KEY_MSG);
             indices.push(idx);
@@ -262,7 +266,7 @@ impl<'args> CommitIntent<'args> {
 }
 
 pub struct CommitAndUndelegateIntent<'args> {
-    pub(super) accounts: NoVec<AccountView, MAX_COMMITTED_ACCOUNTS_NUM>,
+    pub(super) accounts: NoVec<AccountView, MAX_STATIC_CPI_ACCOUNTS>,
     pub(super) post_commit_actions: NoVec<CallHandler<'args>, MAX_ACTIONS_NUM>,
     pub(super) post_undelegate_actions: NoVec<CallHandler<'args>, MAX_ACTIONS_NUM>,
 }
@@ -270,8 +274,8 @@ pub struct CommitAndUndelegateIntent<'args> {
 impl<'args> CommitAndUndelegateIntent<'args> {
     /// Deduplicates committed accounts by address and returns the set of
     /// unique addresses (for cross-intent overlap detection).
-    fn dedup(&mut self) -> NoVec<Address, MAX_ACCOUNTS> {
-        let mut seen = NoVec::<Address, MAX_ACCOUNTS>::new();
+    fn dedup(&mut self) -> NoVec<Address, MAX_STATIC_CPI_ACCOUNTS> {
+        let mut seen = NoVec::<Address, MAX_STATIC_CPI_ACCOUNTS>::new();
         self.accounts.retain(|el| {
             let addr = el.address();
             if seen.contains(addr) {
@@ -305,7 +309,7 @@ impl<'args> CommitAndUndelegateIntent<'args> {
         }
     }
 
-    fn collect_unique_accounts(&self, container: &mut NoVec<AccountView, MAX_ACCOUNTS>) {
+    fn collect_unique_accounts(&self, container: &mut NoVec<AccountView, MAX_STATIC_CPI_ACCOUNTS>) {
         for el in self.accounts.iter() {
             if !container.contains(el) {
                 container.push(el.clone());
@@ -321,7 +325,7 @@ impl<'args> CommitAndUndelegateIntent<'args> {
 
     fn into_args(self, indices_map: &[Address]) -> CommitAndUndelegateArgs<'args> {
         // Build account indices
-        let mut indices = NoVec::<u8, MAX_COMMITTED_ACCOUNTS_NUM>::new();
+        let mut indices = NoVec::<u8, MAX_STATIC_CPI_ACCOUNTS>::new();
         for account in self.accounts {
             let idx = get_index(indices_map, account.address()).expect(EXPECTED_KEY_MSG);
             indices.push(idx);

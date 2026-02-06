@@ -1,5 +1,5 @@
 use crate::intent_bundle::no_vec::NoVec;
-use pinocchio::cpi::invoke_with_bounds;
+use pinocchio::cpi::{invoke_with_bounds, MAX_STATIC_CPI_ACCOUNTS};
 use pinocchio::error::ProgramError;
 use pinocchio::instruction::{InstructionAccount, InstructionView};
 use pinocchio::{AccountView, ProgramResult};
@@ -7,15 +7,13 @@ use solana_address::Address;
 
 mod args;
 mod no_vec;
-mod types;
+pub mod types;
 
 pub use args::{ActionArgs, ShortAccountMeta};
 use types::MagicIntentBundle;
 pub use types::*;
 
 const MAX_ACTIONS_NUM: usize = 10u8 as usize;
-const MAX_COMMITTED_ACCOUNTS_NUM: usize = 64u8 as usize;
-const MAX_ACCOUNTS: usize = pinocchio::cpi::MAX_CPI_ACCOUNTS;
 
 /// Builds a single `MagicBlockInstruction::ScheduleIntentBundle` instruction by aggregating
 /// multiple independent intents (base actions, commits, commit+undelegate), normalizing them,
@@ -124,13 +122,13 @@ impl<'args> MagicIntentBundleBuilder<'args> {
         self.intent_bundle.normalize();
 
         // 2. Collect all unique accounts (payer + context first, then from intents)
-        let mut all_accounts = NoVec::<AccountView, MAX_ACCOUNTS>::new();
+        let mut all_accounts = NoVec::<AccountView, MAX_STATIC_CPI_ACCOUNTS>::new();
         all_accounts.append([self.payer, self.magic_context]);
         self.intent_bundle
             .collect_unique_accounts(&mut all_accounts);
 
         // 3. Build the natural indices map: indices_map[i] = address of account at position i
-        let mut indices_map = NoVec::<Address, MAX_ACCOUNTS>::new();
+        let mut indices_map = NoVec::<Address, MAX_STATIC_CPI_ACCOUNTS>::new();
         for account in all_accounts.iter() {
             indices_map.push(account.address().clone());
         }
@@ -143,7 +141,7 @@ impl<'args> MagicIntentBundleBuilder<'args> {
             .map_err(|_| ProgramError::InvalidInstructionData)?;
 
         // 6. Build instruction account metas
-        let mut instruction_accounts = NoVec::<InstructionAccount, MAX_ACCOUNTS>::new();
+        let mut instruction_accounts = NoVec::<InstructionAccount, MAX_STATIC_CPI_ACCOUNTS>::new();
         for account in all_accounts.iter() {
             instruction_accounts.push(InstructionAccount::from(account));
         }
@@ -156,7 +154,7 @@ impl<'args> MagicIntentBundleBuilder<'args> {
         };
 
         // 8. Build account refs for invoke
-        let mut account_refs = NoVec::<&AccountView, MAX_ACCOUNTS>::new();
+        let mut account_refs = NoVec::<&AccountView, MAX_STATIC_CPI_ACCOUNTS>::new();
         for account in all_accounts.iter() {
             account_refs.push(account);
         }
@@ -228,7 +226,7 @@ impl<'a, 'args> CommitIntentBuilder<'a, 'args> {
             actions,
         } = self;
 
-        let mut accounts = NoVec::<AccountView, MAX_COMMITTED_ACCOUNTS_NUM>::new();
+        let mut accounts = NoVec::<AccountView, MAX_STATIC_CPI_ACCOUNTS>::new();
         accounts.append_slice(committed_accounts);
         let commit = CommitIntent { accounts, actions };
 
@@ -317,7 +315,7 @@ impl<'a, 'args> CommitAndUndelegateIntentBuilder<'a, 'args> {
             post_undelegate_actions,
         } = self;
 
-        let mut accounts = NoVec::<_, MAX_COMMITTED_ACCOUNTS_NUM>::new();
+        let mut accounts = NoVec::<_, MAX_STATIC_CPI_ACCOUNTS>::new();
         accounts.append_slice(committed_accounts);
         let cau = CommitAndUndelegateIntent {
             accounts,
@@ -343,12 +341,12 @@ impl MagicIntentBundleBuilder<'_> {
     fn build_serialized(mut self, buf: &mut [u8]) -> usize {
         self.intent_bundle.normalize();
 
-        let mut all_accounts = NoVec::<AccountView, MAX_ACCOUNTS>::new();
+        let mut all_accounts = NoVec::<AccountView, MAX_STATIC_CPI_ACCOUNTS>::new();
         all_accounts.append([self.payer, self.magic_context]);
         self.intent_bundle
             .collect_unique_accounts(&mut all_accounts);
 
-        let mut indices_map = NoVec::<Address, MAX_ACCOUNTS>::new();
+        let mut indices_map = NoVec::<Address, MAX_STATIC_CPI_ACCOUNTS>::new();
         for account in all_accounts.iter() {
             indices_map.push(account.address().clone());
         }
