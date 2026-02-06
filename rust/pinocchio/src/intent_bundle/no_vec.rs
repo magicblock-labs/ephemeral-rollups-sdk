@@ -324,25 +324,6 @@ impl<'a, T, const N: usize> IntoIterator for &'a NoVec<T, N> {
     }
 }
 
-pub struct Iter<'a, T, const N: usize> {
-    cur: usize,
-    inner: &'a NoVec<T, N>,
-}
-
-impl<'a, T, const N: usize> Iterator for Iter<'a, T, N> {
-    type Item = &'a T;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        if self.inner.len == self.cur {
-            None
-        } else {
-            let index = self.cur;
-            self.cur += 1;
-            Some(&self.inner[index])
-        }
-    }
-}
-
 impl<T, const N: usize> Drop for NoVec<T, N> {
     fn drop(&mut self) {
         unsafe {
