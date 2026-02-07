@@ -1,12 +1,13 @@
 [workspace]
 members = [
-  "sdk",
-  "ephemeral",
-  "delegate",
-  "commit-attribute",
   "action-attribute",
-  "resolver",
+  "commit-attribute",
+  "delegate",
+  "ephemeral",
+  "ephemeral-accounts-attribute",
   "pinocchio",
+  "resolver",
+  "sdk",
 ]
 
 resolver = "2"
@@ -25,6 +26,7 @@ keywords = ["solana", "crypto", "delegation", "ephemeral-rollups", "magicblock"]
 [workspace.dependencies]
 ephemeral-rollups-sdk = { path = "sdk", version = "=0.8.5" }
 ephemeral-rollups-sdk-attribute-ephemeral = { path = "ephemeral", version = "=0.8.5" }
+ephemeral-rollups-sdk-attribute-ephemeral-accounts = { path = "ephemeral-accounts-attribute", version = "=0.8.5" }
 ephemeral-rollups-sdk-attribute-delegate = { path = "delegate", version = "=0.8.5" }
 ephemeral-rollups-sdk-attribute-commit = { path = "commit-attribute", version = "=0.8.5" }
 ephemeral-rollups-sdk-attribute-action = { path = "action-attribute", version = "=0.8.5" }
