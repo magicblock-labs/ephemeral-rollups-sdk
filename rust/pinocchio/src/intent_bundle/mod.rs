@@ -126,6 +126,15 @@ impl<'args> MagicIntentBundleBuilder<'args> {
     pub fn build_and_invoke(mut self, data_buf: &mut [u8]) -> ProgramResult {
         const OFFSET: usize = SCHEDULE_INTENT_BUNDLE_DISCRIMINANT.len();
 
+        // Guard: buffer must be large enough for at least the discriminant plus
+        // one byte of payload; otherwise the slice indexing below would panic.
+        if data_buf.len() <= OFFSET {
+            return Err(ProgramError::InvalidInstructionData);
+        }
+
+        // Validate: ensure intents have at least one committed account
+        self.intent_bundle.validate()?;
+
         // Normalize: dedup within intents, resolve cross-intent overlaps
         self.intent_bundle.normalize()?;
 

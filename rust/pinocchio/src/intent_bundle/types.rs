@@ -109,6 +109,17 @@ impl<'args> MagicIntentBundle<'args> {
         Ok(())
     }
 
+    /// Validates that all present intents have at least one committed account.
+    pub(super) fn validate(&self) -> ProgramResult {
+        if let Some(ref commit) = self.commit_intent {
+            commit.validate()?;
+        }
+        if let Some(ref cau) = self.commit_and_undelegate_intent {
+            cau.validate()?;
+        }
+        Ok(())
+    }
+
     /// Normalizes the bundle into a valid, canonical form.
     ///
     /// Effects:
@@ -221,6 +232,15 @@ pub struct CommitIntent<'args> {
 }
 
 impl<'args> CommitIntent<'args> {
+    /// Validates that this commit intent has at least one account to commit.
+    fn validate(&self) -> ProgramResult {
+        if self.accounts.is_empty() {
+            Err(ProgramError::InvalidInstructionData)
+        } else {
+            Ok(())
+        }
+    }
+
     /// Deduplicates committed accounts by address. Accounts whose address is
     /// already in `seen` are removed. Newly seen addresses are added to `seen`.
     fn dedup(&mut self, seen: &mut NoVec<Address, MAX_STATIC_CPI_ACCOUNTS>) -> ProgramResult {
@@ -309,6 +329,15 @@ pub struct CommitAndUndelegateIntent<'args> {
 }
 
 impl<'args> CommitAndUndelegateIntent<'args> {
+    /// Validates that this commit-and-undelegate intent has at least one account.
+    fn validate(&self) -> ProgramResult {
+        if self.accounts.is_empty() {
+            Err(ProgramError::InvalidInstructionData)
+        } else {
+            Ok(())
+        }
+    }
+
     /// Deduplicates committed accounts by address and returns the set of
     /// unique addresses (for cross-intent overlap detection).
     fn dedup(&mut self) -> Result<NoVec<Address, MAX_STATIC_CPI_ACCOUNTS>, ProgramError> {

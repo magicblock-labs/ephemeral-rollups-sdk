@@ -7,7 +7,6 @@ use core::{mem, ptr, slice};
 const CAPACITY_OVERFLOW_MSG: &str = "capacity overflow";
 const INDEX_OUT_OF_BOUNDS_MSG: &str = "index out of bounds";
 
-#[derive(Debug)]
 pub struct NoVec<T, const N: usize> {
     inner: [MaybeUninit<T>; N],
     len: usize,
@@ -202,15 +201,6 @@ impl<T: Clone, const N: usize> NoVec<T, N> {
             panic!("{}", CAPACITY_OVERFLOW_MSG);
         }
     }
-
-    pub fn append_slice_shadowed<'a, 'new>(&'a mut self, other: &'new [T])
-    where
-        'a: 'new,
-    {
-        if self.len + other.len() > N {
-            panic!("{}", CAPACITY_OVERFLOW_MSG);
-        }
-    }
 }
 
 impl<T: Ord, const N: usize> NoVec<T, N> {
@@ -332,6 +322,12 @@ impl<T, const N: usize> Drop for NoVec<T, N> {
         unsafe {
             ptr::drop_in_place(self.as_mut_slice());
         }
+    }
+}
+
+impl<T: core::fmt::Debug, const N: usize> core::fmt::Debug for NoVec<T, N> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_list().entries(self.as_slice().iter()).finish()
     }
 }
 
