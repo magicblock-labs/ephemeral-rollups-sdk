@@ -272,7 +272,10 @@ impl<T, const N: usize> Drop for IntoIter<T, N> {
                 self.inner.as_mut_ptr().add(self.cur),
                 self.inner.len - self.cur,
             ));
-        }
+        };
+
+        // Set len to 0 so NoVec::drop doesn't double clean
+        self.inner.len = 0;
     }
 }
 
