@@ -36,7 +36,7 @@ rpc-api = { workspace = true }
 solana-program = { workspace = true }
 
 # serialization/parsing
-serde = { workspace = true }
+serde = { workspace = true, default-features = true }
 json = { workspace = true }
 humantime = { workspace = true }
 borsh = { workspace = true } 

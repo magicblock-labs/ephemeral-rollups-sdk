@@ -1,0 +1,451 @@
+use crate::intent_bundle::args::{
+    ActionArgs, BaseActionArgs, CommitAndUndelegateArgs, CommitTypeArgs, MagicIntentBundleArgs,
+    ShortAccountMeta, UndelegateTypeArgs,
+};
+use crate::intent_bundle::no_vec::NoVec;
+use pinocchio::cpi::MAX_STATIC_CPI_ACCOUNTS;
+use pinocchio::error::ProgramError;
+use pinocchio::{AccountView, ProgramResult};
+use solana_address::Address;
+
+use super::MAX_ACTIONS_NUM;
+
+/// Intent to be scheduled for execution on the base layer.
+///
+/// This enum represents the different types of operations that can be bundled
+/// and executed through the Magic program.
+#[allow(clippy::large_enum_variant)]
+pub enum MagicIntent<'args> {
+    /// Standalone actions to execute on base layer without commit/undelegate semantics.
+    StandaloneActions(NoVec<CallHandler<'args>, MAX_ACTIONS_NUM>),
+    /// Commit accounts to base layer, optionally with post-commit actions.
+    Commit(CommitIntent<'args>),
+    /// Commit accounts and undelegate them, optionally with post-commit and post-undelegate actions.
+    CommitAndUndelegate(CommitAndUndelegateIntent<'args>),
+}
+
+/// Bundle of Intents
+///
+/// Note: if `CommitIntent` & `CommitAndUndelegateIntent` has an account overlap
+/// they will be undelegated
+///
+/// Intents assumed to be independent and self-sufficient,
+/// hence order in which they were inserted doesn't matter
+#[derive(Default)]
+pub(super) struct MagicIntentBundle<'args> {
+    standalone_actions: NoVec<CallHandler<'args>, MAX_ACTIONS_NUM>,
+    commit_intent: Option<CommitIntent<'args>>,
+    commit_and_undelegate_intent: Option<CommitAndUndelegateIntent<'args>>,
+}
+
+impl<'args> MagicIntentBundle<'args> {
+    /// Inserts an intent into the bundle, merging with any existing intent of the same category.
+    pub(super) fn add_intent(&mut self, intent: MagicIntent<'args>) -> ProgramResult {
+        match intent {
+            MagicIntent::StandaloneActions(value) => {
+                for el in value {
+                    self.standalone_actions.try_push(el)?;
+                }
+            }
+            MagicIntent::Commit(value) => {
+                if let Some(ref mut existing) = self.commit_intent {
+                    existing.merge(value)?;
+                } else {
+                    self.commit_intent = Some(value);
+                }
+            }
+            MagicIntent::CommitAndUndelegate(value) => {
+                if let Some(ref mut existing) = self.commit_and_undelegate_intent {
+                    existing.merge(value)?;
+                } else {
+                    self.commit_and_undelegate_intent = Some(value);
+                }
+            }
+        }
+        Ok(())
+    }
+
+    /// Consumes the bundle and encodes it into `MagicIntentBundleArgs` using an indices map.
+    ///
+    /// `indices_map` is a natural map: `indices_map[i]` is the address at index `i`.
+    pub(super) fn into_args(
+        self,
+        indices_map: &[Address],
+    ) -> Result<MagicIntentBundleArgs<'args>, ProgramError> {
+        let commit = self
+            .commit_intent
+            .map(|c| c.into_args(indices_map))
+            .transpose()?;
+        let commit_and_undelegate = self
+            .commit_and_undelegate_intent
+            .map(|c| c.into_args(indices_map))
+            .transpose()?;
+        let mut standalone_actions = NoVec::<BaseActionArgs<'args>, MAX_ACTIONS_NUM>::new();
+        for ch in self.standalone_actions {
+            standalone_actions.try_push(ch.into_args(indices_map)?)?;
+        }
+
+        Ok(MagicIntentBundleArgs {
+            commit,
+            commit_and_undelegate,
+            standalone_actions,
+        })
+    }
+
+    /// Collects all accounts referenced by intents in this bundle.
+    pub(super) fn collect_unique_accounts(
+        &self,
+        unique_accounts: &mut NoVec<AccountView, MAX_STATIC_CPI_ACCOUNTS>,
+    ) -> ProgramResult {
+        for el in &self.standalone_actions {
+            el.collect_unique_accounts(unique_accounts)?;
+        }
+        if let Some(commit) = &self.commit_intent {
+            commit.collect_unique_accounts(unique_accounts)?;
+        }
+        if let Some(cau) = &self.commit_and_undelegate_intent {
+            cau.collect_unique_accounts(unique_accounts)?;
+        }
+        Ok(())
+    }
+
+    /// Validates that all present intents have at least one committed account.
+    pub(super) fn validate(&self) -> ProgramResult {
+        if let Some(ref commit) = self.commit_intent {
+            commit.validate()?;
+        }
+        if let Some(ref cau) = self.commit_and_undelegate_intent {
+            cau.validate()?;
+        }
+        Ok(())
+    }
+
+    /// Normalizes the bundle into a valid, canonical form.
+    ///
+    /// Effects:
+    /// - Deduplicates committed accounts within each intent by address (stable; first occurrence wins).
+    /// - Resolves overlap between `Commit` and `CommitAndUndelegate`:
+    ///   any account present in both will be removed from `Commit` and kept in `CommitAndUndelegate`.
+    /// - If `Commit` becomes empty after overlap removal, it is removed from the bundle, and any
+    ///   post-commit actions from the commit intent are merged into the commit-side actions
+    ///   of `CommitAndUndelegate`.
+    pub(super) fn normalize(&mut self) -> ProgramResult {
+        let cau_seen = self
+            .commit_and_undelegate_intent
+            .as_mut()
+            .map(|cau| cau.dedup())
+            .transpose()?;
+        let Some(mut commit) = self.commit_intent.take() else {
+            return Ok(()); // No commit intent, nothing more to normalize
+        };
+
+        let mut seen = cau_seen.unwrap_or_default();
+        commit.dedup(&mut seen)?;
+
+        // If commit lost all its accounts to CAU overlap, move its actions
+        // into CAU's post-commit actions and drop the empty commit intent.
+        if commit.accounts.is_empty() {
+            if let Some(ref mut cau) = self.commit_and_undelegate_intent {
+                for action in commit.actions {
+                    cau.post_commit_actions.try_push(action)?;
+                }
+            }
+            // commit intent is not put back — it's effectively removed
+        } else {
+            self.commit_intent = Some(commit);
+        }
+        Ok(())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Intent Types
+// ---------------------------------------------------------------------------
+
+#[derive(Clone)]
+pub struct CallHandler<'args> {
+    pub destination_program: Address,
+    pub escrow_authority: AccountView,
+    pub args: ActionArgs<'args>,
+    pub compute_units: u32,
+    accounts: NoVec<ShortAccountMeta, MAX_ACTIONS_NUM>,
+}
+
+impl<'args> CallHandler<'args> {
+    pub fn new(
+        destination_program: Address,
+        escrow_authority: AccountView,
+        args: ActionArgs<'args>,
+        compute_units: u32,
+    ) -> Self {
+        Self {
+            args,
+            compute_units,
+            escrow_authority,
+            destination_program,
+            accounts: NoVec::default(),
+        }
+    }
+
+    pub fn add_accounts_slice(&mut self, accounts: &[ShortAccountMeta]) -> ProgramResult {
+        self.accounts.try_append_slice(accounts)?;
+        Ok(())
+    }
+
+    pub fn add_accounts<const N: usize>(
+        &mut self,
+        accounts: [ShortAccountMeta; N],
+    ) -> ProgramResult {
+        self.accounts.try_append(accounts)?;
+        Ok(())
+    }
+
+    pub(super) fn collect_unique_accounts(
+        &self,
+        container: &mut NoVec<AccountView, MAX_STATIC_CPI_ACCOUNTS>,
+    ) -> ProgramResult {
+        if !container.contains(&self.escrow_authority) {
+            container.try_push(self.escrow_authority.clone())?;
+        }
+        Ok(())
+    }
+
+    pub(crate) fn into_args(
+        self,
+        indices_map: &[Address],
+    ) -> Result<BaseActionArgs<'args>, ProgramError> {
+        let escrow_authority_index = get_index(indices_map, self.escrow_authority.address())
+            .ok_or(ProgramError::InvalidArgument)?;
+        Ok(BaseActionArgs {
+            args: self.args,
+            compute_units: self.compute_units,
+            destination_program: self.destination_program,
+            escrow_authority: escrow_authority_index,
+            accounts: self.accounts,
+        })
+    }
+}
+
+pub struct CommitIntent<'args> {
+    pub(super) accounts: NoVec<AccountView, MAX_STATIC_CPI_ACCOUNTS>,
+    pub(super) actions: NoVec<CallHandler<'args>, MAX_ACTIONS_NUM>,
+}
+
+impl<'args> CommitIntent<'args> {
+    /// Validates that this commit intent has at least one account to commit.
+    fn validate(&self) -> ProgramResult {
+        if self.accounts.is_empty() {
+            Err(ProgramError::InvalidInstructionData)
+        } else {
+            Ok(())
+        }
+    }
+
+    /// Deduplicates committed accounts by address. Accounts whose address is
+    /// already in `seen` are removed. Newly seen addresses are added to `seen`.
+    fn dedup(&mut self, seen: &mut NoVec<Address, MAX_STATIC_CPI_ACCOUNTS>) -> ProgramResult {
+        dedup_accounts(&mut self.accounts, seen)
+    }
+
+    /// Merges another CommitIntent into this one. Only inserts accounts
+    /// whose address is not already present (dedup on merge).
+    fn merge(&mut self, other: Self) -> ProgramResult {
+        for account in other.accounts {
+            if !self
+                .accounts
+                .as_slice()
+                .iter()
+                .any(|a| a.address() == account.address())
+            {
+                self.accounts.try_push(account)?;
+            }
+        }
+        for action in other.actions {
+            self.actions.try_push(action)?;
+        }
+        Ok(())
+    }
+
+    fn collect_unique_accounts(
+        &self,
+        container: &mut NoVec<AccountView, MAX_STATIC_CPI_ACCOUNTS>,
+    ) -> ProgramResult {
+        for el in self.accounts.iter() {
+            if !container.contains(el) {
+                container.try_push(el.clone())?;
+            }
+        }
+        for el in self.actions.iter() {
+            el.collect_unique_accounts(container)?;
+        }
+        Ok(())
+    }
+
+    fn into_args(self, indices_map: &[Address]) -> Result<CommitTypeArgs<'args>, ProgramError> {
+        let mut indices = NoVec::<u8, MAX_STATIC_CPI_ACCOUNTS>::new();
+        for account in self.accounts {
+            let idx =
+                get_index(indices_map, account.address()).ok_or(ProgramError::InvalidArgument)?;
+            indices.try_push(idx)?;
+        }
+
+        if self.actions.is_empty() {
+            Ok(CommitTypeArgs::Standalone(indices))
+        } else {
+            let mut base_actions = NoVec::<_, MAX_ACTIONS_NUM>::new();
+            for handler in self.actions {
+                base_actions.try_push(handler.into_args(indices_map)?)?;
+            }
+            Ok(CommitTypeArgs::WithBaseActions {
+                committed_accounts: indices,
+                base_actions,
+            })
+        }
+    }
+}
+
+pub struct CommitAndUndelegateIntent<'args> {
+    pub(super) accounts: NoVec<AccountView, MAX_STATIC_CPI_ACCOUNTS>,
+    pub(super) post_commit_actions: NoVec<CallHandler<'args>, MAX_ACTIONS_NUM>,
+    pub(super) post_undelegate_actions: NoVec<CallHandler<'args>, MAX_ACTIONS_NUM>,
+}
+
+impl<'args> CommitAndUndelegateIntent<'args> {
+    /// Validates that this commit-and-undelegate intent has at least one account.
+    fn validate(&self) -> ProgramResult {
+        if self.accounts.is_empty() {
+            Err(ProgramError::InvalidInstructionData)
+        } else {
+            Ok(())
+        }
+    }
+
+    /// Deduplicates committed accounts by address and returns the set of
+    /// unique addresses (for cross-intent overlap detection).
+    fn dedup(&mut self) -> Result<NoVec<Address, MAX_STATIC_CPI_ACCOUNTS>, ProgramError> {
+        let mut seen = NoVec::<Address, MAX_STATIC_CPI_ACCOUNTS>::new();
+        dedup_accounts(&mut self.accounts, &mut seen)?;
+        Ok(seen)
+    }
+
+    /// Merges another CommitAndUndelegateIntent into this one. Only inserts
+    /// accounts whose address is not already present (dedup on merge).
+    fn merge(&mut self, other: Self) -> ProgramResult {
+        for account in other.accounts {
+            if !self
+                .accounts
+                .as_slice()
+                .iter()
+                .any(|a| a.address() == account.address())
+            {
+                self.accounts.try_push(account)?;
+            }
+        }
+        for action in other.post_commit_actions {
+            self.post_commit_actions.try_push(action)?;
+        }
+        for action in other.post_undelegate_actions {
+            self.post_undelegate_actions.try_push(action)?;
+        }
+        Ok(())
+    }
+
+    fn collect_unique_accounts(
+        &self,
+        container: &mut NoVec<AccountView, MAX_STATIC_CPI_ACCOUNTS>,
+    ) -> ProgramResult {
+        for el in self.accounts.iter() {
+            if !container.contains(el) {
+                container.try_push(el.clone())?;
+            }
+        }
+        for el in self.post_commit_actions.iter() {
+            el.collect_unique_accounts(container)?;
+        }
+        for el in self.post_undelegate_actions.iter() {
+            el.collect_unique_accounts(container)?;
+        }
+        Ok(())
+    }
+
+    fn into_args(
+        self,
+        indices_map: &[Address],
+    ) -> Result<CommitAndUndelegateArgs<'args>, ProgramError> {
+        // Build account indices
+        let mut indices = NoVec::<u8, MAX_STATIC_CPI_ACCOUNTS>::new();
+        for account in self.accounts {
+            let idx =
+                get_index(indices_map, account.address()).ok_or(ProgramError::InvalidArgument)?;
+            indices.try_push(idx)?;
+        }
+
+        // Build commit type
+        let commit_type = if self.post_commit_actions.is_empty() {
+            CommitTypeArgs::Standalone(indices)
+        } else {
+            let mut base_actions = NoVec::<_, MAX_ACTIONS_NUM>::new();
+            for handler in self.post_commit_actions {
+                base_actions.try_push(handler.into_args(indices_map)?)?;
+            }
+            CommitTypeArgs::WithBaseActions {
+                committed_accounts: indices,
+                base_actions,
+            }
+        };
+
+        // Build undelegate type
+        let undelegate_type = if self.post_undelegate_actions.is_empty() {
+            UndelegateTypeArgs::Standalone
+        } else {
+            let mut base_actions = NoVec::<_, MAX_ACTIONS_NUM>::new();
+            for handler in self.post_undelegate_actions {
+                base_actions.try_push(handler.into_args(indices_map)?)?;
+            }
+            UndelegateTypeArgs::WithBaseActions { base_actions }
+        };
+
+        Ok(CommitAndUndelegateArgs {
+            commit_type,
+            undelegate_type,
+        })
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+/// Deduplicates `accounts` by address against a running `seen` set.
+/// Accounts whose address is already in `seen` are removed; newly encountered
+/// addresses are appended to `seen`.
+fn dedup_accounts(
+    accounts: &mut NoVec<AccountView, MAX_STATIC_CPI_ACCOUNTS>,
+    seen: &mut NoVec<Address, MAX_STATIC_CPI_ACCOUNTS>,
+) -> ProgramResult {
+    let mut result: ProgramResult = Ok(());
+    accounts.retain(|el| {
+        if result.is_err() {
+            return false;
+        }
+        let addr = el.address();
+        if seen.contains(addr) {
+            false
+        } else {
+            match seen.try_push(addr.clone()) {
+                Ok(()) => true,
+                Err(_) => {
+                    result = Err(ProgramError::InvalidArgument);
+                    false
+                }
+            }
+        }
+    });
+    result
+}
+
+/// Gets the index of a pubkey in the deduplicated pubkey list.
+/// Returns None if the pubkey is not found.
+fn get_index(pubkeys: &[Address], needle: &Address) -> Option<u8> {
+    pubkeys.iter().position(|k| k == needle).map(|i| i as u8)
+}
