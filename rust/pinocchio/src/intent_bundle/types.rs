@@ -244,25 +244,7 @@ impl<'args> CommitIntent<'args> {
     /// Deduplicates committed accounts by address. Accounts whose address is
     /// already in `seen` are removed. Newly seen addresses are added to `seen`.
     fn dedup(&mut self, seen: &mut NoVec<Address, MAX_STATIC_CPI_ACCOUNTS>) -> ProgramResult {
-        let mut err: ProgramResult = Ok(());
-        self.accounts.retain(|el| {
-            if err.is_err() {
-                return false;
-            }
-            let addr = el.address();
-            if seen.contains(addr) {
-                false
-            } else {
-                match seen.try_push(addr.clone()) {
-                    Ok(()) => true,
-                    Err(_) => {
-                        err = Err(ProgramError::InvalidArgument);
-                        false
-                    }
-                }
-            }
-        });
-        err
+        dedup_accounts(&mut self.accounts, seen)
     }
 
     /// Merges another CommitIntent into this one. Only inserts accounts
@@ -342,25 +324,7 @@ impl<'args> CommitAndUndelegateIntent<'args> {
     /// unique addresses (for cross-intent overlap detection).
     fn dedup(&mut self) -> Result<NoVec<Address, MAX_STATIC_CPI_ACCOUNTS>, ProgramError> {
         let mut seen = NoVec::<Address, MAX_STATIC_CPI_ACCOUNTS>::new();
-        let mut err: ProgramResult = Ok(());
-        self.accounts.retain(|el| {
-            if err.is_err() {
-                return false;
-            }
-            let addr = el.address();
-            if seen.contains(addr) {
-                false
-            } else {
-                match seen.try_push(addr.clone()) {
-                    Ok(()) => true,
-                    Err(_) => {
-                        err = Err(ProgramError::InvalidArgument);
-                        false
-                    }
-                }
-            }
-        });
-        err?;
+        dedup_accounts(&mut self.accounts, &mut seen)?;
         Ok(seen)
     }
 
@@ -451,6 +415,34 @@ impl<'args> CommitAndUndelegateIntent<'args> {
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+
+/// Deduplicates `accounts` by address against a running `seen` set.
+/// Accounts whose address is already in `seen` are removed; newly encountered
+/// addresses are appended to `seen`.
+fn dedup_accounts(
+    accounts: &mut NoVec<AccountView, MAX_STATIC_CPI_ACCOUNTS>,
+    seen: &mut NoVec<Address, MAX_STATIC_CPI_ACCOUNTS>,
+) -> ProgramResult {
+    let mut result: ProgramResult = Ok(());
+    accounts.retain(|el| {
+        if result.is_err() {
+            return false;
+        }
+        let addr = el.address();
+        if seen.contains(addr) {
+            false
+        } else {
+            match seen.try_push(addr.clone()) {
+                Ok(()) => true,
+                Err(_) => {
+                    result = Err(ProgramError::InvalidArgument);
+                    false
+                }
+            }
+        }
+    });
+    result
+}
 
 /// Gets the index of a pubkey in the deduplicated pubkey list.
 /// Returns None if the pubkey is not found.
