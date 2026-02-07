@@ -1,8 +1,8 @@
 use proc_macro::TokenStream;
 use proc_macro2::{Span, TokenStream as TokenStream2};
-use quote::{quote, ToTokens};
+use quote::quote;
 use syn::spanned::Spanned;
-use syn::{parse_macro_input, Attribute, Expr, Field, Ident, ItemStruct, Type};
+use syn::{parse_macro_input, Attribute, Expr, ExprArray, Field, Ident, ItemStruct, Type};
 
 // ==================== Constants ====================
 
@@ -21,6 +21,36 @@ fn get_account_attr(field: &Field) -> Option<String> {
         .iter()
         .find(|a| a.path.is_ident(ATTR_ACCOUNT))
         .map(|a| a.tokens.to_string())
+}
+
+/// Splits parenthesized attribute content into top-level comma-separated segments.
+///
+/// Returns `(was_parenthesized, segments)`. Tracks bracket/paren depth so that
+/// commas inside nested `[...]` or `(...)` are not treated as separators.
+fn split_attr_tokens(tokens: &str) -> (bool, Vec<&str>) {
+    let trimmed = tokens.trim();
+    let inner = if trimmed.starts_with('(') && trimmed.ends_with(')') {
+        &trimmed[1..trimmed.len() - 1]
+    } else {
+        return (false, vec![trimmed]);
+    };
+
+    let mut segments = Vec::new();
+    let mut depth = 0usize;
+    let mut start = 0;
+    for (i, c) in inner.char_indices() {
+        match c {
+            '[' | '(' => depth += 1,
+            ']' | ')' => depth = depth.saturating_sub(1),
+            ',' if depth == 0 => {
+                segments.push(&inner[start..i]);
+                start = i + 1;
+            }
+            _ => {}
+        }
+    }
+    segments.push(&inner[start..]);
+    (true, segments)
 }
 
 /// Extracts the bracketed content after a keyword (e.g., `seeds = [...]`).
@@ -43,91 +73,185 @@ fn extract_bracketed_after(s: &str, keyword: &str) -> Option<String> {
 }
 
 /// Extracts `seeds = [...]` expression from a field's `#[account(...)]` attribute.
-fn extract_seeds(field: &Field) -> Option<TokenStream2> {
+fn extract_seeds(field: &Field) -> Option<ExprArray> {
     let attr_str = get_account_attr(field)?;
     let seeds_str = extract_bracketed_after(&attr_str, ATTR_SEEDS)?;
-    syn::parse_str::<Expr>(&seeds_str)
-        .ok()
-        .map(|e| e.to_token_stream())
+    syn::parse_str::<ExprArray>(&seeds_str).ok()
 }
 
-/// Checks if a field has a specific marker in its account attribute.
+/// Checks if a field has a specific marker in its account attribute (exact token match).
 fn has_marker(field: &Field, marker: &str) -> bool {
-    get_account_attr(field).is_some_and(|s| s.contains(marker))
+    get_account_attr(field).is_some_and(|s| {
+        let (_, segments) = split_attr_tokens(&s);
+        segments.iter().any(|seg| seg.trim() == marker)
+    })
 }
 
-/// Returns true if the type is `Signer<'info>`.
+/// Checks if any segment starts with the given prefix (for `init` / `init_if_needed`).
+fn has_marker_prefix(field: &Field, prefix: &str) -> bool {
+    get_account_attr(field).is_some_and(|s| {
+        let (_, segments) = split_attr_tokens(&s);
+        segments.iter().any(|seg| seg.trim().starts_with(prefix))
+    })
+}
+
+/// Returns true if the type is `Signer<'info>` (AST-based, matches last path segment).
 fn is_signer_type(ty: &Type) -> bool {
-    ty.to_token_stream().to_string().contains("Signer")
+    if let Type::Path(type_path) = ty {
+        type_path
+            .path
+            .segments
+            .last()
+            .is_some_and(|seg| seg.ident == "Signer")
+    } else {
+        false
+    }
 }
 
 // ==================== Seed Transformation ====================
 
-/// Transforms seed expressions to handle `.key()` lifetime issues.
+/// Transforms seed expressions to handle `.key()` lifetime issues (AST-based).
 ///
 /// Problem: `[b"seed", payer.key().as_ref()]` - the `Pubkey` from `key()` is
 /// temporary and won't live long enough for the CPI call.
 ///
 /// Solution: Extract `.key()` calls into let bindings that extend their lifetime.
-fn transform_seeds(seeds: &TokenStream2, field_names: &[Ident]) -> (TokenStream2, TokenStream2) {
-    let original = seeds.to_string();
-    let mut result = original.clone();
+/// Also rewrites bare `field_name` paths to `self.field_name`.
+fn transform_seeds(
+    seeds: &ExprArray,
+    field_names: &[Ident],
+) -> Result<(TokenStream2, ExprArray), syn::Error> {
     let mut bindings = Vec::new();
+    let mut new_elems = syn::punctuated::Punctuated::new();
 
-    // Add self. prefix to bare field references
-    for name in field_names.iter().map(ToString::to_string) {
-        for suffix in [".", ",", "]", " "] {
-            let pattern = format!("{name}{suffix}");
-            let replacement = format!("self.{name}{suffix}");
-            result = result.replace(&pattern, &replacement);
-        }
+    for elem in &seeds.elems {
+        let transformed = transform_seed_expr(elem, field_names, &mut bindings)?;
+        new_elems.push(transformed);
     }
-    result = result.replace("self.self.", "self."); // Fix double-prefix
 
-    // Extract .key() calls into let bindings to extend Pubkey lifetime
-    for name in field_names.iter().map(ToString::to_string) {
-        let key_call = format!("{name}.key()");
-        if original.contains(&key_call) {
-            let var = Ident::new(&format!("__{name}_key"), Span::call_site());
-            let field = Ident::new(&name, Span::call_site());
-            bindings.push(quote! { let #var = self.#field.key(); });
-            // Replace both prefixed and unprefixed versions
-            result = result.replace(&format!("self.{key_call}"), &format!("__{name}_key"));
-        }
-    }
+    let mut result = seeds.clone();
+    result.elems = new_elems;
 
     let bindings = quote! { #(#bindings)* };
-    let transformed = syn::parse_str(&result).unwrap_or_else(|_| seeds.clone());
-    (bindings, transformed)
+    Ok((bindings, result))
+}
+
+/// Recursively transforms a single seed expression.
+fn transform_seed_expr(
+    expr: &Expr,
+    field_names: &[Ident],
+    bindings: &mut Vec<TokenStream2>,
+) -> Result<Expr, syn::Error> {
+    match expr {
+        // Handle method calls like `field.key().as_ref()`
+        Expr::MethodCall(mc) => {
+            let method_name = mc.method.to_string();
+
+            // Check for `field.key().as_ref()` pattern
+            if method_name == "as_ref" {
+                if let Expr::MethodCall(inner) = mc.receiver.as_ref() {
+                    if inner.method == "key" {
+                        if let Some(field_ident) = extract_bare_field(&inner.receiver, field_names)
+                        {
+                            let var =
+                                Ident::new(&format!("__{field_ident}_key"), Span::call_site());
+                            bindings.push(quote! { let #var = self.#field_ident.key(); });
+                            return Ok(syn::parse_quote!(#var.as_ref()));
+                        }
+                    }
+                }
+            }
+
+            // Generic method call: transform receiver
+            let new_receiver = transform_seed_expr(&mc.receiver, field_names, bindings)?;
+            let mut new_mc = mc.clone();
+            new_mc.receiver = Box::new(new_receiver);
+            Ok(Expr::MethodCall(new_mc))
+        }
+
+        // Handle bare field references like `field` → `self.field`
+        Expr::Path(ep) => {
+            if let Some(field_ident) = extract_bare_field(expr, field_names) {
+                Ok(syn::parse_quote!(self.#field_ident))
+            } else {
+                Ok(Expr::Path(ep.clone()))
+            }
+        }
+
+        // Handle field access like `field.something`
+        Expr::Field(ef) => {
+            let new_base = transform_seed_expr(&ef.base, field_names, bindings)?;
+            let mut new_ef = ef.clone();
+            new_ef.base = Box::new(new_base);
+            Ok(Expr::Field(new_ef))
+        }
+
+        // Handle references like `&expr`
+        Expr::Reference(er) => {
+            let new_expr = transform_seed_expr(&er.expr, field_names, bindings)?;
+            let mut new_er = er.clone();
+            new_er.expr = Box::new(new_expr);
+            Ok(Expr::Reference(new_er))
+        }
+
+        // Everything else (literals like b"seed") passes through unchanged
+        _ => Ok(expr.clone()),
+    }
+}
+
+/// Extracts a bare field identifier if the expression is a simple path matching a known field.
+fn extract_bare_field<'a>(expr: &Expr, field_names: &'a [Ident]) -> Option<&'a Ident> {
+    if let Expr::Path(ep) = expr {
+        if ep.qself.is_none() && ep.path.segments.len() == 1 {
+            let ident = &ep.path.segments[0].ident;
+            return field_names.iter().find(|f| *f == ident);
+        }
+    }
+    None
 }
 
 // ==================== Code Generation ====================
 
 /// Generates PDA signer seeds computation with bump derivation.
+///
+/// Assumes `crate::id()` as the program owner for `find_program_address`.
+/// Emits fixed-size arrays `[&[u8]; N]` and `[&[u8]; N+1]` instead of `Vec`.
 fn gen_pda_seeds(
-    seeds: &TokenStream2,
+    seeds: &ExprArray,
     field_names: &[Ident],
     prefix: &str,
-) -> (TokenStream2, Ident) {
-    let (bindings, transformed) = transform_seeds(seeds, field_names);
+) -> Result<(TokenStream2, Ident), syn::Error> {
+    let (bindings, transformed) = transform_seeds(seeds, field_names)?;
+    let n = transformed.elems.len();
 
     let raw = Ident::new(&format!("{prefix}_seeds_raw"), Span::call_site());
-    let vec = Ident::new(&format!("{prefix}_seeds_vec"), Span::call_site());
+    let seeds_arr = Ident::new(&format!("{prefix}_seeds_arr"), Span::call_site());
     let bump = Ident::new(&format!("{prefix}_bump"), Span::call_site());
     let bump_arr = Ident::new(&format!("{prefix}_bump_arr"), Span::call_site());
     let with_bump = Ident::new(&format!("{prefix}_seeds_with_bump"), Span::call_site());
 
+    // Generate index literals for array copy: 0, 1, 2, ...
+    let indices = (0..n).map(syn::Index::from);
+
     let code = quote! {
         #bindings
         let #raw = #transformed;
-        let #vec: Vec<&[u8]> = #raw.iter().map(|s| s.as_ref()).collect();
-        let (_, #bump) = anchor_lang::prelude::Pubkey::find_program_address(&#vec, &crate::id());
+        let #seeds_arr: [&[u8]; #n] = [#(#raw[#indices].as_ref()),*];
+        let (_, #bump) = anchor_lang::prelude::Pubkey::find_program_address(&#seeds_arr, &crate::id());
         let #bump_arr: [u8; 1] = [#bump];
-        let mut #with_bump = #vec.clone();
-        #with_bump.push(&#bump_arr);
+        let #with_bump: [&[u8]; #n + 1] = {
+            let mut arr: [&[u8]; #n + 1] = [&[0u8; 0]; #n + 1];
+            let mut i = 0usize;
+            while i < #n {
+                arr[i] = #seeds_arr[i];
+                i += 1;
+            }
+            arr[#n] = &#bump_arr;
+            arr
+        };
     };
 
-    (code, with_bump)
+    Ok((code, with_bump))
 }
 
 /// Generates the `EphemeralAccount` builder call.
@@ -136,7 +260,7 @@ fn gen_builder(sponsor: &Ident, ephemeral: &Ident) -> TokenStream2 {
         ephemeral_rollups_sdk::ephemeral_accounts::EphemeralAccount::new(
             &self.#sponsor.to_account_info(),
             &self.#ephemeral.to_account_info(),
-            &self.vault,
+            &self.vault.to_account_info(),
         )
     }
 }
@@ -165,14 +289,14 @@ fn gen_builder_with_seeds(
 /// Information about an ephemeral field for code generation.
 struct EphFieldInfo<'a> {
     name: &'a Ident,
-    seeds: Option<TokenStream2>,
+    seeds: Option<ExprArray>,
 }
 
 /// Information about the sponsor for code generation.
 struct SponsorInfo {
     name: Ident,
     is_signer: bool,
-    seeds: Option<TokenStream2>,
+    seeds: Option<ExprArray>,
 }
 
 /// Generates all four methods for an ephemeral field.
@@ -181,7 +305,7 @@ fn gen_ephemeral_methods(
     sponsor: &SponsorInfo,
     field_names: &[Ident],
     span: proc_macro2::Span,
-) -> Vec<TokenStream2> {
+) -> Result<Vec<TokenStream2>, syn::Error> {
     let eph_name = eph.name;
     let spon_name = &sponsor.name;
 
@@ -195,39 +319,44 @@ fn gen_ephemeral_methods(
     let create_seeds = match (sponsor.is_signer, &eph.seeds, &sponsor.seeds) {
         // Wallet sponsor, PDA ephemeral: only ephemeral seeds
         (true, Some(s), _) => {
-            let (code, var) = gen_pda_seeds(s, field_names, "eph");
+            let (code, var) = gen_pda_seeds(s, field_names, "eph")?;
             Some((code, vec![var]))
         }
         // Wallet sponsor, wallet ephemeral: no seeds
         (true, None, _) => None,
         // PDA sponsor, PDA ephemeral: both seeds
         (false, Some(eph_s), Some(spon_s)) => {
-            let (spon_code, spon_var) = gen_pda_seeds(spon_s, field_names, "sponsor");
-            let (eph_code, eph_var) = gen_pda_seeds(eph_s, field_names, "eph");
+            let (spon_code, spon_var) = gen_pda_seeds(spon_s, field_names, "sponsor")?;
+            let (eph_code, eph_var) = gen_pda_seeds(eph_s, field_names, "eph")?;
             Some((quote! { #spon_code #eph_code }, vec![spon_var, eph_var]))
         }
         // PDA sponsor, wallet ephemeral: only sponsor seeds
         (false, None, Some(s)) => {
-            let (code, var) = gen_pda_seeds(s, field_names, "sponsor");
+            let (code, var) = gen_pda_seeds(s, field_names, "sponsor")?;
             Some((code, vec![var]))
         }
-        _ => None,
+        // PDA sponsor without seeds is rejected during validation
+        (false, Some(_), None) | (false, None, None) => {
+            unreachable!("PDA sponsor without seeds is rejected during validation")
+        }
     };
 
     // Build signer seeds for modify (only sponsor needs to sign)
     let modify_seeds = if sponsor.is_signer {
         None
     } else {
-        sponsor.seeds.as_ref().map(|s| {
-            let (code, var) = gen_pda_seeds(s, field_names, "sponsor");
-            (code, vec![var])
-        })
+        sponsor
+            .seeds
+            .as_ref()
+            .map(|s| gen_pda_seeds(s, field_names, "sponsor"))
+            .transpose()?
+            .map(|(code, var)| (code, vec![var]))
     };
 
     let create_builder = gen_builder_with_seeds(spon_name, eph_name, create_seeds);
     let modify_builder = gen_builder_with_seeds(spon_name, eph_name, modify_seeds);
 
-    vec![
+    Ok(vec![
         quote! {
             /// Creates an ephemeral account with the specified data length.
             pub fn #create(&self, data_len: u32) -> anchor_lang::Result<()> {
@@ -258,36 +387,46 @@ fn gen_ephemeral_methods(
                 Ok(())
             }
         },
-    ]
+    ])
 }
 
 // ==================== Attribute Processing ====================
 
-/// Removes custom markers from an attribute token string.
+/// Removes custom markers from an attribute token string (boundary-aware).
 fn strip_markers(tokens: &str, markers: &[&str]) -> String {
-    let mut result = tokens.to_string();
-    for marker in markers {
-        // Handle: ", marker" | "marker, " | "marker"
-        result = result
-            .replace(&format!(", {marker}"), "")
-            .replace(&format!("{marker}, "), "")
-            .replace(marker, "");
+    let (was_paren, segments) = split_attr_tokens(tokens);
+    let filtered: Vec<&str> = segments
+        .into_iter()
+        .filter(|seg| !markers.contains(&seg.trim()))
+        .collect();
+    let joined = filtered.join(",");
+    if was_paren {
+        format!("({joined})")
+    } else {
+        joined
     }
-    result
 }
 
 /// Cleans custom markers from a field's account attribute.
-fn clean_field_attrs(attrs: &mut [Attribute], markers: &[&str]) {
+///
+/// Returns `Err(compile_error)` if the cleaned attribute fails to parse.
+fn clean_field_attrs(attrs: &mut [Attribute], markers: &[&str]) -> Result<(), TokenStream2> {
     for attr in attrs.iter_mut() {
         if attr.path.is_ident(ATTR_ACCOUNT) {
             let original = attr.tokens.to_string();
             let cleaned = strip_markers(&original, markers);
             if cleaned != original {
-                attr.tokens =
-                    syn::parse_str(&cleaned).expect("internal: failed to parse cleaned attribute");
+                attr.tokens = syn::parse_str(&cleaned).map_err(|_| {
+                    syn::Error::new(
+                        attr.span(),
+                        format!("failed to parse cleaned attribute: {cleaned}"),
+                    )
+                    .to_compile_error()
+                })?;
             }
         }
     }
+    Ok(())
 }
 
 // ==================== Validation ====================
@@ -318,9 +457,7 @@ fn validate(input: &ItemStruct) -> Result<MacroContext, TokenStream> {
             syn::Error::new_spanned(field, "Unnamed fields not supported").to_compile_error()
         })?;
 
-        let attr = get_account_attr(field).unwrap_or_default();
-
-        if attr.contains(MARKER_SPONSOR) {
+        if has_marker(field, MARKER_SPONSOR) {
             ctx.sponsor = Some(SponsorInfo {
                 name: name.clone(),
                 is_signer: is_signer_type(&field.ty),
@@ -328,12 +465,12 @@ fn validate(input: &ItemStruct) -> Result<MacroContext, TokenStream> {
             });
         }
 
-        if attr.contains(MARKER_EPH) {
+        if has_marker(field, MARKER_EPH) {
             ctx.has_eph = true;
-            if attr.contains(ATTR_INIT) {
+            if has_marker(field, ATTR_INIT) || has_marker_prefix(field, ATTR_INIT) {
                 return Err(syn::Error::new_spanned(
                     field,
-                    "'eph' cannot be combined with 'init'. Use create_ephemeral_*() instead.",
+                    "'eph' cannot be combined with 'init' or 'init_if_needed'. Use create_ephemeral_*() instead.",
                 )
                 .to_compile_error()
                 .into());
@@ -429,18 +566,18 @@ pub fn ephemeral_accounts(_attr: TokenStream, item: TokenStream) -> TokenStream 
                     name,
                     seeds: extract_seeds(field),
                 };
-                methods.extend(gen_ephemeral_methods(
-                    &info,
-                    sponsor,
-                    &ctx.field_names,
-                    field.span(),
-                ));
+                match gen_ephemeral_methods(&info, sponsor, &ctx.field_names, field.span()) {
+                    Ok(m) => methods.extend(m),
+                    Err(e) => return TokenStream::from(e.to_compile_error()),
+                }
             }
         }
 
         // Clean markers from attributes
         if is_eph || is_sponsor {
-            clean_field_attrs(&mut attrs, &[MARKER_EPH, MARKER_SPONSOR]);
+            if let Err(err) = clean_field_attrs(&mut attrs, &[MARKER_EPH, MARKER_SPONSOR]) {
+                return TokenStream::from(err);
+            }
         }
 
         new_fields.push(quote! {
@@ -460,20 +597,21 @@ pub fn ephemeral_accounts(_attr: TokenStream, item: TokenStream) -> TokenStream 
         }
         if !ctx.has_magic_program {
             new_fields.push(quote! {
-                /// CHECK: Magic program for CPI
-                #[account(address = ephemeral_rollups_sdk::consts::MAGIC_PROGRAM_ID)]
-                pub magic_program: AccountInfo<'info>,
+                pub magic_program: Program<'info, ephemeral_rollups_sdk::anchor::MagicProgram>,
             });
         }
     }
 
+    let (impl_generics, ty_generics, where_clause) = input.generics.split_for_impl();
+    let generics = &input.generics;
+
     let expanded = quote! {
         #(#original_attrs)*
-        pub struct #struct_name<'info> {
+        pub struct #struct_name #generics #where_clause {
             #(#new_fields)*
         }
 
-        impl<'info> #struct_name<'info> {
+        impl #impl_generics #struct_name #ty_generics #where_clause {
             #(#methods)*
         }
     };

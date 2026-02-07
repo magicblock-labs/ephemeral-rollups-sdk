@@ -46,7 +46,7 @@ use crate::{
 use magicblock_magic_program_api::{instruction::MagicBlockInstruction, EPHEMERAL_RENT_PER_BYTE};
 
 /// Account overhead in bytes (static account size in accountsdb).
-const ACCOUNT_OVERHEAD: usize = 60;
+const ACCOUNT_OVERHEAD: u32 = 60;
 
 // -----------------
 // Utility Functions
@@ -65,16 +65,8 @@ const ACCOUNT_OVERHEAD: usize = 60;
 /// assert_eq!(cost, (1000 + 60) * 32);
 /// ```
 #[inline]
-pub const fn rent(data_len: usize) -> u64 {
+pub const fn rent(data_len: u32) -> u64 {
     (data_len + ACCOUNT_OVERHEAD) as u64 * EPHEMERAL_RENT_PER_BYTE
-}
-
-/// Calculates rent difference when resizing an account.
-///
-/// Returns positive if growing (sponsor pays), negative if shrinking (sponsor receives).
-#[inline]
-pub const fn rent_delta(old_len: usize, new_len: usize) -> i64 {
-    rent(new_len) as i64 - rent(old_len) as i64
 }
 
 // -----------------
