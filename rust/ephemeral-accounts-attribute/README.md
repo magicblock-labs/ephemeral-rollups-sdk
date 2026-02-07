@@ -7,7 +7,7 @@ Procedural macro for creating and managing ephemeral accounts in Ephemeral Rollu
 Ephemeral accounts are zero-balance accounts that exist only in the Ephemeral Rollup. Rent is 109x cheaper than Solana (32 lamports/byte).
 
 The `#[ephemeral_accounts]` macro simplifies working with ephemeral accounts by:
-- Auto-generating `vault`, `magic_program`, and `system_program` fields
+- Auto-generating `vault` and `magic_program` fields
 - Generating helper methods for account lifecycle management
 - Extracting seeds from Anchor's `#[account]` attributes
 
