@@ -45,7 +45,7 @@ pub struct BaseActionArgs<'args> {
     pub escrow_authority: u8,
     #[bincode(with_serde)]
     pub destination_program: Address,
-    pub accounts: NoVec<ShortAccountMeta, MAX_ACTIONS_NUM>,
+    pub accounts: NoVec<ShortAccountMeta, MAX_STATIC_CPI_ACCOUNTS>,
 }
 
 /// A compact account meta used for base-layer actions.
@@ -169,7 +169,7 @@ mod tests {
         let sdk_bytes = bincode1::serialize(&sdk_args).unwrap();
 
         // Pinocchio type
-        let mut pino_accounts = NoVec::<ShortAccountMeta, MAX_ACTIONS_NUM>::new();
+        let mut pino_accounts = NoVec::<ShortAccountMeta, MAX_STATIC_CPI_ACCOUNTS>::new();
         pino_accounts.push(ShortAccountMeta {
             pubkey: make_address(0x11),
             is_writable: true,
@@ -360,7 +360,7 @@ mod tests {
             pino_cau_indices.push(*i);
         }
 
-        let mut pino_action_accounts = NoVec::<ShortAccountMeta, MAX_ACTIONS_NUM>::new();
+        let mut pino_action_accounts = NoVec::<ShortAccountMeta, MAX_STATIC_CPI_ACCOUNTS>::new();
         pino_action_accounts.push(ShortAccountMeta {
             pubkey: make_address(0x88),
             is_writable: true,

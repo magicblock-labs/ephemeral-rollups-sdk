@@ -193,6 +193,61 @@ pub struct CommitIntentBuilder<'a, 'args> {
     actions: NoVec<CallHandler<'args>, MAX_ACTIONS_NUM>,
 }
 
+pub struct CommitIntentBuilderV2<'a, 'args, T> {
+    parent: MagicIntentBundleBuilder<'args>,
+    accounts: &'a [AccountView],
+    actions: T,
+}
+
+impl<'a, 'args> CommitIntentBuilderV2<'a, 'args, &'static [CallHandler<'static>]> {
+    pub fn new(parent: MagicIntentBundleBuilder<'args>, accounts: &'a [AccountView]) -> Self {
+        Self {
+            parent,
+            accounts,
+            actions: &[],
+        }
+    }
+
+    /// Adds post-commit actions. Chainable.
+    pub fn add_post_commit_actions<'slice, 'new_args>(
+        self,
+        actions: &'slice [CallHandler<'new_args>],
+    ) -> Result<CommitIntentBuilderV2<'a, 'new_args, &'slice [CallHandler<'new_args>]>, ProgramError>
+    where
+        'args: 'new_args,
+    {
+        Ok(CommitIntentBuilderV2 {
+            parent: self.parent,
+            accounts: self.accounts,
+            actions,
+        })
+    }
+}
+impl<'a, 'args, 'slice> CommitIntentBuilderV2<'a, 'args, &'slice [CallHandler<'args>]> {
+    fn build_and_invoke(self) -> ProgramResult {
+        // self.done()?.build_and_invoke()
+        todo!()
+    }
+
+    /// Finalizes this commit intent and folds it into the parent bundle.
+    fn done(self) -> Result<MagicIntentBundleBuilder<'args>, ProgramError> {
+        let Self {
+            mut parent,
+            accounts: committed_accounts,
+            actions,
+        } = self;
+
+        let mut accounts = NoVec::<AccountView, MAX_STATIC_CPI_ACCOUNTS>::new();
+        accounts.try_append_slice(committed_accounts)?;
+        let commit = CommitIntent { accounts, actions };
+
+        parent
+            .intent_bundle
+            .add_intent(MagicIntent::Commit(commit))?;
+        Ok(parent)
+    }
+}
+
 impl<'a, 'args> CommitIntentBuilder<'a, 'args> {
     /// Adds post-commit actions. Chainable.
     pub fn add_post_commit_actions<'new_args>(
@@ -264,6 +319,91 @@ pub struct CommitAndUndelegateIntentBuilder<'a, 'args> {
     accounts: &'a [AccountView],
     post_commit_actions: NoVec<CallHandler<'args>, MAX_ACTIONS_NUM>,
     post_undelegate_actions: NoVec<CallHandler<'args>, MAX_ACTIONS_NUM>,
+}
+
+pub struct CommitAndUndelegateIntentBuilderV2<'a, 'args, S1, S2> {
+    parent: MagicIntentBundleBuilder<'args>,
+    accounts: &'a [AccountView],
+    post_commit_actions: S1,
+    post_undelegate_actions: S2,
+}
+
+impl<'a, 'args>
+    CommitAndUndelegateIntentBuilderV2<
+        'a,
+        'args,
+        &'static [CallHandler<'static>],
+        &'static [CallHandler<'static>],
+    >
+{
+    fn new(parent: MagicIntentBundleBuilder<'args>, accounts: &'a [AccountView]) -> Self {
+        Self {
+            parent,
+            accounts,
+            post_commit_actions: &[],
+            post_undelegate_actions: &[],
+        }
+    }
+}
+
+impl<'a, 'args, S2>
+    CommitAndUndelegateIntentBuilderV2<
+        'a,
+        'args,
+        &'static [CallHandler<'static>],
+        S2,
+    >
+{
+    /// Adds post-undelegate actions. Chainable.
+    pub fn add_post_commit_actions<'new_args, 'slice>(
+        self,
+        actions: &'slice [CallHandler<'new_args>],
+    ) -> CommitAndUndelegateIntentBuilderV2<
+        'a,
+        'new_args,
+        &'slice [CallHandler<'new_args>],
+        S2
+    >
+    where
+        'args: 'new_args,
+    {
+        CommitAndUndelegateIntentBuilderV2 {
+            parent: self.parent,
+            accounts: self.accounts,
+            post_commit_actions: actions,
+            post_undelegate_actions: self.post_undelegate_actions,
+        }
+    }
+}
+
+impl<'a, 'args, T1>
+    CommitAndUndelegateIntentBuilderV2<
+        'a,
+        'args,
+         T1,
+        &'static [CallHandler<'static>],
+    >
+{
+    /// Adds post-undelegate actions. Chainable.
+    pub fn add_post_undelegate_actions<'new_args, 'other_slice>(
+        self,
+        actions: &'other_slice [CallHandler<'new_args>],
+    ) -> CommitAndUndelegateIntentBuilderV2<
+        'a,
+        'new_args,
+        T1,
+        &'other_slice [CallHandler<'new_args>],
+    >
+    where
+        'args: 'new_args,
+    {
+        CommitAndUndelegateIntentBuilderV2 {
+            parent: self.parent,
+            accounts: self.accounts,
+            post_commit_actions: self.post_commit_actions,
+            post_undelegate_actions: actions,
+        }
+    }
 }
 
 impl<'a, 'args> CommitAndUndelegateIntentBuilder<'a, 'args> {
@@ -598,6 +738,16 @@ mod tests {
         );
         let commit_accs = [p_acc1.as_account_view()];
         let mut buf = [0u8; CPI_DATA_BUF_SIZE];
+        let builder = MagicIntentBundleBuilder::new(
+            p_payer.as_account_view(),
+            p_ctx.as_account_view(),
+            p_prog.as_account_view(),
+        );
+        let builder = CommitAndUndelegateIntentBuilderV2::new(builder, &commit_accs);
+        let asd = builder.add_post_commit_actions(&[handler]).add_post_undelegate_actions();
+        let commit_builder = CommitIntentBuilderV2::new(builder, &commit_accs);
+        commit_builder.build_and_invoke();
+
         let pino_len = MagicIntentBundleBuilder::new(
             p_payer.as_account_view(),
             p_ctx.as_account_view(),
@@ -1052,5 +1202,49 @@ mod tests {
             &ix.data,
             "full chain with actions mismatch"
         );
+    }
+
+    struct A;
+
+    struct Builder<T1, T2> {
+        t1: T1,
+        t2: T2,
+    }
+
+    impl Builder<&'static [A], &'static [A]> {
+        pub fn new() -> Self {
+            Self { t1: &[], t2: &[] }
+        }
+
+        pub fn add_a<'l>(self, a: &'l [A]) -> Builder<&'l [A], &'l [A]> {
+            Builder { t1: a, t2: a }
+        }
+    }
+
+    impl<'a, 'b> Builder<&'a [A], &'b [A]> {
+        fn hi(&self) -> u32 {
+            1
+        }
+    }
+
+    fn asd(flag: bool) -> Option<[A; 1]> {
+        if flag {
+            Some([A; 1])
+        } else {
+            None
+        }
+    }
+
+    fn kek<'l>(builder: Builder<&'static [A], &'static [A]>, a: &'l [A]) {
+        let flag = true;
+        let a = asd(flag).unwrap();
+        let builder = if flag { builder.add_a(&a) } else { builder };
+        builder.hi();
+        // builder.add_a(&a);
+    }
+
+    #[test]
+    fn test_bb() {
+        let mut builder = Builder::new();
     }
 }

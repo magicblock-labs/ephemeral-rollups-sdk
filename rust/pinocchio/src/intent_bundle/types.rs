@@ -168,7 +168,7 @@ pub struct CallHandler<'args> {
     pub escrow_authority: AccountView,
     pub args: ActionArgs<'args>,
     pub compute_units: u32,
-    accounts: NoVec<ShortAccountMeta, MAX_ACTIONS_NUM>,
+    accounts: NoVec<ShortAccountMeta, MAX_STATIC_CPI_ACCOUNTS>,
 }
 
 impl<'args> CallHandler<'args> {
@@ -448,4 +448,36 @@ fn dedup_accounts(
 /// Returns None if the pubkey is not found.
 fn get_index(pubkeys: &[Address], needle: &Address) -> Option<u8> {
     pubkeys.iter().position(|k| k == needle).map(|i| i as u8)
+}
+
+#[cfg(test)]
+mod size_tests {
+    extern crate std;
+    use super::*;
+    use crate::intent_bundle::args::BaseActionArgs;
+
+    #[test]
+    fn print_sizes() {
+        std::println!(
+            "ShortAccountMeta: {}",
+            core::mem::size_of::<ShortAccountMeta>()
+        );
+        std::println!(
+            "NoVec<ShortAccountMeta, MAX_STATIC_CPI_ACCOUNTS>: {}",
+            core::mem::size_of::<NoVec<ShortAccountMeta, MAX_STATIC_CPI_ACCOUNTS>>()
+        );
+        std::println!("CallHandler: {}", core::mem::size_of::<CallHandler>());
+        std::println!("BaseActionArgs: {}", core::mem::size_of::<BaseActionArgs>());
+        std::println!("CommitIntent: {}", core::mem::size_of::<CommitIntent>());
+        std::println!(
+            "CommitAndUndelegateIntent: {}",
+            core::mem::size_of::<CommitAndUndelegateIntent>()
+        );
+        std::println!(
+            "MagicIntentBundle: {}",
+            core::mem::size_of::<MagicIntentBundle>()
+        );
+        std::println!("MAX_STATIC_CPI_ACCOUNTS: {}", MAX_STATIC_CPI_ACCOUNTS);
+        std::println!("MAX_ACTIONS_NUM: {}", MAX_ACTIONS_NUM);
+    }
 }
