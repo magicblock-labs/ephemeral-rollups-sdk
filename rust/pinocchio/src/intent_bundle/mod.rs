@@ -25,11 +25,11 @@ const SCHEDULE_INTENT_BUNDLE_DISCRIMINANT: [u8; 4] = 11u32.to_le_bytes();
 /// Builds a single `MagicBlockInstruction::ScheduleIntentBundle` instruction by aggregating
 /// multiple independent intents (base actions, commits, commit+undelegate), normalizing them,
 /// and producing a deduplicated account list plus the corresponding CPI `Instruction`.
-pub struct MagicIntentBundleBuilder<'a, 'args> {
+pub struct MagicIntentBundleBuilder<'act, 'args> {
     payer: AccountView,
     magic_context: AccountView,
     magic_program: AccountView,
-    intent_bundle: MagicIntentBundle<'a, 'args>,
+    intent_bundle: MagicIntentBundle<'act, 'args>,
 }
 
 impl MagicIntentBundleBuilder<'static, 'static> {
@@ -43,7 +43,7 @@ impl MagicIntentBundleBuilder<'static, 'static> {
     }
 }
 
-impl<'a, 'args> MagicIntentBundleBuilder<'a, 'args> {
+impl<'act, 'args> MagicIntentBundleBuilder<'act, 'args> {
     /// Starts building a Commit intent. Returns a [`CommitIntentBuilder`] that owns this parent.
     ///
     /// The returned builder lets you chain `.add_post_commit_actions()`, transition to other
@@ -51,7 +51,7 @@ impl<'a, 'args> MagicIntentBundleBuilder<'a, 'args> {
     pub fn commit<'acc>(
         self,
         accounts: &'acc [AccountView],
-    ) -> CommitIntentBuilder<'acc, 'a, 'args, &'static [CallHandler<'static>]> {
+    ) -> CommitIntentBuilder<'act, 'args, 'acc, &'static [CallHandler<'static>]> {
         CommitIntentBuilder::new(self, accounts)
     }
 
@@ -65,9 +65,9 @@ impl<'a, 'args> MagicIntentBundleBuilder<'a, 'args> {
         self,
         accounts: &'acc [AccountView],
     ) -> CommitAndUndelegateIntentBuilder<
+        'act,  // actions (from parent)
+        'args, // args in CallHandlers
         'acc,  // accounts
-        'a,    // CallHandlers
-        'args, // Args in CallHandlers
         &'static [CallHandler<'static>],
         &'static [CallHandler<'static>],
     > {
@@ -75,13 +75,13 @@ impl<'a, 'args> MagicIntentBundleBuilder<'a, 'args> {
     }
 
     /// Adds standalone base-layer actions to be executed without any commit/undelegate semantics.
-    pub fn add_standalone_actions<'new_a, 'newargs>(
+    pub fn add_standalone_actions<'new_act, 'new_args>(
         self,
-        actions: &'new_a [CallHandler<'newargs>],
-    ) -> MagicIntentBundleBuilder<'new_a, 'newargs>
+        actions: &'new_act [CallHandler<'new_args>],
+    ) -> MagicIntentBundleBuilder<'new_act, 'new_args>
     where
-        'args: 'newargs,
-        'a: 'new_a,
+        'args: 'new_args,
+        'act: 'new_act,
     {
         let MagicIntentBundle {
             standalone_actions: _,
@@ -206,20 +206,20 @@ impl MagicIntentBundleBuilder<'_, '_> {
 }
 
 #[cfg(test)]
-impl<'a, 'pa, 'args> CommitIntentBuilder<'a, 'pa, 'args, &'pa [CallHandler<'args>]> {
+impl<'act, 'args, 'acc> CommitIntentBuilder<'act, 'args, 'acc, &'act [CallHandler<'args>]> {
     fn build_serialized(self, buf: &mut [u8]) -> usize {
         self.fold().build_serialized(buf)
     }
 }
 
 #[cfg(test)]
-impl<'a, 'pa, 'args>
+impl<'act, 'args, 'acc>
     CommitAndUndelegateIntentBuilder<
-        'a,
-        'pa,
+        'act,
         'args,
-        &'pa [CallHandler<'args>],
-        &'pa [CallHandler<'args>],
+        'acc,
+        &'act [CallHandler<'args>],
+        &'act [CallHandler<'args>],
     >
 {
     fn build_serialized(self, buf: &mut [u8]) -> usize {
@@ -915,5 +915,168 @@ mod tests {
     #[test]
     fn test_bb() {
         let mut builder = Builder::new();
+    }
+
+    // -----------------------------------------------------------------
+    // Stack usage measurement
+    // -----------------------------------------------------------------
+
+    /// How many bytes to paint with sentinels.
+    /// Must be larger than the peak stack usage we want to measure.
+    const PAINT_SIZE: usize = 16 * 1024 * 1024; // 16 MB
+    const SENTINEL: u8 = 0xCD;
+
+    /// Paints `PAINT_SIZE` bytes of the current thread's stack with a sentinel
+    /// value and returns the (bottom, top) address range.
+    ///
+    /// When this function returns, the painted memory remains readable below the
+    /// caller's stack pointer.  The very next function called from the same
+    /// frame will re-use that stack space, overwriting some of the sentinels.
+    #[inline(never)]
+    fn paint_stack() -> (usize, usize) {
+        // MaybeUninit avoids a redundant zero-init before we overwrite.
+        let mut arr: core::mem::MaybeUninit<[u8; PAINT_SIZE]> = core::mem::MaybeUninit::uninit();
+        let ptr = arr.as_mut_ptr() as *mut u8;
+        // volatile memset so the compiler cannot elide the write.
+        unsafe { core::ptr::write_bytes(ptr, SENTINEL, PAINT_SIZE) };
+        let bottom = ptr as usize;
+        (bottom, bottom + PAINT_SIZE)
+    }
+
+    /// Scans the previously-painted region and returns how many bytes (from the
+    /// top) were overwritten, i.e. the peak stack depth that touched the region.
+    #[inline(never)]
+    fn scan_stack(bottom: usize, top: usize) -> usize {
+        // Stack grows downward: the *deepest* frame is at the lowest address.
+        // Scan upward from `bottom`; the first non-sentinel byte is the deepest
+        // byte that was touched.
+        for addr in bottom..top {
+            let byte = unsafe { core::ptr::read_volatile(addr as *const u8) };
+            if byte != SENTINEL {
+                return top - addr;
+            }
+        }
+        0
+    }
+
+    /// Measures the peak stack usage of `f` using the paint-scan technique.
+    ///
+    /// 1. `paint_stack()` fills PAINT_SIZE bytes on the stack with 0xCD, then returns.
+    /// 2. `f()` is called from the same frame – its activation records overwrite
+    ///    part of the painted region.
+    /// 3. `scan_stack()` reads the region back and reports how many bytes changed.
+    ///
+    /// Accuracy: `scan_stack` itself has a small frame (~128 B) that also lands
+    /// in the painted region, so the reported value includes that overhead.
+    /// This is constant between runs and branches, so it does not affect the
+    /// relative comparison.
+    #[inline(never)]
+    fn measure_peak_stack(f: impl FnOnce()) -> usize {
+        let (bottom, top) = paint_stack();
+        f();
+        scan_stack(bottom, top)
+    }
+
+    /// Runs the pinocchio builder chain (same as test_compat_full_chain_with_actions)
+    /// and returns the serialized length.  Factored out so we can wrap it in
+    /// `measure_peak_stack`.
+    #[inline(never)]
+    fn run_full_chain_builder() {
+        let payer_addr = [0x01; 32];
+        let ctx_addr = [0x02; 32];
+        let commit_acc_addr = [0x03; 32];
+        let cau_acc_addr = [0x04; 32];
+        let escrow1_addr = [0x05; 32];
+        let escrow2_addr = [0x06; 32];
+        let dest1_addr = [0xC1; 32];
+        let dest2_addr = [0xD1; 32];
+        let prog_addr = [0xFF; 32];
+        let commit_data = [0xC0u8];
+        let undelegate_data = [0xD0u8];
+
+        let mut p_payer = MockRuntimeAccount::new(payer_addr);
+        let mut p_ctx = MockRuntimeAccount::new(ctx_addr);
+        let mut p_commit = MockRuntimeAccount::new(commit_acc_addr);
+        let mut p_cau = MockRuntimeAccount::new(cau_acc_addr);
+        let mut p_escrow1 = MockRuntimeAccount::new(escrow1_addr);
+        let mut p_escrow2 = MockRuntimeAccount::new(escrow2_addr);
+        let mut p_prog = MockRuntimeAccount::new(prog_addr);
+
+        let commit_handler = CallHandler::new(
+            Address::new_from_array(dest1_addr),
+            p_escrow1.as_account_view(),
+            ActionArgs::new(&commit_data),
+            100_000,
+        );
+        let undelegate_handler = CallHandler::new(
+            Address::new_from_array(dest2_addr),
+            p_escrow2.as_account_view(),
+            ActionArgs::new(&undelegate_data),
+            50_000,
+        );
+        let commit_accs = [p_commit.as_account_view()];
+        let cau_accs = [p_cau.as_account_view()];
+        let mut buf = [0u8; CPI_DATA_BUF_SIZE];
+        let _pino_len = MagicIntentBundleBuilder::new(
+            p_payer.as_account_view(),
+            p_ctx.as_account_view(),
+            p_prog.as_account_view(),
+        )
+        .commit(&commit_accs)
+        .add_post_commit_actions(&[commit_handler])
+        .commit_and_undelegate(&cau_accs)
+        .add_post_undelegate_actions(&[undelegate_handler])
+        .build_serialized(&mut buf);
+        std::hint::black_box(&buf);
+    }
+
+    #[test]
+    fn test_measure_stack_full_chain() {
+        use crate::intent_bundle::args::BaseActionArgs;
+
+        // Print struct sizes first
+        std::println!();
+        std::println!("--- Struct Sizes ---");
+        std::println!(
+            "  CallHandler:                    {} bytes",
+            core::mem::size_of::<CallHandler>()
+        );
+        std::println!(
+            "  CommitIntent:                   {} bytes",
+            core::mem::size_of::<CommitIntent>()
+        );
+        std::println!(
+            "  CommitAndUndelegateIntent:       {} bytes",
+            core::mem::size_of::<CommitAndUndelegateIntent>()
+        );
+        std::println!(
+            "  MagicIntentBundle:               {} bytes",
+            core::mem::size_of::<MagicIntentBundle>()
+        );
+        std::println!(
+            "  MagicIntentBundleBuilder:        {} bytes",
+            core::mem::size_of::<MagicIntentBundleBuilder>()
+        );
+        std::println!(
+            "  BaseActionArgs:                  {} bytes",
+            core::mem::size_of::<BaseActionArgs>()
+        );
+
+        // Run on a dedicated thread with a large stack so even the "overflow"
+        // branch can complete without aborting.
+        let handle = std::thread::Builder::new()
+            .name("stack-measure".into())
+            .stack_size(32 * 1024 * 1024) // 32 MB
+            .spawn(|| {
+                let peak = measure_peak_stack(run_full_chain_builder);
+                std::println!();
+                std::println!("====================================================");
+                std::println!("  PEAK STACK USAGE (full chain with actions builder)");
+                std::println!("  {} bytes  ({:.1} KB)", peak, peak as f64 / 1024.0);
+                std::println!("====================================================");
+                std::println!();
+            })
+            .expect("failed to spawn measurement thread");
+        handle.join().expect("measurement thread panicked");
     }
 }

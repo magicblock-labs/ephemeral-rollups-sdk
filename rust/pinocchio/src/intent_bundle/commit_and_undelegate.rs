@@ -14,24 +14,33 @@ use crate::intent_bundle::{
 /// Created via [`MagicIntentBundleBuilder::commit_and_undelegate()`] or
 /// [`CommitIntentBuilder::commit_and_undelegate()`]. Owns the parent builder
 /// and returns it (or a sibling sub-builder) on every transition/terminal call.
-pub struct CommitAndUndelegateIntentBuilder<'a, 'pa, 'args, S1, S2> {
-    parent: MagicIntentBundleBuilder<'pa, 'args>,
-    accounts: &'a [AccountView],
+///
+/// - `'act`  – lifetime of `&[CallHandler]` action slices stored in the parent bundle
+/// - `'args` – lifetime of the data inside `CallHandler` (i.e. `ActionArgs` payload)
+/// - `'acc`  – lifetime of the `&[AccountView]` slice passed to `.commit_and_undelegate()`
+/// - `S1`    – typestate: tracks whether post-commit actions have been set
+/// - `S2`    – typestate: tracks whether post-undelegate actions have been set
+pub struct CommitAndUndelegateIntentBuilder<'act, 'args, 'acc, S1, S2> {
+    parent: MagicIntentBundleBuilder<'act, 'args>,
+    accounts: &'acc [AccountView],
     post_commit_actions: S1,
     post_undelegate_actions: S2,
 }
 
 /// Builder without actions
-impl<'a, 'pa, 'args>
+impl<'act, 'args, 'acc>
     CommitAndUndelegateIntentBuilder<
-        'a,
-        'pa,
+        'act,
         'args,
+        'acc,
         &'static [CallHandler<'static>],
         &'static [CallHandler<'static>],
     >
 {
-    pub fn new(parent: MagicIntentBundleBuilder<'pa, 'args>, accounts: &'a [AccountView]) -> Self {
+    pub fn new(
+        parent: MagicIntentBundleBuilder<'act, 'args>,
+        accounts: &'acc [AccountView],
+    ) -> Self {
         Self {
             parent,
             accounts,
@@ -42,17 +51,23 @@ impl<'a, 'pa, 'args>
 }
 
 /// Builder with post_commit_actions not defined yet
-impl<'a, 'pa, 'args, S2>
-    CommitAndUndelegateIntentBuilder<'a, 'pa, 'args, &'static [CallHandler<'static>], S2>
+impl<'act, 'args, 'acc, S2>
+    CommitAndUndelegateIntentBuilder<'act, 'args, 'acc, &'static [CallHandler<'static>], S2>
 {
-    /// Adds post-undelegate actions. Chainable.
-    pub fn add_post_commit_actions<'new_args, 'slice>(
+    /// Adds post-commit actions. Chainable.
+    pub fn add_post_commit_actions<'new_args, 'new_act>(
         self,
-        actions: &'slice [CallHandler<'new_args>],
-    ) -> CommitAndUndelegateIntentBuilder<'a, 'slice, 'new_args, &'slice [CallHandler<'new_args>], S2>
+        actions: &'new_act [CallHandler<'new_args>],
+    ) -> CommitAndUndelegateIntentBuilder<
+        'new_act,
+        'new_args,
+        'acc,
+        &'new_act [CallHandler<'new_args>],
+        S2,
+    >
     where
         'args: 'new_args,
-        'pa: 'slice,
+        'act: 'new_act,
     {
         CommitAndUndelegateIntentBuilder {
             parent: self.parent,
@@ -64,23 +79,23 @@ impl<'a, 'pa, 'args, S2>
 }
 
 /// Builder with post_undelegate_actions not defined yet
-impl<'a, 'pa, 'args, T1>
-    CommitAndUndelegateIntentBuilder<'a, 'pa, 'args, T1, &'static [CallHandler<'static>]>
+impl<'act, 'args, 'acc, T1>
+    CommitAndUndelegateIntentBuilder<'act, 'args, 'acc, T1, &'static [CallHandler<'static>]>
 {
     /// Adds post-undelegate actions. Chainable.
-    pub fn add_post_undelegate_actions<'new_args, 'other_slice>(
+    pub fn add_post_undelegate_actions<'new_args, 'new_act>(
         self,
-        actions: &'other_slice [CallHandler<'new_args>],
+        actions: &'new_act [CallHandler<'new_args>],
     ) -> CommitAndUndelegateIntentBuilder<
-        'a,
-        'other_slice,
+        'new_act,
         'new_args,
+        'acc,
         T1,
-        &'other_slice [CallHandler<'new_args>],
+        &'new_act [CallHandler<'new_args>],
     >
     where
         'args: 'new_args,
-        'pa: 'other_slice,
+        'act: 'new_act,
     {
         CommitAndUndelegateIntentBuilder {
             parent: self.parent,
@@ -91,31 +106,31 @@ impl<'a, 'pa, 'args, T1>
     }
 }
 
-impl<'a, 'pa, 'args>
+impl<'act, 'args, 'acc>
     CommitAndUndelegateIntentBuilder<
-        'a,
-        'pa,
+        'act,
         'args,
-        &'pa [CallHandler<'args>],
-        &'pa [CallHandler<'args>],
+        'acc,
+        &'act [CallHandler<'args>],
+        &'act [CallHandler<'args>],
     >
 {
     /// Transition: finalizes this commit-and-undelegate intent and starts a new commit intent.
-    pub fn commit<'b>(
+    pub fn commit<'commit_acc>(
         self,
-        accounts: &'b [AccountView],
-    ) -> CommitIntentBuilder<'b, 'pa, 'args, &'static [CallHandler<'static>]> {
+        accounts: &'commit_acc [AccountView],
+    ) -> CommitIntentBuilder<'act, 'args, 'commit_acc, &'static [CallHandler<'static>]> {
         self.fold().commit(accounts)
     }
 
     /// Transition: finalizes this commit-and-undelegate intent and adds standalone base-layer actions.
-    pub fn add_standalone_actions<'new_a, 'newargs>(
+    pub fn add_standalone_actions<'new_act, 'new_args>(
         self,
-        actions: &'new_a [CallHandler<'newargs>],
-    ) -> MagicIntentBundleBuilder<'new_a, 'newargs>
+        actions: &'new_act [CallHandler<'new_args>],
+    ) -> MagicIntentBundleBuilder<'new_act, 'new_args>
     where
-        'args: 'newargs,
-        'pa: 'new_a,
+        'args: 'new_args,
+        'act: 'new_act,
     {
         self.fold().add_standalone_actions(actions)
     }
@@ -126,7 +141,7 @@ impl<'a, 'pa, 'args>
     }
 
     /// Finalizes this commit-and-undelegate intent and folds it into the parent bundle.
-    pub fn fold(self) -> MagicIntentBundleBuilder<'pa, 'args> {
+    pub fn fold(self) -> MagicIntentBundleBuilder<'act, 'args> {
         let Self {
             accounts: committed_accounts,
             post_commit_actions,

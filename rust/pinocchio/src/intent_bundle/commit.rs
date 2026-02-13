@@ -10,14 +10,22 @@ use pinocchio::{AccountView, ProgramResult};
 ///
 /// Created via [`MagicIntentBundleBuilder::commit()`]. Owns the parent builder
 /// and returns it (or a sibling sub-builder) on every transition/terminal call.
-pub struct CommitIntentBuilder<'a, 'pa, 'args, T> {
-    parent: MagicIntentBundleBuilder<'pa, 'args>,
-    accounts: &'a [AccountView],
+///
+/// - `'act`  – lifetime of `&[CallHandler]` action slices stored in the parent bundle
+/// - `'args` – lifetime of the data inside `CallHandler` (i.e. `ActionArgs` payload)
+/// - `'acc`  – lifetime of the `&[AccountView]` slice passed to `.commit()`
+/// - `T`     – typestate: tracks whether post-commit actions have been set
+pub struct CommitIntentBuilder<'act, 'args, 'acc, T> {
+    parent: MagicIntentBundleBuilder<'act, 'args>,
+    accounts: &'acc [AccountView],
     actions: T,
 }
 
-impl<'a, 'pa, 'args> CommitIntentBuilder<'a, 'pa, 'args, &'static [CallHandler<'static>]> {
-    pub fn new(parent: MagicIntentBundleBuilder<'pa, 'args>, accounts: &'a [AccountView]) -> Self {
+impl<'act, 'args, 'acc> CommitIntentBuilder<'act, 'args, 'acc, &'static [CallHandler<'static>]> {
+    pub fn new(
+        parent: MagicIntentBundleBuilder<'act, 'args>,
+        accounts: &'acc [AccountView],
+    ) -> Self {
         Self {
             parent,
             accounts,
@@ -26,13 +34,13 @@ impl<'a, 'pa, 'args> CommitIntentBuilder<'a, 'pa, 'args, &'static [CallHandler<'
     }
 
     /// Adds post-commit actions
-    pub fn add_post_commit_actions<'slice, 'new_args>(
+    pub fn add_post_commit_actions<'new_act, 'new_args>(
         self,
-        actions: &'slice [CallHandler<'new_args>],
-    ) -> MagicIntentBundleBuilder<'slice, 'new_args>
+        actions: &'new_act [CallHandler<'new_args>],
+    ) -> MagicIntentBundleBuilder<'new_act, 'new_args>
     where
         'args: 'new_args,
-        'pa: 'slice,
+        'act: 'new_act,
     {
         let MagicIntentBundle {
             standalone_actions,
@@ -55,14 +63,14 @@ impl<'a, 'pa, 'args> CommitIntentBuilder<'a, 'pa, 'args, &'static [CallHandler<'
     }
 }
 
-/// `a - lifetime of slice &[AccountView[
-/// `pa - lifetime of slice [CallHandler] in parent builder
-/// `args - lifetime of CallHandler args slice
-/// `new_args - new lifetime of new CallHandler args slice
-/// `slice - new lifetime of slice [CallHandler] in parent builder
-impl<'a, 'pa, 'args> CommitIntentBuilder<'a, 'pa, 'args, &'pa [CallHandler<'args>]> {
+/// - `'act`      – lifetime of `&[CallHandler]` action slices in the parent bundle
+/// - `'args`     – lifetime of the `CallHandler` args payload
+/// - `'acc`      – lifetime of the `&[AccountView]` accounts slice
+/// - `'new_act`  – lifetime of a new `&[CallHandler]` slice being added
+/// - `'new_args` – lifetime of the new `CallHandler` args payload
+impl<'act, 'args, 'acc> CommitIntentBuilder<'act, 'args, 'acc, &'act [CallHandler<'args>]> {
     /// Finalizes this commit intent and folds it into the parent bundle.
-    pub fn fold(self) -> MagicIntentBundleBuilder<'pa, 'args> {
+    pub fn fold(self) -> MagicIntentBundleBuilder<'act, 'args> {
         let mut accounts = NoVec::new();
         accounts.append_slice(self.accounts);
 
@@ -88,13 +96,13 @@ impl<'a, 'pa, 'args> CommitIntentBuilder<'a, 'pa, 'args, &'pa [CallHandler<'args
     }
 
     /// Transition: finalizes this commit intent and starts a commit-and-undelegate intent.
-    pub fn commit_and_undelegate<'cau>(
+    pub fn commit_and_undelegate<'cau_acc>(
         self,
-        accounts: &'cau [AccountView],
+        accounts: &'cau_acc [AccountView],
     ) -> CommitAndUndelegateIntentBuilder<
-        'cau,
-        'pa,
+        'act,
         'args,
+        'cau_acc,
         &'static [CallHandler<'static>],
         &'static [CallHandler<'static>],
     > {
@@ -102,13 +110,13 @@ impl<'a, 'pa, 'args> CommitIntentBuilder<'a, 'pa, 'args, &'pa [CallHandler<'args
     }
 
     /// Transition: finalizes this commit intent and adds standalone base-layer actions.
-    pub fn add_standalone_actions<'new_slice, 'new_args>(
+    pub fn add_standalone_actions<'new_act, 'new_args>(
         self,
-        actions: &'new_slice [CallHandler<'new_args>],
-    ) -> MagicIntentBundleBuilder<'new_slice, 'new_args>
+        actions: &'new_act [CallHandler<'new_args>],
+    ) -> MagicIntentBundleBuilder<'new_act, 'new_args>
     where
         'args: 'new_args,
-        'pa: 'new_slice,
+        'act: 'new_act,
     {
         self.fold().add_standalone_actions(actions)
     }
