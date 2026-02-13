@@ -15,13 +15,13 @@ use super::MAX_ACTIONS_NUM;
 /// This enum represents the different types of operations that can be bundled
 /// and executed through the Magic program.
 #[allow(clippy::large_enum_variant)]
-pub enum MagicIntent<'args> {
+pub enum MagicIntent<'a, 'args> {
     /// Standalone actions to execute on base layer without commit/undelegate semantics.
-    StandaloneActions(NoVec<CallHandler<'args>, MAX_ACTIONS_NUM>),
+    StandaloneActions(&'a [CallHandler<'args>]),
     /// Commit accounts to base layer, optionally with post-commit actions.
-    Commit(CommitIntent<'args>),
+    Commit(CommitIntent<'a, 'args>),
     /// Commit accounts and undelegate them, optionally with post-commit and post-undelegate actions.
-    CommitAndUndelegate(CommitAndUndelegateIntent<'args>),
+    CommitAndUndelegate(CommitAndUndelegateIntent<'a, 'args>),
 }
 
 /// Bundle of Intents
@@ -32,37 +32,26 @@ pub enum MagicIntent<'args> {
 /// Intents assumed to be independent and self-sufficient,
 /// hence order in which they were inserted doesn't matter
 #[derive(Default)]
-pub(super) struct MagicIntentBundle<'args> {
-    standalone_actions: NoVec<CallHandler<'args>, MAX_ACTIONS_NUM>,
-    commit_intent: Option<CommitIntent<'args>>,
-    commit_and_undelegate_intent: Option<CommitAndUndelegateIntent<'args>>,
+pub(super) struct MagicIntentBundle<'a, 'args> {
+    pub(super) standalone_actions: &'a [CallHandler<'args>],
+    pub(super) commit_intent: Option<CommitIntent<'a, 'args>>,
+    pub(super) commit_and_undelegate_intent: Option<CommitAndUndelegateIntent<'a, 'args>>,
 }
 
-impl<'args> MagicIntentBundle<'args> {
+impl<'a, 'args> MagicIntentBundle<'a, 'args> {
     /// Inserts an intent into the bundle, merging with any existing intent of the same category.
-    pub(super) fn add_intent(&mut self, intent: MagicIntent<'args>) -> ProgramResult {
+    pub(super) fn add_intent(&mut self, intent: MagicIntent<'a, 'args>) {
         match intent {
             MagicIntent::StandaloneActions(value) => {
-                for el in value {
-                    self.standalone_actions.try_push(el)?;
-                }
+                self.standalone_actions = value;
             }
             MagicIntent::Commit(value) => {
-                if let Some(ref mut existing) = self.commit_intent {
-                    existing.merge(value)?;
-                } else {
-                    self.commit_intent = Some(value);
-                }
+                self.commit_intent = Some(value);
             }
             MagicIntent::CommitAndUndelegate(value) => {
-                if let Some(ref mut existing) = self.commit_and_undelegate_intent {
-                    existing.merge(value)?;
-                } else {
-                    self.commit_and_undelegate_intent = Some(value);
-                }
+                self.commit_and_undelegate_intent = Some(value);
             }
         }
-        Ok(())
     }
 
     /// Consumes the bundle and encodes it into `MagicIntentBundleArgs` using an indices map.
@@ -226,12 +215,12 @@ impl<'args> CallHandler<'args> {
     }
 }
 
-pub struct CommitIntent<'args> {
+pub struct CommitIntent<'a, 'args> {
     pub(super) accounts: NoVec<AccountView, MAX_STATIC_CPI_ACCOUNTS>,
-    pub(super) actions: NoVec<CallHandler<'args>, MAX_ACTIONS_NUM>,
+    pub(super) actions: &'a [CallHandler<'args>],
 }
 
-impl<'args> CommitIntent<'args> {
+impl<'a, 'args> CommitIntent<'a, 'args> {
     /// Validates that this commit intent has at least one account to commit.
     fn validate(&self) -> ProgramResult {
         if self.accounts.is_empty() {
@@ -304,13 +293,13 @@ impl<'args> CommitIntent<'args> {
     }
 }
 
-pub struct CommitAndUndelegateIntent<'args> {
+pub struct CommitAndUndelegateIntent<'a, 'args> {
     pub(super) accounts: NoVec<AccountView, MAX_STATIC_CPI_ACCOUNTS>,
-    pub(super) post_commit_actions: NoVec<CallHandler<'args>, MAX_ACTIONS_NUM>,
-    pub(super) post_undelegate_actions: NoVec<CallHandler<'args>, MAX_ACTIONS_NUM>,
+    pub(super) post_commit_actions: &'a [CallHandler<'args>],
+    pub(super) post_undelegate_actions: &'a [CallHandler<'args>],
 }
 
-impl<'args> CommitAndUndelegateIntent<'args> {
+impl<'a, 'args> CommitAndUndelegateIntent<'a, 'args> {
     /// Validates that this commit-and-undelegate intent has at least one account.
     fn validate(&self) -> ProgramResult {
         if self.accounts.is_empty() {

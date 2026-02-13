@@ -6,9 +6,13 @@ use pinocchio::{AccountView, ProgramResult};
 use solana_address::Address;
 
 mod args;
+mod commit;
+mod commit_and_undelegate;
 mod no_vec;
 pub mod types;
 
+use crate::intent_bundle::commit::CommitIntentBuilder;
+use crate::intent_bundle::commit_and_undelegate::CommitAndUndelegateIntentBuilder;
 pub use args::{ActionArgs, ShortAccountMeta};
 use types::MagicIntentBundle;
 pub use types::*;
@@ -21,14 +25,14 @@ const SCHEDULE_INTENT_BUNDLE_DISCRIMINANT: [u8; 4] = 11u32.to_le_bytes();
 /// Builds a single `MagicBlockInstruction::ScheduleIntentBundle` instruction by aggregating
 /// multiple independent intents (base actions, commits, commit+undelegate), normalizing them,
 /// and producing a deduplicated account list plus the corresponding CPI `Instruction`.
-pub struct MagicIntentBundleBuilder<'args> {
+pub struct MagicIntentBundleBuilder<'a, 'args> {
     payer: AccountView,
     magic_context: AccountView,
     magic_program: AccountView,
-    intent_bundle: MagicIntentBundle<'args>,
+    intent_bundle: MagicIntentBundle<'a, 'args>,
 }
 
-impl<'args> MagicIntentBundleBuilder<'args> {
+impl MagicIntentBundleBuilder<'static, 'static> {
     pub fn new(payer: AccountView, magic_context: AccountView, magic_program: AccountView) -> Self {
         Self {
             payer,
@@ -37,17 +41,18 @@ impl<'args> MagicIntentBundleBuilder<'args> {
             intent_bundle: MagicIntentBundle::default(),
         }
     }
+}
 
+impl<'a, 'args> MagicIntentBundleBuilder<'a, 'args> {
     /// Starts building a Commit intent. Returns a [`CommitIntentBuilder`] that owns this parent.
     ///
     /// The returned builder lets you chain `.add_post_commit_actions()`, transition to other
     /// intents via `.commit_and_undelegate()`, or finalize via `.build_and_invoke()`.
-    pub fn commit<'a>(self, accounts: &'a [AccountView]) -> CommitIntentBuilder<'a, 'args> {
-        CommitIntentBuilder {
-            parent: self,
-            accounts,
-            actions: NoVec::<CallHandler, MAX_ACTIONS_NUM>::new(),
-        }
+    pub fn commit<'acc>(
+        self,
+        accounts: &'acc [AccountView],
+    ) -> CommitIntentBuilder<'acc, 'a, 'args, &'static [CallHandler<'static>]> {
+        CommitIntentBuilder::new(self, accounts)
     }
 
     /// Starts building a CommitAndUndelegate intent. Returns a [`CommitAndUndelegateIntentBuilder`]
@@ -56,67 +61,44 @@ impl<'args> MagicIntentBundleBuilder<'args> {
     /// The returned builder lets you chain `.add_post_commit_actions()`,
     /// `.add_post_undelegate_actions()`, transition to other intents via `.commit()`,
     /// or finalize via `.build_and_invoke()`.
-    pub fn commit_and_undelegate<'a>(
+    pub fn commit_and_undelegate<'acc>(
         self,
-        accounts: &'a [AccountView],
-    ) -> CommitAndUndelegateIntentBuilder<'a, 'args> {
-        CommitAndUndelegateIntentBuilder {
-            parent: self,
-            accounts,
-            post_commit_actions: NoVec::default(),
-            post_undelegate_actions: NoVec::default(),
-        }
-    }
-
-    /// Adds an intent to the bundle.
-    ///
-    /// If an intent of the same category already exists in the bundle:
-    /// - base actions are appended
-    /// - commit intents are merged (unique accounts/actions appended)
-    /// - commit+undelegate intents are merged (unique accounts/actions appended)
-    ///
-    /// See `MagicIntentBundle::add_intent` for merge semantics.
-    pub fn add_intent(mut self, intent: MagicIntent<'args>) -> Result<Self, ProgramError> {
-        self.intent_bundle.add_intent(intent)?;
-        Ok(self)
-    }
-
-    /// Adds (or merges) a `Commit` intent into the bundle.
-    pub fn add_commit(mut self, commit: CommitIntent<'args>) -> Result<Self, ProgramError> {
-        self.intent_bundle.add_intent(MagicIntent::Commit(commit))?;
-        Ok(self)
-    }
-
-    /// Adds (or merges) a `CommitAndUndelegate` intent into the bundle.
-    pub fn add_commit_and_undelegate(
-        mut self,
-        value: CommitAndUndelegateIntent<'args>,
-    ) -> Result<Self, ProgramError> {
-        self.intent_bundle
-            .add_intent(MagicIntent::CommitAndUndelegate(value))?;
-        Ok(self)
+        accounts: &'acc [AccountView],
+    ) -> CommitAndUndelegateIntentBuilder<
+        'acc,  // accounts
+        'a,    // CallHandlers
+        'args, // Args in CallHandlers
+        &'static [CallHandler<'static>],
+        &'static [CallHandler<'static>],
+    > {
+        CommitAndUndelegateIntentBuilder::new(self, accounts)
     }
 
     /// Adds standalone base-layer actions to be executed without any commit/undelegate semantics.
-    pub fn add_standalone_actions<'newargs>(
+    pub fn add_standalone_actions<'new_a, 'newargs>(
         self,
-        actions: &[CallHandler<'newargs>],
-    ) -> Result<MagicIntentBundleBuilder<'newargs>, ProgramError>
+        actions: &'new_a [CallHandler<'newargs>],
+    ) -> MagicIntentBundleBuilder<'new_a, 'newargs>
     where
         'args: 'newargs,
+        'a: 'new_a,
     {
-        let mut this = MagicIntentBundleBuilder::<'newargs> {
+        let MagicIntentBundle {
+            standalone_actions: _,
+            commit_intent,
+            commit_and_undelegate_intent,
+        } = self.intent_bundle;
+
+        MagicIntentBundleBuilder {
             payer: self.payer,
             magic_program: self.magic_program,
             magic_context: self.magic_context,
-            intent_bundle: self.intent_bundle,
-        };
-
-        let mut standalone_actions = NoVec::<CallHandler<'newargs>, MAX_ACTIONS_NUM>::new();
-        standalone_actions.try_append_slice(actions)?;
-        this.intent_bundle
-            .add_intent(MagicIntent::StandaloneActions(standalone_actions))?;
-        Ok(this)
+            intent_bundle: MagicIntentBundle {
+                standalone_actions: actions,
+                commit_intent,
+                commit_and_undelegate_intent,
+            },
+        }
     }
 
     /// Normalizes the bundle, serializes it with bincode into `data_buf`, builds the
@@ -180,313 +162,6 @@ impl<'args> MagicIntentBundleBuilder<'args> {
         }
 
         invoke_with_bounds::<MAX_STATIC_CPI_ACCOUNTS>(&ix, account_refs.as_slice())
-    }
-}
-
-/// Builder of Commit Intent.
-///
-/// Created via [`MagicIntentBundleBuilder::commit()`]. Owns the parent builder
-/// and returns it (or a sibling sub-builder) on every transition/terminal call.
-pub struct CommitIntentBuilder<'a, 'args> {
-    parent: MagicIntentBundleBuilder<'args>,
-    accounts: &'a [AccountView],
-    actions: NoVec<CallHandler<'args>, MAX_ACTIONS_NUM>,
-}
-
-pub struct CommitIntentBuilderV2<'a, 'args, T> {
-    parent: MagicIntentBundleBuilder<'args>,
-    accounts: &'a [AccountView],
-    actions: T,
-}
-
-impl<'a, 'args> CommitIntentBuilderV2<'a, 'args, &'static [CallHandler<'static>]> {
-    pub fn new(parent: MagicIntentBundleBuilder<'args>, accounts: &'a [AccountView]) -> Self {
-        Self {
-            parent,
-            accounts,
-            actions: &[],
-        }
-    }
-
-    /// Adds post-commit actions. Chainable.
-    pub fn add_post_commit_actions<'slice, 'new_args>(
-        self,
-        actions: &'slice [CallHandler<'new_args>],
-    ) -> Result<CommitIntentBuilderV2<'a, 'new_args, &'slice [CallHandler<'new_args>]>, ProgramError>
-    where
-        'args: 'new_args,
-    {
-        Ok(CommitIntentBuilderV2 {
-            parent: self.parent,
-            accounts: self.accounts,
-            actions,
-        })
-    }
-}
-impl<'a, 'args, 'slice> CommitIntentBuilderV2<'a, 'args, &'slice [CallHandler<'args>]> {
-    fn build_and_invoke(self) -> ProgramResult {
-        // self.done()?.build_and_invoke()
-        todo!()
-    }
-
-    /// Finalizes this commit intent and folds it into the parent bundle.
-    fn done(self) -> Result<MagicIntentBundleBuilder<'args>, ProgramError> {
-        let Self {
-            mut parent,
-            accounts: committed_accounts,
-            actions,
-        } = self;
-
-        let mut accounts = NoVec::<AccountView, MAX_STATIC_CPI_ACCOUNTS>::new();
-        accounts.try_append_slice(committed_accounts)?;
-        let commit = CommitIntent { accounts, actions };
-
-        parent
-            .intent_bundle
-            .add_intent(MagicIntent::Commit(commit))?;
-        Ok(parent)
-    }
-}
-
-impl<'a, 'args> CommitIntentBuilder<'a, 'args> {
-    /// Adds post-commit actions. Chainable.
-    pub fn add_post_commit_actions<'new_args>(
-        self,
-        actions: &[CallHandler<'new_args>],
-    ) -> Result<CommitIntentBuilder<'a, 'new_args>, ProgramError>
-    where
-        'args: 'new_args,
-    {
-        let mut this = CommitIntentBuilder::<'a, 'new_args> {
-            parent: self.parent,
-            accounts: self.accounts,
-            actions: self.actions,
-        };
-        this.actions.try_append_slice(actions)?;
-        Ok(this)
-    }
-
-    /// Transition: finalizes this commit intent and starts a commit-and-undelegate intent.
-    pub fn commit_and_undelegate<'cau>(
-        self,
-        accounts: &'cau [AccountView],
-    ) -> Result<CommitAndUndelegateIntentBuilder<'cau, 'args>, ProgramError> {
-        Ok(self.done()?.commit_and_undelegate(accounts))
-    }
-
-    /// Transition: finalizes this commit intent and adds standalone base-layer actions.
-    pub fn add_standalone_actions<'newargs>(
-        self,
-        actions: &[CallHandler<'newargs>],
-    ) -> Result<MagicIntentBundleBuilder<'newargs>, ProgramError>
-    where
-        'args: 'newargs,
-    {
-        self.done()?.add_standalone_actions(actions)
-    }
-
-    /// Terminal: finalizes this commit intent, builds the instruction and invokes it.
-    pub fn build_and_invoke(self, data_buf: &mut [u8]) -> ProgramResult {
-        self.done()?.build_and_invoke(data_buf)
-    }
-
-    /// Finalizes this commit intent and folds it into the parent bundle.
-    fn done(self) -> Result<MagicIntentBundleBuilder<'args>, ProgramError> {
-        let Self {
-            mut parent,
-            accounts: committed_accounts,
-            actions,
-        } = self;
-
-        let mut accounts = NoVec::<AccountView, MAX_STATIC_CPI_ACCOUNTS>::new();
-        accounts.try_append_slice(committed_accounts)?;
-        let commit = CommitIntent { accounts, actions };
-
-        parent
-            .intent_bundle
-            .add_intent(MagicIntent::Commit(commit))?;
-        Ok(parent)
-    }
-}
-
-/// Builder of CommitAndUndelegate Intent.
-///
-/// Created via [`MagicIntentBundleBuilder::commit_and_undelegate()`] or
-/// [`CommitIntentBuilder::commit_and_undelegate()`]. Owns the parent builder
-/// and returns it (or a sibling sub-builder) on every transition/terminal call.
-pub struct CommitAndUndelegateIntentBuilder<'a, 'args> {
-    parent: MagicIntentBundleBuilder<'args>,
-    accounts: &'a [AccountView],
-    post_commit_actions: NoVec<CallHandler<'args>, MAX_ACTIONS_NUM>,
-    post_undelegate_actions: NoVec<CallHandler<'args>, MAX_ACTIONS_NUM>,
-}
-
-pub struct CommitAndUndelegateIntentBuilderV2<'a, 'args, S1, S2> {
-    parent: MagicIntentBundleBuilder<'args>,
-    accounts: &'a [AccountView],
-    post_commit_actions: S1,
-    post_undelegate_actions: S2,
-}
-
-impl<'a, 'args>
-    CommitAndUndelegateIntentBuilderV2<
-        'a,
-        'args,
-        &'static [CallHandler<'static>],
-        &'static [CallHandler<'static>],
-    >
-{
-    fn new(parent: MagicIntentBundleBuilder<'args>, accounts: &'a [AccountView]) -> Self {
-        Self {
-            parent,
-            accounts,
-            post_commit_actions: &[],
-            post_undelegate_actions: &[],
-        }
-    }
-}
-
-impl<'a, 'args, S2>
-    CommitAndUndelegateIntentBuilderV2<
-        'a,
-        'args,
-        &'static [CallHandler<'static>],
-        S2,
-    >
-{
-    /// Adds post-undelegate actions. Chainable.
-    pub fn add_post_commit_actions<'new_args, 'slice>(
-        self,
-        actions: &'slice [CallHandler<'new_args>],
-    ) -> CommitAndUndelegateIntentBuilderV2<
-        'a,
-        'new_args,
-        &'slice [CallHandler<'new_args>],
-        S2
-    >
-    where
-        'args: 'new_args,
-    {
-        CommitAndUndelegateIntentBuilderV2 {
-            parent: self.parent,
-            accounts: self.accounts,
-            post_commit_actions: actions,
-            post_undelegate_actions: self.post_undelegate_actions,
-        }
-    }
-}
-
-impl<'a, 'args, T1>
-    CommitAndUndelegateIntentBuilderV2<
-        'a,
-        'args,
-         T1,
-        &'static [CallHandler<'static>],
-    >
-{
-    /// Adds post-undelegate actions. Chainable.
-    pub fn add_post_undelegate_actions<'new_args, 'other_slice>(
-        self,
-        actions: &'other_slice [CallHandler<'new_args>],
-    ) -> CommitAndUndelegateIntentBuilderV2<
-        'a,
-        'new_args,
-        T1,
-        &'other_slice [CallHandler<'new_args>],
-    >
-    where
-        'args: 'new_args,
-    {
-        CommitAndUndelegateIntentBuilderV2 {
-            parent: self.parent,
-            accounts: self.accounts,
-            post_commit_actions: self.post_commit_actions,
-            post_undelegate_actions: actions,
-        }
-    }
-}
-
-impl<'a, 'args> CommitAndUndelegateIntentBuilder<'a, 'args> {
-    /// Adds post-commit actions. Chainable.
-    pub fn add_post_commit_actions<'new_args>(
-        self,
-        actions: &[CallHandler<'new_args>],
-    ) -> Result<CommitAndUndelegateIntentBuilder<'a, 'new_args>, ProgramError>
-    where
-        'args: 'new_args,
-    {
-        let mut this = CommitAndUndelegateIntentBuilder::<'a, 'new_args> {
-            parent: self.parent,
-            accounts: self.accounts,
-            post_commit_actions: self.post_commit_actions,
-            post_undelegate_actions: self.post_undelegate_actions,
-        };
-        this.post_commit_actions.try_append_slice(actions)?;
-        Ok(this)
-    }
-
-    /// Adds post-undelegate actions. Chainable.
-    pub fn add_post_undelegate_actions<'new_args>(
-        self,
-        actions: &[CallHandler<'new_args>],
-    ) -> Result<CommitAndUndelegateIntentBuilder<'a, 'new_args>, ProgramError>
-    where
-        'args: 'new_args,
-    {
-        let mut this = CommitAndUndelegateIntentBuilder::<'a, 'new_args> {
-            parent: self.parent,
-            accounts: self.accounts,
-            post_commit_actions: self.post_commit_actions,
-            post_undelegate_actions: self.post_undelegate_actions,
-        };
-        this.post_undelegate_actions.try_append_slice(actions)?;
-        Ok(this)
-    }
-
-    /// Transition: finalizes this commit-and-undelegate intent and starts a new commit intent.
-    pub fn commit<'b>(
-        self,
-        accounts: &'b [AccountView],
-    ) -> Result<CommitIntentBuilder<'b, 'args>, ProgramError> {
-        Ok(self.done()?.commit(accounts))
-    }
-
-    /// Transition: finalizes this commit-and-undelegate intent and adds standalone base-layer actions.
-    pub fn add_standalone_actions<'newargs>(
-        self,
-        actions: &[CallHandler<'newargs>],
-    ) -> Result<MagicIntentBundleBuilder<'newargs>, ProgramError>
-    where
-        'args: 'newargs,
-    {
-        self.done()?.add_standalone_actions(actions)
-    }
-
-    /// Terminal: finalizes this intent, builds the instruction and invokes it.
-    pub fn build_and_invoke(self, data_buf: &mut [u8]) -> ProgramResult {
-        self.done()?.build_and_invoke(data_buf)
-    }
-
-    /// Finalizes this commit-and-undelegate intent and folds it into the parent bundle.
-    fn done(self) -> Result<MagicIntentBundleBuilder<'args>, ProgramError> {
-        let Self {
-            mut parent,
-            accounts: committed_accounts,
-            post_commit_actions,
-            post_undelegate_actions,
-        } = self;
-
-        let mut accounts = NoVec::<_, MAX_STATIC_CPI_ACCOUNTS>::new();
-        accounts.try_append_slice(committed_accounts)?;
-        let cau = CommitAndUndelegateIntent {
-            accounts,
-            post_commit_actions,
-            post_undelegate_actions,
-        };
-        parent
-            .intent_bundle
-            .add_intent(MagicIntent::CommitAndUndelegate(cau))?;
-        Ok(parent)
     }
 }
 
@@ -744,7 +419,9 @@ mod tests {
             p_prog.as_account_view(),
         );
         let builder = CommitAndUndelegateIntentBuilderV2::new(builder, &commit_accs);
-        let asd = builder.add_post_commit_actions(&[handler]).add_post_undelegate_actions();
+        let asd = builder
+            .add_post_commit_actions(&[handler])
+            .add_post_undelegate_actions();
         let commit_builder = CommitIntentBuilderV2::new(builder, &commit_accs);
         commit_builder.build_and_invoke();
 
