@@ -60,14 +60,9 @@ impl<'a, 'pa, 'args> CommitIntentBuilder<'a, 'pa, 'args, &'static [CallHandler<'
 /// `args - lifetime of CallHandler args slice
 /// `new_args - new lifetime of new CallHandler args slice
 /// `slice - new lifetime of slice [CallHandler] in parent builder
-impl<'a, 'pa, 'args, 'new_args, 'slice>
-    CommitIntentBuilder<'a, 'pa, 'args, &'slice [CallHandler<'new_args>]>
-where
-    'args: 'new_args,
-    'pa: 'slice,
-{
+impl<'a, 'pa, 'args> CommitIntentBuilder<'a, 'pa, 'args, &'pa [CallHandler<'args>]> {
     /// Finalizes this commit intent and folds it into the parent bundle.
-    pub fn fold(self) -> MagicIntentBundleBuilder<'slice, 'new_args> {
+    pub fn fold(self) -> MagicIntentBundleBuilder<'pa, 'args> {
         let mut accounts = NoVec::new();
         accounts.append_slice(self.accounts);
 
@@ -98,8 +93,8 @@ where
         accounts: &'cau [AccountView],
     ) -> CommitAndUndelegateIntentBuilder<
         'cau,
-        'slice,
-        'new_args,
+        'pa,
+        'args,
         &'static [CallHandler<'static>],
         &'static [CallHandler<'static>],
     > {
@@ -113,12 +108,13 @@ where
     ) -> MagicIntentBundleBuilder<'new_slice, 'new_args>
     where
         'args: 'new_args,
+        'pa: 'new_slice,
     {
         self.fold().add_standalone_actions(actions)
     }
 
     /// Terminal: finalizes this commit intent, builds the instruction and invokes it.
     pub fn build_and_invoke(self, data_buf: &mut [u8]) -> ProgramResult {
-        self.done()?.build_and_invoke(data_buf)
+        self.fold().build_and_invoke(data_buf)
     }
 }

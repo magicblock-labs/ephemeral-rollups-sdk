@@ -91,13 +91,21 @@ impl<'a, 'pa, 'args, T1>
     }
 }
 
-impl<'a, 'pa, 'args, S1, S2> CommitAndUndelegateIntentBuilder<'a, 'pa, 'args, S1, S2> {
+impl<'a, 'pa, 'args>
+    CommitAndUndelegateIntentBuilder<
+        'a,
+        'pa,
+        'args,
+        &'pa [CallHandler<'args>],
+        &'pa [CallHandler<'args>],
+    >
+{
     /// Transition: finalizes this commit-and-undelegate intent and starts a new commit intent.
     pub fn commit<'b>(
         self,
         accounts: &'b [AccountView],
     ) -> CommitIntentBuilder<'b, 'pa, 'args, &'static [CallHandler<'static>]> {
-        self.done().commit(accounts)
+        self.fold().commit(accounts)
     }
 
     /// Transition: finalizes this commit-and-undelegate intent and adds standalone base-layer actions.
@@ -109,21 +117,21 @@ impl<'a, 'pa, 'args, S1, S2> CommitAndUndelegateIntentBuilder<'a, 'pa, 'args, S1
         'args: 'newargs,
         'pa: 'new_a,
     {
-        self.done().add_standalone_actions(actions)
+        self.fold().add_standalone_actions(actions)
     }
 
     /// Terminal: finalizes this intent, builds the instruction and invokes it.
     pub fn build_and_invoke(self, data_buf: &mut [u8]) -> ProgramResult {
-        self.done()?.build_and_invoke(data_buf)
+        self.fold().build_and_invoke(data_buf)
     }
 
     /// Finalizes this commit-and-undelegate intent and folds it into the parent bundle.
-    fn done(self) -> MagicIntentBundleBuilder<'pa, 'args> {
+    pub fn fold(self) -> MagicIntentBundleBuilder<'pa, 'args> {
         let Self {
             accounts: committed_accounts,
             post_commit_actions,
             post_undelegate_actions,
-            mut parent,
+            parent,
         } = self;
         let MagicIntentBundleBuilder {
             payer,
