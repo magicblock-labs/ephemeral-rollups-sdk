@@ -176,7 +176,7 @@ impl<T> From<CapacityError<T>> for ProgramError {
 // ---------------------------------------------------------------------------
 
 #[cfg(test)]
-impl MagicIntentBundleBuilder<'_> {
+impl MagicIntentBundleBuilder<'_, '_> {
     /// Reproduces the logic of `build_and_invoke` but serializes the
     /// `MagicIntentBundleArgs` into the provided buffer instead of invoking CPI.
     /// Returns the number of bytes written.
@@ -206,16 +206,24 @@ impl MagicIntentBundleBuilder<'_> {
 }
 
 #[cfg(test)]
-impl CommitIntentBuilder<'_, '_> {
+impl<'a, 'pa, 'args> CommitIntentBuilder<'a, 'pa, 'args, &'pa [CallHandler<'args>]> {
     fn build_serialized(self, buf: &mut [u8]) -> usize {
-        self.done().unwrap().build_serialized(buf)
+        self.fold().build_serialized(buf)
     }
 }
 
 #[cfg(test)]
-impl CommitAndUndelegateIntentBuilder<'_, '_> {
+impl<'a, 'pa, 'args>
+    CommitAndUndelegateIntentBuilder<
+        'a,
+        'pa,
+        'args,
+        &'pa [CallHandler<'args>],
+        &'pa [CallHandler<'args>],
+    >
+{
     fn build_serialized(self, buf: &mut [u8]) -> usize {
-        self.done().unwrap().build_serialized(buf)
+        self.fold().build_serialized(buf)
     }
 }
 
@@ -418,12 +426,6 @@ mod tests {
             p_ctx.as_account_view(),
             p_prog.as_account_view(),
         );
-        let builder = CommitAndUndelegateIntentBuilderV2::new(builder, &commit_accs);
-        let asd = builder
-            .add_post_commit_actions(&[handler])
-            .add_post_undelegate_actions();
-        let commit_builder = CommitIntentBuilderV2::new(builder, &commit_accs);
-        commit_builder.build_and_invoke();
 
         let pino_len = MagicIntentBundleBuilder::new(
             p_payer.as_account_view(),
@@ -432,7 +434,6 @@ mod tests {
         )
         .commit(&commit_accs)
         .add_post_commit_actions(&[handler])
-        .unwrap()
         .build_serialized(&mut buf);
 
         // --- SDK ---
@@ -551,9 +552,7 @@ mod tests {
         )
         .commit_and_undelegate(&cau_accs)
         .add_post_commit_actions(&[post_commit])
-        .unwrap()
         .add_post_undelegate_actions(&[post_undelegate])
-        .unwrap()
         .build_serialized(&mut buf);
 
         // --- SDK ---
@@ -632,7 +631,6 @@ mod tests {
             p_prog.as_account_view(),
         )
         .add_standalone_actions(&[handler])
-        .unwrap()
         .build_serialized(&mut buf);
 
         // --- SDK ---
@@ -689,7 +687,6 @@ mod tests {
         )
         .commit(&commit_accs)
         .commit_and_undelegate(&cau_accs)
-        .unwrap()
         .build_serialized(&mut buf);
 
         // --- SDK ---
@@ -752,9 +749,7 @@ mod tests {
         )
         .commit(&commit_accs)
         .commit_and_undelegate(&cau_accs)
-        .unwrap()
         .add_standalone_actions(&[handler])
-        .unwrap()
         .build_serialized(&mut buf);
 
         // --- SDK ---
@@ -832,11 +827,8 @@ mod tests {
         )
         .commit(&commit_accs)
         .add_post_commit_actions(&[commit_handler])
-        .unwrap()
         .commit_and_undelegate(&cau_accs)
-        .unwrap()
         .add_post_undelegate_actions(&[undelegate_handler])
-        .unwrap()
         .build_serialized(&mut buf);
 
         // --- SDK ---
