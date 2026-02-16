@@ -38,22 +38,7 @@ pub(super) struct MagicIntentBundle<'act, 'args> {
     pub(super) commit_and_undelegate_intent: Option<CommitAndUndelegateIntent<'act, 'args>>,
 }
 
-impl<'act, 'args> MagicIntentBundle<'act, 'args> {
-    /// Inserts an intent into the bundle, merging with any existing intent of the same category.
-    pub(super) fn add_intent(&mut self, intent: MagicIntent<'act, 'args>) {
-        match intent {
-            MagicIntent::StandaloneActions(value) => {
-                self.standalone_actions = value;
-            }
-            MagicIntent::Commit(value) => {
-                self.commit_intent = Some(value);
-            }
-            MagicIntent::CommitAndUndelegate(value) => {
-                self.commit_and_undelegate_intent = Some(value);
-            }
-        }
-    }
-
+impl<'args> MagicIntentBundle<'_, 'args> {
     /// Consumes the bundle and encodes it into `MagicIntentBundleArgs` using an indices map.
     ///
     /// `indices_map` is a natural map: `indices_map[i]` is the address at index `i`.
@@ -215,7 +200,7 @@ pub struct CommitIntent<'act, 'args> {
     pub(super) actions: &'act [CallHandler<'args>],
 }
 
-impl<'act, 'args> CommitIntent<'act, 'args> {
+impl<'args> CommitIntent<'_, 'args> {
     /// Validates that this commit intent has at least one account to commit.
     fn validate(&self) -> ProgramResult {
         if self.accounts.is_empty() {
@@ -275,7 +260,7 @@ pub struct CommitAndUndelegateIntent<'act, 'args> {
     pub(super) post_undelegate_actions: &'act [CallHandler<'args>],
 }
 
-impl<'act, 'args> CommitAndUndelegateIntent<'act, 'args> {
+impl<'args> CommitAndUndelegateIntent<'_, 'args> {
     /// Validates that this commit-and-undelegate intent has at least one account.
     fn validate(&self) -> ProgramResult {
         if self.accounts.is_empty() {

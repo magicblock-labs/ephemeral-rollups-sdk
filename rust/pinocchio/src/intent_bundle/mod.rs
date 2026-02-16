@@ -206,18 +206,11 @@ impl MagicIntentBundleBuilder<'_, '_> {
 }
 
 #[cfg(test)]
-impl<'act, 'args, 'acc> CommitIntentBuilder<'act, 'args, 'acc, &'act [CallHandler<'args>]> {
-    fn build_serialized(self, buf: &mut [u8]) -> usize {
-        self.fold().build_serialized(buf)
-    }
-}
-
-#[cfg(test)]
-impl<'act, 'args, 'acc>
+impl<'act, 'args>
     CommitAndUndelegateIntentBuilder<
         'act,
         'args,
-        'acc,
+        '_,
         &'act [CallHandler<'args>],
         &'act [CallHandler<'args>],
     >
@@ -244,15 +237,12 @@ mod tests {
     const CPI_DATA_BUF_SIZE: usize = 1280;
 
     use super::*;
-    use crate::intent_bundle::args::ShortAccountMeta;
 
     // SDK builder
     use ephemeral_rollups_sdk::ephem::{
         CallHandler as SdkCallHandler, MagicIntentBundleBuilder as SdkBuilder,
     };
-    use magicblock_magic_program_api::args::{
-        ActionArgs as SdkActionArgs, ShortAccountMeta as SdkShortAccountMeta,
-    };
+    use magicblock_magic_program_api::args::ActionArgs as SdkActionArgs;
     use magicblock_magic_program_api::Pubkey;
     use solana_program::account_info::AccountInfo;
 
@@ -374,11 +364,6 @@ mod tests {
         );
         let commit_accs = [p_acc1.as_account_view()];
         let mut buf = [0u8; CPI_DATA_BUF_SIZE];
-        let builder = MagicIntentBundleBuilder::new(
-            p_payer.as_account_view(),
-            p_ctx.as_account_view(),
-            p_prog.as_account_view(),
-        );
 
         let pino_len = MagicIntentBundleBuilder::new(
             p_payer.as_account_view(),
@@ -594,8 +579,10 @@ mod tests {
         );
     }
 
-    #[inline(never)]
-    fn run_full_chain_builder() {
+    /// Demonstrates that the builder API supports conditional building:
+    /// actions can be optionally attached based on runtime state.
+    #[test]
+    fn test_conditional_building() {
         let payer_addr = [0x01; 32];
         let ctx_addr = [0x02; 32];
         let commit_acc_addr = [0x03; 32];
@@ -616,31 +603,54 @@ mod tests {
         let mut p_escrow2 = MockRuntimeAccount::new(escrow2_addr);
         let mut p_prog = MockRuntimeAccount::new(prog_addr);
 
-        let commit_handler = CallHandler::new(
+        let post_commit_handler = CallHandler::new(
             Address::new_from_array(dest1_addr),
             p_escrow1.as_account_view(),
             ActionArgs::new(&commit_data),
             100_000,
         );
-        let undelegate_handler = CallHandler::new(
+        let post_undelegate_handler = CallHandler::new(
             Address::new_from_array(dest2_addr),
             p_escrow2.as_account_view(),
             ActionArgs::new(&undelegate_data),
             50_000,
         );
+
         let commit_accs = [p_commit.as_account_view()];
         let cau_accs = [p_cau.as_account_view()];
+        let post_commit_actions = &[post_commit_handler];
+        let post_undelegate_actions = &[post_undelegate_handler];
+
+        // Runtime conditions that control which optional actions get attached
+        let should_add_post_commit = true;
+        let should_add_post_undelegate = false;
+
         let mut buf = [0u8; CPI_DATA_BUF_SIZE];
-        let _pino_len = MagicIntentBundleBuilder::new(
+
+        // Build commit intent - conditionally attach post-commit actions
+        let builder = MagicIntentBundleBuilder::new(
             p_payer.as_account_view(),
             p_ctx.as_account_view(),
             p_prog.as_account_view(),
         )
-        .commit(&commit_accs)
-        .add_post_commit_actions(&[commit_handler])
-        .commit_and_undelegate(&cau_accs)
-        .add_post_undelegate_actions(&[undelegate_handler])
-        .build_serialized(&mut buf);
+        .commit(&commit_accs);
+
+        let builder = if should_add_post_commit {
+            builder.add_post_commit_actions(post_commit_actions)
+        } else {
+            builder.fold()
+        };
+
+        // Build commit-and-undelegate intent - conditionally attach post-undelegate actions
+        let builder = builder.commit_and_undelegate(&cau_accs);
+
+        let builder = if should_add_post_undelegate {
+            builder.add_post_undelegate_actions(post_undelegate_actions)
+        } else {
+            builder
+        };
+
+        let _len = builder.build_serialized(&mut buf);
         std::hint::black_box(&buf);
     }
 }

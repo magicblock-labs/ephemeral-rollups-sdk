@@ -1,12 +1,10 @@
 use pinocchio::cpi::MAX_STATIC_CPI_ACCOUNTS;
-use pinocchio::error::ProgramError;
 use pinocchio::{AccountView, ProgramResult};
 
 use crate::intent_bundle::no_vec::NoVec;
 use crate::intent_bundle::types::MagicIntentBundle;
 use crate::intent_bundle::{
-    CallHandler, CommitAndUndelegateIntent, CommitIntentBuilder, MagicIntent,
-    MagicIntentBundleBuilder,
+    CallHandler, CommitAndUndelegateIntent, CommitIntentBuilder, MagicIntentBundleBuilder,
 };
 
 /// Builder of CommitAndUndelegate Intent.
@@ -106,11 +104,11 @@ impl<'act, 'args, 'acc, T1>
     }
 }
 
-impl<'act, 'args, 'acc>
+impl<'act, 'args>
     CommitAndUndelegateIntentBuilder<
         'act,
         'args,
-        'acc,
+        '_,
         &'act [CallHandler<'args>],
         &'act [CallHandler<'args>],
     >

@@ -1,9 +1,7 @@
 use crate::intent_bundle::commit_and_undelegate::CommitAndUndelegateIntentBuilder;
 use crate::intent_bundle::no_vec::NoVec;
 use crate::intent_bundle::types::MagicIntentBundle;
-use crate::intent_bundle::{CallHandler, CommitIntent, MagicIntent, MagicIntentBundleBuilder};
-use pinocchio::cpi::MAX_STATIC_CPI_ACCOUNTS;
-use pinocchio::error::ProgramError;
+use crate::intent_bundle::{CallHandler, CommitIntent, MagicIntentBundleBuilder};
 use pinocchio::{AccountView, ProgramResult};
 
 /// Builder of Commit Intent.
@@ -68,7 +66,7 @@ impl<'act, 'args, 'acc> CommitIntentBuilder<'act, 'args, 'acc, &'static [CallHan
 /// - `'acc`      – lifetime of the `&[AccountView]` accounts slice
 /// - `'new_act`  – lifetime of a new `&[CallHandler]` slice being added
 /// - `'new_args` – lifetime of the new `CallHandler` args payload
-impl<'act, 'args, 'acc> CommitIntentBuilder<'act, 'args, 'acc, &'act [CallHandler<'args>]> {
+impl<'act, 'args> CommitIntentBuilder<'act, 'args, '_, &'act [CallHandler<'args>]> {
     /// Finalizes this commit intent and folds it into the parent bundle.
     pub fn fold(self) -> MagicIntentBundleBuilder<'act, 'args> {
         let mut accounts = NoVec::new();
