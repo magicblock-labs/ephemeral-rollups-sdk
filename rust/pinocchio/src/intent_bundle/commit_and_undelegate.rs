@@ -122,7 +122,7 @@ impl<'act, 'args>
     }
 
     /// Transition: finalizes this commit-and-undelegate intent and adds standalone base-layer actions.
-    pub fn add_standalone_actions<'new_act, 'new_args>(
+    pub fn set_standalone_actions<'new_act, 'new_args>(
         self,
         actions: &'new_act [CallHandler<'new_args>],
     ) -> MagicIntentBundleBuilder<'new_act, 'new_args>
@@ -130,7 +130,7 @@ impl<'act, 'args>
         'args: 'new_args,
         'act: 'new_act,
     {
-        self.fold().add_standalone_actions(actions)
+        self.fold().set_standalone_actions(actions)
     }
 
     /// Terminal: finalizes this intent, builds the instruction and invokes it.

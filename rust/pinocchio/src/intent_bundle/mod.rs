@@ -75,7 +75,7 @@ impl<'act, 'args> MagicIntentBundleBuilder<'act, 'args> {
     }
 
     /// Adds standalone base-layer actions to be executed without any commit/undelegate semantics.
-    pub fn add_standalone_actions<'new_act, 'new_args>(
+    pub fn set_standalone_actions<'new_act, 'new_args>(
         self,
         actions: &'new_act [CallHandler<'new_args>],
     ) -> MagicIntentBundleBuilder<'new_act, 'new_args>
