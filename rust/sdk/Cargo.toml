@@ -12,9 +12,16 @@ edition = { workspace = true }
 readme = "README.md"
 
 [features]
-default = ["solana-program", "solana-system-interface"]
+default = [
+    "solana-program",
+    "solana-system-interface",
+    "spl",
+    "access-control",
+    "modular-sdk",
+]
 anchor = ["anchor-lang"]
 access-control = ["num-derive", "num-traits", "thiserror"]
+spl = []
 disable-realloc = []
 modular-sdk = [
     "solana-account",
@@ -43,7 +50,7 @@ ephemeral-rollups-sdk-attribute-action = { workspace = true }
 solana-program = { workspace = true, optional = true }
 solana-account = { workspace = true, optional = true }
 solana-account-info = { workspace = true, optional = true }
-solana-cpi= { workspace = true, optional = true }
+solana-cpi = { workspace = true, optional = true }
 solana-instruction = { workspace = true, optional = true }
 solana-pubkey = { workspace = true, optional = true }
 solana-program-error = { workspace = true, optional = true }
@@ -51,7 +58,10 @@ solana-program-memory = { workspace = true, optional = true }
 solana-system-interface = { workspace = true, optional = true }
 solana-sysvar = { workspace = true, optional = true }
 magicblock-magic-program-api = { workspace = true }
-magicblock-delegation-program  = { workspace = true, features = ["no-entrypoint", "core"], default-features = false }
+magicblock-delegation-program = { workspace = true, features = [
+    "no-entrypoint",
+    "core",
+], default-features = false }
 num-derive = { workspace = true, optional = true }
 num-traits = { workspace = true, optional = true }
 thiserror = { workspace = true, optional = true }
@@ -89,5 +99,10 @@ path = "../tests/sdk_test.rs"
 name = "macros_test"
 path = "../tests/macros_test.rs"
 
+[[test]]
+name = "spl_test"
+path = "../tests/spl_test.rs"
+required-features = ["spl", "access-control", "modular-sdk"]
+
 [dev-dependencies]
-bincode = "1.3.3"
+bincode = { workspace = true }

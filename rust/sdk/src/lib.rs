@@ -10,6 +10,8 @@ pub mod utils;
 
 #[cfg(feature = "access-control")]
 pub mod access_control;
+#[cfg(feature = "spl")]
+pub mod spl;
 
 pub use dlp::args::CallHandlerArgs;
 pub use dlp::pda;
