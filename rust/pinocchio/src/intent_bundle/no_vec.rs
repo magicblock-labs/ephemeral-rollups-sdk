@@ -59,7 +59,7 @@ impl<T, const N: usize> NoVec<T, N> {
         }
     }
 
-    pub fn iter(&self) -> slice::Iter<T> {
+    pub fn iter(&self) -> slice::Iter<'_, T> {
         self.as_slice().iter()
     }
 
@@ -258,7 +258,7 @@ impl<T, const N: usize> Iterator for IntoIter<T, N> {
 impl<T, const N: usize> Drop for IntoIter<T, N> {
     fn drop(&mut self) {
         unsafe {
-            ptr::drop_in_place(slice::from_raw_parts_mut(
+            ptr::drop_in_place(ptr::slice_from_raw_parts_mut(
                 self.inner.as_mut_ptr().add(self.cur),
                 self.inner.len - self.cur,
             ));
