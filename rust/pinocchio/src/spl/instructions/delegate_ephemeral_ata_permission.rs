@@ -4,7 +4,7 @@ use crate::spl::consts::ESPL_TOKEN_PROGRAM_ID;
 use crate::spl::EphemeralSplDiscriminator;
 use pinocchio::cpi::{invoke, invoke_signed, Signer, MAX_CPI_ACCOUNTS};
 use pinocchio::instruction::{InstructionAccount, InstructionView};
-use pinocchio::{AccountView, Address, ProgramResult};
+use pinocchio::{AccountView, ProgramResult};
 
 /// Delegate an ephemeral ATA permission.
 #[allow(clippy::too_many_arguments)]
@@ -18,7 +18,7 @@ pub fn delegate_ephemeral_ata_permission(
     delegation_record: AccountView,
     delegation_metadata: AccountView,
     delegation_program: AccountView,
-    validator: Address,
+    validator: AccountView,
     eata_bump: u8,
     signer_seeds: Option<Signer<'_, '_>>,
 ) -> ProgramResult {
@@ -35,7 +35,7 @@ pub fn delegate_ephemeral_ata_permission(
             .write(InstructionAccount::writable(eata.address()));
         account_metas
             .get_unchecked_mut(2)
-            .write(InstructionAccount::readonly(&permission_program.address()));
+            .write(InstructionAccount::readonly(permission_program.address()));
         account_metas
             .get_unchecked_mut(3)
             .write(InstructionAccount::writable(permission.address()));
@@ -53,10 +53,7 @@ pub fn delegate_ephemeral_ata_permission(
             .write(InstructionAccount::writable(delegation_metadata.address()));
         account_metas
             .get_unchecked_mut(8)
-            .write(InstructionAccount::readonly(&delegation_program.address()));
-        account_metas
-            .get_unchecked_mut(9)
-            .write(InstructionAccount::readonly(&validator));
+            .write(InstructionAccount::readonly(delegation_program.address()));
     }
 
     let acc_infos: [&AccountView; 10] = [
@@ -68,11 +65,11 @@ pub fn delegate_ephemeral_ata_permission(
         &delegation_buffer,
         &delegation_record,
         &delegation_metadata,
-        &payer,
-        &payer,
+        &delegation_program,
+        &validator,
     ];
 
-    let data: [u8; 2] = [
+    let data = [
         EphemeralSplDiscriminator::DelegateEphemeralAtaPermission as u8,
         eata_bump,
     ];

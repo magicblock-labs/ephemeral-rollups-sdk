@@ -7,6 +7,7 @@ use pinocchio::instruction::{InstructionAccount, InstructionView};
 use pinocchio::{AccountView, Address, ProgramResult};
 
 /// Delegate an ephemeral ATA.
+#[allow(clippy::too_many_arguments)]
 pub fn delegate_ephemeral_ata(
     payer: AccountView,
     eata: AccountView,
@@ -61,7 +62,7 @@ pub fn delegate_ephemeral_ata(
         &system_program,
     ];
 
-    let mut data: [u8; 33] = [0; 33];
+    let mut data = [0_u8; 34];
     data[0] = EphemeralSplDiscriminator::DelegateEphemeralAta as u8;
     data[1] = eata_bump;
     if let Some(validator) = validator {

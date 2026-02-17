@@ -7,6 +7,7 @@ use pinocchio::instruction::{InstructionAccount, InstructionView};
 use pinocchio::{AccountView, ProgramResult};
 
 /// Deposit SPL tokens into an ephemeral ATA.
+#[allow(clippy::too_many_arguments)]
 pub fn deposit_spl_tokens(
     authority: AccountView,
     eata: AccountView,
