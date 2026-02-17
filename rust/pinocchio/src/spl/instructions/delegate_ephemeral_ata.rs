@@ -11,6 +11,7 @@ use pinocchio::{AccountView, Address, ProgramResult};
 pub fn delegate_ephemeral_ata(
     payer: AccountView,
     eata: AccountView,
+    espl_token_program: AccountView,
     delegation_buffer: AccountView,
     delegation_record: AccountView,
     delegation_metadata: AccountView,
@@ -27,13 +28,13 @@ pub fn delegate_ephemeral_ata(
     unsafe {
         account_metas
             .get_unchecked_mut(0)
-            .write(InstructionAccount::writable_signer(payer.address()));
+            .write(InstructionAccount::readonly_signer(payer.address()));
         account_metas
             .get_unchecked_mut(1)
             .write(InstructionAccount::writable(eata.address()));
         account_metas
             .get_unchecked_mut(2)
-            .write(InstructionAccount::readonly(&ESPL_TOKEN_PROGRAM_ID));
+            .write(InstructionAccount::readonly(espl_token_program.address()));
         account_metas
             .get_unchecked_mut(3)
             .write(InstructionAccount::writable(delegation_buffer.address()));
@@ -54,7 +55,7 @@ pub fn delegate_ephemeral_ata(
     let acc_infos: [&AccountView; 8] = [
         &payer,
         &eata,
-        &payer,
+        &espl_token_program,
         &delegation_buffer,
         &delegation_record,
         &delegation_metadata,

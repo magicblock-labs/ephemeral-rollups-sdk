@@ -42,7 +42,7 @@ pub fn withdraw_spl_tokens(
             .write(InstructionAccount::writable(user_ata.address()));
         account_metas
             .get_unchecked_mut(5)
-            .write(InstructionAccount::writable_signer(payer.address()));
+            .write(InstructionAccount::readonly_signer(payer.address()));
         account_metas
             .get_unchecked_mut(6)
             .write(InstructionAccount::readonly(token_program.address()));

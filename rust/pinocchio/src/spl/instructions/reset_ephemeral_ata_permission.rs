@@ -31,13 +31,13 @@ pub fn reset_ephemeral_ata_permission(
             .write(InstructionAccount::writable(permission.address()));
         account_metas
             .get_unchecked_mut(2)
-            .write(InstructionAccount::writable_signer(owner.address()));
+            .write(InstructionAccount::readonly_signer(owner.address()));
         account_metas
             .get_unchecked_mut(3)
             .write(InstructionAccount::readonly(permission_program.address()));
     }
 
-    let acc_infos: [&AccountView; 4] = [&eata, &permission, &owner, &owner];
+    let acc_infos: [&AccountView; 4] = [&eata, &permission, &owner, &permission_program];
 
     let data: [u8; 3] = [
         EphemeralSplDiscriminator::ResetEphemeralAtaPermission as u8,

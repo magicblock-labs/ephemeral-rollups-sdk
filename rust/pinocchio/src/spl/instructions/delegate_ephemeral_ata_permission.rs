@@ -29,7 +29,7 @@ pub fn delegate_ephemeral_ata_permission(
     unsafe {
         account_metas
             .get_unchecked_mut(0)
-            .write(InstructionAccount::writable_signer(payer.address()));
+            .write(InstructionAccount::readonly_signer(payer.address()));
         account_metas
             .get_unchecked_mut(1)
             .write(InstructionAccount::writable(eata.address()));

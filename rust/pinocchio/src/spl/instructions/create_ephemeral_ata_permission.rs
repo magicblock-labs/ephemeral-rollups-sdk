@@ -33,7 +33,7 @@ pub fn create_ephemeral_ata_permission(
             .write(InstructionAccount::writable(permission.address()));
         account_metas
             .get_unchecked_mut(2)
-            .write(InstructionAccount::writable_signer(payer.address()));
+            .write(InstructionAccount::readonly_signer(payer.address()));
         account_metas
             .get_unchecked_mut(3)
             .write(InstructionAccount::readonly(system_program.address()));

@@ -43,7 +43,7 @@ pub fn deposit_spl_tokens(
             .write(InstructionAccount::writable(vault_token_acc.address()));
         account_metas
             .get_unchecked_mut(5)
-            .write(InstructionAccount::writable_signer(authority.address()));
+            .write(InstructionAccount::readonly_signer(authority.address()));
         account_metas
             .get_unchecked_mut(6)
             .write(InstructionAccount::readonly(token_program.address()));
