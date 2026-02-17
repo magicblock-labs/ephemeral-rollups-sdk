@@ -269,6 +269,10 @@ impl<T, const N: usize> Drop for IntoIter<T, N> {
     }
 }
 
+/// # Panics
+///
+/// Panics if the iterator yields more than `N` items (fixed capacity).
+/// Use [`NoVec::try_push`] directly for a non-panicking alternative.
 impl<T, const N: usize> FromIterator<T> for NoVec<T, N> {
     fn from_iter<I: IntoIterator<Item = T>>(iter: I) -> Self {
         let mut this = Self::new();
@@ -280,6 +284,10 @@ impl<T, const N: usize> FromIterator<T> for NoVec<T, N> {
     }
 }
 
+/// # Panics
+///
+/// Panics if the total number of elements exceeds capacity `N`.
+/// Use [`NoVec::try_push`] directly for a non-panicking alternative.
 impl<T, const N: usize> Extend<T> for NoVec<T, N> {
     fn extend<I: IntoIterator<Item = T>>(&mut self, iter: I) {
         for el in iter {

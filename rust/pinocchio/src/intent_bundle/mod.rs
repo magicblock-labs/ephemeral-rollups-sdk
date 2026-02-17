@@ -17,7 +17,8 @@ pub use args::{ActionArgs, ShortAccountMeta};
 use types::MagicIntentBundle;
 pub use types::*;
 
-const MAX_ACTIONS_NUM: usize = 10u8 as usize;
+const MAX_ACTIONS_NUM: usize = 10;
+const _: () = assert!(MAX_ACTIONS_NUM <= u8::MAX as usize);
 
 /// Bincode 1.x u32 LE discriminant for `MagicBlockInstruction::ScheduleIntentBundle` (variant index 11).
 const SCHEDULE_INTENT_BUNDLE_DISCRIMINANT: [u8; 4] = 11u32.to_le_bytes();
@@ -165,9 +166,12 @@ impl<'act, 'args> MagicIntentBundleBuilder<'act, 'args> {
     }
 }
 
+/// Custom error code returned when a `NoVec` capacity limit is exceeded.
+pub const CAPACITY_EXCEEDED_ERROR: u32 = 0xEB_00_00_01;
+
 impl<T> From<CapacityError<T>> for ProgramError {
     fn from(_: CapacityError<T>) -> Self {
-        ProgramError::InvalidArgument
+        ProgramError::Custom(CAPACITY_EXCEEDED_ERROR)
     }
 }
 

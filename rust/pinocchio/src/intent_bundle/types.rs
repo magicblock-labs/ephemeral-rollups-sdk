@@ -100,9 +100,9 @@ impl<'args> MagicIntentBundle<'_, 'args> {
     /// - Deduplicates committed accounts within each intent by address (stable; first occurrence wins).
     /// - Resolves overlap between `Commit` and `CommitAndUndelegate`:
     ///   any account present in both will be removed from `Commit` and kept in `CommitAndUndelegate`.
-    /// - If `Commit` becomes empty after overlap removal, it is removed from the bundle, and any
-    ///   post-commit actions from the commit intent are merged into the commit-side actions
-    ///   of `CommitAndUndelegate`.
+    /// - Returns `Err(InvalidArgument)` if `Commit` becomes empty after overlap removal.
+    ///   Action merging into `CommitAndUndelegate` is not possible because actions are
+    ///   stored as borrowed slices (`&[CallHandler]`).
     pub(super) fn normalize(&mut self) -> ProgramResult {
         let cau_seen = self
             .commit_and_undelegate_intent
@@ -116,8 +116,6 @@ impl<'args> MagicIntentBundle<'_, 'args> {
         let mut seen = cau_seen.unwrap_or_default();
         commit.dedup(&mut seen)?;
 
-        // If commit lost all its accounts to CAU overlap, move its actions
-        // into CAU's post-commit actions and drop the empty commit intent.
         if commit.accounts.is_empty() {
             Err(ProgramError::InvalidArgument)
         } else {
