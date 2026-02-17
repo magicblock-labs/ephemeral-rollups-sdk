@@ -1945,8 +1945,8 @@ dependencies = [
 
 [[package]]
 name = "magicblock-magic-program-api"
-version = "0.6.2"
-source = "git+https://github.com/magicblock-labs/magicblock-validator.git?branch=snawaz%2Fschedule-commit-finalize#fac3a53f8da5f1392f84ad1760239367bc3de0ee"
+version = "0.7.0"
+source = "git+https://github.com/magicblock-labs/magicblock-validator.git?branch=snawaz%2Fschedule-commit-finalize#5c2c4cbfb26db6ddfd1e1a8d8d79cb34588c29ca"
 dependencies = [
  "bincode",
  "serde",
