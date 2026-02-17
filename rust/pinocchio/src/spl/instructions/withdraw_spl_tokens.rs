@@ -58,7 +58,7 @@ pub fn withdraw_spl_tokens(
         &token_program,
     ];
 
-    let mut data: [u8; 13] = [0; 13];
+    let mut data: [u8; 10] = [0; 10];
     data[0] = EphemeralSplDiscriminator::WithdrawSplTokens as u8;
     data[1..9].copy_from_slice(&amount.to_le_bytes());
     data[9] = eata_bump;
