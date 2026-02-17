@@ -135,38 +135,10 @@ pub struct CallHandler<'args> {
     pub escrow_authority: AccountView,
     pub args: ActionArgs<'args>,
     pub compute_units: u32,
-    accounts: NoVec<ShortAccountMeta, MAX_STATIC_CPI_ACCOUNTS>,
+    pub accounts: &'args [ShortAccountMeta],
 }
 
 impl<'args> CallHandler<'args> {
-    pub fn new(
-        destination_program: Address,
-        escrow_authority: AccountView,
-        args: ActionArgs<'args>,
-        compute_units: u32,
-    ) -> Self {
-        Self {
-            args,
-            compute_units,
-            escrow_authority,
-            destination_program,
-            accounts: NoVec::default(),
-        }
-    }
-
-    pub fn add_accounts_slice(&mut self, accounts: &[ShortAccountMeta]) -> ProgramResult {
-        self.accounts.try_append_slice(accounts)?;
-        Ok(())
-    }
-
-    pub fn add_accounts<const N: usize>(
-        &mut self,
-        accounts: [ShortAccountMeta; N],
-    ) -> ProgramResult {
-        self.accounts.try_append(accounts)?;
-        Ok(())
-    }
-
     pub(super) fn collect_unique_accounts(
         &self,
         container: &mut NoVec<AccountView, MAX_STATIC_CPI_ACCOUNTS>,
@@ -188,7 +160,7 @@ impl<'args> CallHandler<'args> {
             compute_units: self.compute_units,
             destination_program: self.destination_program.clone(),
             escrow_authority: escrow_authority_index,
-            accounts: self.accounts.clone(),
+            accounts: self.accounts,
         })
     }
 }

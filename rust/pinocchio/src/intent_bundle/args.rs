@@ -45,7 +45,7 @@ pub struct BaseActionArgs<'args> {
     pub escrow_authority: u8,
     #[bincode(with_serde)]
     pub destination_program: Address,
-    pub accounts: NoVec<ShortAccountMeta, MAX_STATIC_CPI_ACCOUNTS>,
+    pub accounts: &'args [ShortAccountMeta],
 }
 
 /// A compact account meta used for base-layer actions.
@@ -64,8 +64,7 @@ pub struct ShortAccountMeta {
 #[derive(Serialize, bincode::Encode)]
 #[allow(clippy::large_enum_variant)]
 pub enum CommitTypeArgs<'args> {
-    // we generate it
-    Standalone(NoVec<u8, MAX_STATIC_CPI_ACCOUNTS>), // slice or NoVec
+    Standalone(NoVec<u8, MAX_STATIC_CPI_ACCOUNTS>),
     WithBaseActions {
         committed_accounts: NoVec<u8, MAX_STATIC_CPI_ACCOUNTS>,
         base_actions: NoVec<BaseActionArgs<'args>, MAX_ACTIONS_NUM>,
@@ -169,15 +168,16 @@ mod tests {
         let sdk_bytes = bincode1::serialize(&sdk_args).unwrap();
 
         // Pinocchio type
-        let mut pino_accounts = NoVec::<ShortAccountMeta, MAX_STATIC_CPI_ACCOUNTS>::new();
-        pino_accounts.push(ShortAccountMeta {
-            pubkey: make_address(0x11),
-            is_writable: true,
-        });
-        pino_accounts.push(ShortAccountMeta {
-            pubkey: make_address(0x22),
-            is_writable: false,
-        });
+        let pino_accounts = [
+            ShortAccountMeta {
+                pubkey: make_address(0x11),
+                is_writable: true,
+            },
+            ShortAccountMeta {
+                pubkey: make_address(0x22),
+                is_writable: false,
+            },
+        ];
 
         let pino_args = BaseActionArgs {
             args: ActionArgs {
@@ -187,7 +187,7 @@ mod tests {
             compute_units: 200_000,
             escrow_authority: 2,
             destination_program: make_address(0xDE),
-            accounts: pino_accounts,
+            accounts: &pino_accounts,
         };
         let mut pino_buf = [0u8; 512];
         let pino_len =
@@ -237,7 +237,7 @@ mod tests {
             compute_units: 100_000,
             escrow_authority: 0,
             destination_program: make_address(0xCC),
-            accounts: NoVec::new(),
+            accounts: &[],
         });
         let pino_commit = CommitTypeArgs::WithBaseActions {
             committed_accounts: pino_indices,
@@ -299,7 +299,7 @@ mod tests {
             compute_units: 50_000,
             escrow_authority: 1,
             destination_program: make_address(0xEE),
-            accounts: NoVec::new(),
+            accounts: &[],
         });
         let pino_with_actions = UndelegateTypeArgs::WithBaseActions {
             base_actions: pino_base_actions,
@@ -360,11 +360,10 @@ mod tests {
             pino_cau_indices.push(*i);
         }
 
-        let mut pino_action_accounts = NoVec::<ShortAccountMeta, MAX_STATIC_CPI_ACCOUNTS>::new();
-        pino_action_accounts.push(ShortAccountMeta {
+        let pino_action_accounts = [ShortAccountMeta {
             pubkey: make_address(0x88),
             is_writable: true,
-        });
+        }];
 
         let mut pino_standalone = NoVec::<BaseActionArgs, MAX_ACTIONS_NUM>::new();
         pino_standalone.push(BaseActionArgs {
@@ -375,7 +374,7 @@ mod tests {
             compute_units: 300_000,
             escrow_authority: 7,
             destination_program: make_address(0x99),
-            accounts: pino_action_accounts,
+            accounts: &pino_action_accounts,
         });
 
         let pino_bundle = MagicIntentBundleArgs {

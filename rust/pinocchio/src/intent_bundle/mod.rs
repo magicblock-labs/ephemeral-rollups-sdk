@@ -360,12 +360,13 @@ mod tests {
         let mut p_prog = MockRuntimeAccount::new(prog_addr);
 
         let escrow_view = p_escrow.as_account_view();
-        let handler = CallHandler::new(
-            Address::new_from_array(dest_addr),
-            escrow_view,
-            ActionArgs::new(&action_data),
-            200_000,
-        );
+        let handler = CallHandler {
+            destination_program: Address::new_from_array(dest_addr),
+            escrow_authority: escrow_view,
+            args: ActionArgs::new(&action_data),
+            compute_units: 200_000,
+            accounts: &[],
+        };
         let commit_accs = [p_acc1.as_account_view()];
         let mut buf = [0u8; CPI_DATA_BUF_SIZE];
 
@@ -427,18 +428,20 @@ mod tests {
         let mut p_escrow2 = MockRuntimeAccount::new(escrow2_addr);
         let mut p_prog = MockRuntimeAccount::new(prog_addr);
 
-        let post_commit = CallHandler::new(
-            Address::new_from_array(dest1_addr),
-            p_escrow1.as_account_view(),
-            ActionArgs::new(&commit_data),
-            100_000,
-        );
-        let post_undelegate = CallHandler::new(
-            Address::new_from_array(dest2_addr),
-            p_escrow2.as_account_view(),
-            ActionArgs::new(&undelegate_data),
-            50_000,
-        );
+        let post_commit = CallHandler {
+            destination_program: Address::new_from_array(dest1_addr),
+            escrow_authority: p_escrow1.as_account_view(),
+            args: ActionArgs::new(&commit_data),
+            compute_units: 100_000,
+            accounts: &[],
+        };
+        let post_undelegate = CallHandler {
+            destination_program: Address::new_from_array(dest2_addr),
+            escrow_authority: p_escrow2.as_account_view(),
+            args: ActionArgs::new(&undelegate_data),
+            compute_units: 50_000,
+            accounts: &[],
+        };
         let cau_accs = [p_acc1.as_account_view()];
         let mut buf = [0u8; CPI_DATA_BUF_SIZE];
         let pino_len = MagicIntentBundleBuilder::new(
@@ -515,18 +518,20 @@ mod tests {
         let mut p_escrow2 = MockRuntimeAccount::new(escrow2_addr);
         let mut p_prog = MockRuntimeAccount::new(prog_addr);
 
-        let commit_handler = CallHandler::new(
-            Address::new_from_array(dest1_addr),
-            p_escrow1.as_account_view(),
-            ActionArgs::new(&commit_data),
-            100_000,
-        );
-        let undelegate_handler = CallHandler::new(
-            Address::new_from_array(dest2_addr),
-            p_escrow2.as_account_view(),
-            ActionArgs::new(&undelegate_data),
-            50_000,
-        );
+        let commit_handler = CallHandler {
+            destination_program: Address::new_from_array(dest1_addr),
+            escrow_authority: p_escrow1.as_account_view(),
+            args: ActionArgs::new(&commit_data),
+            compute_units: 100_000,
+            accounts: &[],
+        };
+        let undelegate_handler = CallHandler {
+            destination_program: Address::new_from_array(dest2_addr),
+            escrow_authority: p_escrow2.as_account_view(),
+            args: ActionArgs::new(&undelegate_data),
+            compute_units: 50_000,
+            accounts: &[],
+        };
         let commit_accs = [p_commit.as_account_view()];
         let cau_accs = [p_cau.as_account_view()];
         let mut buf = [0u8; CPI_DATA_BUF_SIZE];
@@ -607,18 +612,20 @@ mod tests {
         let mut p_escrow2 = MockRuntimeAccount::new(escrow2_addr);
         let mut p_prog = MockRuntimeAccount::new(prog_addr);
 
-        let post_commit_handler = CallHandler::new(
-            Address::new_from_array(dest1_addr),
-            p_escrow1.as_account_view(),
-            ActionArgs::new(&commit_data),
-            100_000,
-        );
-        let post_undelegate_handler = CallHandler::new(
-            Address::new_from_array(dest2_addr),
-            p_escrow2.as_account_view(),
-            ActionArgs::new(&undelegate_data),
-            50_000,
-        );
+        let post_commit_handler = CallHandler {
+            destination_program: Address::new_from_array(dest1_addr),
+            escrow_authority: p_escrow1.as_account_view(),
+            args: ActionArgs::new(&commit_data),
+            compute_units: 100_000,
+            accounts: &[],
+        };
+        let post_undelegate_handler = CallHandler {
+            destination_program: Address::new_from_array(dest2_addr),
+            escrow_authority: p_escrow2.as_account_view(),
+            args: ActionArgs::new(&undelegate_data),
+            compute_units: 50_000,
+            accounts: &[],
+        };
 
         let commit_accs = [p_commit.as_account_view()];
         let cau_accs = [p_cau.as_account_view()];
