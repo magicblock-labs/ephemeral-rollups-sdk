@@ -14,11 +14,6 @@ mod tests {
     use solana_system_interface::program as system_program;
 
     #[test]
-    fn test_spl_module_exists() {
-        // This test verifies that spl module is properly compiled
-    }
-
-    #[test]
     fn test_initialize_global_vault() {
         let payer = Pubkey::new_unique();
         let vault = Pubkey::new_unique();
@@ -344,6 +339,13 @@ mod tests {
         assert_eq!(instruction.accounts[4].pubkey, PERMISSION_PROGRAM_ID);
         assert!(!instruction.accounts[4].is_writable);
         assert!(!instruction.accounts[4].is_signer);
+
+        assert_eq!(
+            instruction.data[0],
+            EphemeralSplDiscriminator::CreateEphemeralAtaPermission as u8
+        );
+        assert_eq!(instruction.data[1], eata_bump);
+        assert_eq!(instruction.data[2], flag_byte);
     }
 
     #[test]
@@ -404,6 +406,12 @@ mod tests {
         // validator (readonly)
         assert_eq!(instruction.accounts[9].pubkey, validator);
         assert!(!instruction.accounts[9].is_writable);
+
+        assert_eq!(
+            instruction.data[0],
+            EphemeralSplDiscriminator::DelegateEphemeralAtaPermission as u8
+        );
+        assert_eq!(instruction.data[1], eata_bump);
     }
 
     #[test]
@@ -438,6 +446,11 @@ mod tests {
         assert_eq!(instruction.accounts[5].pubkey, MAGIC_CONTEXT_ID);
         assert!(instruction.accounts[5].is_writable);
         assert!(!instruction.accounts[5].is_signer);
+
+        assert_eq!(
+            instruction.data[0],
+            EphemeralSplDiscriminator::UndelegateEphemeralAtaPermission as u8
+        );
     }
 
     #[test]
@@ -468,5 +481,12 @@ mod tests {
         assert_eq!(instruction.accounts[3].pubkey, PERMISSION_PROGRAM_ID);
         assert!(!instruction.accounts[3].is_writable);
         assert!(!instruction.accounts[3].is_signer);
+
+        assert_eq!(
+            instruction.data[0],
+            EphemeralSplDiscriminator::ResetEphemeralAtaPermission as u8
+        );
+        assert_eq!(instruction.data[1], bump);
+        assert_eq!(instruction.data[2], flag_byte);
     }
 }
