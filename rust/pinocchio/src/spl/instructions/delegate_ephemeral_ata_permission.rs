@@ -54,6 +54,9 @@ pub fn delegate_ephemeral_ata_permission(
         account_metas
             .get_unchecked_mut(8)
             .write(InstructionAccount::readonly(delegation_program.address()));
+        account_metas
+            .get_unchecked_mut(9)
+            .write(InstructionAccount::readonly(validator.address()));
     }
 
     let acc_infos: [&AccountView; 10] = [
