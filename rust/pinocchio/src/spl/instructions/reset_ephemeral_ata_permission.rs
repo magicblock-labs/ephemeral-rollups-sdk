@@ -8,7 +8,7 @@ use pinocchio::{AccountView, ProgramResult};
 
 /// Reset an ephemeral ATA permission.
 ///
-/// For details on the flag byte, see the [MemberFlags](`crate::access_control::structs::Member`) struct.
+/// For details on the flag byte, see [MemberFlags](`crate::acl::types::MemberFlags`).
 pub fn reset_ephemeral_ata_permission(
     eata: AccountView,
     permission: AccountView,

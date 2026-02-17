@@ -8,7 +8,7 @@ use pinocchio::{AccountView, ProgramResult};
 
 /// Create a new ephemeral ATA permission.
 ///
-/// For details on the flag byte, see the [MemberFlags](`crate::access_control::structs::Member`) struct.
+/// For details on the flag byte, see [MemberFlags](`crate::acl::types::MemberFlags`).
 #[allow(clippy::too_many_arguments)]
 pub fn create_ephemeral_ata_permission(
     eata: AccountView,
