@@ -31,6 +31,7 @@ pub use reset_ephemeral_ata_permission::*;
 pub use undelegate_ephemeral_ata_permission::*;
 
 #[repr(u8)]
+#[derive(Debug, PartialEq, Eq, Copy, Clone)]
 pub enum EphemeralSplDiscriminator {
     InitializeGlobalVault = 0,
     InitializeEphemeralAta = 1,
