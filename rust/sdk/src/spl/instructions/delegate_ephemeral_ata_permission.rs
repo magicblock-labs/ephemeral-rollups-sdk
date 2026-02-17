@@ -6,6 +6,7 @@ use crate::{
 };
 
 /// Delegate an ephemeral ATA permission.
+#[allow(clippy::too_many_arguments)]
 pub fn delegate_ephemeral_ata_permission(
     payer: Pubkey,
     eata: Pubkey,

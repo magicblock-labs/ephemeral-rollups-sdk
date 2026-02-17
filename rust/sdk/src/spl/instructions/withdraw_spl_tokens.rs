@@ -5,6 +5,7 @@ use crate::{
 };
 
 /// Build a withdraw SPL tokens instruction.
+#[allow(clippy::too_many_arguments)]
 pub fn withdraw_spl_tokens(
     payer: Pubkey,
     eata: Pubkey,
