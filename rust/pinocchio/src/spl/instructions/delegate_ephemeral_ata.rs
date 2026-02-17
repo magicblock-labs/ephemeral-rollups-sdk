@@ -65,9 +65,12 @@ pub fn delegate_ephemeral_ata(
     let mut data = [0_u8; 34];
     data[0] = EphemeralSplDiscriminator::DelegateEphemeralAta as u8;
     data[1] = eata_bump;
-    if let Some(validator) = validator {
+    let data = if let Some(validator) = validator {
         data[2..34].copy_from_slice(validator.as_ref());
-    }
+        &data
+    } else {
+        &data[..2]
+    };
 
     let ix = InstructionView {
         program_id: &ESPL_TOKEN_PROGRAM_ID,
@@ -77,7 +80,7 @@ pub fn delegate_ephemeral_ata(
                 num_accounts,
             )
         },
-        data: &data,
+        data,
     };
 
     if let Some(seeds) = signer_seeds {
