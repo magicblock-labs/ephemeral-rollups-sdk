@@ -1,10 +1,8 @@
 use crate::{
-    consts::PERMISSION_PROGRAM_ID,
+    consts::{ESPL_TOKEN_PROGRAM_ID, PERMISSION_PROGRAM_ID},
     solana_compat::solana::{system_program, AccountMeta, Instruction, Pubkey},
     spl::EphemeralSplDiscriminator,
 };
-
-use crate::consts::ESPL_TOKEN_PROGRAM_ID;
 
 /// Create a new ephemeral ATA permission.
 ///

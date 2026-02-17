@@ -1,10 +1,9 @@
 use crate::{
+    consts::ESPL_TOKEN_PROGRAM_ID,
     cpi::DELEGATION_PROGRAM_ID,
     solana_compat::solana::{system_program, AccountMeta, Instruction, Pubkey},
     spl::EphemeralSplDiscriminator,
 };
-
-use crate::consts::ESPL_TOKEN_PROGRAM_ID;
 
 /// Delegate an ephemeral ATA.
 pub fn delegate_ephemeral_ata(
