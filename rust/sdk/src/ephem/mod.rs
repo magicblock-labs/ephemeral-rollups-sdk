@@ -312,7 +312,7 @@ impl<'info> CommitIntentBuilder<'info> {
         self,
         accounts: &[AccountInfo<'info>],
     ) -> CommitAndUndelegateIntentBuilder<'info> {
-        self.done().commit_and_undelegate(accounts)
+        self.fold().commit_and_undelegate(accounts)
     }
 
     /// Transition: finalizes this commit intent and adds standalone base-layer actions.
@@ -320,21 +320,21 @@ impl<'info> CommitIntentBuilder<'info> {
         self,
         actions: impl IntoIterator<Item = CallHandler<'info>>,
     ) -> MagicIntentBundleBuilder<'info> {
-        self.done().add_standalone_actions(actions)
+        self.fold().add_standalone_actions(actions)
     }
 
     /// Terminal: finalizes this commit intent and builds the full instruction.
     pub fn build(self) -> (Vec<AccountInfo<'info>>, Instruction) {
-        self.done().build()
+        self.fold().build()
     }
 
     /// Terminal: finalizes this commit intent, builds the instruction and invokes it.
     pub fn build_and_invoke(self) -> ProgramResult {
-        self.done().build_and_invoke()
+        self.fold().build_and_invoke()
     }
 
     /// Finalizes this commit intent and folds it into the parent bundle.
-    fn done(self) -> MagicIntentBundleBuilder<'info> {
+    pub fn fold(self) -> MagicIntentBundleBuilder<'info> {
         let Self {
             mut parent,
             accounts,
@@ -386,7 +386,7 @@ impl<'info> CommitAndUndelegateIntentBuilder<'info> {
 
     /// Transition: finalizes this commit-and-undelegate intent and starts a new commit intent.
     pub fn commit(self, accounts: &[AccountInfo<'info>]) -> CommitIntentBuilder<'info> {
-        self.done().commit(accounts)
+        self.fold().commit(accounts)
     }
 
     /// Transition: finalizes this commit-and-undelegate intent and adds standalone base-layer actions.
@@ -394,21 +394,21 @@ impl<'info> CommitAndUndelegateIntentBuilder<'info> {
         self,
         actions: impl IntoIterator<Item = CallHandler<'info>>,
     ) -> MagicIntentBundleBuilder<'info> {
-        self.done().add_standalone_actions(actions)
+        self.fold().add_standalone_actions(actions)
     }
 
     /// Terminal: finalizes this intent and builds the full instruction.
     pub fn build(self) -> (Vec<AccountInfo<'info>>, Instruction) {
-        self.done().build()
+        self.fold().build()
     }
 
     /// Terminal: finalizes this intent, builds the instruction and invokes it.
     pub fn build_and_invoke(self) -> ProgramResult {
-        self.done().build_and_invoke()
+        self.fold().build_and_invoke()
     }
 
     /// Finalizes this commit-and-undelegate intent and folds it into the parent bundle.
-    fn done(self) -> MagicIntentBundleBuilder<'info> {
+    pub fn fold(self) -> MagicIntentBundleBuilder<'info> {
         let Self {
             mut parent,
             accounts,
