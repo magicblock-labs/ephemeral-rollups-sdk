@@ -1,7 +1,9 @@
 #![allow(deprecated)]
 
 pub use crate::ephem::deprecated::v0::{
-    commit_accounts, commit_and_undelegate_accounts, create_schedule_commit_ix,
+    commit_accounts, commit_and_undelegate_accounts, commit_finalize_accounts,
+    commit_finalize_and_undelegate_accounts, create_finalize_schedule_commit_ix,
+    create_schedule_commit_ix,
 };
 use crate::ephem::deprecated::v1::utils;
 pub use crate::ephem::deprecated::v1::{
@@ -28,6 +30,10 @@ pub enum MagicIntent<'info> {
     Commit(CommitType<'info>),
     /// Commit accounts and undelegate them, optionally with post-commit and post-undelegate actions.
     CommitAndUndelegate(CommitAndUndelegate<'info>),
+    /// CommitFinalize accounts to base layer, optionally with post-commit actions.
+    CommitFinalize(CommitType<'info>),
+    /// CommitFinalize accounts and undelegate them, optionally with post-commit and post-undelegate actions.
+    CommitFinalizeAndUndelegate(CommitAndUndelegate<'info>),
 }
 
 /// Builds a single `MagicBlockInstruction::ScheduleIntentBundle` instruction by aggregating
@@ -180,6 +186,8 @@ struct MagicIntentBundle<'info> {
     standalone_actions: Vec<CallHandler<'info>>,
     commit_intent: Option<CommitType<'info>>,
     commit_and_undelegate_intent: Option<CommitAndUndelegate<'info>>,
+    commit_finalize_intent: Option<CommitType<'info>>,
+    commit_finalize_and_undelegate_intent: Option<CommitAndUndelegate<'info>>,
 }
 
 impl<'info> MagicIntentBundle<'info> {
@@ -201,25 +209,47 @@ impl<'info> MagicIntentBundle<'info> {
                     self.commit_and_undelegate_intent = Some(value);
                 }
             }
+            MagicIntent::CommitFinalize(value) => {
+                if let Some(ref mut commit_finalize_accounts) = self.commit_finalize_intent {
+                    commit_finalize_accounts.merge(value);
+                } else {
+                    self.commit_finalize_intent = Some(value);
+                }
+            }
+            MagicIntent::CommitFinalizeAndUndelegate(value) => {
+                if let Some(ref mut commit_finalize_and_undelegate) =
+                    self.commit_finalize_and_undelegate_intent
+                {
+                    commit_finalize_and_undelegate.merge(value);
+                } else {
+                    self.commit_finalize_and_undelegate_intent = Some(value);
+                }
+            }
         }
     }
 
     /// Consumes the bundle and encodes it into `MagicIntentBundleArgs` using a `Pubkey -> u8` indices map.
     fn into_args(self, indices_map: &HashMap<Pubkey, u8>) -> MagicIntentBundleArgs {
-        let commit = self.commit_intent.map(|c| c.into_args(indices_map));
-        let commit_and_undelegate = self
-            .commit_and_undelegate_intent
-            .map(|c| c.into_args(indices_map));
-        let standalone_actions = self
-            .standalone_actions
-            .into_iter()
-            .map(|ch| ch.into_args(indices_map))
-            .collect::<Vec<_>>();
-
         MagicIntentBundleArgs {
-            commit,
-            commit_and_undelegate,
-            standalone_actions,
+            commit: self.commit_intent.map(|c| c.into_args(indices_map)),
+
+            commit_and_undelegate: self
+                .commit_and_undelegate_intent
+                .map(|c| c.into_args(indices_map)),
+
+            commit_finalize: self
+                .commit_finalize_intent
+                .map(|c| c.into_args(indices_map)),
+
+            commit_finalize_and_undelegate: self
+                .commit_finalize_and_undelegate_intent
+                .map(|c| c.into_args(indices_map)),
+
+            standalone_actions: self
+                .standalone_actions
+                .into_iter()
+                .map(|ch| ch.into_args(indices_map))
+                .collect::<Vec<_>>(),
         }
     }
 
