@@ -66,7 +66,7 @@ const ACCOUNT_OVERHEAD: u32 = 60;
 /// ```
 #[inline]
 pub const fn rent(data_len: u32) -> u64 {
-    (data_len + ACCOUNT_OVERHEAD) as u64 * EPHEMERAL_RENT_PER_BYTE
+    (data_len as u64 + ACCOUNT_OVERHEAD as u64) * EPHEMERAL_RENT_PER_BYTE
 }
 
 // -----------------

@@ -178,5 +178,5 @@ let cost = rent(1000);  // Cost for 1KB account
 
 ## Resources
 
-- [Ephemeral Accounts Specification](https://docs.magicblock.gg/)
-- [Ephemeral Rollups Documentation](https://docs.magicblock.gg/)
+- [Ephemeral Accounts Specification](https://docs.magicblock.gg/ephemeral-rollups/ephemeral-accounts)
+- [Ephemeral Rollups Documentation](https://docs.magicblock.gg/ephemeral-rollups/overview)

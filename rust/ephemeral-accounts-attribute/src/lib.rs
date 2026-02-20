@@ -73,10 +73,22 @@ fn extract_bracketed_after(s: &str, keyword: &str) -> Option<String> {
 }
 
 /// Extracts `seeds = [...]` expression from a field's `#[account(...)]` attribute.
-fn extract_seeds(field: &Field) -> Option<ExprArray> {
-    let attr_str = get_account_attr(field)?;
-    let seeds_str = extract_bracketed_after(&attr_str, ATTR_SEEDS)?;
-    syn::parse_str::<ExprArray>(&seeds_str).ok()
+///
+/// Returns `Ok(None)` if no seeds attribute is present, `Ok(Some(array))` if seeds
+/// are found and parsed successfully, or `Err` if seeds are present but malformed.
+fn extract_seeds(field: &Field) -> Result<Option<ExprArray>, syn::Error> {
+    let Some(attr_str) = get_account_attr(field) else {
+        return Ok(None);
+    };
+    let Some(seeds_str) = extract_bracketed_after(&attr_str, ATTR_SEEDS) else {
+        return Ok(None);
+    };
+    syn::parse_str::<ExprArray>(&seeds_str).map(Some).map_err(|e| {
+        syn::Error::new(
+            field.span(),
+            format!("failed to parse seeds expression '{}': {}", seeds_str, e),
+        )
+    })
 }
 
 /// Checks if a field has a specific marker in its account attribute (exact token match).
@@ -458,10 +470,22 @@ fn validate(input: &ItemStruct) -> Result<MacroContext, TokenStream> {
         })?;
 
         if has_marker(field, MARKER_SPONSOR) {
+            if ctx.sponsor.is_some() {
+                return Err(syn::Error::new_spanned(
+                    field,
+                    "multiple sponsor markers are not allowed",
+                )
+                .to_compile_error()
+                .into());
+            }
+            let seeds = match extract_seeds(field) {
+                Ok(s) => s,
+                Err(e) => return Err(e.to_compile_error().into()),
+            };
             ctx.sponsor = Some(SponsorInfo {
                 name: name.clone(),
                 is_signer: is_signer_type(&field.ty),
-                seeds: extract_seeds(field),
+                seeds,
             });
         }
 
@@ -562,10 +586,11 @@ pub fn ephemeral_accounts(_attr: TokenStream, item: TokenStream) -> TokenStream 
         // Generate methods for ephemeral fields
         if is_eph {
             if let Some(sponsor) = sponsor {
-                let info = EphFieldInfo {
-                    name,
-                    seeds: extract_seeds(field),
+                let seeds = match extract_seeds(field) {
+                    Ok(s) => s,
+                    Err(e) => return TokenStream::from(e.to_compile_error()),
                 };
+                let info = EphFieldInfo { name, seeds };
                 match gen_ephemeral_methods(&info, sponsor, &ctx.field_names, field.span()) {
                     Ok(m) => methods.extend(m),
                     Err(e) => return TokenStream::from(e.to_compile_error()),
@@ -580,9 +605,10 @@ pub fn ephemeral_accounts(_attr: TokenStream, item: TokenStream) -> TokenStream 
             }
         }
 
+        let vis = &field.vis;
         new_fields.push(quote! {
             #(#attrs)*
-            pub #name: #ty,
+            #vis #name: #ty,
         });
     }
 
