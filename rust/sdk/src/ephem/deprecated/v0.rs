@@ -61,7 +61,7 @@ pub fn create_schedule_commit_ix<'a, 'info>(
     Instruction::new_with_bincode(*magic_program.key, &instruction, account_metas)
 }
 
-/// CPI to trigger a commit for one or more accounts in the ER
+/// CPI to trigger a commit-finalize for one or more accounts in the ER
 #[inline(always)]
 pub fn commit_finalize_accounts<'a, 'info>(
     payer: &'a AccountInfo<'info>,
@@ -80,7 +80,7 @@ pub fn commit_finalize_accounts<'a, 'info>(
     all_accounts.extend(account_infos.into_iter().cloned());
     invoke(&ix, &all_accounts)
 }
-/// CPI to trigger a commit and undelegate one or more accounts in the ER
+/// CPI to trigger a commit-finalize and undelegate one or more accounts in the ER
 #[inline(always)]
 pub fn commit_finalize_and_undelegate_accounts<'a, 'info>(
     payer: &'a AccountInfo<'info>,
