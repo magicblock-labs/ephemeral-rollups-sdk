@@ -8,11 +8,11 @@ use pinocchio::{AccountView, ProgramResult};
 
 /// Initialize a global vault for a mint.
 pub fn initialize_global_vault(
-    payer: AccountView,
-    vault: AccountView,
-    mint: AccountView,
+    payer: &AccountView,
+    vault: &AccountView,
+    mint: &AccountView,
     vault_bump: u8,
-    system_program: AccountView,
+    system_program: &AccountView,
     signer_seeds: Option<Signer<'_, '_>>,
 ) -> ProgramResult {
     let mut account_metas =

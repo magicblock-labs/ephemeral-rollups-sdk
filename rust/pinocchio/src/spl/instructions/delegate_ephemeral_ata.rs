@@ -9,14 +9,14 @@ use pinocchio::{AccountView, Address, ProgramResult};
 /// Delegate an ephemeral ATA.
 #[allow(clippy::too_many_arguments)]
 pub fn delegate_ephemeral_ata(
-    payer: AccountView,
-    eata: AccountView,
-    espl_token_program: AccountView,
-    delegation_buffer: AccountView,
-    delegation_record: AccountView,
-    delegation_metadata: AccountView,
-    delegation_program: AccountView,
-    system_program: AccountView,
+    payer: &AccountView,
+    eata: &AccountView,
+    espl_token_program: &AccountView,
+    delegation_buffer: &AccountView,
+    delegation_record: &AccountView,
+    delegation_metadata: &AccountView,
+    delegation_program: &AccountView,
+    system_program: &AccountView,
     eata_bump: u8,
     validator: Option<Address>,
     signer_seeds: Option<Signer<'_, '_>>,

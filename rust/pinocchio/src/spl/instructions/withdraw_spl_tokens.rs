@@ -9,13 +9,13 @@ use pinocchio::{AccountView, ProgramResult};
 /// Withdraw SPL tokens from an ephemeral ATA.
 #[allow(clippy::too_many_arguments)]
 pub fn withdraw_spl_tokens(
-    payer: AccountView,
-    eata: AccountView,
-    vault: AccountView,
-    mint: AccountView,
-    vault_ata: AccountView,
-    user_ata: AccountView,
-    token_program: AccountView,
+    payer: &AccountView,
+    eata: &AccountView,
+    vault: &AccountView,
+    mint: &AccountView,
+    vault_ata: &AccountView,
+    user_ata: &AccountView,
+    token_program: &AccountView,
     eata_bump: u8,
     amount: u64,
     signer_seeds: Option<Signer<'_, '_>>,

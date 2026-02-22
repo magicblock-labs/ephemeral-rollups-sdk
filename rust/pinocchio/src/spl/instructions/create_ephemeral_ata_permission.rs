@@ -11,11 +11,11 @@ use pinocchio::{AccountView, ProgramResult};
 /// For details on the flag byte, see [MemberFlags](`crate::acl::types::MemberFlags`).
 #[allow(clippy::too_many_arguments)]
 pub fn create_ephemeral_ata_permission(
-    eata: AccountView,
-    permission: AccountView,
-    payer: AccountView,
-    system_program: AccountView,
-    permission_program: AccountView,
+    eata: &AccountView,
+    permission: &AccountView,
+    payer: &AccountView,
+    system_program: &AccountView,
+    permission_program: &AccountView,
     eata_bump: u8,
     flag_byte: u8,
     signer_seeds: Option<Signer<'_, '_>>,

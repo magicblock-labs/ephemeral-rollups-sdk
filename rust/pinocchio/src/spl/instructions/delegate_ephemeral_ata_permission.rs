@@ -9,16 +9,16 @@ use pinocchio::{AccountView, ProgramResult};
 /// Delegate an ephemeral ATA permission.
 #[allow(clippy::too_many_arguments)]
 pub fn delegate_ephemeral_ata_permission(
-    payer: AccountView,
-    eata: AccountView,
-    permission: AccountView,
-    permission_program: AccountView,
-    system_program: AccountView,
-    delegation_buffer: AccountView,
-    delegation_record: AccountView,
-    delegation_metadata: AccountView,
-    delegation_program: AccountView,
-    validator: AccountView,
+    payer: &AccountView,
+    eata: &AccountView,
+    permission: &AccountView,
+    permission_program: &AccountView,
+    system_program: &AccountView,
+    delegation_buffer: &AccountView,
+    delegation_record: &AccountView,
+    delegation_metadata: &AccountView,
+    delegation_program: &AccountView,
+    validator: &AccountView,
     eata_bump: u8,
     signer_seeds: Option<Signer<'_, '_>>,
 ) -> ProgramResult {

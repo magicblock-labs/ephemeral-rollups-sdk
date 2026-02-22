@@ -8,11 +8,11 @@ use pinocchio::{AccountView, ProgramResult};
 
 /// Undelegate an ephemeral ATA.
 pub fn undelegate_ephemeral_ata(
-    payer: AccountView,
-    user_ata: AccountView,
-    eata: AccountView,
-    magic_context: AccountView,
-    magic_program: AccountView,
+    payer: &AccountView,
+    user_ata: &AccountView,
+    eata: &AccountView,
+    magic_context: &AccountView,
+    magic_program: &AccountView,
     signer_seeds: Option<Signer<'_, '_>>,
 ) -> ProgramResult {
     let mut account_metas =

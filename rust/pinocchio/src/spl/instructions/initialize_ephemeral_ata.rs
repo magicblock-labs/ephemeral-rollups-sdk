@@ -8,11 +8,11 @@ use pinocchio::{AccountView, ProgramResult};
 
 /// Initialize an ephemeral ATA.
 pub fn initialize_ephemeral_ata(
-    payer: AccountView,
-    eata: AccountView,
-    user: AccountView,
-    mint: AccountView,
-    system_program: AccountView,
+    payer: &AccountView,
+    eata: &AccountView,
+    user: &AccountView,
+    mint: &AccountView,
+    system_program: &AccountView,
     eata_bump: u8,
     signer_seeds: Option<Signer<'_, '_>>,
 ) -> ProgramResult {

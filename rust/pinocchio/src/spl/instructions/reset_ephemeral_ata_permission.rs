@@ -10,10 +10,10 @@ use pinocchio::{AccountView, ProgramResult};
 ///
 /// For details on the flag byte, see [MemberFlags](`crate::acl::types::MemberFlags`).
 pub fn reset_ephemeral_ata_permission(
-    eata: AccountView,
-    permission: AccountView,
-    owner: AccountView,
-    permission_program: AccountView,
+    eata: &AccountView,
+    permission: &AccountView,
+    owner: &AccountView,
+    permission_program: &AccountView,
     bump: u8,
     flag_byte: u8,
     signer_seeds: Option<Signer<'_, '_>>,

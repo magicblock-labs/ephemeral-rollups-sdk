@@ -9,13 +9,13 @@ use pinocchio::{AccountView, ProgramResult};
 /// Deposit SPL tokens into an ephemeral ATA.
 #[allow(clippy::too_many_arguments)]
 pub fn deposit_spl_tokens(
-    authority: AccountView,
-    eata: AccountView,
-    vault: AccountView,
-    mint: AccountView,
-    user_source_token_acc: AccountView,
-    vault_token_acc: AccountView,
-    token_program: AccountView,
+    authority: &AccountView,
+    eata: &AccountView,
+    vault: &AccountView,
+    mint: &AccountView,
+    user_source_token_acc: &AccountView,
+    vault_token_acc: &AccountView,
+    token_program: &AccountView,
     amount: u64,
     signer_seeds: Option<Signer<'_, '_>>,
 ) -> ProgramResult {
