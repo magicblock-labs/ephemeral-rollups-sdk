@@ -42,12 +42,12 @@ pub fn undelegate_ephemeral_ata_permission(
     }
 
     let acc_infos: [&AccountView; 6] = [
-        &payer,
-        &eata,
-        &permission,
-        &permission_program,
-        &magic_program,
-        &magic_context,
+        payer,
+        eata,
+        permission,
+        permission_program,
+        magic_program,
+        magic_context,
     ];
 
     let data: [u8; 1] = [EphemeralSplDiscriminator::UndelegateEphemeralAtaPermission as u8];

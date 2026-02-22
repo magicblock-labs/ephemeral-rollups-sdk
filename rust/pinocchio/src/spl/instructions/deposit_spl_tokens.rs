@@ -50,13 +50,13 @@ pub fn deposit_spl_tokens(
     }
 
     let acc_infos: [&AccountView; 7] = [
-        &eata,
-        &vault,
-        &mint,
-        &user_source_token_acc,
-        &vault_token_acc,
-        &authority,
-        &token_program,
+        eata,
+        vault,
+        mint,
+        user_source_token_acc,
+        vault_token_acc,
+        authority,
+        token_program,
     ];
 
     let mut data: [u8; 9] = [0; 9];

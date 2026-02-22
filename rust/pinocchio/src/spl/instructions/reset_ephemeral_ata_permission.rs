@@ -37,7 +37,7 @@ pub fn reset_ephemeral_ata_permission(
             .write(InstructionAccount::readonly(permission_program.address()));
     }
 
-    let acc_infos: [&AccountView; 4] = [&eata, &permission, &owner, &permission_program];
+    let acc_infos: [&AccountView; 4] = [eata, permission, owner, permission_program];
 
     let data: [u8; 3] = [
         EphemeralSplDiscriminator::ResetEphemeralAtaPermission as u8,

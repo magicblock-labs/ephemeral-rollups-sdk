@@ -34,7 +34,7 @@ pub fn initialize_global_vault(
             .write(InstructionAccount::readonly(system_program.address()));
     }
 
-    let acc_infos: [&AccountView; 4] = [&vault, &payer, &mint, &system_program];
+    let acc_infos: [&AccountView; 4] = [vault, payer, mint, system_program];
 
     let data: [u8; 2] = [
         EphemeralSplDiscriminator::InitializeGlobalVault as u8,

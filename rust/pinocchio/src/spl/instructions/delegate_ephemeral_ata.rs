@@ -53,14 +53,14 @@ pub fn delegate_ephemeral_ata(
     }
 
     let acc_infos: [&AccountView; 8] = [
-        &payer,
-        &eata,
-        &espl_token_program,
-        &delegation_buffer,
-        &delegation_record,
-        &delegation_metadata,
-        &delegation_program,
-        &system_program,
+        payer,
+        eata,
+        espl_token_program,
+        delegation_buffer,
+        delegation_record,
+        delegation_metadata,
+        delegation_program,
+        system_program,
     ];
 
     let mut data = [0_u8; 34];

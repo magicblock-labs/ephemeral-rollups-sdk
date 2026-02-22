@@ -38,7 +38,7 @@ pub fn initialize_ephemeral_ata(
             .write(InstructionAccount::readonly(system_program.address()));
     }
 
-    let acc_infos: [&AccountView; 5] = [&eata, &payer, &user, &mint, &system_program];
+    let acc_infos: [&AccountView; 5] = [eata, payer, user, mint, system_program];
 
     let data: [u8; 2] = [
         EphemeralSplDiscriminator::InitializeEphemeralAta as u8,

@@ -42,13 +42,8 @@ pub fn create_ephemeral_ata_permission(
             .write(InstructionAccount::readonly(permission_program.address()));
     }
 
-    let acc_infos: [&AccountView; 5] = [
-        &eata,
-        &permission,
-        &payer,
-        &system_program,
-        &permission_program,
-    ];
+    let acc_infos: [&AccountView; 5] =
+        [eata, permission, payer, system_program, permission_program];
 
     let ix = InstructionView {
         program_id: &ESPL_TOKEN_PROGRAM_ID,

@@ -60,16 +60,16 @@ pub fn delegate_ephemeral_ata_permission(
     }
 
     let acc_infos: [&AccountView; 10] = [
-        &payer,
-        &eata,
-        &payer,
-        &permission,
-        &system_program,
-        &delegation_buffer,
-        &delegation_record,
-        &delegation_metadata,
-        &delegation_program,
-        &validator,
+        payer,
+        eata,
+        payer,
+        permission,
+        system_program,
+        delegation_buffer,
+        delegation_record,
+        delegation_metadata,
+        delegation_program,
+        validator,
     ];
 
     let data = [

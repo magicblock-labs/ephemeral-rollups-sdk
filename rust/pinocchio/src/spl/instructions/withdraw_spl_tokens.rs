@@ -48,15 +48,8 @@ pub fn withdraw_spl_tokens(
             .write(InstructionAccount::readonly(token_program.address()));
     }
 
-    let acc_infos: [&AccountView; 7] = [
-        &eata,
-        &vault,
-        &mint,
-        &vault_ata,
-        &user_ata,
-        &payer,
-        &token_program,
-    ];
+    let acc_infos: [&AccountView; 7] =
+        [eata, vault, mint, vault_ata, user_ata, payer, token_program];
 
     let mut data: [u8; 10] = [0; 10];
     data[0] = EphemeralSplDiscriminator::WithdrawSplTokens as u8;

@@ -37,7 +37,7 @@ pub fn undelegate_ephemeral_ata(
             .write(InstructionAccount::readonly(magic_program.address()));
     }
 
-    let acc_infos: [&AccountView; 5] = [&payer, &user_ata, &eata, &magic_context, &magic_program];
+    let acc_infos: [&AccountView; 5] = [payer, user_ata, eata, magic_context, magic_program];
 
     let data: [u8; 1] = [EphemeralSplDiscriminator::UndelegateEphemeralAta as u8];
 
