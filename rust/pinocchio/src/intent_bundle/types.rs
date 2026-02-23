@@ -32,10 +32,11 @@ pub enum MagicIntent<'acc, 'args> {
 /// Intents assumed to be independent and self-sufficient,
 /// hence order in which they were inserted doesn't matter
 #[derive(Default)]
-pub(super) struct MagicIntentBundle<'acc, 'args> {
-    pub(super) standalone_actions: &'args [CallHandler<'args>],
-    pub(super) commit_intent: Option<CommitIntent<'acc, 'args>>,
-    pub(super) commit_and_undelegate_intent: Option<CommitAndUndelegateIntent<'acc, 'args>>,
+pub(in crate::intent_bundle) struct MagicIntentBundle<'acc, 'args> {
+    pub(in crate::intent_bundle) standalone_actions: &'args [CallHandler<'args>],
+    pub(in crate::intent_bundle) commit_intent: Option<CommitIntent<'acc, 'args>>,
+    pub(in crate::intent_bundle) commit_and_undelegate_intent:
+        Option<CommitAndUndelegateIntent<'acc, 'args>>,
 }
 
 impl<'args> MagicIntentBundle<'_, 'args> {
@@ -44,7 +45,7 @@ impl<'args> MagicIntentBundle<'_, 'args> {
     /// `indices_map` is a natural map: `indices_map[i]` is the address at index `i`.
     pub(super) fn into_args(
         self,
-        indices_map: &[Address],
+        indices_map: &[&Address],
     ) -> Result<MagicIntentBundleArgs<'args>, ProgramError> {
         let commit = self
             .commit_intent
@@ -127,7 +128,7 @@ impl<'args> CallHandler<'args> {
 
     pub(crate) fn args(
         &self,
-        indices_map: &[Address],
+        indices_map: &[&Address],
     ) -> Result<BaseActionArgs<'args>, ProgramError> {
         let escrow_authority_index = get_index(indices_map, self.escrow_authority.address())
             .ok_or(ProgramError::InvalidArgument)?;
@@ -141,6 +142,7 @@ impl<'args> CallHandler<'args> {
     }
 }
 
+#[derive(Copy, Clone)]
 pub struct CommitIntent<'acc, 'args> {
     pub(super) accounts: &'acc [AccountView],
     pub(super) actions: &'args [CallHandler<'args>],
@@ -189,7 +191,7 @@ impl<'args> CommitIntent<'_, 'args> {
         Ok(())
     }
 
-    fn into_args(self, indices_map: &[Address]) -> Result<CommitTypeArgs<'args>, ProgramError> {
+    pub(in crate::intent_bundle) fn into_args(self, indices_map: &[&Address]) -> Result<CommitTypeArgs<'args>, ProgramError> {
         let mut indices = NoVec::<u8, MAX_STATIC_CPI_ACCOUNTS>::new();
         for account in self.accounts {
             let idx =
@@ -212,6 +214,7 @@ impl<'args> CommitIntent<'_, 'args> {
     }
 }
 
+#[derive(Copy, Clone)]
 pub struct CommitAndUndelegateIntent<'acc, 'args> {
     pub(super) accounts: &'acc [AccountView],
     pub(super) post_commit_actions: &'args [CallHandler<'args>],
@@ -264,9 +267,9 @@ impl<'args> CommitAndUndelegateIntent<'_, 'args> {
         Ok(())
     }
 
-    fn into_args(
+    pub(in crate::intent_bundle) fn into_args(
         self,
-        indices_map: &[Address],
+        indices_map: &[&Address],
     ) -> Result<CommitAndUndelegateArgs<'args>, ProgramError> {
         // Build account indices
         let mut indices = NoVec::<u8, MAX_STATIC_CPI_ACCOUNTS>::new();
@@ -314,6 +317,6 @@ impl<'args> CommitAndUndelegateIntent<'_, 'args> {
 
 /// Gets the index of a pubkey in the deduplicated pubkey list.
 /// Returns None if the pubkey is not found.
-fn get_index(pubkeys: &[Address], needle: &Address) -> Option<u8> {
-    pubkeys.iter().position(|k| k == needle).map(|i| i as u8)
+fn get_index(pubkeys: &[&Address], needle: &Address) -> Option<u8> {
+    pubkeys.iter().position(|k| k == &needle).map(|i| i as u8)
 }

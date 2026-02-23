@@ -60,12 +60,7 @@ impl<'acc, 'args, S2>
     pub fn add_post_commit_actions<'new_args>(
         self,
         actions: &'new_args [CallHandler<'new_args>],
-    ) -> CommitAndUndelegateIntentBuilder<
-        'acc,
-        'new_args,
-        &'new_args [CallHandler<'new_args>],
-        S2,
-    >
+    ) -> CommitAndUndelegateIntentBuilder<'acc, 'new_args, &'new_args [CallHandler<'new_args>], S2>
     where
         'args: 'new_args,
     {
@@ -86,12 +81,7 @@ impl<'acc, 'args, T1>
     pub fn add_post_undelegate_actions<'new_args>(
         self,
         actions: &'new_args [CallHandler<'new_args>],
-    ) -> CommitAndUndelegateIntentBuilder<
-        'acc,
-        'new_args,
-        T1,
-        &'new_args [CallHandler<'new_args>],
-    >
+    ) -> CommitAndUndelegateIntentBuilder<'acc, 'new_args, T1, &'new_args [CallHandler<'new_args>]>
     where
         'args: 'new_args,
     {

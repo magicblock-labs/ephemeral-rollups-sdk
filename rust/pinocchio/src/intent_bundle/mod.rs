@@ -9,6 +9,7 @@ mod args;
 mod commit;
 mod commit_and_undelegate;
 mod no_vec;
+mod serialize;
 pub mod types;
 
 use crate::intent_bundle::args::MagicIntentBundleArgs;
@@ -107,37 +108,36 @@ impl<'acc, 'args> MagicIntentBundleBuilder<'acc, 'args> {
         }
     }
 
-    pub fn into_args(
+    pub(in crate::intent_bundle) fn into_args(
         all_accounts: &[AccountView],
         intent_bundle: MagicIntentBundle<'_, 'args>,
     ) -> Result<MagicIntentBundleArgs<'args>, ProgramError> {
-        let mut indices_map = NoVec::<Address, MAX_STATIC_CPI_ACCOUNTS>::new();
+        let mut indices_map = NoVec::<&Address, MAX_STATIC_CPI_ACCOUNTS>::new();
         for account in all_accounts {
-            indices_map.try_push(account.address().clone())?;
+            indices_map.try_push(account.address())?;
         }
 
         // 4. Convert intents to serializable args
         intent_bundle.into_args(indices_map.as_slice())
     }
 
-    pub fn encode_into_slice(
+    pub(in crate::intent_bundle) fn encode_into_slice(
         all_accounts: &[AccountView],
         intent_bundle: MagicIntentBundle<'_, 'args>,
         data_buf: &mut [u8],
     ) -> Result<usize, ProgramError> {
         const OFFSET: usize = SCHEDULE_INTENT_BUNDLE_DISCRIMINANT.len();
 
-        let mut indices_map = NoVec::<Address, MAX_STATIC_CPI_ACCOUNTS>::new();
+        let mut indices_map = NoVec::<&Address, MAX_STATIC_CPI_ACCOUNTS>::new();
         for account in all_accounts {
-            indices_map.try_push(account.address().clone())?;
+            indices_map.try_push(account.address())?;
         }
 
-        // 4. Convert intents to serializable args
-        let args = intent_bundle.into_args(indices_map.as_slice())?;
+        let bundle = serialize::MagicIntentBundleSerialize::new(indices_map.as_slice(), intent_bundle);
 
         data_buf[..OFFSET].copy_from_slice(&SCHEDULE_INTENT_BUNDLE_DISCRIMINANT);
         let args_len =
-            bincode::encode_into_slice(&args, &mut data_buf[OFFSET..], bincode::config::legacy())
+            bincode::encode_into_slice(&bundle, &mut data_buf[OFFSET..], bincode::config::legacy())
                 .map_err(|_| ProgramError::InvalidInstructionData)?;
 
         Ok(OFFSET + args_len)
@@ -227,9 +227,9 @@ impl MagicIntentBundleBuilder<'_, '_> {
             .collect_unique_accounts(&mut all_accounts)
             .unwrap();
 
-        let mut indices_map = NoVec::<Address, MAX_STATIC_CPI_ACCOUNTS>::new();
+        let mut indices_map = NoVec::<&Address, MAX_STATIC_CPI_ACCOUNTS>::new();
         for account in all_accounts.iter() {
-            indices_map.push(account.address().clone());
+            indices_map.push(account.address());
         }
 
         let args = self
