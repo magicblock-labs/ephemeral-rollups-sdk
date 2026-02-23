@@ -215,8 +215,9 @@ impl<T> From<CapacityError<T>> for ProgramError {
 impl MagicIntentBundleBuilder<'_, '_> {
     /// Reproduces the logic of `build_and_invoke` but serializes the
     /// `MagicIntentBundleArgs` into the provided buffer instead of invoking CPI.
-    /// Returns the number of bytes written.
-    fn build_serialized(self, buf: &mut [u8]) -> usize {
+    /// Returns `(bytes_written, cpi_account_keys)` so tests can verify both the
+    /// instruction data and the CPI account list.
+    fn build_serialized(self, buf: &mut [u8]) -> (usize, NoVec<Address, MAX_STATIC_CPI_ACCOUNTS>) {
         self.intent_bundle.validate().unwrap();
 
         let mut all_accounts = NoVec::<AccountView, MAX_STATIC_CPI_ACCOUNTS>::new();
@@ -225,8 +226,10 @@ impl MagicIntentBundleBuilder<'_, '_> {
             .collect_unique_accounts(&mut all_accounts)
             .unwrap();
 
+        let mut account_keys = NoVec::<Address, MAX_STATIC_CPI_ACCOUNTS>::new();
         let mut indices_map = NoVec::<&Address, MAX_STATIC_CPI_ACCOUNTS>::new();
         for account in all_accounts.iter() {
+            account_keys.push(account.address().clone());
             indices_map.push(account.address());
         }
 
@@ -237,7 +240,7 @@ impl MagicIntentBundleBuilder<'_, '_> {
         buf[..4].copy_from_slice(&SCHEDULE_INTENT_BUNDLE_DISCRIMINANT);
         let args_len =
             bincode::encode_into_slice(&args, &mut buf[4..], bincode::config::legacy()).unwrap();
-        4 + args_len
+        (4 + args_len, account_keys)
     }
 }
 
@@ -250,7 +253,7 @@ impl<'acc, 'args>
         &'args [CallHandler<'args>],
     >
 {
-    fn build_serialized(self, buf: &mut [u8]) -> usize {
+    fn build_serialized(self, buf: &mut [u8]) -> (usize, NoVec<Address, MAX_STATIC_CPI_ACCOUNTS>) {
         self.fold().build_serialized(buf)
     }
 }
@@ -413,7 +416,7 @@ mod tests {
         let commit_accs = [p_acc1.as_account_view()];
         let mut buf = [0u8; CPI_DATA_BUF_SIZE];
 
-        let pino_len = MagicIntentBundleBuilder::new(
+        let (pino_len, pino_accounts) = MagicIntentBundleBuilder::new(
             p_payer.as_account_view(),
             p_ctx.as_account_view(),
             p_prog.as_account_view(),
@@ -444,9 +447,17 @@ mod tests {
         .commit(&[s_acc1.as_account_info()])
         .add_post_commit_actions([sdk_handler])
         .build();
-        drop(accounts);
 
         assert_eq!(&buf[..pino_len], &ix.data, "commit with handler mismatch");
+        let sdk_addrs: Vec<Address> = accounts
+            .iter()
+            .map(|a| Address::new_from_array(a.key.to_bytes()))
+            .collect();
+        assert_eq!(
+            pino_accounts.as_slice(),
+            sdk_addrs.as_slice(),
+            "commit with handler: account list mismatch"
+        );
     }
 
     /// CommitAndUndelegate with post-commit and post-undelegate actions.
@@ -487,7 +498,7 @@ mod tests {
         };
         let cau_accs = [p_acc1.as_account_view()];
         let mut buf = [0u8; CPI_DATA_BUF_SIZE];
-        let pino_len = MagicIntentBundleBuilder::new(
+        let (pino_len, pino_accounts) = MagicIntentBundleBuilder::new(
             p_payer.as_account_view(),
             p_ctx.as_account_view(),
             p_prog.as_account_view(),
@@ -528,12 +539,20 @@ mod tests {
         .add_post_commit_actions([sdk_post_commit])
         .add_post_undelegate_actions([sdk_post_undelegate])
         .build();
-        drop(accounts);
 
         assert_eq!(
             &buf[..pino_len],
             &ix.data,
             "commit_and_undelegate with actions mismatch"
+        );
+        let sdk_addrs: Vec<Address> = accounts
+            .iter()
+            .map(|a| Address::new_from_array(a.key.to_bytes()))
+            .collect();
+        assert_eq!(
+            pino_accounts.as_slice(),
+            sdk_addrs.as_slice(),
+            "commit_and_undelegate: account list mismatch"
         );
     }
 
@@ -578,7 +597,7 @@ mod tests {
         let commit_accs = [p_commit.as_account_view()];
         let cau_accs = [p_cau.as_account_view()];
         let mut buf = [0u8; CPI_DATA_BUF_SIZE];
-        let pino_len = MagicIntentBundleBuilder::new(
+        let (pino_len, pino_accounts) = MagicIntentBundleBuilder::new(
             p_payer.as_account_view(),
             p_ctx.as_account_view(),
             p_prog.as_account_view(),
@@ -622,12 +641,20 @@ mod tests {
         .commit_and_undelegate(&[s_cau.as_account_info()])
         .add_post_undelegate_actions([sdk_undelegate_handler])
         .build();
-        drop(accounts);
 
         assert_eq!(
             &buf[..pino_len],
             &ix.data,
             "full chain with actions mismatch"
+        );
+        let sdk_addrs: Vec<Address> = accounts
+            .iter()
+            .map(|a| Address::new_from_array(a.key.to_bytes()))
+            .collect();
+        assert_eq!(
+            pino_accounts.as_slice(),
+            sdk_addrs.as_slice(),
+            "full chain: account list mismatch"
         );
     }
 
@@ -704,7 +731,7 @@ mod tests {
             builder
         };
 
-        let _len = builder.build_serialized(&mut buf);
+        let (_len, _accounts) = builder.build_serialized(&mut buf);
         std::hint::black_box(&buf);
     }
 }

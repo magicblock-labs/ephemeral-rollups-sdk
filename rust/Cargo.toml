@@ -66,6 +66,7 @@ reqwest = { version = "0.12" }
 solana-program = { version = ">=1.16, <3", default-features = false }
 solana-account = { version = ">=2, <3" }
 solana-account-info = { version = ">=2, <3" }
+solana-address = { version = ">=2, <3"}
 solana-cpi = { version = ">=2, <3" }
 solana-pubkey = { version = ">=2, <3" }
 solana-program-error = { version = ">=2, <3" }
