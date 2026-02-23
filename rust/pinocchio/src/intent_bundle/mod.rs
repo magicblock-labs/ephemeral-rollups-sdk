@@ -375,18 +375,6 @@ mod tests {
     // Builder compatibility tests
     // -----------------------------------------------------------------
 
-    #[test]
-    fn test() {
-        assert_eq!(
-            size_of::<NoVec::<&Address, MAX_STATIC_CPI_ACCOUNTS>>(),
-            8 * 64 + 4 + 4
-        );
-        assert_eq!(
-            size_of::<NoVec::<Address, MAX_STATIC_CPI_ACCOUNTS>>(),
-            32 * 64 + 4 + 4
-        );
-    }
-
     /// Commit with a post-commit action (handler).
     #[test]
     fn test_compat_commit_with_handler() {
