@@ -84,6 +84,10 @@ pub(super) struct MagicIntentBundleSerialize<'i, 'acc, 'args> {
     indices_map: &'i [&'i Address],
     commit: Option<CommitSerialize<'i, 'acc, 'args>>,
     commit_and_undelegate: Option<CommitAndUndelegateSerialize<'i, 'acc, 'args>>,
+    /// Not yet implemented; always `None`. Reserved for wire-format compatibility.
+    commit_finalize: Option<()>,
+    /// Not yet implemented; always `None`. Reserved for wire-format compatibility.
+    commit_finalize_and_undelegate: Option<()>,
     standalone_actions: &'args [CallHandler<'args>],
 }
 
@@ -99,6 +103,8 @@ impl<'i, 'acc, 'args> MagicIntentBundleSerialize<'i, 'acc, 'args> {
             commit_and_undelegate: bundle
                 .commit_and_undelegate_intent
                 .map(|c| CommitAndUndelegateSerialize::new(c, indices_map)),
+            commit_finalize: None,
+            commit_finalize_and_undelegate: None,
             standalone_actions: bundle.standalone_actions,
             indices_map,
         }
@@ -110,6 +116,8 @@ impl bincode::Encode for MagicIntentBundleSerialize<'_, '_, '_> {
     fn encode<E: Encoder>(&self, encoder: &mut E) -> Result<(), EncodeError> {
         self.commit.encode(encoder)?;
         self.commit_and_undelegate.encode(encoder)?;
+        self.commit_finalize.encode(encoder)?;
+        self.commit_finalize_and_undelegate.encode(encoder)?;
         encode_handler_slice(self.standalone_actions, self.indices_map, encoder)
     }
 }

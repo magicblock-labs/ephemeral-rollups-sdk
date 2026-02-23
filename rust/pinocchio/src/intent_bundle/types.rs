@@ -64,6 +64,8 @@ impl<'args> MagicIntentBundle<'_, 'args> {
         Ok(MagicIntentBundleArgs {
             commit,
             commit_and_undelegate,
+            commit_finalize: None,
+            commit_finalize_and_undelegate: None,
             standalone_actions,
         })
     }

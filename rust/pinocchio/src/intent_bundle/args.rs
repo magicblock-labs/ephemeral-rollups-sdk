@@ -94,6 +94,10 @@ pub struct CommitAndUndelegateArgs<'args> {
 pub struct MagicIntentBundleArgs<'args> {
     pub commit: Option<CommitTypeArgs<'args>>,
     pub commit_and_undelegate: Option<CommitAndUndelegateArgs<'args>>,
+    /// Not yet implemented; always `None`. Reserved for wire-format compatibility.
+    pub commit_finalize: Option<()>,
+    /// Not yet implemented; always `None`. Reserved for wire-format compatibility.
+    pub commit_finalize_and_undelegate: Option<()>,
     pub standalone_actions: NoVec<BaseActionArgs<'args>, MAX_ACTIONS_NUM>,
 }
 
@@ -334,6 +338,8 @@ mod tests {
                 commit_type: sdk::CommitTypeArgs::Standalone(cau_indices.clone()),
                 undelegate_type: sdk::UndelegateTypeArgs::Standalone,
             }),
+            commit_finalize: None,
+            commit_finalize_and_undelegate: None,
             standalone_actions: vec![sdk::BaseActionArgs {
                 args: sdk::ActionArgs {
                     escrow_index: 0,
@@ -384,6 +390,8 @@ mod tests {
                 commit_type: CommitTypeArgs::Standalone(pino_cau_indices),
                 undelegate_type: UndelegateTypeArgs::Standalone,
             }),
+            commit_finalize: None,
+            commit_finalize_and_undelegate: None,
             standalone_actions: pino_standalone,
         };
         let mut pino_buf = [0u8; 1024];
@@ -405,6 +413,8 @@ mod tests {
         let sdk_bundle = sdk::MagicIntentBundleArgs {
             commit: None,
             commit_and_undelegate: None,
+            commit_finalize: None,
+            commit_finalize_and_undelegate: None,
             standalone_actions: vec![],
         };
         let sdk_bytes = bincode1::serialize(&sdk_bundle).unwrap();
@@ -413,6 +423,8 @@ mod tests {
         let pino_bundle = MagicIntentBundleArgs {
             commit: None,
             commit_and_undelegate: None,
+            commit_finalize: None,
+            commit_finalize_and_undelegate: None,
             standalone_actions: NoVec::new(),
         };
         let mut pino_buf = [0u8; 256];
