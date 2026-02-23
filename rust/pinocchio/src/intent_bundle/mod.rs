@@ -213,34 +213,24 @@ impl<T> From<CapacityError<T>> for ProgramError {
 
 #[cfg(test)]
 impl MagicIntentBundleBuilder<'_, '_> {
-    /// Reproduces the logic of `build_and_invoke` but serializes the
-    /// `MagicIntentBundleArgs` into the provided buffer instead of invoking CPI.
+    /// Mirrors `build_and_invoke` exactly (streaming `encode_into_slice` /
+    /// `MagicIntentBundleSerialize`) but writes into `buf` instead of invoking CPI.
     /// Returns `(bytes_written, cpi_account_keys)` so tests can verify both the
-    /// instruction data and the CPI account list.
+    /// instruction data and the CPI account list against the SDK reference.
     fn build_serialized(self, buf: &mut [u8]) -> (usize, NoVec<Address, MAX_STATIC_CPI_ACCOUNTS>) {
         self.intent_bundle.validate().unwrap();
-
         let mut all_accounts = NoVec::<AccountView, MAX_STATIC_CPI_ACCOUNTS>::new();
         all_accounts.append([self.payer, self.magic_context]);
         self.intent_bundle
             .collect_unique_accounts(&mut all_accounts)
             .unwrap();
-
         let mut account_keys = NoVec::<Address, MAX_STATIC_CPI_ACCOUNTS>::new();
-        let mut indices_map = NoVec::<&Address, MAX_STATIC_CPI_ACCOUNTS>::new();
         for account in all_accounts.iter() {
             account_keys.push(account.address().clone());
-            indices_map.push(account.address());
         }
-
-        let args = self
-            .intent_bundle
-            .into_args(indices_map.as_slice())
-            .unwrap();
-        buf[..4].copy_from_slice(&SCHEDULE_INTENT_BUNDLE_DISCRIMINANT);
-        let args_len =
-            bincode::encode_into_slice(&args, &mut buf[4..], bincode::config::legacy()).unwrap();
-        (4 + args_len, account_keys)
+        let len =
+            Self::encode_into_slice(all_accounts.as_slice(), self.intent_bundle, buf).unwrap();
+        (len, account_keys)
     }
 }
 
