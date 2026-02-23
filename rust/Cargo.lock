@@ -1053,6 +1053,7 @@ dependencies = [
  "solana-pubkey",
  "solana-system-interface",
  "solana-sysvar",
+ "spl-associated-token-account-interface",
  "thiserror 1.0.69",
 ]
 
@@ -4742,6 +4743,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5707edbfb34a40c9f2a55fa09a49101d9fec4e0cc171ce386086bd9616f34257"
 dependencies = [
  "cfg-if",
+]
+
+[[package]]
+name = "spl-associated-token-account-interface"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5e6bbe0794e532ac08428d3abf5bf8ae75bd81dfddd785c388e326c00c92c6f5"
+dependencies = [
+ "solana-instruction",
+ "solana-pubkey",
 ]
 
 [[package]]

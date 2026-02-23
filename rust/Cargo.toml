@@ -73,6 +73,7 @@ solana-program-memory = { version = ">=2, <3" }
 solana-system-interface = { version = ">=1, <3", features = ["bincode"] }
 solana-instruction = { version = ">=1, <3" }
 solana-sysvar = { version = ">=2, <3" }
+spl-associated-token-account-interface = { version = "1.0.0" }
 pinocchio = { version = "0.10", default-features = false, features = [
 	"cpi",
 	"alloc",

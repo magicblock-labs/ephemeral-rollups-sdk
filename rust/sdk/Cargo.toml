@@ -12,10 +12,10 @@ edition = { workspace = true }
 readme = "README.md"
 
 [features]
-default = ["solana-program", "solana-system-interface"]
+default = ["solana-program", "solana-system-interface", "access-control", "spl"]
 anchor = ["anchor-lang"]
 access-control = ["num-derive", "num-traits", "thiserror"]
-spl = []
+spl = ["spl-associated-token-account-interface"]
 disable-realloc = []
 modular-sdk = [
     "solana-account",
@@ -51,6 +51,7 @@ solana-program-error = { workspace = true, optional = true }
 solana-program-memory = { workspace = true, optional = true }
 solana-system-interface = { workspace = true, optional = true }
 solana-sysvar = { workspace = true, optional = true }
+spl-associated-token-account-interface = { workspace = true, optional = true }
 magicblock-magic-program-api = { workspace = true }
 magicblock-delegation-program = { workspace = true, features = [
     "no-entrypoint",

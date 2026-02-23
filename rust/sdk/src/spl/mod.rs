@@ -1,5 +1,6 @@
-pub mod instructions;
+pub mod builders;
+pub mod cpi;
 pub mod types;
 
-pub use instructions::*;
+pub use cpi::*;
 pub use types::*;
