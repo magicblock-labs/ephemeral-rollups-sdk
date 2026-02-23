@@ -48,7 +48,7 @@ impl<'info> MagicInstructionBuilder<'info> {
             all_accounts,
             Instruction::new_with_bincode(
                 *self.magic_program.key,
-                &MagicBlockInstruction::ScheduleBaseIntent(args),
+                &MagicBlockInstruction::ScheduleIntentBundle(args.into()),
                 accounts_meta,
             ),
         )

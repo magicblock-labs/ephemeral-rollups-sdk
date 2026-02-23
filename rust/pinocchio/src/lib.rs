@@ -8,6 +8,7 @@ pub mod instruction;
 pub mod intent_bundle;
 pub mod pda;
 pub mod seeds;
+pub mod spl;
 pub mod types;
 pub mod utils;
 

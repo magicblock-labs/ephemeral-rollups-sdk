@@ -1,7 +1,9 @@
 #![allow(deprecated)]
 
 pub use crate::ephem::deprecated::v0::{
-    commit_accounts, commit_and_undelegate_accounts, create_schedule_commit_ix,
+    commit_accounts, commit_and_undelegate_accounts, commit_finalize_accounts,
+    commit_finalize_and_undelegate_accounts, create_finalize_schedule_commit_ix,
+    create_schedule_commit_ix,
 };
 use crate::ephem::deprecated::v1::utils;
 pub use crate::ephem::deprecated::v1::{
@@ -28,6 +30,10 @@ pub enum MagicIntent<'info> {
     Commit(CommitType<'info>),
     /// Commit accounts and undelegate them, optionally with post-commit and post-undelegate actions.
     CommitAndUndelegate(CommitAndUndelegate<'info>),
+    /// CommitFinalize accounts to base layer, optionally with post-commit actions.
+    CommitFinalize(CommitType<'info>),
+    /// CommitFinalize accounts and undelegate them, optionally with post-commit and post-undelegate actions.
+    CommitFinalizeAndUndelegate(CommitAndUndelegate<'info>),
 }
 
 /// Builds a single `MagicBlockInstruction::ScheduleIntentBundle` instruction by aggregating
@@ -180,6 +186,8 @@ struct MagicIntentBundle<'info> {
     standalone_actions: Vec<CallHandler<'info>>,
     commit_intent: Option<CommitType<'info>>,
     commit_and_undelegate_intent: Option<CommitAndUndelegate<'info>>,
+    commit_finalize_intent: Option<CommitType<'info>>,
+    commit_finalize_and_undelegate_intent: Option<CommitAndUndelegate<'info>>,
 }
 
 impl<'info> MagicIntentBundle<'info> {
@@ -201,25 +209,47 @@ impl<'info> MagicIntentBundle<'info> {
                     self.commit_and_undelegate_intent = Some(value);
                 }
             }
+            MagicIntent::CommitFinalize(value) => {
+                if let Some(ref mut commit_finalize_accounts) = self.commit_finalize_intent {
+                    commit_finalize_accounts.merge(value);
+                } else {
+                    self.commit_finalize_intent = Some(value);
+                }
+            }
+            MagicIntent::CommitFinalizeAndUndelegate(value) => {
+                if let Some(ref mut commit_finalize_and_undelegate) =
+                    self.commit_finalize_and_undelegate_intent
+                {
+                    commit_finalize_and_undelegate.merge(value);
+                } else {
+                    self.commit_finalize_and_undelegate_intent = Some(value);
+                }
+            }
         }
     }
 
     /// Consumes the bundle and encodes it into `MagicIntentBundleArgs` using a `Pubkey -> u8` indices map.
     fn into_args(self, indices_map: &HashMap<Pubkey, u8>) -> MagicIntentBundleArgs {
-        let commit = self.commit_intent.map(|c| c.into_args(indices_map));
-        let commit_and_undelegate = self
-            .commit_and_undelegate_intent
-            .map(|c| c.into_args(indices_map));
-        let standalone_actions = self
-            .standalone_actions
-            .into_iter()
-            .map(|ch| ch.into_args(indices_map))
-            .collect::<Vec<_>>();
-
         MagicIntentBundleArgs {
-            commit,
-            commit_and_undelegate,
-            standalone_actions,
+            commit: self.commit_intent.map(|c| c.into_args(indices_map)),
+
+            commit_and_undelegate: self
+                .commit_and_undelegate_intent
+                .map(|c| c.into_args(indices_map)),
+
+            commit_finalize: self
+                .commit_finalize_intent
+                .map(|c| c.into_args(indices_map)),
+
+            commit_finalize_and_undelegate: self
+                .commit_finalize_and_undelegate_intent
+                .map(|c| c.into_args(indices_map)),
+
+            standalone_actions: self
+                .standalone_actions
+                .into_iter()
+                .map(|ch| ch.into_args(indices_map))
+                .collect::<Vec<_>>(),
         }
     }
 
@@ -312,7 +342,7 @@ impl<'info> CommitIntentBuilder<'info> {
         self,
         accounts: &[AccountInfo<'info>],
     ) -> CommitAndUndelegateIntentBuilder<'info> {
-        self.done().commit_and_undelegate(accounts)
+        self.fold().commit_and_undelegate(accounts)
     }
 
     /// Transition: finalizes this commit intent and adds standalone base-layer actions.
@@ -320,21 +350,21 @@ impl<'info> CommitIntentBuilder<'info> {
         self,
         actions: impl IntoIterator<Item = CallHandler<'info>>,
     ) -> MagicIntentBundleBuilder<'info> {
-        self.done().add_standalone_actions(actions)
+        self.fold().add_standalone_actions(actions)
     }
 
     /// Terminal: finalizes this commit intent and builds the full instruction.
     pub fn build(self) -> (Vec<AccountInfo<'info>>, Instruction) {
-        self.done().build()
+        self.fold().build()
     }
 
     /// Terminal: finalizes this commit intent, builds the instruction and invokes it.
     pub fn build_and_invoke(self) -> ProgramResult {
-        self.done().build_and_invoke()
+        self.fold().build_and_invoke()
     }
 
     /// Finalizes this commit intent and folds it into the parent bundle.
-    fn done(self) -> MagicIntentBundleBuilder<'info> {
+    pub fn fold(self) -> MagicIntentBundleBuilder<'info> {
         let Self {
             mut parent,
             accounts,
@@ -386,7 +416,7 @@ impl<'info> CommitAndUndelegateIntentBuilder<'info> {
 
     /// Transition: finalizes this commit-and-undelegate intent and starts a new commit intent.
     pub fn commit(self, accounts: &[AccountInfo<'info>]) -> CommitIntentBuilder<'info> {
-        self.done().commit(accounts)
+        self.fold().commit(accounts)
     }
 
     /// Transition: finalizes this commit-and-undelegate intent and adds standalone base-layer actions.
@@ -394,21 +424,21 @@ impl<'info> CommitAndUndelegateIntentBuilder<'info> {
         self,
         actions: impl IntoIterator<Item = CallHandler<'info>>,
     ) -> MagicIntentBundleBuilder<'info> {
-        self.done().add_standalone_actions(actions)
+        self.fold().add_standalone_actions(actions)
     }
 
     /// Terminal: finalizes this intent and builds the full instruction.
     pub fn build(self) -> (Vec<AccountInfo<'info>>, Instruction) {
-        self.done().build()
+        self.fold().build()
     }
 
     /// Terminal: finalizes this intent, builds the instruction and invokes it.
     pub fn build_and_invoke(self) -> ProgramResult {
-        self.done().build_and_invoke()
+        self.fold().build_and_invoke()
     }
 
     /// Finalizes this commit-and-undelegate intent and folds it into the parent bundle.
-    fn done(self) -> MagicIntentBundleBuilder<'info> {
+    pub fn fold(self) -> MagicIntentBundleBuilder<'info> {
         let Self {
             mut parent,
             accounts,
