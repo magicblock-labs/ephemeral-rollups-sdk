@@ -12,7 +12,7 @@ edition = { workspace = true }
 readme = "README.md"
 
 [features]
-default = ["solana-program", "solana-system-interface", "access-control", "spl"]
+default = ["solana-program", "solana-system-interface"]
 anchor = ["anchor-lang"]
 access-control = ["num-derive", "num-traits", "thiserror"]
 spl = ["spl-associated-token-account-interface"]
