@@ -326,6 +326,6 @@ impl<'args> CommitAndUndelegateIntent<'_, 'args> {
 
 /// Gets the index of a pubkey in the deduplicated pubkey list.
 /// Returns None if the pubkey is not found.
-fn get_index(pubkeys: &[&Address], needle: &Address) -> Option<u8> {
+pub(in crate::intent_bundle) fn get_index(pubkeys: &[&Address], needle: &Address) -> Option<u8> {
     pubkeys.iter().position(|k| k == &needle).map(|i| i as u8)
 }

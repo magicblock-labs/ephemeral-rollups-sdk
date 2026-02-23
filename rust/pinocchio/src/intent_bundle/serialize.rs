@@ -16,7 +16,7 @@ use solana_address::Address;
 
 use crate::intent_bundle::args::BaseActionArgs;
 use crate::intent_bundle::types::{
-    CallHandler, CommitAndUndelegateIntent, CommitIntent, MagicIntentBundle,
+    get_index, CallHandler, CommitAndUndelegateIntent, CommitIntent, MagicIntentBundle,
 };
 
 // ---------------------------------------------------------------------------
@@ -154,9 +154,4 @@ fn encode_handler<E: Encoder>(
         accounts: handler.accounts,
     }
     .encode(encoder)
-}
-
-/// Finds the position of `needle` in the deduplicated address list and returns it as `u8`.
-fn get_index(pubkeys: &[&Address], needle: &Address) -> Option<u8> {
-    pubkeys.iter().position(|k| k == &needle).map(|i| i as u8)
 }
