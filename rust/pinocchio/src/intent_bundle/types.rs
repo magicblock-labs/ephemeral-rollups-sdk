@@ -15,13 +15,13 @@ use super::MAX_ACTIONS_NUM;
 /// This enum represents the different types of operations that can be bundled
 /// and executed through the Magic program.
 #[allow(clippy::large_enum_variant)]
-pub enum MagicIntent<'act, 'args> {
+pub enum MagicIntent<'acc, 'args> {
     /// Standalone actions to execute on base layer without commit/undelegate semantics.
-    StandaloneActions(&'act [CallHandler<'args>]),
+    StandaloneActions(&'args [CallHandler<'args>]),
     /// Commit accounts to base layer, optionally with post-commit actions.
-    Commit(CommitIntent<'act, 'args>),
+    Commit(CommitIntent<'acc, 'args>),
     /// Commit accounts and undelegate them, optionally with post-commit and post-undelegate actions.
-    CommitAndUndelegate(CommitAndUndelegateIntent<'act, 'args>),
+    CommitAndUndelegate(CommitAndUndelegateIntent<'acc, 'args>),
 }
 
 /// Bundle of Intents
@@ -32,10 +32,10 @@ pub enum MagicIntent<'act, 'args> {
 /// Intents assumed to be independent and self-sufficient,
 /// hence order in which they were inserted doesn't matter
 #[derive(Default)]
-pub(super) struct MagicIntentBundle<'act, 'args> {
-    pub(super) standalone_actions: &'act [CallHandler<'args>],
-    pub(super) commit_intent: Option<CommitIntent<'act, 'args>>,
-    pub(super) commit_and_undelegate_intent: Option<CommitAndUndelegateIntent<'act, 'args>>,
+pub(super) struct MagicIntentBundle<'acc, 'args> {
+    pub(super) standalone_actions: &'args [CallHandler<'args>],
+    pub(super) commit_intent: Option<CommitIntent<'acc, 'args>>,
+    pub(super) commit_and_undelegate_intent: Option<CommitAndUndelegateIntent<'acc, 'args>>,
 }
 
 impl<'args> MagicIntentBundle<'_, 'args> {
@@ -83,45 +83,21 @@ impl<'args> MagicIntentBundle<'_, 'args> {
         Ok(())
     }
 
-    /// Validates that all present intents have at least one committed account.
+    /// Validates the bundle:
+    /// - Each present intent must have at least one committed account.
+    /// - No duplicate accounts within an intent.
+    /// - No account overlap between `Commit` and `CommitAndUndelegate`.
     pub(super) fn validate(&self) -> ProgramResult {
-        if let Some(ref commit) = self.commit_intent {
+        let mut seen = NoVec::<Address, MAX_STATIC_CPI_ACCOUNTS>::new();
+        if let Some(commit) = &self.commit_intent {
             commit.validate()?;
+            commit.try_collect_unique_addresses(&mut seen)?;
         }
-        if let Some(ref cau) = self.commit_and_undelegate_intent {
+        if let Some(cau) = &self.commit_and_undelegate_intent {
             cau.validate()?;
+            cau.try_collect_unique_addresses(&mut seen)?;
         }
         Ok(())
-    }
-
-    /// Normalizes the bundle into a valid, canonical form.
-    ///
-    /// Effects:
-    /// - Deduplicates committed accounts within each intent by address (stable; first occurrence wins).
-    /// - Resolves overlap between `Commit` and `CommitAndUndelegate`:
-    ///   any account present in both will be removed from `Commit` and kept in `CommitAndUndelegate`.
-    /// - Returns `Err(InvalidArgument)` if `Commit` becomes empty after overlap removal.
-    ///   Action merging into `CommitAndUndelegate` is not possible because actions are
-    ///   stored as borrowed slices (`&[CallHandler]`).
-    pub(super) fn normalize(&mut self) -> ProgramResult {
-        let cau_seen = self
-            .commit_and_undelegate_intent
-            .as_mut()
-            .map(|cau| cau.dedup())
-            .transpose()?;
-        let Some(mut commit) = self.commit_intent.take() else {
-            return Ok(()); // No commit intent, nothing more to normalize
-        };
-
-        let mut seen = cau_seen.unwrap_or_default();
-        commit.dedup(&mut seen)?;
-
-        if commit.accounts.is_empty() {
-            Err(ProgramError::InvalidArgument)
-        } else {
-            self.commit_intent = Some(commit);
-            Ok(())
-        }
     }
 }
 
@@ -165,9 +141,9 @@ impl<'args> CallHandler<'args> {
     }
 }
 
-pub struct CommitIntent<'act, 'args> {
-    pub(super) accounts: NoVec<AccountView, MAX_STATIC_CPI_ACCOUNTS>,
-    pub(super) actions: &'act [CallHandler<'args>],
+pub struct CommitIntent<'acc, 'args> {
+    pub(super) accounts: &'acc [AccountView],
+    pub(super) actions: &'args [CallHandler<'args>],
 }
 
 impl<'args> CommitIntent<'_, 'args> {
@@ -180,10 +156,22 @@ impl<'args> CommitIntent<'_, 'args> {
         }
     }
 
-    /// Deduplicates committed accounts by address. Accounts whose address is
-    /// already in `seen` are removed. Newly seen addresses are added to `seen`.
-    fn dedup(&mut self, seen: &mut NoVec<Address, MAX_STATIC_CPI_ACCOUNTS>) -> ProgramResult {
-        dedup_accounts(&mut self.accounts, seen)
+    /// Validates that none of this intent's accounts are already in `seen`,
+    /// then appends each address to `seen`.
+    /// Returns `Err(InvalidArgument)` on duplicates within this intent or
+    /// overlap with addresses already in `seen` (e.g. from another intent).
+    fn try_collect_unique_addresses(
+        &self,
+        seen: &mut NoVec<Address, MAX_STATIC_CPI_ACCOUNTS>,
+    ) -> ProgramResult {
+        for account in self.accounts {
+            let addr = account.address();
+            if seen.contains(addr) {
+                return Err(ProgramError::InvalidArgument);
+            }
+            seen.try_push(addr.clone())?;
+        }
+        Ok(())
     }
 
     fn collect_unique_accounts(
@@ -224,10 +212,10 @@ impl<'args> CommitIntent<'_, 'args> {
     }
 }
 
-pub struct CommitAndUndelegateIntent<'act, 'args> {
-    pub(super) accounts: NoVec<AccountView, MAX_STATIC_CPI_ACCOUNTS>,
-    pub(super) post_commit_actions: &'act [CallHandler<'args>],
-    pub(super) post_undelegate_actions: &'act [CallHandler<'args>],
+pub struct CommitAndUndelegateIntent<'acc, 'args> {
+    pub(super) accounts: &'acc [AccountView],
+    pub(super) post_commit_actions: &'args [CallHandler<'args>],
+    pub(super) post_undelegate_actions: &'args [CallHandler<'args>],
 }
 
 impl<'args> CommitAndUndelegateIntent<'_, 'args> {
@@ -240,12 +228,22 @@ impl<'args> CommitAndUndelegateIntent<'_, 'args> {
         }
     }
 
-    /// Deduplicates committed accounts by address and returns the set of
-    /// unique addresses (for cross-intent overlap detection).
-    fn dedup(&mut self) -> Result<NoVec<Address, MAX_STATIC_CPI_ACCOUNTS>, ProgramError> {
-        let mut seen = NoVec::<Address, MAX_STATIC_CPI_ACCOUNTS>::new();
-        dedup_accounts(&mut self.accounts, &mut seen)?;
-        Ok(seen)
+    /// Validates that none of this intent's accounts are already in `seen`,
+    /// then appends each address to `seen`.
+    /// Returns `Err(InvalidArgument)` on duplicates within this intent or
+    /// overlap with addresses already in `seen` (e.g. from another intent).
+    fn try_collect_unique_addresses(
+        &self,
+        seen: &mut NoVec<Address, MAX_STATIC_CPI_ACCOUNTS>,
+    ) -> ProgramResult {
+        for account in self.accounts {
+            let addr = account.address();
+            if seen.contains(addr) {
+                return Err(ProgramError::InvalidArgument);
+            }
+            seen.try_push(addr.clone())?;
+        }
+        Ok(())
     }
 
     fn collect_unique_accounts(
@@ -313,34 +311,6 @@ impl<'args> CommitAndUndelegateIntent<'_, 'args> {
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-/// Deduplicates `accounts` by address against a running `seen` set.
-/// Accounts whose address is already in `seen` are removed; newly encountered
-/// addresses are appended to `seen`.
-fn dedup_accounts(
-    accounts: &mut NoVec<AccountView, MAX_STATIC_CPI_ACCOUNTS>,
-    seen: &mut NoVec<Address, MAX_STATIC_CPI_ACCOUNTS>,
-) -> ProgramResult {
-    let mut result: ProgramResult = Ok(());
-    accounts.retain(|el| {
-        if result.is_err() {
-            return false;
-        }
-        let addr = el.address();
-        if seen.contains(addr) {
-            false
-        } else {
-            match seen.try_push(addr.clone()) {
-                Ok(()) => true,
-                Err(_) => {
-                    result = Err(ProgramError::InvalidArgument);
-                    false
-                }
-            }
-        }
-    });
-    result
-}
 
 /// Gets the index of a pubkey in the deduplicated pubkey list.
 /// Returns None if the pubkey is not found.

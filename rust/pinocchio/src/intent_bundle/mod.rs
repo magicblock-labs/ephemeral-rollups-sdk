@@ -11,6 +11,7 @@ mod commit_and_undelegate;
 mod no_vec;
 pub mod types;
 
+use crate::intent_bundle::args::MagicIntentBundleArgs;
 use crate::intent_bundle::commit::CommitIntentBuilder;
 use crate::intent_bundle::commit_and_undelegate::CommitAndUndelegateIntentBuilder;
 pub use args::{ActionArgs, ShortAccountMeta};
@@ -26,11 +27,11 @@ const SCHEDULE_INTENT_BUNDLE_DISCRIMINANT: [u8; 4] = 11u32.to_le_bytes();
 /// Builds a single `MagicBlockInstruction::ScheduleIntentBundle` instruction by aggregating
 /// multiple independent intents (base actions, commits, commit+undelegate), normalizing them,
 /// and producing a deduplicated account list plus the corresponding CPI `Instruction`.
-pub struct MagicIntentBundleBuilder<'act, 'args> {
+pub struct MagicIntentBundleBuilder<'acc, 'args> {
     payer: AccountView,
     magic_context: AccountView,
     magic_program: AccountView,
-    intent_bundle: MagicIntentBundle<'act, 'args>,
+    intent_bundle: MagicIntentBundle<'acc, 'args>,
 }
 
 impl MagicIntentBundleBuilder<'static, 'static> {
@@ -44,15 +45,18 @@ impl MagicIntentBundleBuilder<'static, 'static> {
     }
 }
 
-impl<'act, 'args> MagicIntentBundleBuilder<'act, 'args> {
+impl<'acc, 'args> MagicIntentBundleBuilder<'acc, 'args> {
     /// Starts building a Commit intent. Returns a [`CommitIntentBuilder`] that owns this parent.
     ///
     /// The returned builder lets you chain `.add_post_commit_actions()`, transition to other
     /// intents via `.commit_and_undelegate()`, or finalize via `.build_and_invoke()`.
-    pub fn commit<'acc>(
+    pub fn commit<'new_acc>(
         self,
-        accounts: &'acc [AccountView],
-    ) -> CommitIntentBuilder<'act, 'args, 'acc, &'static [CallHandler<'static>]> {
+        accounts: &'new_acc [AccountView],
+    ) -> CommitIntentBuilder<'new_acc, 'args, &'static [CallHandler<'static>]>
+    where
+        'acc: 'new_acc,
+    {
         CommitIntentBuilder::new(self, accounts)
     }
 
@@ -62,27 +66,28 @@ impl<'act, 'args> MagicIntentBundleBuilder<'act, 'args> {
     /// The returned builder lets you chain `.add_post_commit_actions()`,
     /// `.add_post_undelegate_actions()`, transition to other intents via `.commit()`,
     /// or finalize via `.build_and_invoke()`.
-    pub fn commit_and_undelegate<'acc>(
+    pub fn commit_and_undelegate<'new_acc>(
         self,
-        accounts: &'acc [AccountView],
+        accounts: &'new_acc [AccountView],
     ) -> CommitAndUndelegateIntentBuilder<
-        'act,  // actions (from parent)
-        'args, // args in CallHandlers
-        'acc,  // accounts
+        'new_acc,
+        'args,
         &'static [CallHandler<'static>],
         &'static [CallHandler<'static>],
-    > {
+    >
+    where
+        'acc: 'new_acc,
+    {
         CommitAndUndelegateIntentBuilder::new(self, accounts)
     }
 
     /// Adds standalone base-layer actions to be executed without any commit/undelegate semantics.
-    pub fn set_standalone_actions<'new_act, 'new_args>(
+    pub fn set_standalone_actions<'new_args>(
         self,
-        actions: &'new_act [CallHandler<'new_args>],
-    ) -> MagicIntentBundleBuilder<'new_act, 'new_args>
+        actions: &'new_args [CallHandler<'new_args>],
+    ) -> MagicIntentBundleBuilder<'acc, 'new_args>
     where
         'args: 'new_args,
-        'act: 'new_act,
     {
         let MagicIntentBundle {
             standalone_actions: _,
@@ -102,11 +107,47 @@ impl<'act, 'args> MagicIntentBundleBuilder<'act, 'args> {
         }
     }
 
+    pub fn into_args(
+        all_accounts: &[AccountView],
+        intent_bundle: MagicIntentBundle<'_, 'args>,
+    ) -> Result<MagicIntentBundleArgs<'args>, ProgramError> {
+        let mut indices_map = NoVec::<Address, MAX_STATIC_CPI_ACCOUNTS>::new();
+        for account in all_accounts {
+            indices_map.try_push(account.address().clone())?;
+        }
+
+        // 4. Convert intents to serializable args
+        intent_bundle.into_args(indices_map.as_slice())
+    }
+
+    pub fn encode_into_slice(
+        all_accounts: &[AccountView],
+        intent_bundle: MagicIntentBundle<'_, 'args>,
+        data_buf: &mut [u8],
+    ) -> Result<usize, ProgramError> {
+        const OFFSET: usize = SCHEDULE_INTENT_BUNDLE_DISCRIMINANT.len();
+
+        let mut indices_map = NoVec::<Address, MAX_STATIC_CPI_ACCOUNTS>::new();
+        for account in all_accounts {
+            indices_map.try_push(account.address().clone())?;
+        }
+
+        // 4. Convert intents to serializable args
+        let args = intent_bundle.into_args(indices_map.as_slice())?;
+
+        data_buf[..OFFSET].copy_from_slice(&SCHEDULE_INTENT_BUNDLE_DISCRIMINANT);
+        let args_len =
+            bincode::encode_into_slice(&args, &mut data_buf[OFFSET..], bincode::config::legacy())
+                .map_err(|_| ProgramError::InvalidInstructionData)?;
+
+        Ok(OFFSET + args_len)
+    }
+
     /// Normalizes the bundle, serializes it with bincode into `data_buf`, builds the
     /// CPI instruction, and invokes the magic program.
     ///
     /// `data_buf` must be large enough to hold the serialized `MagicIntentBundleArgs`.
-    pub fn build_and_invoke(mut self, data_buf: &mut [u8]) -> ProgramResult {
+    pub fn build_and_invoke(self, data_buf: &mut [u8]) -> ProgramResult {
         const OFFSET: usize = SCHEDULE_INTENT_BUNDLE_DISCRIMINANT.len();
 
         // Guard: buffer must be large enough for at least the discriminant plus
@@ -115,11 +156,8 @@ impl<'act, 'args> MagicIntentBundleBuilder<'act, 'args> {
             return Err(ProgramError::InvalidInstructionData);
         }
 
-        // Validate: ensure intents have at least one committed account
+        // Validate: ensure intents have at least one committed account, no overlap
         self.intent_bundle.validate()?;
-
-        // Normalize: dedup within intents, resolve cross-intent overlaps
-        self.intent_bundle.normalize()?;
 
         // Collect all unique accounts (payer + context first, then from intents)
         let mut all_accounts = NoVec::<AccountView, MAX_STATIC_CPI_ACCOUNTS>::new();
@@ -128,20 +166,16 @@ impl<'act, 'args> MagicIntentBundleBuilder<'act, 'args> {
             .collect_unique_accounts(&mut all_accounts)?;
 
         // 3. Build the natural indices map: indices_map[i] = address of account at position i
-        let mut indices_map = NoVec::<Address, MAX_STATIC_CPI_ACCOUNTS>::new();
-        for account in all_accounts.iter() {
-            indices_map.try_push(account.address().clone())?;
-        }
-
-        // 4. Convert intents to serializable args
-        let args = self.intent_bundle.into_args(indices_map.as_slice())?;
-
-        // 5. Write instruction discriminant + serialize args (bincode 1.x wire compat)
-        data_buf[..OFFSET].copy_from_slice(&SCHEDULE_INTENT_BUNDLE_DISCRIMINANT);
-        let args_len =
-            bincode::encode_into_slice(&args, &mut data_buf[OFFSET..], bincode::config::legacy())
-                .map_err(|_| ProgramError::InvalidInstructionData)?;
-        let data_len = OFFSET + args_len;
+        let data_len =
+            Self::encode_into_slice(all_accounts.as_slice(), self.intent_bundle, data_buf)?;
+        // let args = Self::into_args(all_accounts.as_slice(), self.intent_bundle)?;
+        //
+        // // 5. Write instruction discriminant + serialize args (bincode 1.x wire compat)
+        // data_buf[..OFFSET].copy_from_slice(&SCHEDULE_INTENT_BUNDLE_DISCRIMINANT);
+        // let args_len =
+        //     bincode::encode_into_slice(&args, &mut data_buf[OFFSET..], bincode::config::legacy())
+        //         .map_err(|_| ProgramError::InvalidInstructionData)?;
+        // let data_len = OFFSET + args_len;
 
         // 6. Build instruction account metas
         let mut instruction_accounts = NoVec::<InstructionAccount, MAX_STATIC_CPI_ACCOUNTS>::new();
@@ -184,8 +218,8 @@ impl MagicIntentBundleBuilder<'_, '_> {
     /// Reproduces the logic of `build_and_invoke` but serializes the
     /// `MagicIntentBundleArgs` into the provided buffer instead of invoking CPI.
     /// Returns the number of bytes written.
-    fn build_serialized(mut self, buf: &mut [u8]) -> usize {
-        self.intent_bundle.normalize().unwrap();
+    fn build_serialized(self, buf: &mut [u8]) -> usize {
+        self.intent_bundle.validate().unwrap();
 
         let mut all_accounts = NoVec::<AccountView, MAX_STATIC_CPI_ACCOUNTS>::new();
         all_accounts.append([self.payer, self.magic_context]);
@@ -210,13 +244,12 @@ impl MagicIntentBundleBuilder<'_, '_> {
 }
 
 #[cfg(test)]
-impl<'act, 'args>
+impl<'acc, 'args>
     CommitAndUndelegateIntentBuilder<
-        'act,
+        'acc,
         'args,
-        '_,
-        &'act [CallHandler<'args>],
-        &'act [CallHandler<'args>],
+        &'args [CallHandler<'args>],
+        &'args [CallHandler<'args>],
     >
 {
     fn build_serialized(self, buf: &mut [u8]) -> usize {
@@ -340,6 +373,18 @@ mod tests {
     // -----------------------------------------------------------------
     // Builder compatibility tests
     // -----------------------------------------------------------------
+
+    #[test]
+    fn test() {
+        assert_eq!(
+            size_of::<NoVec::<&Address, MAX_STATIC_CPI_ACCOUNTS>>(),
+            8 * 64 + 4 + 4
+        );
+        assert_eq!(
+            size_of::<NoVec::<Address, MAX_STATIC_CPI_ACCOUNTS>>(),
+            32 * 64 + 4 + 4
+        );
+    }
 
     /// Commit with a post-commit action (handler).
     #[test]
