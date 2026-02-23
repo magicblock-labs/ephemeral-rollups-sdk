@@ -1,71 +1,63 @@
-use core::mem::MaybeUninit;
-
-use crate::spl::consts::ESPL_TOKEN_PROGRAM_ID;
-use crate::spl::EphemeralSplDiscriminator;
-use pinocchio::cpi::{invoke, invoke_signed, Signer, MAX_CPI_ACCOUNTS};
-use pinocchio::instruction::{InstructionAccount, InstructionView};
-use pinocchio::{AccountView, ProgramResult};
+use {
+    crate::spl::{consts::ESPL_TOKEN_PROGRAM_ID, EphemeralSplDiscriminator},
+    core::{mem::MaybeUninit, slice::from_raw_parts},
+    pinocchio::{
+        cpi::{invoke_signed_with_bounds, Signer},
+        instruction::{InstructionAccount, InstructionView},
+        AccountView, ProgramResult,
+    },
+};
 
 /// Undelegate an ephemeral ATA permission.
-pub fn undelegate_ephemeral_ata_permission(
-    payer: &AccountView,
-    eata: &AccountView,
-    permission: &AccountView,
-    permission_program: &AccountView,
-    magic_program: &AccountView,
-    magic_context: &AccountView,
-    signer_seeds: Option<Signer<'_, '_>>,
-) -> ProgramResult {
-    let mut account_metas =
-        [const { MaybeUninit::<InstructionAccount>::uninit() }; MAX_CPI_ACCOUNTS];
-    let num_accounts = 6;
+pub struct UndelegateEphemeralAtaPermission<'a> {
+    pub payer: &'a AccountView,
+    pub eata: &'a AccountView,
+    pub permission: &'a AccountView,
+    pub permission_program: &'a AccountView,
+    pub magic_program: &'a AccountView,
+    pub magic_context: &'a AccountView,
+}
 
-    unsafe {
-        account_metas
-            .get_unchecked_mut(0)
-            .write(InstructionAccount::readonly_signer(payer.address()));
-        account_metas
-            .get_unchecked_mut(1)
-            .write(InstructionAccount::readonly(eata.address()));
-        account_metas
-            .get_unchecked_mut(2)
-            .write(InstructionAccount::writable(permission.address()));
-        account_metas
-            .get_unchecked_mut(3)
-            .write(InstructionAccount::readonly(permission_program.address()));
-        account_metas
-            .get_unchecked_mut(4)
-            .write(InstructionAccount::readonly(magic_program.address()));
-        account_metas
-            .get_unchecked_mut(5)
-            .write(InstructionAccount::writable(magic_context.address()));
+impl<'a> UndelegateEphemeralAtaPermission<'a> {
+    #[inline(always)]
+    pub fn invoke(&self) -> ProgramResult {
+        self.invoke_signed(&[])
     }
 
-    let acc_infos: [&AccountView; 6] = [
-        payer,
-        eata,
-        permission,
-        permission_program,
-        magic_program,
-        magic_context,
-    ];
+    #[inline(always)]
+    pub fn invoke_signed(&self, signers: &[Signer<'_, '_>]) -> ProgramResult {
+        let expected_accounts = 6;
 
-    let data: [u8; 1] = [EphemeralSplDiscriminator::UndelegateEphemeralAtaPermission as u8];
+        let mut instruction_accounts = [const { MaybeUninit::<InstructionAccount>::uninit() }; 6];
+        instruction_accounts[0].write(InstructionAccount::readonly_signer(self.payer.address()));
+        instruction_accounts[1].write(InstructionAccount::readonly(self.eata.address()));
+        instruction_accounts[2].write(InstructionAccount::writable(self.permission.address()));
+        instruction_accounts[3].write(InstructionAccount::readonly(
+            self.permission_program.address(),
+        ));
+        instruction_accounts[4].write(InstructionAccount::readonly(self.magic_program.address()));
+        instruction_accounts[5].write(InstructionAccount::writable(self.magic_context.address()));
 
-    let ix = InstructionView {
-        program_id: &ESPL_TOKEN_PROGRAM_ID,
-        accounts: unsafe {
-            core::slice::from_raw_parts(
-                account_metas.as_ptr() as *const InstructionAccount,
-                num_accounts,
-            )
-        },
-        data: &data,
-    };
+        let mut accounts = [const { MaybeUninit::<&AccountView>::uninit() }; 6];
+        accounts[0].write(self.payer);
+        accounts[1].write(self.eata);
+        accounts[2].write(self.permission);
+        accounts[3].write(self.permission_program);
+        accounts[4].write(self.magic_program);
+        accounts[5].write(self.magic_context);
 
-    if let Some(seeds) = signer_seeds {
-        invoke_signed(&ix, &acc_infos, &[seeds])
-    } else {
-        invoke(&ix, &acc_infos)
+        let instruction_data = [EphemeralSplDiscriminator::UndelegateEphemeralAtaPermission as u8];
+
+        invoke_signed_with_bounds::<6>(
+            &InstructionView {
+                program_id: &ESPL_TOKEN_PROGRAM_ID,
+                accounts: unsafe {
+                    from_raw_parts(instruction_accounts.as_ptr() as _, expected_accounts)
+                },
+                data: unsafe { from_raw_parts(instruction_data.as_ptr() as _, 1) },
+            },
+            unsafe { from_raw_parts(accounts.as_ptr() as _, expected_accounts) },
+            signers,
+        )
     }
 }

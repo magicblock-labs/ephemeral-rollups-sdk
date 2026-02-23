@@ -9,16 +9,16 @@ pub mod undelegate_ephemeral_ata;
 pub mod undelegate_ephemeral_ata_permission;
 pub mod withdraw_spl_tokens;
 
-pub use create_ephemeral_ata_permission::create_ephemeral_ata_permission;
-pub use delegate_ephemeral_ata::delegate_ephemeral_ata;
-pub use delegate_ephemeral_ata_permission::delegate_ephemeral_ata_permission;
-pub use deposit_spl_tokens::deposit_spl_tokens;
-pub use initialize_ephemeral_ata::initialize_ephemeral_ata;
-pub use initialize_global_vault::initialize_global_vault;
-pub use reset_ephemeral_ata_permission::reset_ephemeral_ata_permission;
-pub use undelegate_ephemeral_ata::undelegate_ephemeral_ata;
-pub use undelegate_ephemeral_ata_permission::undelegate_ephemeral_ata_permission;
-pub use withdraw_spl_tokens::withdraw_spl_tokens;
+pub use create_ephemeral_ata_permission::*;
+pub use delegate_ephemeral_ata::*;
+pub use delegate_ephemeral_ata_permission::*;
+pub use deposit_spl_tokens::*;
+pub use initialize_ephemeral_ata::*;
+pub use initialize_global_vault::*;
+pub use reset_ephemeral_ata_permission::*;
+pub use undelegate_ephemeral_ata::*;
+pub use undelegate_ephemeral_ata_permission::*;
+pub use withdraw_spl_tokens::*;
 
 #[repr(u8)]
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]

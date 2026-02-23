@@ -1,96 +1,87 @@
-use core::mem::MaybeUninit;
-
-use crate::spl::consts::ESPL_TOKEN_PROGRAM_ID;
-use crate::spl::EphemeralSplDiscriminator;
-use pinocchio::cpi::{invoke, invoke_signed, Signer, MAX_CPI_ACCOUNTS};
-use pinocchio::instruction::{InstructionAccount, InstructionView};
-use pinocchio::{AccountView, ProgramResult};
+use {
+    crate::spl::{consts::ESPL_TOKEN_PROGRAM_ID, EphemeralSplDiscriminator},
+    core::{mem::MaybeUninit, slice::from_raw_parts},
+    pinocchio::{
+        cpi::{invoke_signed_with_bounds, Signer},
+        instruction::{InstructionAccount, InstructionView},
+        AccountView, ProgramResult,
+    },
+};
 
 /// Delegate an ephemeral ATA permission.
-#[allow(clippy::too_many_arguments)]
-pub fn delegate_ephemeral_ata_permission(
-    payer: &AccountView,
-    eata: &AccountView,
-    permission: &AccountView,
-    permission_program: &AccountView,
-    system_program: &AccountView,
-    delegation_buffer: &AccountView,
-    delegation_record: &AccountView,
-    delegation_metadata: &AccountView,
-    delegation_program: &AccountView,
-    validator: &AccountView,
-    eata_bump: u8,
-    signer_seeds: Option<Signer<'_, '_>>,
-) -> ProgramResult {
-    let mut account_metas =
-        [const { MaybeUninit::<InstructionAccount>::uninit() }; MAX_CPI_ACCOUNTS];
-    let num_accounts = 10;
+pub struct DelegateEphemeralAtaPermission<'a> {
+    pub payer: &'a AccountView,
+    pub eata: &'a AccountView,
+    pub permission: &'a AccountView,
+    pub permission_program: &'a AccountView,
+    pub system_program: &'a AccountView,
+    pub delegation_buffer: &'a AccountView,
+    pub delegation_record: &'a AccountView,
+    pub delegation_metadata: &'a AccountView,
+    pub delegation_program: &'a AccountView,
+    pub validator: &'a AccountView,
+    pub eata_bump: u8,
+}
 
-    unsafe {
-        account_metas
-            .get_unchecked_mut(0)
-            .write(InstructionAccount::readonly_signer(payer.address()));
-        account_metas
-            .get_unchecked_mut(1)
-            .write(InstructionAccount::writable(eata.address()));
-        account_metas
-            .get_unchecked_mut(2)
-            .write(InstructionAccount::readonly(permission_program.address()));
-        account_metas
-            .get_unchecked_mut(3)
-            .write(InstructionAccount::writable(permission.address()));
-        account_metas
-            .get_unchecked_mut(4)
-            .write(InstructionAccount::readonly(system_program.address()));
-        account_metas
-            .get_unchecked_mut(5)
-            .write(InstructionAccount::writable(delegation_buffer.address()));
-        account_metas
-            .get_unchecked_mut(6)
-            .write(InstructionAccount::writable(delegation_record.address()));
-        account_metas
-            .get_unchecked_mut(7)
-            .write(InstructionAccount::writable(delegation_metadata.address()));
-        account_metas
-            .get_unchecked_mut(8)
-            .write(InstructionAccount::readonly(delegation_program.address()));
-        account_metas
-            .get_unchecked_mut(9)
-            .write(InstructionAccount::readonly(validator.address()));
+impl<'a> DelegateEphemeralAtaPermission<'a> {
+    #[inline(always)]
+    pub fn invoke(&self) -> ProgramResult {
+        self.invoke_signed(&[])
     }
 
-    let acc_infos: [&AccountView; 10] = [
-        payer,
-        eata,
-        payer,
-        permission,
-        system_program,
-        delegation_buffer,
-        delegation_record,
-        delegation_metadata,
-        delegation_program,
-        validator,
-    ];
+    #[inline(always)]
+    pub fn invoke_signed(&self, signers: &[Signer<'_, '_>]) -> ProgramResult {
+        let expected_accounts = 10;
 
-    let data = [
-        EphemeralSplDiscriminator::DelegateEphemeralAtaPermission as u8,
-        eata_bump,
-    ];
+        let mut instruction_accounts = [const { MaybeUninit::<InstructionAccount>::uninit() }; 10];
+        instruction_accounts[0].write(InstructionAccount::readonly_signer(self.payer.address()));
+        instruction_accounts[1].write(InstructionAccount::writable(self.eata.address()));
+        instruction_accounts[2].write(InstructionAccount::readonly(
+            self.permission_program.address(),
+        ));
+        instruction_accounts[3].write(InstructionAccount::writable(self.permission.address()));
+        instruction_accounts[4].write(InstructionAccount::readonly(self.system_program.address()));
+        instruction_accounts[5].write(InstructionAccount::writable(
+            self.delegation_buffer.address(),
+        ));
+        instruction_accounts[6].write(InstructionAccount::writable(
+            self.delegation_record.address(),
+        ));
+        instruction_accounts[7].write(InstructionAccount::writable(
+            self.delegation_metadata.address(),
+        ));
+        instruction_accounts[8].write(InstructionAccount::readonly(
+            self.delegation_program.address(),
+        ));
+        instruction_accounts[9].write(InstructionAccount::readonly(self.validator.address()));
 
-    let ix = InstructionView {
-        program_id: &ESPL_TOKEN_PROGRAM_ID,
-        accounts: unsafe {
-            core::slice::from_raw_parts(
-                account_metas.as_ptr() as *const InstructionAccount,
-                num_accounts,
-            )
-        },
-        data: &data,
-    };
+        let mut accounts = [const { MaybeUninit::<&AccountView>::uninit() }; 10];
+        accounts[0].write(self.payer);
+        accounts[1].write(self.eata);
+        accounts[2].write(self.payer);
+        accounts[3].write(self.permission);
+        accounts[4].write(self.system_program);
+        accounts[5].write(self.delegation_buffer);
+        accounts[6].write(self.delegation_record);
+        accounts[7].write(self.delegation_metadata);
+        accounts[8].write(self.delegation_program);
+        accounts[9].write(self.validator);
 
-    if let Some(seeds) = signer_seeds {
-        invoke_signed(&ix, &acc_infos, &[seeds])
-    } else {
-        invoke(&ix, &acc_infos)
+        let instruction_data = [
+            EphemeralSplDiscriminator::DelegateEphemeralAtaPermission as u8,
+            self.eata_bump,
+        ];
+
+        invoke_signed_with_bounds::<10>(
+            &InstructionView {
+                program_id: &ESPL_TOKEN_PROGRAM_ID,
+                accounts: unsafe {
+                    from_raw_parts(instruction_accounts.as_ptr() as _, expected_accounts)
+                },
+                data: unsafe { from_raw_parts(instruction_data.as_ptr() as _, 2) },
+            },
+            unsafe { from_raw_parts(accounts.as_ptr() as _, expected_accounts) },
+            signers,
+        )
     }
 }
