@@ -15,7 +15,9 @@ use bincode::Encode;
 use solana_address::Address;
 
 use crate::intent_bundle::args::BaseActionArgs;
-use crate::intent_bundle::types::{CallHandler, CommitAndUndelegateIntent, CommitIntent, MagicIntentBundle};
+use crate::intent_bundle::types::{
+    CallHandler, CommitAndUndelegateIntent, CommitIntent, MagicIntentBundle,
+};
 
 // ---------------------------------------------------------------------------
 // Wrapper types
@@ -64,6 +66,7 @@ impl<'i, 'acc, 'args> CommitAndUndelegateSerialize<'i, 'acc, 'args> {
 }
 
 impl bincode::Encode for CommitAndUndelegateSerialize<'_, '_, '_> {
+    #[inline(never)]
     fn encode<E: Encoder>(&self, encoder: &mut E) -> Result<(), EncodeError> {
         self.inner // Copy — CommitAndUndelegateIntent is three fat pointers
             .into_args(self.indices_map)
@@ -90,7 +93,9 @@ impl<'i, 'acc, 'args> MagicIntentBundleSerialize<'i, 'acc, 'args> {
         bundle: MagicIntentBundle<'acc, 'args>,
     ) -> Self {
         Self {
-            commit: bundle.commit_intent.map(|c| CommitSerialize::new(c, indices_map)),
+            commit: bundle
+                .commit_intent
+                .map(|c| CommitSerialize::new(c, indices_map)),
             commit_and_undelegate: bundle
                 .commit_and_undelegate_intent
                 .map(|c| CommitAndUndelegateSerialize::new(c, indices_map)),
@@ -101,6 +106,7 @@ impl<'i, 'acc, 'args> MagicIntentBundleSerialize<'i, 'acc, 'args> {
 }
 
 impl bincode::Encode for MagicIntentBundleSerialize<'_, '_, '_> {
+    #[inline(never)]
     fn encode<E: Encoder>(&self, encoder: &mut E) -> Result<(), EncodeError> {
         self.commit.encode(encoder)?;
         self.commit_and_undelegate.encode(encoder)?;
@@ -116,6 +122,7 @@ impl bincode::Encode for MagicIntentBundleSerialize<'_, '_, '_> {
 ///
 /// Each handler is encoded by constructing a [`BaseActionArgs`] locally (~80 bytes),
 /// avoiding the 808-byte `NoVec<BaseActionArgs, MAX_ACTIONS_NUM>` allocation.
+#[inline(never)]
 fn encode_handler_slice<E: Encoder>(
     handlers: &[CallHandler<'_>],
     indices_map: &[&Address],

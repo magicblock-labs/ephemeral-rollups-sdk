@@ -43,6 +43,7 @@ impl<'args> MagicIntentBundle<'_, 'args> {
     /// Consumes the bundle and encodes it into `MagicIntentBundleArgs` using an indices map.
     ///
     /// `indices_map` is a natural map: `indices_map[i]` is the address at index `i`.
+    #[allow(dead_code)]
     pub(super) fn into_args(
         self,
         indices_map: &[&Address],
@@ -68,6 +69,7 @@ impl<'args> MagicIntentBundle<'_, 'args> {
     }
 
     /// Collects all accounts referenced by intents in this bundle.
+    #[inline(never)]
     pub(super) fn collect_unique_accounts(
         &self,
         unique_accounts: &mut NoVec<AccountView, MAX_STATIC_CPI_ACCOUNTS>,
@@ -88,6 +90,7 @@ impl<'args> MagicIntentBundle<'_, 'args> {
     /// - Each present intent must have at least one committed account.
     /// - No duplicate accounts within an intent.
     /// - No account overlap between `Commit` and `CommitAndUndelegate`.
+    #[inline(never)]
     pub(super) fn validate(&self) -> ProgramResult {
         let mut seen = NoVec::<Address, MAX_STATIC_CPI_ACCOUNTS>::new();
         if let Some(commit) = &self.commit_intent {
@@ -116,6 +119,7 @@ pub struct CallHandler<'args> {
 }
 
 impl<'args> CallHandler<'args> {
+    #[inline(never)]
     pub(super) fn collect_unique_accounts(
         &self,
         container: &mut NoVec<AccountView, MAX_STATIC_CPI_ACCOUNTS>,
@@ -176,6 +180,7 @@ impl<'args> CommitIntent<'_, 'args> {
         Ok(())
     }
 
+    #[inline(never)]
     fn collect_unique_accounts(
         &self,
         container: &mut NoVec<AccountView, MAX_STATIC_CPI_ACCOUNTS>,
@@ -191,7 +196,10 @@ impl<'args> CommitIntent<'_, 'args> {
         Ok(())
     }
 
-    pub(in crate::intent_bundle) fn into_args(self, indices_map: &[&Address]) -> Result<CommitTypeArgs<'args>, ProgramError> {
+    pub(in crate::intent_bundle) fn into_args(
+        self,
+        indices_map: &[&Address],
+    ) -> Result<CommitTypeArgs<'args>, ProgramError> {
         let mut indices = NoVec::<u8, MAX_STATIC_CPI_ACCOUNTS>::new();
         for account in self.accounts {
             let idx =
@@ -249,6 +257,7 @@ impl<'args> CommitAndUndelegateIntent<'_, 'args> {
         Ok(())
     }
 
+    #[inline(never)]
     fn collect_unique_accounts(
         &self,
         container: &mut NoVec<AccountView, MAX_STATIC_CPI_ACCOUNTS>,

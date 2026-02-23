@@ -89,6 +89,7 @@ pub struct CommitAndUndelegateArgs<'args> {
 }
 
 /// Magic intent bundle arguments for serialization.
+#[allow(dead_code)]
 #[derive(Serialize, bincode::Encode)]
 pub struct MagicIntentBundleArgs<'args> {
     pub commit: Option<CommitTypeArgs<'args>>,

@@ -12,7 +12,6 @@ mod no_vec;
 mod serialize;
 pub mod types;
 
-use crate::intent_bundle::args::MagicIntentBundleArgs;
 use crate::intent_bundle::commit::CommitIntentBuilder;
 use crate::intent_bundle::commit_and_undelegate::CommitAndUndelegateIntentBuilder;
 pub use args::{ActionArgs, ShortAccountMeta};
@@ -24,6 +23,7 @@ const _: () = assert!(MAX_ACTIONS_NUM <= u8::MAX as usize);
 
 /// Bincode 1.x u32 LE discriminant for `MagicBlockInstruction::ScheduleIntentBundle` (variant index 11).
 const SCHEDULE_INTENT_BUNDLE_DISCRIMINANT: [u8; 4] = 11u32.to_le_bytes();
+const OFFSET: usize = SCHEDULE_INTENT_BUNDLE_DISCRIMINANT.len();
 
 /// Builds a single `MagicBlockInstruction::ScheduleIntentBundle` instruction by aggregating
 /// multiple independent intents (base actions, commits, commit+undelegate), normalizing them,
@@ -108,33 +108,19 @@ impl<'acc, 'args> MagicIntentBundleBuilder<'acc, 'args> {
         }
     }
 
-    pub(in crate::intent_bundle) fn into_args(
-        all_accounts: &[AccountView],
-        intent_bundle: MagicIntentBundle<'_, 'args>,
-    ) -> Result<MagicIntentBundleArgs<'args>, ProgramError> {
-        let mut indices_map = NoVec::<&Address, MAX_STATIC_CPI_ACCOUNTS>::new();
-        for account in all_accounts {
-            indices_map.try_push(account.address())?;
-        }
-
-        // 4. Convert intents to serializable args
-        intent_bundle.into_args(indices_map.as_slice())
-    }
-
+    #[inline(never)]
     pub(in crate::intent_bundle) fn encode_into_slice(
         all_accounts: &[AccountView],
         intent_bundle: MagicIntentBundle<'_, 'args>,
         data_buf: &mut [u8],
     ) -> Result<usize, ProgramError> {
-        const OFFSET: usize = SCHEDULE_INTENT_BUNDLE_DISCRIMINANT.len();
-
         let mut indices_map = NoVec::<&Address, MAX_STATIC_CPI_ACCOUNTS>::new();
         for account in all_accounts {
             indices_map.try_push(account.address())?;
         }
 
-        let bundle = serialize::MagicIntentBundleSerialize::new(indices_map.as_slice(), intent_bundle);
-
+        let bundle =
+            serialize::MagicIntentBundleSerialize::new(indices_map.as_slice(), intent_bundle);
         data_buf[..OFFSET].copy_from_slice(&SCHEDULE_INTENT_BUNDLE_DISCRIMINANT);
         let args_len =
             bincode::encode_into_slice(&bundle, &mut data_buf[OFFSET..], bincode::config::legacy())
@@ -147,9 +133,8 @@ impl<'acc, 'args> MagicIntentBundleBuilder<'acc, 'args> {
     /// CPI instruction, and invokes the magic program.
     ///
     /// `data_buf` must be large enough to hold the serialized `MagicIntentBundleArgs`.
+    #[inline(never)]
     pub fn build_and_invoke(self, data_buf: &mut [u8]) -> ProgramResult {
-        const OFFSET: usize = SCHEDULE_INTENT_BUNDLE_DISCRIMINANT.len();
-
         // Guard: buffer must be large enough for at least the discriminant plus
         // one byte of payload; otherwise the slice indexing below would panic.
         if data_buf.len() <= OFFSET {
@@ -165,38 +150,51 @@ impl<'acc, 'args> MagicIntentBundleBuilder<'acc, 'args> {
         self.intent_bundle
             .collect_unique_accounts(&mut all_accounts)?;
 
-        // 3. Build the natural indices map: indices_map[i] = address of account at position i
         let data_len =
             Self::encode_into_slice(all_accounts.as_slice(), self.intent_bundle, data_buf)?;
-        // let args = Self::into_args(all_accounts.as_slice(), self.intent_bundle)?;
-        //
-        // // 5. Write instruction discriminant + serialize args (bincode 1.x wire compat)
-        // data_buf[..OFFSET].copy_from_slice(&SCHEDULE_INTENT_BUNDLE_DISCRIMINANT);
-        // let args_len =
-        //     bincode::encode_into_slice(&args, &mut data_buf[OFFSET..], bincode::config::legacy())
-        //         .map_err(|_| ProgramError::InvalidInstructionData)?;
-        // let data_len = OFFSET + args_len;
 
-        // 6. Build instruction account metas
+        Self::invoke_cpi(
+            all_accounts.as_slice(),
+            self.magic_program.address(),
+            &data_buf[..data_len],
+        )
+    }
+
+    /// Builds `instruction_accounts` + `ix`, then delegates to [`Self::do_invoke`].
+    ///
+    /// Split from [`Self::build_and_invoke`] so these `NoVec` allocations live in
+    /// their own stack frame.
+    #[inline(never)]
+    fn invoke_cpi(
+        all_accounts: &[AccountView],
+        program_id: &Address,
+        data: &[u8],
+    ) -> ProgramResult {
         let mut instruction_accounts = NoVec::<InstructionAccount, MAX_STATIC_CPI_ACCOUNTS>::new();
         for account in all_accounts.iter() {
             instruction_accounts.try_push(InstructionAccount::from(account))?;
         }
 
-        // 7. Build instruction view
-        let ix = InstructionView {
-            program_id: self.magic_program.address(),
-            data: &data_buf[..data_len],
-            accounts: instruction_accounts.as_slice(),
-        };
-
-        // 8. Build account refs for invoke
         let mut account_refs = NoVec::<&AccountView, MAX_STATIC_CPI_ACCOUNTS>::new();
         for account in all_accounts.iter() {
             account_refs.try_push(account)?;
         }
 
-        invoke_with_bounds::<MAX_STATIC_CPI_ACCOUNTS>(&ix, account_refs.as_slice())
+        let ix = InstructionView {
+            program_id,
+            data,
+            accounts: instruction_accounts.as_slice(),
+        };
+
+        Self::do_invoke(&ix, account_refs.as_slice())
+    }
+
+    /// Thin `#[inline(never)]` wrapper around [`invoke_with_bounds`] so its internal
+    /// locals (large fixed-size arrays) live in their own stack frame, separate from
+    /// [`Self::invoke_cpi`].
+    #[inline(never)]
+    fn do_invoke(ix: &InstructionView, account_refs: &[&AccountView]) -> ProgramResult {
+        invoke_with_bounds::<MAX_STATIC_CPI_ACCOUNTS>(ix, account_refs)
     }
 }
 
