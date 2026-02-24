@@ -1,6 +1,7 @@
 use core::mem::size_of;
 use pinocchio::{error::ProgramError, Address};
 
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Permission<'a> {
     pub discriminator: u8,
     pub bump: u8,
@@ -118,7 +119,7 @@ impl<'a> Permission<'a> {
 }
 
 #[repr(C)]
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Member {
     pub flags: MemberFlags,
     pub pubkey: Address,
@@ -231,7 +232,7 @@ impl MembersArgs<'_> {
     }
 }
 
-#[derive(Default, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 #[repr(transparent)]
 pub struct MemberFlags(u8);
 
