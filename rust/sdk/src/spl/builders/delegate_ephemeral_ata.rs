@@ -7,7 +7,7 @@ use crate::{
     consts::ESPL_TOKEN_PROGRAM_ID,
     cpi::DELEGATION_PROGRAM_ID,
     solana_compat::solana::{system_program, AccountMeta, Instruction, Pubkey},
-    spl::{cpi::EphemeralSplDiscriminator, EphemeralAta},
+    spl::{EphemeralAta, EphemeralSplDiscriminator},
 };
 
 pub struct DelegateEphemeralAtaBuilder {

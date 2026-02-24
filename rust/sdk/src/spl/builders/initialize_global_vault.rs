@@ -1,7 +1,7 @@
 use crate::{
     consts::ESPL_TOKEN_PROGRAM_ID,
     solana_compat::solana::{system_program, AccountMeta, Instruction, Pubkey},
-    spl::{cpi::EphemeralSplDiscriminator, GlobalVault},
+    spl::{EphemeralSplDiscriminator, GlobalVault},
 };
 
 pub struct InitializeGlobalVaultBuilder {

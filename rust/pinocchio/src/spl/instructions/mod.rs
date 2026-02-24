@@ -1,3 +1,4 @@
+pub mod close_ephemeral_ata;
 pub mod create_ephemeral_ata_permission;
 pub mod delegate_ephemeral_ata;
 pub mod delegate_ephemeral_ata_permission;
@@ -9,6 +10,7 @@ pub mod undelegate_ephemeral_ata;
 pub mod undelegate_ephemeral_ata_permission;
 pub mod withdraw_spl_tokens;
 
+pub use close_ephemeral_ata::*;
 pub use create_ephemeral_ata_permission::*;
 pub use delegate_ephemeral_ata::*;
 pub use delegate_ephemeral_ata_permission::*;
@@ -23,8 +25,8 @@ pub use withdraw_spl_tokens::*;
 #[repr(u8)]
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
 pub enum EphemeralSplDiscriminator {
-    InitializeGlobalVault = 0,
-    InitializeEphemeralAta = 1,
+    InitializeEphemeralAta = 0,
+    InitializeGlobalVault = 1,
     DepositSplTokens = 2,
     WithdrawSplTokens = 3,
     DelegateEphemeralAta = 4,
@@ -33,4 +35,5 @@ pub enum EphemeralSplDiscriminator {
     DelegateEphemeralAtaPermission = 7,
     UndelegateEphemeralAtaPermission = 8,
     ResetEphemeralAtaPermission = 9,
+    CloseEphemeralAta = 10,
 }

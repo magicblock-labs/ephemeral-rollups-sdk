@@ -28,9 +28,10 @@ impl<'a> DepositSplTokens<'a> {
 
     #[inline(always)]
     pub fn invoke_signed(&self, signers: &[Signer<'_, '_>]) -> ProgramResult {
-        let expected_accounts = 7;
+        const NUM_ACCOUNTS: usize = 7;
 
-        let mut instruction_accounts = [const { MaybeUninit::<InstructionAccount>::uninit() }; 7];
+        let mut instruction_accounts =
+            [const { MaybeUninit::<InstructionAccount>::uninit() }; NUM_ACCOUNTS];
         instruction_accounts[0].write(InstructionAccount::writable(self.eata.address()));
         instruction_accounts[1].write(InstructionAccount::readonly(self.vault.address()));
         instruction_accounts[2].write(InstructionAccount::readonly(self.mint.address()));
@@ -43,7 +44,7 @@ impl<'a> DepositSplTokens<'a> {
         ));
         instruction_accounts[6].write(InstructionAccount::readonly(self.token_program.address()));
 
-        let mut accounts = [const { MaybeUninit::<&AccountView>::uninit() }; 7];
+        let mut accounts = [const { MaybeUninit::<&AccountView>::uninit() }; NUM_ACCOUNTS];
         accounts[0].write(self.eata);
         accounts[1].write(self.vault);
         accounts[2].write(self.mint);
@@ -56,15 +57,15 @@ impl<'a> DepositSplTokens<'a> {
         instruction_data[0] = EphemeralSplDiscriminator::DepositSplTokens as u8;
         instruction_data[1..9].copy_from_slice(&self.amount.to_le_bytes());
 
-        invoke_signed_with_bounds::<7>(
+        invoke_signed_with_bounds::<NUM_ACCOUNTS>(
             &InstructionView {
                 program_id: &ESPL_TOKEN_PROGRAM_ID,
                 accounts: unsafe {
-                    from_raw_parts(instruction_accounts.as_ptr() as _, expected_accounts)
+                    from_raw_parts(instruction_accounts.as_ptr() as _, NUM_ACCOUNTS)
                 },
-                data: unsafe { from_raw_parts(instruction_data.as_ptr() as _, 9) },
+                data: &instruction_data,
             },
-            unsafe { from_raw_parts(accounts.as_ptr() as _, expected_accounts) },
+            unsafe { from_raw_parts(accounts.as_ptr() as _, NUM_ACCOUNTS) },
             signers,
         )
     }
