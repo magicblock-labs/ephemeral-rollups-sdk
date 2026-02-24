@@ -26,16 +26,17 @@ impl<'a> InitializeEphemeralAta<'a> {
 
     #[inline(always)]
     pub fn invoke_signed(&self, signers: &[Signer<'_, '_>]) -> ProgramResult {
-        let expected_accounts = 5;
+        const NUM_ACCOUNTS: usize = 5;
 
-        let mut instruction_accounts = [const { MaybeUninit::<InstructionAccount>::uninit() }; 5];
+        let mut instruction_accounts =
+            [const { MaybeUninit::<InstructionAccount>::uninit() }; NUM_ACCOUNTS];
         instruction_accounts[0].write(InstructionAccount::writable(self.eata.address()));
         instruction_accounts[1].write(InstructionAccount::writable_signer(self.payer.address()));
         instruction_accounts[2].write(InstructionAccount::readonly(self.user.address()));
         instruction_accounts[3].write(InstructionAccount::readonly(self.mint.address()));
         instruction_accounts[4].write(InstructionAccount::readonly(self.system_program.address()));
 
-        let mut accounts = [const { MaybeUninit::<&AccountView>::uninit() }; 5];
+        let mut accounts = [const { MaybeUninit::<&AccountView>::uninit() }; NUM_ACCOUNTS];
         accounts[0].write(self.eata);
         accounts[1].write(self.payer);
         accounts[2].write(self.user);
@@ -47,15 +48,15 @@ impl<'a> InitializeEphemeralAta<'a> {
             self.eata_bump,
         ];
 
-        invoke_signed_with_bounds::<5>(
+        invoke_signed_with_bounds::<NUM_ACCOUNTS>(
             &InstructionView {
                 program_id: &ESPL_TOKEN_PROGRAM_ID,
                 accounts: unsafe {
-                    from_raw_parts(instruction_accounts.as_ptr() as _, expected_accounts)
+                    from_raw_parts(instruction_accounts.as_ptr() as _, NUM_ACCOUNTS)
                 },
-                data: unsafe { from_raw_parts(instruction_data.as_ptr() as _, 2) },
+                data: &instruction_data,
             },
-            unsafe { from_raw_parts(accounts.as_ptr() as _, expected_accounts) },
+            unsafe { from_raw_parts(accounts.as_ptr() as _, NUM_ACCOUNTS) },
             signers,
         )
     }

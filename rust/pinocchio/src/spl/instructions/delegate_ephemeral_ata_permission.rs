@@ -31,9 +31,10 @@ impl<'a> DelegateEphemeralAtaPermission<'a> {
 
     #[inline(always)]
     pub fn invoke_signed(&self, signers: &[Signer<'_, '_>]) -> ProgramResult {
-        let expected_accounts = 10;
+        const NUM_ACCOUNTS: usize = 10;
 
-        let mut instruction_accounts = [const { MaybeUninit::<InstructionAccount>::uninit() }; 10];
+        let mut instruction_accounts =
+            [const { MaybeUninit::<InstructionAccount>::uninit() }; NUM_ACCOUNTS];
         instruction_accounts[0].write(InstructionAccount::readonly_signer(self.payer.address()));
         instruction_accounts[1].write(InstructionAccount::writable(self.eata.address()));
         instruction_accounts[2].write(InstructionAccount::readonly(
@@ -55,7 +56,7 @@ impl<'a> DelegateEphemeralAtaPermission<'a> {
         ));
         instruction_accounts[9].write(InstructionAccount::readonly(self.validator.address()));
 
-        let mut accounts = [const { MaybeUninit::<&AccountView>::uninit() }; 10];
+        let mut accounts = [const { MaybeUninit::<&AccountView>::uninit() }; NUM_ACCOUNTS];
         accounts[0].write(self.payer);
         accounts[1].write(self.eata);
         accounts[2].write(self.payer);
@@ -72,15 +73,15 @@ impl<'a> DelegateEphemeralAtaPermission<'a> {
             self.eata_bump,
         ];
 
-        invoke_signed_with_bounds::<10>(
+        invoke_signed_with_bounds::<NUM_ACCOUNTS>(
             &InstructionView {
                 program_id: &ESPL_TOKEN_PROGRAM_ID,
                 accounts: unsafe {
-                    from_raw_parts(instruction_accounts.as_ptr() as _, expected_accounts)
+                    from_raw_parts(instruction_accounts.as_ptr() as _, NUM_ACCOUNTS)
                 },
-                data: unsafe { from_raw_parts(instruction_data.as_ptr() as _, 2) },
+                data: &instruction_data,
             },
-            unsafe { from_raw_parts(accounts.as_ptr() as _, expected_accounts) },
+            unsafe { from_raw_parts(accounts.as_ptr() as _, NUM_ACCOUNTS) },
             signers,
         )
     }

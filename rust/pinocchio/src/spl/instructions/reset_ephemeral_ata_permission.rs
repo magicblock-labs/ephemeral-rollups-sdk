@@ -28,9 +28,10 @@ impl<'a> ResetEphemeralAtaPermission<'a> {
 
     #[inline(always)]
     pub fn invoke_signed(&self, signers: &[Signer<'_, '_>]) -> ProgramResult {
-        let expected_accounts = 4;
+        const NUM_ACCOUNTS: usize = 4;
 
-        let mut instruction_accounts = [const { MaybeUninit::<InstructionAccount>::uninit() }; 4];
+        let mut instruction_accounts =
+            [const { MaybeUninit::<InstructionAccount>::uninit() }; NUM_ACCOUNTS];
         instruction_accounts[0].write(InstructionAccount::writable(self.eata.address()));
         instruction_accounts[1].write(InstructionAccount::writable(self.permission.address()));
         instruction_accounts[2].write(InstructionAccount::readonly_signer(self.owner.address()));
@@ -38,7 +39,7 @@ impl<'a> ResetEphemeralAtaPermission<'a> {
             self.permission_program.address(),
         ));
 
-        let mut accounts = [const { MaybeUninit::<&AccountView>::uninit() }; 4];
+        let mut accounts = [const { MaybeUninit::<&AccountView>::uninit() }; NUM_ACCOUNTS];
         accounts[0].write(self.eata);
         accounts[1].write(self.permission);
         accounts[2].write(self.owner);
@@ -50,15 +51,15 @@ impl<'a> ResetEphemeralAtaPermission<'a> {
             self.flag_byte,
         ];
 
-        invoke_signed_with_bounds::<4>(
+        invoke_signed_with_bounds::<NUM_ACCOUNTS>(
             &InstructionView {
                 program_id: &ESPL_TOKEN_PROGRAM_ID,
                 accounts: unsafe {
-                    from_raw_parts(instruction_accounts.as_ptr() as _, expected_accounts)
+                    from_raw_parts(instruction_accounts.as_ptr() as _, NUM_ACCOUNTS)
                 },
-                data: unsafe { from_raw_parts(instruction_data.as_ptr() as _, 3) },
+                data: &instruction_data,
             },
-            unsafe { from_raw_parts(accounts.as_ptr() as _, expected_accounts) },
+            unsafe { from_raw_parts(accounts.as_ptr() as _, NUM_ACCOUNTS) },
             signers,
         )
     }
