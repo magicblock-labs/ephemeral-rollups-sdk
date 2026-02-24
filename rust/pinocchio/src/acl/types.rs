@@ -39,19 +39,20 @@ impl<'a> Permission<'a> {
             Address::try_from(&data[2..34]).map_err(|_| ProgramError::InvalidAccountData)?;
 
         // Check if there are members
-        let members = {
-            let member_count_bytes: [u8; 4] = data[34..38]
+        let members_exists = data[34] == 1;
+        let members = if members_exists {
+            let member_count_bytes: [u8; 4] = data[35..39]
                 .try_into()
                 .map_err(|_| ProgramError::InvalidAccountData)?;
             let member_count = u32::from_le_bytes(member_count_bytes) as usize;
 
-            if member_count == 0 {
-                None
+            Some(if member_count == 0 {
+                &[]
             } else {
                 if member_count > MAX_MEMBERS_COUNT {
                     return Err(ProgramError::InvalidAccountData);
                 }
-                let members_start: usize = 38;
+                let members_start: usize = 39;
                 let members_len = member_count
                     .checked_mul(MAX_MEMBER_SIZE)
                     .ok_or(ProgramError::InvalidAccountData)?;
@@ -69,8 +70,10 @@ impl<'a> Permission<'a> {
                         member_count,
                     )
                 };
-                Some(members_slice)
-            }
+                members_slice
+            })
+        } else {
+            None
         };
 
         Ok(Permission {
