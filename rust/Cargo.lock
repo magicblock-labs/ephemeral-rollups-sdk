@@ -1020,6 +1020,8 @@ dependencies = [
 name = "ephemeral-rollups-pinocchio"
 version = "0.8.5"
 dependencies = [
+ "bincode",
+ "magicblock-magic-program-api",
  "pinocchio 0.10.1",
  "pinocchio-pubkey",
  "pinocchio-system",
