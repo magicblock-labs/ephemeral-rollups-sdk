@@ -118,6 +118,7 @@ impl<'a> Permission<'a> {
 }
 
 #[repr(C)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct Member {
     pub flags: MemberFlags,
     pub pubkey: Address,
@@ -230,7 +231,7 @@ impl MembersArgs<'_> {
     }
 }
 
-#[derive(Default)]
+#[derive(Default, Clone, Copy, PartialEq, Eq)]
 #[repr(transparent)]
 pub struct MemberFlags(u8);
 
