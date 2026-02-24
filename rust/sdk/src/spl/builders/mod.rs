@@ -1,3 +1,4 @@
+pub mod close_ephemeral_ata;
 pub mod delegate_ephemeral_ata;
 pub mod deposit_spl_tokens;
 pub mod initialize_ephemeral_ata;
@@ -14,6 +15,7 @@ pub mod reset_ephemeral_ata_permission;
 #[cfg(feature = "access-control")]
 pub mod undelegate_ephemeral_ata_permission;
 
+pub use close_ephemeral_ata::*;
 pub use delegate_ephemeral_ata::*;
 pub use deposit_spl_tokens::*;
 pub use initialize_ephemeral_ata::*;

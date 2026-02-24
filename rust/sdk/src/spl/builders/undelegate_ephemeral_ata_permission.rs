@@ -2,7 +2,7 @@ use crate::{
     access_control::structs::Permission,
     consts::{ESPL_TOKEN_PROGRAM_ID, MAGIC_CONTEXT_ID, MAGIC_PROGRAM_ID, PERMISSION_PROGRAM_ID},
     solana_compat::solana::{AccountMeta, Instruction, Pubkey},
-    spl::{cpi::EphemeralSplDiscriminator, EphemeralAta},
+    spl::{EphemeralAta, EphemeralSplDiscriminator},
 };
 
 pub struct UndelegateEphemeralAtaPermissionBuilder {
