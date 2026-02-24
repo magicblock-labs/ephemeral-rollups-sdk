@@ -83,12 +83,14 @@ fn extract_seeds(field: &Field) -> Result<Option<ExprArray>, syn::Error> {
     let Some(seeds_str) = extract_bracketed_after(&attr_str, ATTR_SEEDS) else {
         return Ok(None);
     };
-    syn::parse_str::<ExprArray>(&seeds_str).map(Some).map_err(|e| {
-        syn::Error::new(
-            field.span(),
-            format!("failed to parse seeds expression '{}': {}", seeds_str, e),
-        )
-    })
+    syn::parse_str::<ExprArray>(&seeds_str)
+        .map(Some)
+        .map_err(|e| {
+            syn::Error::new(
+                field.span(),
+                format!("failed to parse seeds expression '{}': {}", seeds_str, e),
+            )
+        })
 }
 
 /// Checks if a field has a specific marker in its account attribute (exact token match).
