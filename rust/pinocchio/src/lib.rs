@@ -4,6 +4,8 @@ extern crate alloc;
 
 pub mod acl;
 pub mod consts;
+#[cfg(feature = "crank")]
+pub mod crank;
 pub mod instruction;
 pub mod intent_bundle;
 pub mod pda;
