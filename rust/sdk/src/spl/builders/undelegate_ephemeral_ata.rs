@@ -3,7 +3,7 @@ use spl_associated_token_account_interface::address::get_associated_token_addres
 use crate::{
     consts::{ESPL_TOKEN_PROGRAM_ID, MAGIC_CONTEXT_ID, MAGIC_PROGRAM_ID},
     solana_compat::solana::{AccountMeta, Instruction, Pubkey},
-    spl::{cpi::EphemeralSplDiscriminator, EphemeralAta},
+    spl::{EphemeralAta, EphemeralSplDiscriminator},
 };
 
 pub struct UndelegateEphemeralAtaBuilder {

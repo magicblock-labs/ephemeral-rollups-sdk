@@ -3,7 +3,7 @@ use spl_associated_token_account_interface::address::get_associated_token_addres
 use crate::{
     consts::{ESPL_TOKEN_PROGRAM_ID, TOKEN_PROGRAM_ID},
     solana_compat::solana::{AccountMeta, Instruction, Pubkey},
-    spl::{cpi::EphemeralSplDiscriminator, EphemeralAta, GlobalVault},
+    spl::{EphemeralAta, EphemeralSplDiscriminator, GlobalVault},
 };
 
 pub struct DepositSplTokensBuilder {

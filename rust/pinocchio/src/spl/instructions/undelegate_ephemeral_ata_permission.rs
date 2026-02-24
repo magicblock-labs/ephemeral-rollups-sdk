@@ -26,9 +26,10 @@ impl<'a> UndelegateEphemeralAtaPermission<'a> {
 
     #[inline(always)]
     pub fn invoke_signed(&self, signers: &[Signer<'_, '_>]) -> ProgramResult {
-        let expected_accounts = 6;
+        const NUM_ACCOUNTS: usize = 6;
 
-        let mut instruction_accounts = [const { MaybeUninit::<InstructionAccount>::uninit() }; 6];
+        let mut instruction_accounts =
+            [const { MaybeUninit::<InstructionAccount>::uninit() }; NUM_ACCOUNTS];
         instruction_accounts[0].write(InstructionAccount::readonly_signer(self.payer.address()));
         instruction_accounts[1].write(InstructionAccount::readonly(self.eata.address()));
         instruction_accounts[2].write(InstructionAccount::writable(self.permission.address()));
@@ -38,7 +39,7 @@ impl<'a> UndelegateEphemeralAtaPermission<'a> {
         instruction_accounts[4].write(InstructionAccount::readonly(self.magic_program.address()));
         instruction_accounts[5].write(InstructionAccount::writable(self.magic_context.address()));
 
-        let mut accounts = [const { MaybeUninit::<&AccountView>::uninit() }; 6];
+        let mut accounts = [const { MaybeUninit::<&AccountView>::uninit() }; NUM_ACCOUNTS];
         accounts[0].write(self.payer);
         accounts[1].write(self.eata);
         accounts[2].write(self.permission);
@@ -48,15 +49,15 @@ impl<'a> UndelegateEphemeralAtaPermission<'a> {
 
         let instruction_data = [EphemeralSplDiscriminator::UndelegateEphemeralAtaPermission as u8];
 
-        invoke_signed_with_bounds::<6>(
+        invoke_signed_with_bounds::<NUM_ACCOUNTS>(
             &InstructionView {
                 program_id: &ESPL_TOKEN_PROGRAM_ID,
                 accounts: unsafe {
-                    from_raw_parts(instruction_accounts.as_ptr() as _, expected_accounts)
+                    from_raw_parts(instruction_accounts.as_ptr() as _, NUM_ACCOUNTS)
                 },
-                data: unsafe { from_raw_parts(instruction_data.as_ptr() as _, 1) },
+                data: &instruction_data,
             },
-            unsafe { from_raw_parts(accounts.as_ptr() as _, expected_accounts) },
+            unsafe { from_raw_parts(accounts.as_ptr() as _, NUM_ACCOUNTS) },
             signers,
         )
     }
