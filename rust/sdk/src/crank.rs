@@ -64,13 +64,13 @@ impl<'a> CancelCrankCpi<'a> {
     }
 
     pub fn invoke(&self) -> ProgramResult {
-        invoke(&self.instruction(), &[self.authority.clone()])
+        invoke(&self.instruction(), core::slice::from_ref(self.authority))
     }
 
     pub fn invoke_signed(&self, signers_seeds: &[&[&[u8]]]) -> ProgramResult {
         invoke_signed(
             &self.instruction(),
-            &[self.authority.clone()],
+            core::slice::from_ref(self.authority),
             signers_seeds,
         )
     }
