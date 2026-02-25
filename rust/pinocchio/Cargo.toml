@@ -12,7 +12,6 @@ license = { workspace = true }
 edition = { workspace = true }
 
 [features]
-crank = ["magicblock-magic-program-api", "bincode"]
 default = []
 
 [dependencies]
@@ -20,8 +19,11 @@ pinocchio = { workspace = true }
 pinocchio-pubkey = { workspace = true }
 pinocchio-system = { workspace = true }
 solana-address = { version = ">=2, <3", features = ["curve25519"] }
-magicblock-magic-program-api = { workspace = true, optional = true }
-bincode = { workspace = true, optional = true }
+
+[dev-dependencies]
+bincode = { workspace = true }
+magicblock-magic-program-api = { workspace = true }
+solana-instruction = { workspace = true }
 
 [lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = [
