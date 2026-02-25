@@ -27,8 +27,8 @@ impl<'a> CrankInstruction<'a> {
 
     pub fn serialize(&self) -> Result<Vec<u8>, ProgramError> {
         let mut data = Vec::with_capacity(self.serialized_size());
-        data.extend_from_slice(&self.program_id.as_ref());
-        data.extend_from_slice(&(self.accounts.len() as u64).to_le_bytes().as_ref());
+        data.extend_from_slice(self.program_id.as_ref());
+        data.extend_from_slice((self.accounts.len() as u64).to_le_bytes().as_ref());
         for account in &self.accounts {
             let mut serialized = [0; 34];
             serialized[..32].copy_from_slice(account.address.as_ref());
@@ -36,7 +36,7 @@ impl<'a> CrankInstruction<'a> {
             serialized[33] = account.is_writable as u8;
             data.extend_from_slice(&serialized);
         }
-        data.extend_from_slice(&(self.data.len() as u64).to_le_bytes().as_ref());
+        data.extend_from_slice((self.data.len() as u64).to_le_bytes().as_ref());
         data.extend_from_slice(&self.data);
         Ok(data)
     }
@@ -109,7 +109,7 @@ impl<'a> ScheduleCrankCpi<'a> {
 
         Ok(InstructionView {
             program_id: self.magic_program.address(),
-            data: data,
+            data,
             accounts: unsafe {
                 core::slice::from_raw_parts(
                     accounts.as_ptr() as *const InstructionAccount,
@@ -133,7 +133,7 @@ impl<'a> ScheduleCrankCpi<'a> {
 
         let data = self.data()?;
 
-        invoke_with_slice(&self.instruction(&data)?, &accounts.as_slice())
+        invoke_with_slice(&self.instruction(&data)?, accounts.as_slice())
     }
 
     pub fn invoke_signed(&self, signers_seeds: &[Signer<'_, '_>]) -> ProgramResult {
@@ -145,7 +145,7 @@ impl<'a> ScheduleCrankCpi<'a> {
 
         invoke_signed_with_slice(
             &self.instruction(&data)?,
-            &accounts.as_slice(),
+            accounts.as_slice(),
             signers_seeds,
         )
     }
