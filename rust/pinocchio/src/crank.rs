@@ -151,6 +151,68 @@ impl<'a> ScheduleCrankCpi<'a> {
     }
 }
 
+pub struct CancelCrankCpi {
+    pub authority: AccountView,
+    pub magic_program: AccountView,
+    pub crank_id: i64,
+}
+
+impl CancelCrankCpi {
+    fn instruction<'a>(
+        &'a self,
+        data: &'a [u8],
+    ) -> Result<InstructionView<'a, 'a, 'a, 'a>, ProgramError> {
+        let mut accounts =
+            [const { MaybeUninit::<InstructionAccount>::uninit() }; MAX_CPI_ACCOUNTS];
+
+        unsafe {
+            accounts.get_unchecked_mut(0).write(InstructionAccount {
+                address: self.authority.address(),
+                is_writable: self.authority.is_writable(),
+                is_signer: self.authority.is_signer(),
+            });
+            accounts.get_unchecked_mut(1).write(InstructionAccount {
+                address: self.magic_program.address(),
+                is_writable: self.magic_program.is_writable(),
+                is_signer: self.magic_program.is_signer(),
+            });
+        }
+
+        Ok(InstructionView {
+            program_id: self.magic_program.address(),
+            data,
+            accounts: unsafe {
+                core::slice::from_raw_parts(accounts.as_ptr() as *const InstructionAccount, 2)
+            },
+        })
+    }
+
+    fn data(&self) -> [u8; 12] {
+        let mut data = [0; 12];
+        data[..4].copy_from_slice(&7_u32.to_le_bytes());
+        data[4..].copy_from_slice(&self.crank_id.to_le_bytes());
+        data
+    }
+
+    pub fn invoke(&self) -> ProgramResult {
+        let accounts = [&self.authority, &self.magic_program];
+        let data = self.data();
+
+        invoke_with_slice(&self.instruction(&data)?, accounts.as_slice())
+    }
+
+    pub fn invoke_signed(&self, signers_seeds: &[Signer<'_, '_>]) -> ProgramResult {
+        let accounts = [&self.authority, &self.magic_program];
+        let data = self.data();
+
+        invoke_signed_with_slice(
+            &self.instruction(&data)?,
+            accounts.as_slice(),
+            signers_seeds,
+        )
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use alloc::vec;
@@ -405,5 +467,46 @@ mod tests {
         let api_data = bincode::serialize(&MagicBlockInstruction::ScheduleTask(api_args)).unwrap();
 
         assert_eq!(data, api_data);
+    }
+
+    #[test]
+    fn test_cancel_crank_cpi() {
+        let this_instruction = CancelCrankCpi {
+            authority: unsafe {
+                AccountView::new_unchecked(&mut RuntimeAccount {
+                    borrow_state: 0,
+                    is_signer: 0,
+                    is_writable: 0,
+                    executable: 0,
+                    resize_delta: 0,
+                    address: Address::new_from_array([0; 32]),
+                    owner: Address::new_from_array([0; 32]),
+                    lamports: 0,
+                    data_len: 0,
+                } as *mut RuntimeAccount)
+            },
+            magic_program: unsafe {
+                AccountView::new_unchecked(&mut RuntimeAccount {
+                    borrow_state: 0,
+                    is_signer: 0,
+                    is_writable: 0,
+                    executable: 0,
+                    resize_delta: 0,
+                    address: Address::new_from_array([0; 32]),
+                    owner: Address::new_from_array([0; 32]),
+                    lamports: 0,
+                    data_len: 0,
+                } as *mut RuntimeAccount)
+            },
+            crank_id: 123,
+        };
+
+        let data = this_instruction.data();
+        let api_data = bincode::serialize(&MagicBlockInstruction::CancelTask {
+            task_id: this_instruction.crank_id,
+        })
+        .unwrap();
+
+        assert_eq!(&data[..], &api_data[..]);
     }
 }
