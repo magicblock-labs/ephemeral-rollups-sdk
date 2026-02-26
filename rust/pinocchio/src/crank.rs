@@ -166,7 +166,7 @@ impl CancelCrankCpi {
     fn instruction<'a, 'b>(
         &'a self,
         data: &'a [u8],
-        accounts: &'b mut [MaybeUninit<InstructionAccount<'a>>; MAX_CPI_ACCOUNTS],
+        accounts: &'b mut [MaybeUninit<InstructionAccount<'a>>; 1],
     ) -> Result<InstructionView<'a, 'a, 'a, 'a>, ProgramError> {
         unsafe {
             accounts.get_unchecked_mut(0).write(InstructionAccount {
@@ -174,18 +174,13 @@ impl CancelCrankCpi {
                 is_writable: self.authority.is_writable(),
                 is_signer: self.authority.is_signer(),
             });
-            accounts.get_unchecked_mut(1).write(InstructionAccount {
-                address: self.magic_program.address(),
-                is_writable: self.magic_program.is_writable(),
-                is_signer: self.magic_program.is_signer(),
-            });
         }
 
         Ok(InstructionView {
             program_id: self.magic_program.address(),
             data,
             accounts: unsafe {
-                core::slice::from_raw_parts(accounts.as_ptr() as *const InstructionAccount, 2)
+                core::slice::from_raw_parts(accounts.as_ptr() as *const InstructionAccount, 1)
             },
         })
     }
@@ -198,8 +193,7 @@ impl CancelCrankCpi {
     }
 
     pub fn invoke(&self) -> ProgramResult {
-        let mut ix_accounts =
-            [const { MaybeUninit::<InstructionAccount>::uninit() }; MAX_CPI_ACCOUNTS];
+        let mut ix_accounts = [const { MaybeUninit::<InstructionAccount>::uninit() }; 1];
         let accounts = [&self.authority, &self.magic_program];
         let data = self.data();
 
@@ -210,8 +204,7 @@ impl CancelCrankCpi {
     }
 
     pub fn invoke_signed(&self, signers_seeds: &[Signer<'_, '_>]) -> ProgramResult {
-        let mut ix_accounts =
-            [const { MaybeUninit::<InstructionAccount>::uninit() }; MAX_CPI_ACCOUNTS];
+        let mut ix_accounts = [const { MaybeUninit::<InstructionAccount>::uninit() }; 1];
         let accounts = [&self.authority, &self.magic_program];
         let data = self.data();
 
