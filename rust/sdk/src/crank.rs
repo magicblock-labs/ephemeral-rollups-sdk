@@ -1,7 +1,8 @@
 use magicblock_magic_program_api::{args::ScheduleTaskArgs, instruction::MagicBlockInstruction};
-use solana_program::{instruction::AccountMeta, program::invoke_signed};
 
-use crate::solana_compat::solana::{invoke, AccountInfo, Instruction, ProgramResult};
+use crate::solana_compat::solana::{
+    invoke, invoke_signed, AccountInfo, AccountMeta, Instruction, ProgramResult,
+};
 
 pub struct ScheduleCrankCpi<'a> {
     pub payer: &'a AccountInfo<'a>,
