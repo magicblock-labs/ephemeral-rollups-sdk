@@ -17,7 +17,7 @@ pub struct CrankInstruction<'a> {
 impl<'a> CrankInstruction<'a> {
     pub fn serialized_size(&self) -> usize {
         let mut size = 0;
-        size += 8; // program_id
+        size += 32; // program_id
         size += 8; // number of accounts
         size += self.accounts.len() * 34; // 32 bytes for address + 1 byte for is_writable + 1 byte for is_signer
         size += 8; // data length
@@ -85,13 +85,11 @@ pub struct ScheduleCrankCpi<'a> {
 }
 
 impl<'a> ScheduleCrankCpi<'a> {
-    fn instruction(
+    fn instruction<'b>(
         &'a self,
         data: &'a [u8],
+        accounts: &'b mut [MaybeUninit<InstructionAccount<'a>>; MAX_CPI_ACCOUNTS],
     ) -> Result<InstructionView<'a, 'a, 'a, 'a>, ProgramError> {
-        let mut accounts =
-            [const { MaybeUninit::<InstructionAccount>::uninit() }; MAX_CPI_ACCOUNTS];
-
         unsafe {
             accounts.get_unchecked_mut(0).write(InstructionAccount {
                 address: self.payer.address(),
@@ -120,23 +118,30 @@ impl<'a> ScheduleCrankCpi<'a> {
     }
 
     fn data(&self) -> Result<Vec<u8>, ProgramError> {
-        let mut data = Vec::with_capacity(8 + self.args.serialized_size());
+        let mut data = Vec::with_capacity(4 + self.args.serialized_size());
         data.extend_from_slice(6_u32.to_le_bytes().as_ref());
         data.extend_from_slice(&self.args.serialize()?);
         Ok(data)
     }
 
     pub fn invoke(&self) -> ProgramResult {
+        let mut ix_accounts =
+            [const { MaybeUninit::<InstructionAccount>::uninit() }; MAX_CPI_ACCOUNTS];
         let mut accounts = Vec::with_capacity(1 + self.instruction_accounts.len());
         accounts.push(&self.payer);
         accounts.extend_from_slice(self.instruction_accounts);
 
         let data = self.data()?;
 
-        invoke_with_slice(&self.instruction(&data)?, accounts.as_slice())
+        invoke_with_slice(
+            &self.instruction(&data, &mut ix_accounts)?,
+            accounts.as_slice(),
+        )
     }
 
     pub fn invoke_signed(&self, signers_seeds: &[Signer<'_, '_>]) -> ProgramResult {
+        let mut ix_accounts =
+            [const { MaybeUninit::<InstructionAccount>::uninit() }; MAX_CPI_ACCOUNTS];
         let mut accounts = Vec::with_capacity(1 + self.instruction_accounts.len());
         accounts.push(&self.payer);
         accounts.extend_from_slice(self.instruction_accounts);
@@ -144,7 +149,7 @@ impl<'a> ScheduleCrankCpi<'a> {
         let data = self.data()?;
 
         invoke_signed_with_slice(
-            &self.instruction(&data)?,
+            &self.instruction(&data, &mut ix_accounts)?,
             accounts.as_slice(),
             signers_seeds,
         )
@@ -158,13 +163,11 @@ pub struct CancelCrankCpi {
 }
 
 impl CancelCrankCpi {
-    fn instruction<'a>(
+    fn instruction<'a, 'b>(
         &'a self,
         data: &'a [u8],
+        accounts: &'b mut [MaybeUninit<InstructionAccount<'a>>; MAX_CPI_ACCOUNTS],
     ) -> Result<InstructionView<'a, 'a, 'a, 'a>, ProgramError> {
-        let mut accounts =
-            [const { MaybeUninit::<InstructionAccount>::uninit() }; MAX_CPI_ACCOUNTS];
-
         unsafe {
             accounts.get_unchecked_mut(0).write(InstructionAccount {
                 address: self.authority.address(),
@@ -195,18 +198,25 @@ impl CancelCrankCpi {
     }
 
     pub fn invoke(&self) -> ProgramResult {
+        let mut ix_accounts =
+            [const { MaybeUninit::<InstructionAccount>::uninit() }; MAX_CPI_ACCOUNTS];
         let accounts = [&self.authority, &self.magic_program];
         let data = self.data();
 
-        invoke_with_slice(&self.instruction(&data)?, accounts.as_slice())
+        invoke_with_slice(
+            &self.instruction(&data, &mut ix_accounts)?,
+            accounts.as_slice(),
+        )
     }
 
     pub fn invoke_signed(&self, signers_seeds: &[Signer<'_, '_>]) -> ProgramResult {
+        let mut ix_accounts =
+            [const { MaybeUninit::<InstructionAccount>::uninit() }; MAX_CPI_ACCOUNTS];
         let accounts = [&self.authority, &self.magic_program];
         let data = self.data();
 
         invoke_signed_with_slice(
-            &self.instruction(&data)?,
+            &self.instruction(&data, &mut ix_accounts)?,
             accounts.as_slice(),
             signers_seeds,
         )
