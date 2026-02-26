@@ -13,8 +13,7 @@ pub struct ScheduleCrankCpi<'a> {
 
 impl<'a> ScheduleCrankCpi<'a> {
     pub fn instruction(&self) -> Instruction {
-        let mut accounts = vec![self.payer.clone()];
-        accounts.extend_from_slice(self.instruction_accounts);
+        let accounts = Self::build_accounts(self.payer, self.instruction_accounts);
 
         Instruction::new_with_bincode(
             *self.magic_program.key,
@@ -31,19 +30,25 @@ impl<'a> ScheduleCrankCpi<'a> {
     }
 
     pub fn invoke(&self) -> ProgramResult {
-        let mut accounts = Vec::with_capacity(1 + self.instruction_accounts.len());
-        accounts.push(self.payer.clone());
-        accounts.extend_from_slice(self.instruction_accounts);
+        let accounts = Self::build_accounts(self.payer, self.instruction_accounts);
 
         invoke(&self.instruction(), &accounts)
     }
 
     pub fn invoke_signed(&self, signers_seeds: &[&[&[u8]]]) -> ProgramResult {
-        let mut accounts = Vec::with_capacity(1 + self.instruction_accounts.len());
-        accounts.push(self.payer.clone());
-        accounts.extend_from_slice(self.instruction_accounts);
+        let accounts = Self::build_accounts(self.payer, self.instruction_accounts);
 
         invoke_signed(&self.instruction(), &accounts, signers_seeds)
+    }
+
+    fn build_accounts(
+        payer: &'a AccountInfo<'a>,
+        instruction_accounts: &'a [AccountInfo<'a>],
+    ) -> Vec<AccountInfo<'a>> {
+        let mut accounts = Vec::with_capacity(1 + instruction_accounts.len());
+        accounts.push(payer.clone());
+        accounts.extend_from_slice(instruction_accounts);
+        accounts
     }
 }
 
