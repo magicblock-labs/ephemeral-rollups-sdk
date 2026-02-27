@@ -16,7 +16,7 @@ use crate::intent_bundle::commit::CommitIntentBuilder;
 use crate::intent_bundle::commit_and_undelegate::CommitAndUndelegateIntentBuilder;
 pub use args::{ActionArgs, ShortAccountMeta};
 use types::MagicIntentBundle;
-pub use types::*;
+pub use types::{CallHandler, CommitAndUndelegateIntent, CommitIntent, MagicIntent};
 
 const MAX_ACTIONS_NUM: usize = 10;
 const _: () = assert!(MAX_ACTIONS_NUM <= u8::MAX as usize);

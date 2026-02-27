@@ -39,6 +39,7 @@ impl<'i, 'acc, 'args> CommitSerialize<'i, 'acc, 'args> {
 }
 
 impl bincode::Encode for CommitSerialize<'_, '_, '_> {
+    #[inline(never)]
     fn encode<E: Encoder>(&self, encoder: &mut E) -> Result<(), EncodeError> {
         self.inner // Copy — CommitIntent is two fat pointers
             .into_args(self.indices_map)
@@ -148,6 +149,7 @@ fn encode_handler_slice<E: Encoder>(
 /// Constructs `BaseActionArgs` on the stack (~80 bytes) and delegates to its
 /// derived [`bincode::Encode`] impl, so field order cannot silently diverge
 /// from the canonical serialization type.
+#[inline(never)]
 fn encode_handler<E: Encoder>(
     handler: &CallHandler<'_>,
     indices_map: &[&Address],
