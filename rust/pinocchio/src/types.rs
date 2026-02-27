@@ -74,6 +74,7 @@ impl DelegateAccountArgs<'_> {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DelegateConfig {
     pub commit_frequency_ms: u32,
     pub validator: Option<Address>,
