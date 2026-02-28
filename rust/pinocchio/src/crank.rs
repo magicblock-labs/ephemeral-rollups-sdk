@@ -10,8 +10,8 @@ use pinocchio::{
 
 pub struct CrankInstruction<'a> {
     pub program_id: Address,
-    pub accounts: Vec<InstructionAccount<'a>>,
-    pub data: Vec<u8>,
+    pub accounts: &'a [InstructionAccount<'a>],
+    pub data: &'a [u8],
 }
 
 impl<'a> CrankInstruction<'a> {
@@ -29,7 +29,7 @@ impl<'a> CrankInstruction<'a> {
         let mut data = Vec::with_capacity(self.serialized_size());
         data.extend_from_slice(self.program_id.as_ref());
         data.extend_from_slice((self.accounts.len() as u64).to_le_bytes().as_ref());
-        for account in &self.accounts {
+        for account in self.accounts {
             let mut serialized = [0; 34];
             serialized[..32].copy_from_slice(account.address.as_ref());
             serialized[32] = account.is_signer as u8;
@@ -46,7 +46,7 @@ pub struct ScheduleCrankArgs<'a> {
     pub task_id: i64,
     pub execution_interval_millis: i64,
     pub iterations: i64,
-    pub instructions: Vec<CrankInstruction<'a>>,
+    pub instructions: &'a [CrankInstruction<'a>],
 }
 
 impl<'a> ScheduleCrankArgs<'a> {
@@ -70,7 +70,7 @@ impl<'a> ScheduleCrankArgs<'a> {
         data.extend_from_slice(&self.execution_interval_millis.to_le_bytes());
         data.extend_from_slice(&self.iterations.to_le_bytes());
         data.extend_from_slice((self.instructions.len() as u64).to_le_bytes().as_ref());
-        for instruction in &self.instructions {
+        for instruction in self.instructions {
             data.extend_from_slice(&instruction.serialize()?);
         }
         Ok(data)
@@ -233,7 +233,7 @@ mod tests {
             task_id: 123,
             execution_interval_millis: 123456,
             iterations: 123456,
-            instructions: vec![],
+            instructions: &[],
         };
         let api_args = ScheduleTaskArgs {
             task_id: this_args.task_id,
@@ -288,10 +288,10 @@ mod tests {
             task_id: 123,
             execution_interval_millis: 123,
             iterations: 123,
-            instructions: vec![CrankInstruction {
+            instructions: &[CrankInstruction {
                 program_id: program_id.clone(),
-                data: vec![1, 2, 3],
-                accounts: vec![InstructionAccount {
+                data: &[1, 2, 3],
+                accounts: &[InstructionAccount {
                     address: &acc1,
                     is_writable: true,
                     is_signer: false,
@@ -360,11 +360,11 @@ mod tests {
             task_id: 123,
             execution_interval_millis: 123456,
             iterations: 123456,
-            instructions: vec![
+            instructions: &[
                 CrankInstruction {
                     program_id: program_id.clone(),
-                    data: vec![1, 2, 3],
-                    accounts: vec![
+                    data: &[1, 2, 3],
+                    accounts: &[
                         InstructionAccount {
                             address: &acc1,
                             is_writable: true,
@@ -379,8 +379,8 @@ mod tests {
                 },
                 CrankInstruction {
                     program_id: program_id.clone(),
-                    data: vec![1, 2, 3],
-                    accounts: vec![
+                    data: &[1, 2, 3],
+                    accounts: &[
                         InstructionAccount {
                             address: &acc1,
                             is_writable: true,
