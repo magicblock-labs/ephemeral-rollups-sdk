@@ -111,7 +111,7 @@ pub struct MaybeEncryptedIxData<'a> {
 }
 
 #[derive(Clone, Debug, Default)]
-pub struct EncryptedBuffer<'a>(&'a [u8]);
+pub struct EncryptedBuffer<'a>(pub &'a [u8]);
 
 #[derive(Debug)]
 pub struct PostDelegationActions<'a> {
