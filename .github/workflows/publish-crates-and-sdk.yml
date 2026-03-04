@@ -77,6 +77,7 @@ jobs:
           fi      
 
           cargo publish $DRY_RUN_FLAG --manifest-path=ephemeral/Cargo.toml --token $CRATES_TOKEN $NO_VERIFY_FLAG
+          cargo publish $DRY_RUN_FLAG --manifest-path=ephemeral-accounts-attribute/Cargo.toml --token $CRATES_TOKEN $NO_VERIFY_FLAG
           cargo publish $DRY_RUN_FLAG --manifest-path=delegate/Cargo.toml --token $CRATES_TOKEN $NO_VERIFY_FLAG
           cargo publish $DRY_RUN_FLAG --manifest-path=commit-attribute/Cargo.toml --token $CRATES_TOKEN $NO_VERIFY_FLAG
           cargo publish $DRY_RUN_FLAG --manifest-path=action-attribute/Cargo.toml --token $CRATES_TOKEN $NO_VERIFY_FLAG
