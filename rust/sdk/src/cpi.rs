@@ -1,7 +1,6 @@
 use crate::types::DelegateAccountArgs;
 use crate::utils::{close_pda_with_system_transfer, create_pda, seeds_with_bump};
-use borsh::BorshSerialize;
-use bincode;
+use borsh::{BorshSerialize, to_vec};
 use dlp::delegate_buffer_seeds_from_delegated_account;
 use dlp::args::{DelegateArgs, DelegateWithActionsArgs, PostDelegationActions};
 use dlp::discriminator::DlpDiscriminator;
@@ -338,7 +337,7 @@ pub fn cpi_delegate_with_actions<'a, 'info>(
     action_signer_infos: &'a [&'a AccountInfo<'info>],
 ) -> ProgramResult {
     let mut data = DlpDiscriminator::DelegateWithActions.to_vec();
-    let payload = bincode::serialize(&args).map_err(|_| ProgramError::InvalidInstructionData)?;
+    let payload = to_vec(&args).map_err(|_| ProgramError::InvalidInstructionData)?;
     data.extend_from_slice(&payload);
 
     let mut accounts = vec![

@@ -4,6 +4,7 @@ use crate::{
 };
 use alloc::vec::Vec;
 use core::mem::MaybeUninit;
+use borsh::to_vec;
 use dlp::args::{DelegateArgs, DelegateWithActionsArgs, PostDelegationActions};
 use dlp::discriminator::DlpDiscriminator;
 use pinocchio::{
@@ -251,7 +252,8 @@ pub fn cpi_delegate_with_actions(
     let args = DelegateWithActionsArgs { delegate, actions };
 
     let mut data = DlpDiscriminator::DelegateWithActions.to_vec();
-    let payload = bincode1::serialize(&args).map_err(|_| ProgramError::InvalidInstructionData)?;
+    let payload =
+        to_vec(&args).map_err(|_| ProgramError::InvalidInstructionData)?;
     data.extend_from_slice(&payload);
 
     let instruction = InstructionView {
