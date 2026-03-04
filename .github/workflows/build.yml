@@ -10,7 +10,7 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 env:
-  rust_version: 1.89.0
+  rust_version: 1.93.1
   node_version: 23
   anchor_version: 0.31.1
   solana_version: v2.2.20
