@@ -873,7 +873,7 @@ export async function delegateSpl(
   const payer = opts?.payer ?? owner;
   const validator = opts?.validator; // Use the default validator authority if not specified
   const initIfMissing = opts?.initIfMissing ?? true;
-  const initVaultIfMissing = opts?.initVaultIfMissing ?? false;
+  const initVaultIfMissing = opts?.initVaultIfMissing ?? initIfMissing;
 
   const instructions: TransactionInstruction[] = [];
 
@@ -930,7 +930,7 @@ export async function delegateSpl(
  *
  * If no shuttleId is provided, a random u32 is used.
  */
-export async function delegateSplV2(
+export async function delegateSplIdempotent(
   owner: PublicKey,
   mint: PublicKey,
   amount: bigint,
