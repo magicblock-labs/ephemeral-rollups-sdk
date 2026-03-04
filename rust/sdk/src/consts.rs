@@ -23,3 +23,7 @@ pub const ESPL_TOKEN_PROGRAM_ID: Pubkey =
 /// The token program ID.
 pub const TOKEN_PROGRAM_ID: Pubkey =
     Pubkey::from_str_const("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA");
+
+/// The associated token program ID.
+pub const ASSOCIATED_TOKEN_PROGRAM_ID: Pubkey =
+    Pubkey::from_str_const("ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL");

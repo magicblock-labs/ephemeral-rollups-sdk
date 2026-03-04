@@ -1,5 +1,7 @@
+use spl_associated_token_account_interface::address::get_associated_token_address;
+
 use crate::{
-    consts::ESPL_TOKEN_PROGRAM_ID,
+    consts::{ASSOCIATED_TOKEN_PROGRAM_ID, ESPL_TOKEN_PROGRAM_ID, TOKEN_PROGRAM_ID},
     solana_compat::solana::{system_program, AccountMeta, Instruction, Pubkey},
     spl::{EphemeralSplDiscriminator, GlobalVault},
 };
@@ -13,12 +15,16 @@ impl InitializeGlobalVaultBuilder {
     #[inline(always)]
     pub fn instruction(&self) -> Instruction {
         let (vault, vault_bump) = GlobalVault::find_pda(&self.mint);
+        let vault_ata = get_associated_token_address(&vault, &self.mint);
         Instruction {
             program_id: ESPL_TOKEN_PROGRAM_ID,
             accounts: vec![
                 AccountMeta::new(vault, false),
                 AccountMeta::new(self.payer, true),
                 AccountMeta::new_readonly(self.mint, false),
+                AccountMeta::new(vault_ata, false),
+                AccountMeta::new_readonly(TOKEN_PROGRAM_ID, false),
+                AccountMeta::new_readonly(ASSOCIATED_TOKEN_PROGRAM_ID, false),
                 AccountMeta::new_readonly(system_program::id(), false),
             ],
             data: vec![
