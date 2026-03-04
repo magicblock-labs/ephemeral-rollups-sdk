@@ -14,8 +14,8 @@ mod tests {
     use ephemeral_rollups_sdk::{
         access_control::structs::Permission,
         consts::{
-            ESPL_TOKEN_PROGRAM_ID, MAGIC_CONTEXT_ID, MAGIC_PROGRAM_ID, PERMISSION_PROGRAM_ID,
-            TOKEN_PROGRAM_ID,
+            ASSOCIATED_TOKEN_PROGRAM_ID, ESPL_TOKEN_PROGRAM_ID, MAGIC_CONTEXT_ID, MAGIC_PROGRAM_ID,
+            PERMISSION_PROGRAM_ID, TOKEN_PROGRAM_ID,
         },
         spl::{
             builders::{
@@ -25,8 +25,7 @@ mod tests {
                 ResetEphemeralAtaPermissionBuilder, UndelegateEphemeralAtaBuilder,
                 UndelegateEphemeralAtaPermissionBuilder, WithdrawSplTokensBuilder,
             },
-            cpi::*,
-            EphemeralAta, GlobalVault,
+            EphemeralAta, EphemeralSplDiscriminator, GlobalVault,
         },
     };
     use magicblock_magic_program_api::Pubkey;
@@ -38,16 +37,17 @@ mod tests {
         let payer = Pubkey::new_unique();
         let mint = Pubkey::new_unique();
         let (vault, vault_bump) = GlobalVault::find_pda(&mint);
+        let vault_ata = get_associated_token_address(&vault, &mint);
 
         let instruction = InitializeGlobalVaultBuilder { payer, mint }.instruction();
 
         assert_eq!(instruction.program_id, ESPL_TOKEN_PROGRAM_ID);
-        assert_eq!(instruction.accounts.len(), 4);
+        assert_eq!(instruction.accounts.len(), 7);
         // vault (writable, not signer)
         assert_eq!(instruction.accounts[0].pubkey, vault);
         assert!(instruction.accounts[0].is_writable);
         assert!(!instruction.accounts[0].is_signer);
-        // payer (writable, not signer)
+        // payer (writable, signer)
         assert_eq!(instruction.accounts[1].pubkey, payer);
         assert!(instruction.accounts[1].is_writable);
         assert!(instruction.accounts[1].is_signer);
@@ -55,9 +55,22 @@ mod tests {
         assert_eq!(instruction.accounts[2].pubkey, mint);
         assert!(!instruction.accounts[2].is_writable);
         assert!(!instruction.accounts[2].is_signer);
-        // system_program (readonly)
-        assert!(!instruction.accounts[3].is_writable);
+        // vault_ata (writable)
+        assert_eq!(instruction.accounts[3].pubkey, vault_ata);
+        assert!(instruction.accounts[3].is_writable);
         assert!(!instruction.accounts[3].is_signer);
+        // token_program (readonly)
+        assert_eq!(instruction.accounts[4].pubkey, TOKEN_PROGRAM_ID);
+        assert!(!instruction.accounts[4].is_writable);
+        assert!(!instruction.accounts[4].is_signer);
+        // associated_token_program (readonly)
+        assert_eq!(instruction.accounts[5].pubkey, ASSOCIATED_TOKEN_PROGRAM_ID);
+        assert!(!instruction.accounts[5].is_writable);
+        assert!(!instruction.accounts[5].is_signer);
+        // system_program (readonly)
+        assert_eq!(instruction.accounts[6].pubkey, system_program::id());
+        assert!(!instruction.accounts[6].is_writable);
+        assert!(!instruction.accounts[6].is_signer);
 
         assert_eq!(
             instruction.data[0],

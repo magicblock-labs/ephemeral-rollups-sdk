@@ -777,50 +777,46 @@ export function resetEataPermissionIx(
  * @param payer - The payer account
  * @param ephemeralAta - The ephemeral ATA account
  * @param bump - The bump
- * @param validator - Optional validator account
+ * @param validator - The validator account
  * @returns The delegate EATA permission instruction
  */
 export function delegateEataPermissionIx(
   payer: PublicKey,
   ephemeralAta: PublicKey,
   bump: number,
-  validator?: PublicKey,
+  validator: PublicKey,
 ): TransactionInstruction {
   const permission = permissionPdaFromAccount(ephemeralAta);
-  const keys = [
-    { pubkey: payer, isSigner: true, isWritable: true },
-    { pubkey: ephemeralAta, isSigner: false, isWritable: true },
-    { pubkey: PERMISSION_PROGRAM_ID, isSigner: false, isWritable: false },
-    { pubkey: permission, isSigner: false, isWritable: true },
-    { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
-    {
-      pubkey: delegateBufferPdaFromDelegatedAccountAndOwnerProgram(
-        permission,
-        PERMISSION_PROGRAM_ID,
-      ),
-      isSigner: false,
-      isWritable: true,
-    },
-    {
-      pubkey: delegationRecordPdaFromDelegatedAccount(permission),
-      isSigner: false,
-      isWritable: true,
-    },
-    {
-      pubkey: delegationMetadataPdaFromDelegatedAccount(permission),
-      isSigner: false,
-      isWritable: true,
-    },
-    { pubkey: DELEGATION_PROGRAM_ID, isSigner: false, isWritable: false },
-  ];
-
-  if (validator !== undefined) {
-    keys.push({ pubkey: validator, isSigner: false, isWritable: false });
-  }
 
   return new TransactionInstruction({
     programId: EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
-    keys,
+    keys: [
+      { pubkey: payer, isSigner: true, isWritable: true },
+      { pubkey: ephemeralAta, isSigner: false, isWritable: true },
+      { pubkey: PERMISSION_PROGRAM_ID, isSigner: false, isWritable: false },
+      { pubkey: permission, isSigner: false, isWritable: true },
+      { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+      {
+        pubkey: delegateBufferPdaFromDelegatedAccountAndOwnerProgram(
+          permission,
+          PERMISSION_PROGRAM_ID,
+        ),
+        isSigner: false,
+        isWritable: true,
+      },
+      {
+        pubkey: delegationRecordPdaFromDelegatedAccount(permission),
+        isSigner: false,
+        isWritable: true,
+      },
+      {
+        pubkey: delegationMetadataPdaFromDelegatedAccount(permission),
+        isSigner: false,
+        isWritable: true,
+      },
+      { pubkey: DELEGATION_PROGRAM_ID, isSigner: false, isWritable: false },
+      { pubkey: validator, isSigner: false, isWritable: false },
+    ],
     data: Buffer.from([7, bump]),
   });
 }
