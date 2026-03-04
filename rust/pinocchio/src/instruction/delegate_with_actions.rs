@@ -1,17 +1,18 @@
 use pinocchio::{cpi::Signer, error::ProgramError, AccountView, ProgramResult};
 
-use crate::types::DelegateAccountArgs;
-use crate::utils::cpi_delegate_prepare;
-use crate::utils::fill_seeds;
-use crate::utils::{cpi_delegate, make_seed_buf};
+use crate::types::PostDelegationActions;
+use crate::utils::cpi_delegate_with_actions;
+use crate::utils::{fill_seeds, make_seed_buf};
+use crate::{types::DelegateAccountArgs, utils::cpi_delegate_prepare};
 use crate::{types::DelegateConfig, utils::close_pda_acc};
 
 #[allow(unknown_lints, clippy::cloned_ref_to_slice_refs)]
-pub fn delegate_account(
+pub fn delegate_with_actions<'a>(
     accounts: &[&AccountView],
     seeds: &[&[u8]],
     bump: u8,
     config: DelegateConfig,
+    actions: PostDelegationActions<'a>,
 ) -> ProgramResult {
     let [payer, pda_acc, owner_program, buffer_acc, delegation_record, delegation_metadata, system_program] =
         accounts
@@ -39,7 +40,7 @@ pub fn delegate_account(
         validator: config.validator,
     };
 
-    cpi_delegate(
+    cpi_delegate_with_actions(
         payer,
         pda_acc,
         owner_program,
@@ -48,6 +49,7 @@ pub fn delegate_account(
         delegation_metadata,
         system_program,
         delegate_args,
+        actions,
         delegate_signer_seeds,
     )?;
 
@@ -57,7 +59,7 @@ pub fn delegate_account(
     Ok(())
 }
 
-pub struct DelegateAccountCpiBuilder<'a> {
+pub struct DelegateWithActionsCpiBuilder<'a> {
     payer: &'a AccountView,
     pda_acc: &'a AccountView,
     owner_program: &'a AccountView,
@@ -68,9 +70,10 @@ pub struct DelegateAccountCpiBuilder<'a> {
     seeds: Option<&'a [&'a [u8]]>,
     bump: Option<u8>,
     config: Option<DelegateConfig>,
+    actions: Option<PostDelegationActions<'a>>,
 }
 
-impl<'a> DelegateAccountCpiBuilder<'a> {
+impl<'a> DelegateWithActionsCpiBuilder<'a> {
     pub fn new(
         payer: &'a AccountView,
         pda_acc: &'a AccountView,
@@ -91,6 +94,7 @@ impl<'a> DelegateAccountCpiBuilder<'a> {
             seeds: None,
             bump: None,
             config: None,
+            actions: None,
         }
     }
 
@@ -109,6 +113,11 @@ impl<'a> DelegateAccountCpiBuilder<'a> {
         self
     }
 
+    pub fn actions(mut self, actions: PostDelegationActions<'a>) -> Self {
+        self.actions = Some(actions);
+        self
+    }
+
     pub fn invoke(self) -> ProgramResult {
         let seeds = self.seeds.ok_or(ProgramError::InvalidInstructionData)?;
         if seeds.len() > 15 {
@@ -116,7 +125,8 @@ impl<'a> DelegateAccountCpiBuilder<'a> {
         }
         let bump = self.bump.ok_or(ProgramError::InvalidInstructionData)?;
         let config = self.config.ok_or(ProgramError::InvalidInstructionData)?;
-        delegate_account(
+        let actions = self.actions.ok_or(ProgramError::InvalidInstructionData)?;
+        delegate_with_actions(
             &[
                 self.payer,
                 self.pda_acc,
@@ -129,6 +139,7 @@ impl<'a> DelegateAccountCpiBuilder<'a> {
             seeds,
             bump,
             config,
+            actions,
         )
     }
 }
