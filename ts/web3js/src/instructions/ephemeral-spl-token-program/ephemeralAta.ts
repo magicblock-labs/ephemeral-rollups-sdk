@@ -402,19 +402,15 @@ export function depositSplTokensIx(
   owner: PublicKey,
   amount: bigint,
 ): TransactionInstruction {
-  return new TransactionInstruction({
-    programId: EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
-    keys: [
-      { pubkey: ephemeralAta, isSigner: false, isWritable: true },
-      { pubkey: vault, isSigner: false, isWritable: false },
-      { pubkey: mint, isSigner: false, isWritable: false },
-      { pubkey: sourceAta, isSigner: false, isWritable: true },
-      { pubkey: vaultAta, isSigner: false, isWritable: true },
-      { pubkey: owner, isSigner: true, isWritable: false },
-      { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
-    ],
-    data: Buffer.from([2, ...u64le(amount)]),
-  });
+  return transferToVaultIx(
+    ephemeralAta,
+    vault,
+    mint,
+    sourceAta,
+    vaultAta,
+    owner,
+    amount,
+  );
 }
 
 /**
@@ -974,7 +970,6 @@ export async function delegateSplV2(
   const [ephemeralAta, eataBump] = deriveEphemeralAta(owner, mint);
   const [vault, vaultBump] = deriveVault(mint);
   const vaultAta = deriveVaultAta(mint, vault);
-  console.log("Vault ata: ", vaultAta.toBase58());
   const ownerAta = getAssociatedTokenAddressSync(mint, owner);
 
   const [shuttleEphemeralAta, shuttleBump] = deriveShuttleEphemeralAta(

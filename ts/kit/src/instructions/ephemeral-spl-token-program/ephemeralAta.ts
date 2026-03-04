@@ -911,19 +911,21 @@ export async function delegateSpl(
 }
 
 /**
- * High-level method to delegate SPL tokens with shuttle fallback when EATA is already delegated.
+ * High-level idempotent delegation flow using shuttle accounts.
  *
- * Delegated path:
- * 1) init shuttle metadata/eata/wallet
- * 2) optional deposit into vault using shuttle EATA (if amount > 0)
- * 3) delegate shuttle EATA
- * 4) merge shuttle wallet ATA into owner ATA
- * 5) undelegate and close shuttle wallet ATA
+ * Emitted instructions:
+ * 1) optionally initialize global vault + vault ATA
+ * 2) optionally initialize owner/shuttle ATAs
+ * 3) initialize ephemeral ATA (idempotent on-chain)
+ * 4) initialize EATA permission
+ * 5) delegate EATA
+ * 6) initialize shuttle ephemeral ATA
+ * 7) deposit SPL tokens from owner ATA into the vault for shuttle ATA
+ * 8) delegate shuttle ephemeral ATA
  *
- * Non-delegated path:
- * falls back to delegateSpl.
+ * If no shuttleId is provided, a random u32 is used.
  */
-export async function delegateSplV2(
+export async function delegateSplIdempotent(
   owner: Address,
   mint: Address,
   amount: bigint,
@@ -932,42 +934,31 @@ export async function delegateSplV2(
     validator?: Address;
     initIfMissing?: boolean;
     initVaultIfMissing?: boolean;
+    initAtasIfMissing?: boolean;
     shuttleId?: number;
     escrowIndex?: number;
-    isEphemeralAtaDelegated?: boolean;
-    getEphemeralAtaOwnerProgram?: (
-      ephemeralAta: Address,
-    ) => Promise<Address | null>;
   },
 ): Promise<Instruction[]> {
   const payer = opts?.payer ?? owner;
   const validator = opts?.validator;
-  const initIfMissing = opts?.initIfMissing ?? true;
   const initVaultIfMissing = opts?.initVaultIfMissing ?? false;
-  const shuttleId = opts?.shuttleId ?? 0;
+  const initAtasIfMissing = opts?.initAtasIfMissing ?? false;
 
-  const [ephemeralAta] = await deriveEphemeralAta(owner, mint);
+  const randomShuttleId = (): number => {
+    const cryptoObj = (globalThis as any)?.crypto;
+    if (cryptoObj?.getRandomValues !== undefined) {
+      const buf = new Uint32Array(1);
+      cryptoObj.getRandomValues(buf);
+      return buf[0];
+    }
+    return Math.floor(Math.random() * 0x1_0000_0000);
+  };
 
-  let isEphemeralAtaDelegated = opts?.isEphemeralAtaDelegated;
-  if (
-    isEphemeralAtaDelegated === undefined &&
-    opts?.getEphemeralAtaOwnerProgram !== undefined
-  ) {
-    const ownerProgram = await opts.getEphemeralAtaOwnerProgram(ephemeralAta);
-    isEphemeralAtaDelegated = ownerProgram === DELEGATION_PROGRAM_ID;
-  }
-
-  if (isEphemeralAtaDelegated !== true) {
-    return delegateSpl(owner, mint, amount, {
-      payer,
-      validator,
-      initIfMissing,
-      initVaultIfMissing,
-    });
-  }
+  const shuttleId = opts?.shuttleId ?? randomShuttleId();
 
   const instructions: Instruction[] = [];
 
+  const [ephemeralAta, eataBump] = await deriveEphemeralAta(owner, mint);
   const [vault, vaultBump] = await deriveVault(mint);
   const vaultAta = await deriveVaultAta(mint, vault);
   const ownerAta = await getAssociatedTokenAddressSync(mint, owner);
@@ -993,7 +984,17 @@ export async function delegateSplV2(
     );
   }
 
+  if (initAtasIfMissing) {
+    instructions.push(
+      initVaultAtaIx(payer, ownerAta, owner, mint),
+      initVaultAtaIx(payer, shuttleWalletAta, shuttleEphemeralAta, mint),
+    );
+  }
+
   instructions.push(
+    initEphemeralAtaIx(ephemeralAta, owner, mint, payer, eataBump),
+    await createEataPermissionIx(ephemeralAta, payer, eataBump),
+    await delegateIx(payer, ephemeralAta, eataBump, validator),
     initShuttleEphemeralAtaIx(
       payer,
       shuttleEphemeralAta,
@@ -1027,19 +1028,6 @@ export async function delegateSplV2(
       shuttleAta,
       shuttleAtaBump,
       validator,
-    ),
-    mergeShuttleIntoAtaIx(
-      owner,
-      ownerAta,
-      shuttleEphemeralAta,
-      shuttleWalletAta,
-      mint,
-    ),
-    undelegateAndCloseShuttleEphemeralAtaIx(
-      payer,
-      shuttleEphemeralAta,
-      shuttleAta,
-      shuttleWalletAta,
     ),
   );
 
