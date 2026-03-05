@@ -25,7 +25,6 @@ bincode = { version = "2.0.1", default-features = false, features = [
 magicblock-delegation-program = { workspace = true, features = [
     "no-entrypoint",
 ], default-features = false }
-bincode1 = { package = "bincode", version = "1.3", optional = true }
 borsh = { workspace = true, optional = true }
 
 [dev-dependencies]
@@ -38,7 +37,7 @@ solana-instruction = { workspace = true }
 [features]
 default = []
 delegation-actions = ["borsh"]
-intent-bundle = ["bincode1", "bincode"]
+intent-bundle = ["bincode"]
 
 [lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = [
