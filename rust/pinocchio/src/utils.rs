@@ -188,8 +188,12 @@ pub fn cpi_delegate_with_actions(
     use alloc::vec::Vec;
     use dlp::args::{DelegateArgs, DelegateWithActionsArgs};
     use dlp::discriminator::DlpDiscriminator;
-    use pinocchio::cpi::{invoke_signed_with_bounds, MAX_STATIC_CPI_ACCOUNTS};
+    use pinocchio::cpi::invoke_signed_with_bounds;
     use solana_program::pubkey::Pubkey;
+
+    use crate::consts::MAX_POST_DELEGATION_SIGNERS;
+
+    const MAX_ACCOUNTS: usize = 7 + MAX_POST_DELEGATION_SIGNERS;
 
     if action_signer_accounts.len() != actions.signers.len() {
         return Err(ProgramError::NotEnoughAccountKeys);
@@ -197,10 +201,12 @@ pub fn cpi_delegate_with_actions(
 
     const UNINIT_ACCOUNT: MaybeUninit<InstructionAccount> =
         MaybeUninit::<InstructionAccount>::uninit();
-    let mut account_metas = [UNINIT_ACCOUNT; MAX_CPI_ACCOUNTS];
+    // Keep this bounded to the same static CPI cap used by `invoke_signed_with_bounds`
+    // to avoid blowing the sBPF 4KB per-frame stack budget.
+    let mut account_metas = [UNINIT_ACCOUNT; MAX_ACCOUNTS];
 
     let num_accounts = 7 + action_signer_accounts.len();
-    if num_accounts > MAX_CPI_ACCOUNTS {
+    if num_accounts > MAX_ACCOUNTS {
         return Err(ProgramError::InvalidArgument);
     }
 
@@ -265,7 +271,7 @@ pub fn cpi_delegate_with_actions(
         data: &data,
     };
 
-    let mut acc_infos: [&AccountView; MAX_STATIC_CPI_ACCOUNTS] = [payer; MAX_STATIC_CPI_ACCOUNTS];
+    let mut acc_infos: [&AccountView; MAX_ACCOUNTS] = [payer; MAX_ACCOUNTS];
     acc_infos[0] = payer;
     acc_infos[1] = pda_acc;
     acc_infos[2] = owner_program;
@@ -279,7 +285,7 @@ pub fn cpi_delegate_with_actions(
         j += 1;
     }
 
-    invoke_signed_with_bounds::<MAX_STATIC_CPI_ACCOUNTS>(
+    invoke_signed_with_bounds::<MAX_ACCOUNTS>(
         &instruction,
         &acc_infos[..num_accounts],
         &[signer_seeds],

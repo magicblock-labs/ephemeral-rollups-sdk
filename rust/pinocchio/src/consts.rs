@@ -31,3 +31,6 @@ pub const COMMIT_RECORD: &[u8] = b"commit-state-record";
 
 /// The discriminator for the external undelegate instruction.
 pub const EXTERNAL_UNDELEGATE_DISCRIMINATOR: [u8; 8] = [196, 28, 41, 206, 48, 37, 51, 167];
+
+/// The maximum number of signers for the post delegation actions.
+pub const MAX_POST_DELEGATION_SIGNERS: usize = 16;
