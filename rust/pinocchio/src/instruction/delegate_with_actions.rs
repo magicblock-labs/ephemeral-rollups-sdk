@@ -13,8 +13,8 @@ use crate::utils::{cpi_delegate_with_actions, make_seed_buf};
 use crate::{consts::BUFFER, types::DelegateConfig, utils::close_pda_acc};
 pub use dlp::{
     args::{
-        MaybeEncryptedAccountMeta, MaybeEncryptedInstruction, MaybeEncryptedIxData,
-        MaybeEncryptedPubkey, PostDelegationActions,
+        EncryptedBuffer, MaybeEncryptedAccountMeta, MaybeEncryptedInstruction,
+        MaybeEncryptedIxData, MaybeEncryptedPubkey, PostDelegationActions,
     },
     compact::AccountMeta,
 };
