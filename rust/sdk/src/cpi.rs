@@ -352,7 +352,7 @@ pub fn cpi_delegate_with_actions<'a, 'info>(
     for signer in &args.actions.signers {
         let info = action_signer_infos
             .iter()
-            .find(|ai| *ai.key == *signer)
+            .find(|ai| *ai.key.as_array() == *signer)
             .ok_or(ProgramError::NotEnoughAccountKeys)?;
         accounts.push(AccountMeta::new_readonly(*info.key, true));
         signer_infos.push((*info).clone());
