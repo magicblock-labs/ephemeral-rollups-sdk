@@ -24,7 +24,6 @@ bincode = { version = "2.0.1", default-features = false, features = [
 ], optional = true }
 magicblock-delegation-program = { workspace = true, features = [
     "no-entrypoint",
-    "sdk",
 ], default-features = false }
 bincode1 = { package = "bincode", version = "1.3", optional = true }
 borsh = { workspace = true, optional = true }
