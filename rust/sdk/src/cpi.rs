@@ -1,8 +1,8 @@
 use crate::types::DelegateAccountArgs;
 use crate::utils::{close_pda_with_system_transfer, create_pda, seeds_with_bump};
-use borsh::{BorshSerialize, to_vec};
-use dlp::delegate_buffer_seeds_from_delegated_account;
+use borsh::{to_vec, BorshSerialize};
 use dlp::args::{DelegateArgs, DelegateWithActionsArgs, PostDelegationActions};
+use dlp::delegate_buffer_seeds_from_delegated_account;
 use dlp::discriminator::DlpDiscriminator;
 
 use crate::solana_compat::solana::{
@@ -139,8 +139,7 @@ pub fn delegate_account_with_actions<'a, 'info>(
     actions: PostDelegationActions,
     action_signer_infos: &'a [&'a AccountInfo<'info>],
 ) -> ProgramResult {
-    let buffer_seeds: &[&[u8]] =
-        delegate_buffer_seeds_from_delegated_account!(accounts.pda.key);
+    let buffer_seeds: &[&[u8]] = delegate_buffer_seeds_from_delegated_account!(accounts.pda.key);
 
     let (_, delegate_account_bump) =
         Pubkey::find_program_address(pda_seeds, accounts.owner_program.key);
@@ -155,8 +154,7 @@ pub fn delegate_account_with_actions<'a, 'info>(
 
     // Buffer signer seeds
     let buffer_bump_slice: &[u8] = &[buffer_pda_bump];
-    let buffer_signer_seeds: &[&[&[u8]]] =
-        &[&*seeds_with_bump(buffer_seeds, buffer_bump_slice)];
+    let buffer_signer_seeds: &[&[&[u8]]] = &[&*seeds_with_bump(buffer_seeds, buffer_bump_slice)];
 
     let data_len = accounts.pda.data_len();
 
@@ -356,7 +354,7 @@ pub fn cpi_delegate_with_actions<'a, 'info>(
             .iter()
             .find(|ai| *ai.key == *signer)
             .ok_or(ProgramError::NotEnoughAccountKeys)?;
-        accounts.push(AccountMeta::new_readonly((*info.key).into(), true));
+        accounts.push(AccountMeta::new_readonly(*info.key, true));
         signer_infos.push((*info).clone());
     }
 
