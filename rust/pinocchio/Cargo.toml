@@ -13,15 +13,21 @@ edition = { workspace = true }
 
 [dependencies]
 pinocchio = { workspace = true }
-pinocchio-pubkey  = { workspace = true }
-pinocchio-system  = { workspace = true }
-solana-address = { workspace = true , features = ["curve25519", "serde"] }
+pinocchio-pubkey = { workspace = true }
+pinocchio-system = { workspace = true }
+solana-address = { workspace = true, features = ["curve25519", "serde"] }
 solana-program = { workspace = true }
 serde = { workspace = true }
-bincode = { version = "2.0.1", default-features = false, features = ["derive", "serde"] }
-magicblock-delegation-program = { workspace = true, features = ["no-entrypoint", "sdk"], default-features = false }
+bincode = { version = "2.0.1", default-features = false, features = [
+    "derive",
+    "serde",
+] }
+magicblock-delegation-program = { workspace = true, features = [
+    "no-entrypoint",
+    "sdk",
+], default-features = false }
 bincode1 = { package = "bincode", version = "1.3" }
-borsh = { workspace = true }
+borsh = { workspace = true, optional = true }
 
 [dev-dependencies]
 bincode1 = { package = "bincode", version = "1.3" }
@@ -29,6 +35,10 @@ magicblock-magic-program-api = { workspace = true }
 ephemeral-rollups-sdk = { workspace = true }
 solana-program = { workspace = true }
 solana-instruction = { workspace = true }
+
+[features]
+default = ["delegation-actions"]
+delegation-actions = ["borsh"]
 
 [lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = [

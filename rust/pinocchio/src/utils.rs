@@ -2,22 +2,14 @@ use crate::{
     consts::DELEGATION_PROGRAM_ID,
     types::{DelegateAccountArgs, MAX_DELEGATE_ACCOUNT_ARGS_SIZE},
 };
-use alloc::vec::Vec;
 use core::mem::MaybeUninit;
-use borsh::to_vec;
-use dlp::args::{DelegateArgs, DelegateWithActionsArgs, PostDelegationActions};
-use dlp::discriminator::DlpDiscriminator;
 use pinocchio::{
     address::MAX_SEEDS,
-    cpi::{
-        invoke_signed, invoke_signed_with_bounds, Seed, Signer, MAX_CPI_ACCOUNTS,
-        MAX_STATIC_CPI_ACCOUNTS,
-    },
+    cpi::{invoke_signed, Seed, Signer, MAX_CPI_ACCOUNTS},
     error::ProgramError,
     instruction::{InstructionAccount, InstructionView},
     AccountView,
 };
-use solana_program::pubkey::Pubkey;
 
 #[inline(always)]
 pub fn empty_seed<'a>() -> Seed<'a> {
@@ -178,6 +170,7 @@ fn cpi_delegate_with_discriminator(
     Ok(())
 }
 
+#[cfg(feature = "delegation-actions")]
 #[allow(clippy::too_many_arguments)]
 pub fn cpi_delegate_with_actions(
     payer: &AccountView,
@@ -188,10 +181,16 @@ pub fn cpi_delegate_with_actions(
     delegation_metadata: &AccountView,
     system_program: &AccountView,
     delegate_args: DelegateAccountArgs,
-    actions: PostDelegationActions,
+    actions: dlp::args::PostDelegationActions,
     action_signer_accounts: &[&AccountView],
     signer_seeds: Signer<'_, '_>,
 ) -> Result<(), ProgramError> {
+    use alloc::vec::Vec;
+    use dlp::args::{DelegateArgs, DelegateWithActionsArgs};
+    use dlp::discriminator::DlpDiscriminator;
+    use pinocchio::cpi::{invoke_signed_with_bounds, MAX_STATIC_CPI_ACCOUNTS};
+    use solana_program::pubkey::Pubkey;
+
     if action_signer_accounts.len() != actions.signers.len() {
         return Err(ProgramError::NotEnoughAccountKeys);
     }
@@ -252,8 +251,7 @@ pub fn cpi_delegate_with_actions(
     let args = DelegateWithActionsArgs { delegate, actions };
 
     let mut data = DlpDiscriminator::DelegateWithActions.to_vec();
-    let payload =
-        to_vec(&args).map_err(|_| ProgramError::InvalidInstructionData)?;
+    let payload = borsh::to_vec(&args).map_err(|_| ProgramError::InvalidInstructionData)?;
     data.extend_from_slice(&payload);
 
     let instruction = InstructionView {

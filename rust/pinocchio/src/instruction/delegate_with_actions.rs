@@ -11,7 +11,13 @@ use crate::pda::find_program_address;
 use crate::types::DelegateAccountArgs;
 use crate::utils::{cpi_delegate_with_actions, make_seed_buf};
 use crate::{consts::BUFFER, types::DelegateConfig, utils::close_pda_acc};
-use dlp::args::PostDelegationActions;
+pub use dlp::{
+    args::{
+        MaybeEncryptedAccountMeta, MaybeEncryptedInstruction, MaybeEncryptedIxData,
+        MaybeEncryptedPubkey, PostDelegationActions,
+    },
+    compact::AccountMeta,
+};
 
 /// Find the bump for a buffer PDA using the pinocchio PDA derivation.
 fn find_buffer_pda_bump(pda_key: &[u8], owner_program: &Address) -> u8 {
@@ -184,10 +190,7 @@ impl<'a> DelegateAccountWithActionsCpiBuilder<'a> {
         self
     }
 
-    pub fn action_signer_accounts(
-        mut self,
-        accounts: &'a [&'a AccountView],
-    ) -> Self {
+    pub fn action_signer_accounts(mut self, accounts: &'a [&'a AccountView]) -> Self {
         self.action_signer_accounts = Some(accounts);
         self
     }
