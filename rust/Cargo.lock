@@ -729,9 +729,9 @@ checksum = "b35204fbdc0b3f4446b89fc1ac2cf84a8a68971995d0bf2e925ec7cd960f9cb3"
 
 [[package]]
 name = "cc"
-version = "1.2.52"
+version = "1.2.56"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cd4932aefd12402b36c60956a4fe0035421f544799057659ff86f923657aada3"
+checksum = "aebf35691d1bfb0ac386a69bac2fde4dd276fb618cf8bf4f5318fe285e821bb2"
 dependencies = [
  "find-msvc-tools",
  "jobserver",
@@ -1234,9 +1234,9 @@ checksum = "28dea519a9695b9977216879a3ebfddf92f1c08c05d984f8996aecd6ecdc811d"
 
 [[package]]
 name = "find-msvc-tools"
-version = "0.1.7"
+version = "0.1.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f449e6c6c08c865631d4890cfacf252b3d396c9bcc83adb6623cdb02a8336c41"
+checksum = "5baebc0774151f905a1a2cc41989300b1e6fbb29aff0ceffa1064fdd3088d582"
 
 [[package]]
 name = "five8"
@@ -2056,7 +2056,7 @@ dependencies = [
 [[package]]
 name = "magicblock-delegation-program"
 version = "1.1.3"
-source = "git+https://github.com/magicblock-labs/delegation-program.git?rev=d03478c6c#d03478c6c51beca9f35a24efdccfeb388014c378"
+source = "git+https://github.com/magicblock-labs/delegation-program.git?rev=93553ba4#93553ba40690aed12bbf11643db0f4e244eea01d"
 dependencies = [
  "bincode 1.3.3",
  "borsh 1.6.0",
@@ -2067,13 +2067,12 @@ dependencies = [
  "pinocchio-log",
  "pinocchio-pubkey",
  "pinocchio-system",
- "rand 0.8.5",
  "rkyv 0.7.46",
  "serde",
  "solana-address",
  "solana-curve25519",
  "solana-program",
- "solana-sdk",
+ "solana-security-txt",
  "solana-sha256-hasher 3.1.0",
  "static_assertions",
  "strum",
