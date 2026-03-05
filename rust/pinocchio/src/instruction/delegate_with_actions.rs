@@ -16,7 +16,7 @@ pub use dlp::{
         EncryptedBuffer, MaybeEncryptedAccountMeta, MaybeEncryptedInstruction,
         MaybeEncryptedIxData, MaybeEncryptedPubkey, PostDelegationActions,
     },
-    compact::AccountMeta,
+    compact::{AccountMeta, ClearText, Instruction},
 };
 
 /// Find the bump for a buffer PDA using the pinocchio PDA derivation.

@@ -33,7 +33,7 @@ ephemeral-rollups-sdk-attribute-action = { path = "action-attribute", version = 
 
 
 # Magicblock
-magicblock-delegation-program = { git = "https://github.com/magicblock-labs/delegation-program.git", rev = "93553ba4" }
+magicblock-delegation-program = { git = "https://github.com/magicblock-labs/delegation-program.git", rev = "d588b076619ded85a144ebf9cabdcc70a2be7e7a" }
 magicblock-magic-program-api = { version = "0.8.1", default-features = false }
 
 ## External crates
