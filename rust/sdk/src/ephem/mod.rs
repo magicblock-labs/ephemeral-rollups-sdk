@@ -190,7 +190,7 @@ impl<'info> MagicIntentBundleBuilder<'info> {
                     &MagicBlockInstruction::AddActionCallback(args),
                     vec![payer_meta, ctx_meta],
                 );
-                (vec![self.payer.clone(), self.magic_contex.clone()], ix)
+                (vec![self.payer.clone(), self.magic_context.clone()], ix)
             })
             .collect()
     }
@@ -453,8 +453,18 @@ impl<'info> CommitIntentBuilder<'info> {
         self.fold().add_standalone_actions(actions)
     }
 
-    /// Terminal: finalizes this commit intent and builds the full instruction.
-    pub fn build(self) -> (Vec<AccountInfo<'info>>, Instruction) {
+    /// Transition: finalizes this commit intent and adds a standalone action with a callback.
+    pub fn add_standalone_action_with_callback(
+        self,
+        action: CallHandler<'info>,
+        callback: ActionCallback,
+    ) -> MagicIntentBundleBuilder<'info> {
+        self.fold()
+            .add_standalone_action_with_callback(action, callback)
+    }
+
+    /// Terminal: finalizes this commit intent and builds the full instruction set
+    pub fn build(self) -> IntentInstructions<'info> {
         self.fold().build()
     }
 
@@ -559,8 +569,18 @@ impl<'info> CommitAndUndelegateIntentBuilder<'info> {
         self.fold().add_standalone_actions(actions)
     }
 
-    /// Terminal: finalizes this intent and builds the full instruction.
-    pub fn build(self) -> (Vec<AccountInfo<'info>>, Instruction) {
+    /// Transition: finalizes this intent and adds a standalone action with a callback.
+    pub fn add_standalone_action_with_callback(
+        self,
+        action: CallHandler<'info>,
+        callback: ActionCallback,
+    ) -> MagicIntentBundleBuilder<'info> {
+        self.fold()
+            .add_standalone_action_with_callback(action, callback)
+    }
+
+    /// Terminal: finalizes this intent and builds the full instruction set.
+    pub fn build(self) -> IntentInstructions<'info> {
         self.fold().build()
     }
 
@@ -612,6 +632,7 @@ mod tests {
     use super::*;
     use crate::solana_compat::solana::{AccountInfo, Pubkey};
     use magicblock_magic_program_api::args::ActionArgs;
+    use magicblock_magic_program_api::instruction::MagicBlockInstruction;
     use std::borrow::Borrow;
     use std::cell::RefCell;
     use std::ops::{Deref, DerefMut};
@@ -746,7 +767,7 @@ mod tests {
             true,
         );
 
-        let (accounts, ix) = builder.commit(&[info1, info2]).build();
+        let (accounts, ix) = builder.commit(&[info1, info2]).build().schedule_intent_ix;
 
         // payer + magic_ctx + 2 committed accounts
         assert_eq!(accounts.len(), 4);
@@ -783,13 +804,17 @@ mod tests {
         );
         let handler = create_test_call_handler(escrow_info);
 
-        let (accounts, _ix) = builder
+        let IntentInstructions {
+            schedule_intent_ix: (accounts, _ix),
+            add_callback_ixs,
+        } = builder
             .commit(&[info1])
             .add_post_commit_actions([handler])
             .build();
 
         // payer + magic_ctx + committed acc + escrow
         assert_eq!(accounts.len(), 4);
+        assert_eq!(add_callback_ixs.len(), 0);
     }
 
     // ----- Fluent CommitAndUndelegateIntentBuilder Tests -----
@@ -812,7 +837,10 @@ mod tests {
             true,
         );
 
-        let (accounts, _ix) = builder.commit_and_undelegate(&[info1]).build();
+        let (accounts, _ix) = builder
+            .commit_and_undelegate(&[info1])
+            .build()
+            .schedule_intent_ix;
 
         // payer + magic_ctx + committed acc
         assert_eq!(accounts.len(), 3);
@@ -860,7 +888,8 @@ mod tests {
             .commit_and_undelegate(&[info1])
             .add_post_commit_actions([post_commit_handler])
             .add_post_undelegate_actions([post_undelegate_handler])
-            .build();
+            .build()
+            .schedule_intent_ix;
 
         // payer + magic_ctx + committed acc + 2 escrows
         assert_eq!(accounts.len(), 5);
@@ -899,7 +928,8 @@ mod tests {
         let (accounts, _ix) = builder
             .commit(&[info1])
             .commit_and_undelegate(&[info2])
-            .build();
+            .build()
+            .schedule_intent_ix;
 
         // payer + magic_ctx + commit_acc + cau_acc
         assert_eq!(accounts.len(), 4);
@@ -936,7 +966,8 @@ mod tests {
         let (accounts, _ix) = builder
             .commit_and_undelegate(&[info1])
             .commit(&[info2])
-            .build();
+            .build()
+            .schedule_intent_ix;
 
         // payer + magic_ctx + cau_acc + commit_acc
         assert_eq!(accounts.len(), 4);
@@ -995,7 +1026,8 @@ mod tests {
             .add_post_commit_actions([handler1])
             .commit_and_undelegate(&[info2])
             .add_post_commit_actions([handler2])
-            .build();
+            .build()
+            .schedule_intent_ix;
 
         // payer + magic_ctx + commit_acc + escrow1 + cau_acc + escrow2
         assert_eq!(accounts.len(), 6);
@@ -1155,6 +1187,7 @@ mod tests {
         bundle.add_intent(MagicIntent::Commit(CommitType::WithHandler {
             commited_accounts: vec![shared_info1],
             call_handlers: vec![handler],
+            callbacks: vec![None],
         }));
 
         // Add same account to CommitAndUndelegate
@@ -1305,7 +1338,8 @@ mod tests {
 
         let (accounts, ix) = MagicIntentBundleBuilder::new(payer_info, ctx_info, prog_info)
             .add_commit(commit)
-            .build();
+            .build()
+            .schedule_intent_ix;
 
         // Verify accounts: payer, context, acc1
         assert_eq!(accounts.len(), 3);
@@ -1374,7 +1408,8 @@ mod tests {
 
         let (accounts, _ix) = MagicIntentBundleBuilder::new(payer_info, ctx_info, prog_info)
             .add_commit(commit)
-            .build();
+            .build()
+            .schedule_intent_ix;
 
         // Should be: payer, context, shared_account (deduplicated)
         assert_eq!(accounts.len(), 3, "Duplicate accounts should be removed");
@@ -1450,8 +1485,8 @@ mod tests {
             .add_commit(commit)
             .add_commit_and_undelegate(cau)
             .add_standalone_actions([handler])
-            .add_callbacks([])
-            .build();
+            .build()
+            .schedule_intent_ix;
 
         // Should have: payer, context, commit_acc, cau_acc, escrow_acc
         assert_eq!(accounts.len(), 5);
@@ -1504,7 +1539,8 @@ mod tests {
         // Test that fluent builder methods chain properly
         let (accounts, _ix) = MagicIntentBundleBuilder::new(payer_info, ctx_info, prog_info)
             .commit(&[acc1_info])
-            .build();
+            .build()
+            .schedule_intent_ix;
 
         assert_eq!(accounts.len(), 3);
     }
@@ -1560,6 +1596,7 @@ mod tests {
         let commit = CommitType::WithHandler {
             commited_accounts: vec![acc1_info],
             call_handlers: vec![handler],
+            callbacks: vec![None],
         };
 
         let mut container = Vec::new();
@@ -1569,64 +1606,80 @@ mod tests {
         assert_eq!(container.len(), 2);
     }
 
+    // Verifies flat action index ordering:
     #[test]
-    fn test_deref() {
-        struct Inner {
-            requests: Vec<String>,
-            response: Vec<String>,
-        }
+    fn test_callback_action_index_ordering() {
+        let owner = Pubkey::new_unique();
+        let mut payer = TestAccount::new();
+        let mut magic_ctx = TestAccount::new();
+        let mut magic_prog = TestAccount::new();
+        let mut commit_acc = TestAccount::new();
+        let mut cau_acc = TestAccount::new();
+        let mut escrow_commit = TestAccount::new();
+        let mut escrow_cau_commit = TestAccount::new();
+        let mut escrow_cau_undelegate = TestAccount::new();
+        let mut escrow_standalone = TestAccount::new();
 
-        impl Inner {
-            fn new() -> Self {
-                Self {
-                    requests: vec![],
-                    response: vec![],
-                }
+        let (builder, _) = create_test_builder(&mut payer, &mut magic_ctx, &mut magic_prog, &owner);
+
+        let make_info = |acc: &mut TestAccount| {
+            create_mock_account_info(
+                &acc.key,
+                &mut acc.lamports,
+                &mut acc.data,
+                &owner,
+                true,
+                false,
+            )
+        };
+
+        let make_callback = || ActionCallback {
+            destination_program: Pubkey::new_unique(),
+            discriminator: vec![0u8; 8],
+            payload: vec![],
+            compute_units: 10_000,
+            accounts: vec![],
+        };
+
+        let IntentInstructions {
+            add_callback_ixs, ..
+        } = builder
+            .commit(&[make_info(&mut commit_acc)])
+            .add_post_commit_action_with_callback(
+                create_test_call_handler(make_info(&mut escrow_commit)),
+                make_callback(),
+            )
+            .commit_and_undelegate(&[make_info(&mut cau_acc)])
+            .add_post_commit_action_with_callback(
+                create_test_call_handler(make_info(&mut escrow_cau_commit)),
+                make_callback(),
+            )
+            .add_post_undelegate_action_with_callback(
+                create_test_call_handler(make_info(&mut escrow_cau_undelegate)),
+                make_callback(),
+            )
+            .add_standalone_action_with_callback(
+                create_test_call_handler(make_info(&mut escrow_standalone)),
+                make_callback(),
+            )
+            .build();
+
+        assert_eq!(add_callback_ixs.len(), 4);
+
+        let action_index = |ix: &Instruction| -> u8 {
+            match bincode::deserialize::<MagicBlockInstruction>(&ix.data).unwrap() {
+                MagicBlockInstruction::AddActionCallback(args) => args.action_index,
+                _ => panic!("expected AddActionCallback"),
             }
+        };
 
-            fn add_requests(&mut self, val: Vec<String>) -> Builder {
-                Builder::new(self, val)
-            }
-        }
-
-        struct Builder<'a> {
-            inner: &'a mut Inner,
-            requests: Vec<String>,
-            response: Vec<String>,
-        }
-
-        impl<'a> Builder<'a> {
-            fn new(inner: &'a mut Inner, requests: Vec<String>) -> Self {
-                Self {
-                    inner,
-                    requests,
-                    response: vec![],
-                }
-            }
-
-            fn add_response(mut self, response: Vec<String>) -> &'a mut Inner {
-                self.inner.requests.extend(self.requests);
-                self.inner.response.extend(response);
-                self.inner
-            }
-        }
-
-        impl<'a> Deref for Builder<'a> {
-            type Target = Inner;
-            fn deref(&self) -> &Self::Target {
-                self.inner
-            }
-        }
-
-        impl<'a> DerefMut for Builder<'a> {
-            fn deref_mut(&mut self) -> &mut Self::Target {
-                self.inner.response.extend(self.response);
-                self.inner
-            }
-        }
-
-        let mut inner = Inner::new();
-        let mut builder = inner.add_requests(vec![String::from("Hi")]);
-        builder.add_requests(vec!["hi".to_string()]);
+        assert_eq!(action_index(&add_callback_ixs[0].1), 0, "commit action");
+        assert_eq!(action_index(&add_callback_ixs[1].1), 1, "cau commit action");
+        assert_eq!(
+            action_index(&add_callback_ixs[2].1),
+            2,
+            "cau undelegate action"
+        );
+        assert_eq!(action_index(&add_callback_ixs[3].1), 3, "standalone action");
     }
 }
