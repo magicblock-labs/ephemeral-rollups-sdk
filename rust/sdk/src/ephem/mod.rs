@@ -7,13 +7,13 @@ pub use crate::ephem::deprecated::v0::{
 };
 use crate::ephem::deprecated::v1::utils;
 pub use crate::ephem::deprecated::v1::{
-    CallHandler, CommitAndUndelegate, CommitType, MagicAction, MagicInstructionBuilder,
-    UndelegateType,
+    ActionCallback, CallHandler, CommitAndUndelegate, CommitType, MagicAction,
+    MagicInstructionBuilder, UndelegateType,
 };
 use crate::solana_compat::solana::{
     invoke, AccountInfo, AccountMeta, Instruction, ProgramResult, Pubkey,
 };
-use magicblock_magic_program_api::args::MagicIntentBundleArgs;
+use magicblock_magic_program_api::args::{AddActionCallbackArgs, MagicIntentBundleArgs};
 use magicblock_magic_program_api::instruction::MagicBlockInstruction;
 use std::collections::HashMap;
 
@@ -34,6 +34,28 @@ pub enum MagicIntent<'info> {
     CommitFinalize(CommitType<'info>),
     /// CommitFinalize accounts and undelegate them, optionally with post-commit and post-undelegate actions.
     CommitFinalizeAndUndelegate(CommitAndUndelegate<'info>),
+}
+
+/// The result of [`MagicIntentBundleBuilder::build`].
+///
+/// Holds the `ScheduleIntentBundle` instruction and any `AddActionCallback` instructions
+/// that must be invoked after it. Call [`invoke`](IntentInstructions::invoke) to execute
+/// all of them in order, or inspect the fields to drive the CPIs yourself.
+pub struct IntentInstructions<'info> {
+    pub schedule_intent_ix: (Vec<AccountInfo<'info>>, Instruction),
+    pub add_callback_ixs: Vec<(Vec<AccountInfo<'info>>, Instruction)>,
+}
+
+impl<'info> IntentInstructions<'info> {
+    /// Invokes `ScheduleIntentBundle` followed by each `AddActionCallback` in order.
+    pub fn invoke(self) -> ProgramResult {
+        let (accounts, ix) = self.schedule_intent_ix;
+        invoke(&ix, &accounts)?;
+
+        self.add_callback_ixs
+            .into_iter()
+            .try_for_each(|(accounts, ix)| invoke(&ix, &accounts))
+    }
 }
 
 /// Builds a single `MagicBlockInstruction::ScheduleIntentBundle` instruction by aggregating
@@ -69,6 +91,7 @@ impl<'info> MagicIntentBundleBuilder<'info> {
             parent: self,
             accounts: accounts.to_vec(),
             actions: vec![],
+            callbacks: vec![],
         }
     }
 
@@ -86,7 +109,9 @@ impl<'info> MagicIntentBundleBuilder<'info> {
             parent: self,
             accounts: accounts.to_vec(),
             post_commit_actions: vec![],
+            post_commit_callbacks: vec![],
             post_undelegate_actions: vec![],
+            post_undelegate_callbacks: vec![],
         }
     }
 
@@ -128,21 +153,59 @@ impl<'info> MagicIntentBundleBuilder<'info> {
         self
     }
 
-    /// Builds the deduplicated account list and the CPI `Instruction` that schedules this bundle.
-    ///
-    /// # Returns
-    /// - `Vec<AccountInfo>`: the full, deduplicated account list to pass to CPI (payer/context first).
-    /// - `Instruction`: the instruction to invoke against the magic program.
-    pub fn build(mut self) -> (Vec<AccountInfo<'info>>, Instruction) {
-        // Dedup Intent Bundle
+    /// Adds a single standalone action with a callback. Chainable.
+    pub fn add_standalone_action_with_callback(
+        mut self,
+        action: CallHandler<'info>,
+        callback: ActionCallback,
+    ) -> Self {
+        self.intent_bundle.standalone_actions.push(action);
+        self.intent_bundle.standalone_callbacks.push(Some(callback));
+        self
+    }
+
+    fn build_callback_ixs(&mut self) -> Vec<(Vec<AccountInfo<'info>>, Instruction)> {
+        let callbacks = self.intent_bundle.extract_callbacks();
+        if callbacks.is_empty() {
+            return vec![];
+        }
+
+        callbacks
+            .into_iter()
+            .map(|(action_index, callback)| {
+                let args = callback.into_args(action_index);
+                let payer_meta = AccountMeta {
+                    pubkey: *self.payer.key,
+                    is_signer: true,
+                    is_writable: true,
+                };
+                let ctx_meta = AccountMeta {
+                    pubkey: *self.magic_context.key,
+                    is_signer: false,
+                    is_writable: true,
+                };
+
+                let ix = Instruction::new_with_bincode(
+                    *self.magic_program.key,
+                    &MagicBlockInstruction::AddActionCallback(args),
+                    vec![payer_meta, ctx_meta],
+                );
+                (vec![self.payer.clone(), self.magic_contex.clone()], ix)
+            })
+            .collect()
+    }
+
+    /// Builds [`IntentInstructions`] that schedules IntentBundle in magic program
+    pub fn build(mut self) -> IntentInstructions<'info> {
         self.intent_bundle.normalize();
 
-        // Collect all accounts used by the bundle, then dedup them + create index map.
+        // Build AddActionCallback instructions
+        let add_callback_ixs = self.build_callback_ixs();
+
+        // Build ScheduleIntentBundle instruction
         let mut all_accounts = vec![self.payer, self.magic_context];
         self.intent_bundle.collect_accounts(&mut all_accounts);
         let indices_map = utils::filter_duplicates_with_map(&mut all_accounts);
-
-        // Create data for instruction
         let args = self.intent_bundle.into_args(&indices_map);
         let metas = all_accounts
             .iter()
@@ -152,25 +215,21 @@ impl<'info> MagicIntentBundleBuilder<'info> {
                 is_writable: ai.is_writable,
             })
             .collect();
-        let ix = Instruction::new_with_bincode(
+        let schedule_ix = Instruction::new_with_bincode(
             *self.magic_program.key,
             &MagicBlockInstruction::ScheduleIntentBundle(args),
             metas,
         );
 
-        (all_accounts, ix)
+        IntentInstructions {
+            schedule_intent_ix: (all_accounts, schedule_ix),
+            add_callback_ixs,
+        }
     }
 
-    /// Convenience wrapper that builds the instruction and immediately invokes it.
-    ///
-    /// Equivalent to:
-    /// ```ignore
-    /// let (accounts, ix) = builder.build();
-    /// invoke(&ix, &accounts)
-    /// ```
+    /// Convenience wrapper: builds all instructions and invokes them in order.
     pub fn build_and_invoke(self) -> ProgramResult {
-        let (accounts, ix) = self.build();
-        invoke(&ix, &accounts)
+        self.build().invoke()
     }
 }
 
@@ -184,6 +243,7 @@ impl<'info> MagicIntentBundleBuilder<'info> {
 #[derive(Default)]
 struct MagicIntentBundle<'info> {
     standalone_actions: Vec<CallHandler<'info>>,
+    standalone_callbacks: Vec<Option<ActionCallback>>, // parallel to standalone_actions
     commit_intent: Option<CommitType<'info>>,
     commit_and_undelegate_intent: Option<CommitAndUndelegate<'info>>,
     commit_finalize_intent: Option<CommitType<'info>>,
@@ -194,7 +254,11 @@ impl<'info> MagicIntentBundle<'info> {
     /// Inserts an intent into the bundle, merging with any existing intent of the same category.
     fn add_intent(&mut self, intent: MagicIntent<'info>) {
         match intent {
-            MagicIntent::StandaloneActions(value) => self.standalone_actions.extend(value),
+            MagicIntent::StandaloneActions(value) => {
+                self.standalone_callbacks
+                    .extend((0..value.len()).map(|_| None));
+                self.standalone_actions.extend(value);
+            }
             MagicIntent::Commit(value) => {
                 if let Some(ref mut commit_accounts) = self.commit_intent {
                     commit_accounts.merge(value);
@@ -226,6 +290,28 @@ impl<'info> MagicIntentBundle<'info> {
                 }
             }
         }
+    }
+
+    /// Extracts callbacks with correct Action indices
+    fn extract_callbacks(&mut self) -> Vec<(u8, ActionCallback)> {
+        let mut out = Vec::new();
+        let mut idx: u8 = 0;
+        self.commit_intent
+            .iter_mut()
+            .for_each(|c| c.extract_callbacks(&mut idx, &mut out));
+        self.commit_and_undelegate_intent
+            .iter_mut()
+            .for_each(|cau| cau.extract_callbacks(&mut idx, &mut out));
+        self.standalone_callbacks
+            .iter_mut()
+            .take(self.standalone_actions.len())
+            .for_each(|cb_opt| {
+                if let Some(cb) = cb_opt.take() {
+                    out.push((idx, cb));
+                }
+                idx += 1;
+            });
+        out
     }
 
     /// Consumes the bundle and encodes it into `MagicIntentBundleArgs` using a `Pubkey -> u8` indices map.
@@ -325,6 +411,7 @@ pub struct CommitIntentBuilder<'info> {
     parent: MagicIntentBundleBuilder<'info>,
     accounts: Vec<AccountInfo<'info>>,
     actions: Vec<CallHandler<'info>>,
+    callbacks: Vec<Option<ActionCallback>>,
 }
 
 impl<'info> CommitIntentBuilder<'info> {
@@ -333,7 +420,20 @@ impl<'info> CommitIntentBuilder<'info> {
         mut self,
         actions: impl IntoIterator<Item = CallHandler<'info>>,
     ) -> Self {
+        let actions: Vec<_> = actions.into_iter().collect();
+        self.callbacks.extend((0..actions.len()).map(|_| None));
         self.actions.extend(actions);
+        self
+    }
+
+    /// Adds a single post-commit action with a callback. Chainable.
+    pub fn add_post_commit_action_with_callback(
+        mut self,
+        action: CallHandler<'info>,
+        callback: ActionCallback,
+    ) -> Self {
+        self.actions.push(action);
+        self.callbacks.push(Some(callback));
         self
     }
 
@@ -369,6 +469,7 @@ impl<'info> CommitIntentBuilder<'info> {
             mut parent,
             accounts,
             actions,
+            callbacks,
         } = self;
         let commit = if actions.is_empty() {
             CommitType::Standalone(accounts)
@@ -376,6 +477,7 @@ impl<'info> CommitIntentBuilder<'info> {
             CommitType::WithHandler {
                 commited_accounts: accounts,
                 call_handlers: actions,
+                callbacks,
             }
         };
         parent.intent_bundle.add_intent(MagicIntent::Commit(commit));
@@ -392,7 +494,9 @@ pub struct CommitAndUndelegateIntentBuilder<'info> {
     parent: MagicIntentBundleBuilder<'info>,
     accounts: Vec<AccountInfo<'info>>,
     post_commit_actions: Vec<CallHandler<'info>>,
+    post_commit_callbacks: Vec<Option<ActionCallback>>,
     post_undelegate_actions: Vec<CallHandler<'info>>,
+    post_undelegate_callbacks: Vec<Option<ActionCallback>>,
 }
 
 impl<'info> CommitAndUndelegateIntentBuilder<'info> {
@@ -401,7 +505,21 @@ impl<'info> CommitAndUndelegateIntentBuilder<'info> {
         mut self,
         actions: impl IntoIterator<Item = CallHandler<'info>>,
     ) -> Self {
+        let actions: Vec<_> = actions.into_iter().collect();
+        self.post_commit_callbacks
+            .extend((0..actions.len()).map(|_| None));
         self.post_commit_actions.extend(actions);
+        self
+    }
+
+    /// Adds a single post-commit action with a callback. Chainable.
+    pub fn add_post_commit_action_with_callback(
+        mut self,
+        action: CallHandler<'info>,
+        callback: ActionCallback,
+    ) -> Self {
+        self.post_commit_actions.push(action);
+        self.post_commit_callbacks.push(Some(callback));
         self
     }
 
@@ -410,7 +528,21 @@ impl<'info> CommitAndUndelegateIntentBuilder<'info> {
         mut self,
         actions: impl IntoIterator<Item = CallHandler<'info>>,
     ) -> Self {
+        let actions: Vec<_> = actions.into_iter().collect();
+        self.post_undelegate_callbacks
+            .extend((0..actions.len()).map(|_| None));
         self.post_undelegate_actions.extend(actions);
+        self
+    }
+
+    /// Adds a single post-undelegate action with a callback. Chainable.
+    pub fn add_post_undelegate_action_with_callback(
+        mut self,
+        action: CallHandler<'info>,
+        callback: ActionCallback,
+    ) -> Self {
+        self.post_undelegate_actions.push(action);
+        self.post_undelegate_callbacks.push(Some(callback));
         self
     }
 
@@ -443,7 +575,9 @@ impl<'info> CommitAndUndelegateIntentBuilder<'info> {
             mut parent,
             accounts,
             post_commit_actions,
+            post_commit_callbacks,
             post_undelegate_actions,
+            post_undelegate_callbacks,
         } = self;
         let commit_type = if post_commit_actions.is_empty() {
             CommitType::Standalone(accounts)
@@ -451,12 +585,16 @@ impl<'info> CommitAndUndelegateIntentBuilder<'info> {
             CommitType::WithHandler {
                 commited_accounts: accounts,
                 call_handlers: post_commit_actions,
+                callbacks: post_commit_callbacks,
             }
         };
         let undelegate_type = if post_undelegate_actions.is_empty() {
             UndelegateType::Standalone
         } else {
-            UndelegateType::WithHandler(post_undelegate_actions)
+            UndelegateType::WithHandler {
+                call_handlers: post_undelegate_actions,
+                callbacks: post_undelegate_callbacks,
+            }
         };
         let cau = CommitAndUndelegate {
             commit_type,
@@ -474,7 +612,9 @@ mod tests {
     use super::*;
     use crate::solana_compat::solana::{AccountInfo, Pubkey};
     use magicblock_magic_program_api::args::ActionArgs;
+    use std::borrow::Borrow;
     use std::cell::RefCell;
+    use std::ops::{Deref, DerefMut};
     use std::rc::Rc;
 
     /// Helper to create a mock AccountInfo for testing
@@ -1310,6 +1450,7 @@ mod tests {
             .add_commit(commit)
             .add_commit_and_undelegate(cau)
             .add_standalone_actions([handler])
+            .add_callbacks([])
             .build();
 
         // Should have: payer, context, commit_acc, cau_acc, escrow_acc
@@ -1426,5 +1567,66 @@ mod tests {
 
         // Should have both the committed account and escrow from handler
         assert_eq!(container.len(), 2);
+    }
+
+    #[test]
+    fn test_deref() {
+        struct Inner {
+            requests: Vec<String>,
+            response: Vec<String>,
+        }
+
+        impl Inner {
+            fn new() -> Self {
+                Self {
+                    requests: vec![],
+                    response: vec![],
+                }
+            }
+
+            fn add_requests(&mut self, val: Vec<String>) -> Builder {
+                Builder::new(self, val)
+            }
+        }
+
+        struct Builder<'a> {
+            inner: &'a mut Inner,
+            requests: Vec<String>,
+            response: Vec<String>,
+        }
+
+        impl<'a> Builder<'a> {
+            fn new(inner: &'a mut Inner, requests: Vec<String>) -> Self {
+                Self {
+                    inner,
+                    requests,
+                    response: vec![],
+                }
+            }
+
+            fn add_response(mut self, response: Vec<String>) -> &'a mut Inner {
+                self.inner.requests.extend(self.requests);
+                self.inner.response.extend(response);
+                self.inner
+            }
+        }
+
+        impl<'a> Deref for Builder<'a> {
+            type Target = Inner;
+            fn deref(&self) -> &Self::Target {
+                self.inner
+            }
+        }
+
+        impl<'a> DerefMut for Builder<'a> {
+            fn deref_mut(&mut self) -> &mut Self::Target {
+                self.inner.response.extend(self.response);
+                self.inner
+            }
+        }
+
+        let mut inner = Inner::new();
+        let mut builder = inner.add_requests(vec![String::from("Hi")]);
+        builder.add_requests(vec!["hi".to_string()]);
     }
 }

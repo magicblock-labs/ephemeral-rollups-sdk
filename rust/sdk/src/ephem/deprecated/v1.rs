@@ -114,6 +114,7 @@ pub enum CommitType<'info> {
     WithHandler {
         commited_accounts: Vec<AccountInfo<'info>>,
         call_handlers: Vec<CallHandler<'info>>,
+        callbacks: Vec<Option<ActionCallback>>,
     },
 }
 
@@ -150,6 +151,7 @@ impl<'info> CommitType<'info> {
             Self::WithHandler {
                 commited_accounts,
                 call_handlers,
+                ..
             } => {
                 accounts_container.extend(commited_accounts.clone());
                 call_handlers
@@ -168,6 +170,7 @@ impl<'info> CommitType<'info> {
             Self::WithHandler {
                 commited_accounts,
                 call_handlers,
+                ..
             } => {
                 let commited_accounts_indices =
                     accounts_to_indices(commited_accounts.as_slice(), indices_map);
@@ -183,23 +186,48 @@ impl<'info> CommitType<'info> {
         }
     }
 
-    pub(crate) fn merge(&mut self, mut other: Self) {
-        let take = |value: &mut _| -> (Vec<AccountInfo>, Vec<CallHandler>) {
-            use std::mem::take;
+    pub(crate) fn extract_callbacks(&mut self, idx: &mut u8, out: &mut Vec<(u8, ActionCallback)>) {
+        if let Self::WithHandler {
+            call_handlers,
+            callbacks,
+            ..
+        } = self
+        {
+            for cb_opt in callbacks.iter_mut().take(call_handlers.len()) {
+                if let Some(cb) = cb_opt.take() {
+                    out.push((*idx, cb));
+                }
+                *idx += 1;
+            }
+        }
+    }
 
+    pub(crate) fn merge(&mut self, mut other: Self) {
+        let take = |value: &mut _| -> (
+            Vec<AccountInfo>,
+            Vec<CallHandler>,
+            Vec<Option<ActionCallback>>,
+        ) {
+            use std::mem::take;
             match value {
-                CommitType::Standalone(value) => (take(value), vec![]),
+                CommitType::Standalone(value) => (take(value), vec![], vec![]),
                 CommitType::WithHandler {
                     commited_accounts,
                     call_handlers,
-                } => (take(commited_accounts), take(call_handlers)),
+                    callbacks,
+                } => (
+                    take(commited_accounts),
+                    take(call_handlers),
+                    take(callbacks),
+                ),
             }
         };
 
-        let (mut accounts, mut actions) = take(self);
-        let (other1, other2) = take(&mut other);
-        accounts.extend(other1);
-        actions.extend(other2);
+        let (mut accounts, mut actions, mut callbacks) = take(self);
+        let (other_accounts, other_actions, other_callbacks) = take(&mut other);
+        accounts.extend(other_accounts);
+        actions.extend(other_actions);
+        callbacks.extend(other_callbacks);
 
         if actions.is_empty() {
             *self = CommitType::Standalone(accounts)
@@ -207,6 +235,7 @@ impl<'info> CommitType<'info> {
             *self = CommitType::WithHandler {
                 commited_accounts: accounts,
                 call_handlers: actions,
+                callbacks,
             }
         };
     }
@@ -220,14 +249,17 @@ impl<'info> CommitType<'info> {
 )]
 pub enum UndelegateType<'info> {
     Standalone,
-    WithHandler(Vec<CallHandler<'info>>),
+    WithHandler {
+        call_handlers: Vec<CallHandler<'info>>,
+        callbacks: Vec<Option<ActionCallback>>,
+    },
 }
 
 impl<'info> UndelegateType<'info> {
     fn collect_accounts(&self, accounts_container: &mut Vec<AccountInfo<'info>>) {
         match self {
             Self::Standalone => {}
-            Self::WithHandler(call_handlers) => call_handlers
+            Self::WithHandler { call_handlers, .. } => call_handlers
                 .iter()
                 .for_each(|call_handler| call_handler.collect_accounts(accounts_container)),
         }
@@ -236,7 +268,7 @@ impl<'info> UndelegateType<'info> {
     fn into_args(self, indices_map: &HashMap<Pubkey, u8>) -> UndelegateTypeArgs {
         match self {
             Self::Standalone => UndelegateTypeArgs::Standalone,
-            Self::WithHandler(call_handlers) => {
+            Self::WithHandler { call_handlers, .. } => {
                 let call_handlers_args = call_handlers
                     .into_iter()
                     .map(|call_handler| call_handler.into_args(indices_map))
@@ -246,6 +278,47 @@ impl<'info> UndelegateType<'info> {
                 }
             }
         }
+    }
+
+    pub(crate) fn extract_callbacks(&mut self, idx: &mut u8, out: &mut Vec<(u8, ActionCallback)>) {
+        if let Self::WithHandler {
+            call_handlers,
+            callbacks,
+        } = self
+        {
+            for cb_opt in callbacks.iter_mut().take(call_handlers.len()) {
+                if let Some(cb) = cb_opt.take() {
+                    out.push((*idx, cb));
+                }
+                *idx += 1;
+            }
+        }
+    }
+
+    pub(crate) fn merge(&mut self, other: Self) {
+        let this = std::mem::replace(self, UndelegateType::Standalone);
+        *self = match (this, other) {
+            (UndelegateType::Standalone, UndelegateType::Standalone) => UndelegateType::Standalone,
+            (UndelegateType::Standalone, v @ UndelegateType::WithHandler { .. })
+            | (v @ UndelegateType::WithHandler { .. }, UndelegateType::Standalone) => v,
+            (
+                UndelegateType::WithHandler {
+                    call_handlers: mut a_h,
+                    callbacks: mut a_c,
+                },
+                UndelegateType::WithHandler {
+                    call_handlers: b_h,
+                    callbacks: b_c,
+                },
+            ) => {
+                a_h.extend(b_h);
+                a_c.extend(b_c);
+                UndelegateType::WithHandler {
+                    call_handlers: a_h,
+                    callbacks: a_c,
+                }
+            }
+        };
     }
 }
 
@@ -277,21 +350,40 @@ impl<'info> CommitAndUndelegate<'info> {
         self.commit_type.dedup()
     }
 
+    pub(crate) fn extract_callbacks(&mut self, idx: &mut u8, out: &mut Vec<(u8, ActionCallback)>) {
+        self.commit_type.extract_callbacks(idx, out);
+        self.undelegate_type.extract_callbacks(idx, out);
+    }
+
     pub(crate) fn merge(&mut self, other: Self) {
         self.commit_type.merge(other.commit_type);
+        self.undelegate_type.merge(other.undelegate_type);
+    }
+}
 
-        let this = std::mem::replace(&mut self.undelegate_type, UndelegateType::Standalone);
-        self.undelegate_type = match (this, other.undelegate_type) {
-            (UndelegateType::Standalone, UndelegateType::Standalone) => UndelegateType::Standalone,
-            (UndelegateType::Standalone, UndelegateType::WithHandler(v))
-            | (UndelegateType::WithHandler(v), UndelegateType::Standalone) => {
-                UndelegateType::WithHandler(v)
-            }
-            (UndelegateType::WithHandler(mut a), UndelegateType::WithHandler(b)) => {
-                a.extend(b);
-                UndelegateType::WithHandler(a)
-            }
-        };
+/// Callback to invoke on the base layer after an action executes.
+///
+/// Attach via `add_*_action_with_callback` on the intent builders. The flat
+/// `action_index` required by `AddActionCallback` is computed automatically at
+/// invoke time — the callback travels with its action through merge/normalize.
+pub struct ActionCallback {
+    pub destination_program: Pubkey,
+    pub discriminator: Vec<u8>,
+    pub payload: Vec<u8>,
+    pub compute_units: u32,
+    pub accounts: Vec<ShortAccountMeta>,
+}
+
+impl ActionCallback {
+    pub(crate) fn into_args(self, action_index: u8) -> AddActionCallbackArgs {
+        AddActionCallbackArgs {
+            action_index,
+            destination_program: self.destination_program,
+            discriminator: self.discriminator,
+            payload: self.payload,
+            compute_units: self.compute_units,
+            accounts: self.accounts,
+        }
     }
 }
 
