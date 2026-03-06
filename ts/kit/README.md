@@ -15,6 +15,6 @@ yarn add @magicblock-labs/ephemeral-rollups-kit
 
 ## Usage (basic)
 
-import { Connection } from "@magicblock-labs/ephemeral-rollups-sdk";
+import { Connection } from "@magicblock-labs/ephemeral-rollups-kit";
 
 // See full examples and docs in the Quickstart link above.
