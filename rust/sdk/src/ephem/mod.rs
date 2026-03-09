@@ -409,24 +409,24 @@ impl<'info> MagicIntentBundle<'info> {
 /// the parent [`MagicIntentBundleBuilder`]. All transition/terminal methods are
 /// then available as defaults.
 pub trait FoldableIntentBuilder<'info>: Sized {
-    fn fold(self) -> MagicIntentBundleBuilder<'info>;
+    fn fold_builder(self) -> MagicIntentBundleBuilder<'info>;
 
     fn commit(self, accounts: &[AccountInfo<'info>]) -> CommitIntentBuilder<'info> {
-        self.fold().commit(accounts)
+        self.fold_builder().commit(accounts)
     }
 
     fn commit_and_undelegate(
         self,
         accounts: &[AccountInfo<'info>],
     ) -> CommitAndUndelegateIntentBuilder<'info> {
-        self.fold().commit_and_undelegate(accounts)
+        self.fold_builder().commit_and_undelegate(accounts)
     }
 
     fn add_standalone_actions(
         self,
         actions: impl IntoIterator<Item = CallHandler<'info>>,
     ) -> MagicIntentBundleBuilder<'info> {
-        self.fold().add_standalone_actions(actions)
+        self.fold_builder().add_standalone_actions(actions)
     }
 
     fn add_standalone_action_with_callback(
@@ -434,16 +434,16 @@ pub trait FoldableIntentBuilder<'info>: Sized {
         action: CallHandler<'info>,
         callback: ActionCallback,
     ) -> MagicIntentBundleBuilder<'info> {
-        self.fold()
+        self.fold_builder()
             .add_standalone_action_with_callback(action, callback)
     }
 
     fn build(self) -> IntentInstructions<'info> {
-        self.fold().build()
+        self.fold_builder().build()
     }
 
     fn build_and_invoke(self) -> ProgramResult {
-        self.fold().build_and_invoke()
+        self.fold_builder().build_and_invoke()
     }
 }
 
@@ -483,7 +483,7 @@ impl<'info> CommitIntentBuilder<'info> {
 }
 
 impl<'info> FoldableIntentBuilder<'info> for CommitIntentBuilder<'info> {
-    fn fold(self) -> MagicIntentBundleBuilder<'info> {
+    fn fold_builder(self) -> MagicIntentBundleBuilder<'info> {
         let Self {
             mut parent,
             accounts,
@@ -567,7 +567,7 @@ impl<'info> CommitAndUndelegateIntentBuilder<'info> {
 }
 
 impl<'info> FoldableIntentBuilder<'info> for CommitAndUndelegateIntentBuilder<'info> {
-    fn fold(self) -> MagicIntentBundleBuilder<'info> {
+    fn fold_builder(self) -> MagicIntentBundleBuilder<'info> {
         let Self {
             mut parent,
             accounts,
