@@ -1,12 +1,16 @@
 use core::mem::MaybeUninit;
 
-use alloc::vec::Vec;
 use pinocchio::{
-    cpi::{invoke_signed_with_slice, invoke_with_slice, Signer, MAX_CPI_ACCOUNTS},
+    cpi::{
+        invoke_signed_with_bounds, invoke_with_bounds, Signer,
+        MAX_CPI_ACCOUNTS as PINOCCHIO_MAX_CPI_ACCOUNTS,
+    },
     error::ProgramError,
     instruction::{InstructionAccount, InstructionView},
     AccountView, Address, ProgramResult,
 };
+
+const SCHEDULE_CRANK_DISCRIMINANT: [u8; 4] = 6_u32.to_le_bytes();
 
 pub struct CrankInstruction<'a> {
     pub program_id: Address,
@@ -15,30 +19,51 @@ pub struct CrankInstruction<'a> {
 }
 
 impl<'a> CrankInstruction<'a> {
+    #[inline(always)]
+    pub const fn new(
+        program_id: Address,
+        accounts: &'a [InstructionAccount<'a>],
+        data: &'a [u8],
+    ) -> Self {
+        Self {
+            program_id,
+            accounts,
+            data,
+        }
+    }
+
     pub fn serialized_size(&self) -> usize {
         let mut size = 0;
         size += 32; // program_id
         size += 8; // number of accounts
-        size += self.accounts.len() * 34; // 32 bytes for address + 1 byte for is_writable + 1 byte for is_signer
+        size += self.accounts.len() * 34; // 32 bytes for address + 1 byte for is_signer + 1 byte for is_writable
         size += 8; // data length
         size += self.data.len();
         size
     }
 
-    pub fn serialize(&self) -> Result<Vec<u8>, ProgramError> {
-        let mut data = Vec::with_capacity(self.serialized_size());
-        data.extend_from_slice(self.program_id.as_ref());
-        data.extend_from_slice((self.accounts.len() as u64).to_le_bytes().as_ref());
-        for account in self.accounts {
-            let mut serialized = [0; 34];
-            serialized[..32].copy_from_slice(account.address.as_ref());
-            serialized[32] = account.is_signer as u8;
-            serialized[33] = account.is_writable as u8;
-            data.extend_from_slice(&serialized);
+    pub fn serialize_into(&self, data: &mut [u8]) -> Result<usize, ProgramError> {
+        let required = self.serialized_size();
+        if data.len() < required {
+            return Err(ProgramError::InvalidInstructionData);
         }
-        data.extend_from_slice((self.data.len() as u64).to_le_bytes().as_ref());
-        data.extend_from_slice(&self.data);
-        Ok(data)
+
+        let mut offset = 0;
+        write_serialized_bytes(data, &mut offset, self.program_id.as_ref())?;
+        write_serialized_bytes(
+            data,
+            &mut offset,
+            &(self.accounts.len() as u64).to_le_bytes(),
+        )?;
+        for account in self.accounts {
+            write_serialized_bytes(data, &mut offset, account.address.as_ref())?;
+            write_serialized_bytes(data, &mut offset, &[account.is_signer as u8])?;
+            write_serialized_bytes(data, &mut offset, &[account.is_writable as u8])?;
+        }
+        write_serialized_bytes(data, &mut offset, &(self.data.len() as u64).to_le_bytes())?;
+        write_serialized_bytes(data, &mut offset, self.data)?;
+
+        Ok(offset)
     }
 }
 
@@ -50,6 +75,28 @@ pub struct ScheduleCrankArgs<'a> {
 }
 
 impl<'a> ScheduleCrankArgs<'a> {
+    #[inline(always)]
+    pub const fn new(task_id: i64, instructions: &'a [CrankInstruction<'a>]) -> Self {
+        Self {
+            task_id,
+            execution_interval_millis: 0,
+            iterations: 1,
+            instructions,
+        }
+    }
+
+    #[inline(always)]
+    pub const fn execution_interval_millis(mut self, execution_interval_millis: i64) -> Self {
+        self.execution_interval_millis = execution_interval_millis;
+        self
+    }
+
+    #[inline(always)]
+    pub const fn iterations(mut self, iterations: i64) -> Self {
+        self.iterations = iterations;
+        self
+    }
+
     pub fn serialized_size(&self) -> usize {
         let mut size = 0;
         size += 8; // task_id
@@ -59,21 +106,35 @@ impl<'a> ScheduleCrankArgs<'a> {
         size += self
             .instructions
             .iter()
-            .map(|i| i.serialized_size())
+            .map(|instruction| instruction.serialized_size())
             .sum::<usize>();
         size
     }
 
-    pub fn serialize(&self) -> Result<Vec<u8>, ProgramError> {
-        let mut data = Vec::with_capacity(self.serialized_size());
-        data.extend_from_slice(&self.task_id.to_le_bytes());
-        data.extend_from_slice(&self.execution_interval_millis.to_le_bytes());
-        data.extend_from_slice(&self.iterations.to_le_bytes());
-        data.extend_from_slice((self.instructions.len() as u64).to_le_bytes().as_ref());
-        for instruction in self.instructions {
-            data.extend_from_slice(&instruction.serialize()?);
+    pub fn serialize_into(&self, data: &mut [u8]) -> Result<usize, ProgramError> {
+        let required = self.serialized_size();
+        if data.len() < required {
+            return Err(ProgramError::InvalidInstructionData);
         }
-        Ok(data)
+
+        let mut offset = 0;
+        write_serialized_bytes(data, &mut offset, &self.task_id.to_le_bytes())?;
+        write_serialized_bytes(
+            data,
+            &mut offset,
+            &self.execution_interval_millis.to_le_bytes(),
+        )?;
+        write_serialized_bytes(data, &mut offset, &self.iterations.to_le_bytes())?;
+        write_serialized_bytes(
+            data,
+            &mut offset,
+            &(self.instructions.len() as u64).to_le_bytes(),
+        )?;
+        for instruction in self.instructions {
+            offset += instruction.serialize_into(&mut data[offset..])?;
+        }
+
+        Ok(offset)
     }
 }
 
@@ -85,17 +146,40 @@ pub struct ScheduleCrankCpi<'a> {
 }
 
 impl<'a> ScheduleCrankCpi<'a> {
+    #[inline(always)]
+    pub const fn new(
+        payer: AccountView,
+        magic_program: AccountView,
+        instruction_accounts: &'a [&'a AccountView],
+        args: ScheduleCrankArgs<'a>,
+    ) -> Self {
+        Self {
+            payer,
+            magic_program,
+            instruction_accounts,
+            args,
+        }
+    }
+
+    #[inline(always)]
+    pub fn builder(payer: AccountView, magic_program: AccountView) -> ScheduleCrankCpiBuilder<'a> {
+        ScheduleCrankCpiBuilder::new(payer, magic_program)
+    }
+
     fn instruction<'b>(
         &'a self,
         data: &'a [u8],
-        accounts: &'b mut [MaybeUninit<InstructionAccount<'a>>; MAX_CPI_ACCOUNTS],
+        accounts: &'b mut [MaybeUninit<InstructionAccount<'a>>; PINOCCHIO_MAX_CPI_ACCOUNTS],
     ) -> Result<InstructionView<'a, 'a, 'a, 'a>, ProgramError> {
+        let num_accounts = 1 + self.instruction_accounts.len();
+        if num_accounts > PINOCCHIO_MAX_CPI_ACCOUNTS {
+            return Err(ProgramError::InvalidArgument);
+        }
+
         unsafe {
-            accounts.get_unchecked_mut(0).write(InstructionAccount {
-                address: self.payer.address(),
-                is_writable: self.payer.is_writable(),
-                is_signer: self.payer.is_signer(),
-            });
+            accounts
+                .get_unchecked_mut(0)
+                .write(InstructionAccount::writable_signer(self.payer.address()));
             for i in 0..self.instruction_accounts.len() {
                 accounts.get_unchecked_mut(i + 1).write(InstructionAccount {
                     address: self.instruction_accounts[i].address(),
@@ -111,76 +195,212 @@ impl<'a> ScheduleCrankCpi<'a> {
             accounts: unsafe {
                 core::slice::from_raw_parts(
                     accounts.as_ptr() as *const InstructionAccount,
-                    self.instruction_accounts.len() + 1,
+                    num_accounts,
                 )
             },
         })
     }
 
-    fn data(&self) -> Result<Vec<u8>, ProgramError> {
-        let mut data = Vec::with_capacity(4 + self.args.serialized_size());
-        data.extend_from_slice(6_u32.to_le_bytes().as_ref());
-        data.extend_from_slice(&self.args.serialize()?);
-        Ok(data)
+    pub fn serialized_size(&self) -> usize {
+        SCHEDULE_CRANK_DISCRIMINANT.len() + self.args.serialized_size()
     }
 
-    pub fn invoke(&self) -> ProgramResult {
-        let mut ix_accounts =
-            [const { MaybeUninit::<InstructionAccount>::uninit() }; MAX_CPI_ACCOUNTS];
-        let mut accounts = Vec::with_capacity(1 + self.instruction_accounts.len());
-        accounts.push(&self.payer);
-        accounts.extend_from_slice(self.instruction_accounts);
+    pub fn serialize_into(&self, data: &mut [u8]) -> Result<usize, ProgramError> {
+        let required = self.serialized_size();
+        if data.len() < required {
+            return Err(ProgramError::InvalidInstructionData);
+        }
 
-        let data = self.data()?;
-
-        invoke_with_slice(
-            &self.instruction(&data, &mut ix_accounts)?,
-            accounts.as_slice(),
-        )
+        let mut offset = 0;
+        write_serialized_bytes(data, &mut offset, &SCHEDULE_CRANK_DISCRIMINANT)?;
+        offset += self.args.serialize_into(&mut data[offset..])?;
+        Ok(offset)
     }
 
-    pub fn invoke_signed(&self, signers_seeds: &[Signer<'_, '_>]) -> ProgramResult {
+    pub fn invoke<const MAX_ACCOUNT_INFOS: usize>(&self, data_buf: &mut [u8]) -> ProgramResult {
         let mut ix_accounts =
-            [const { MaybeUninit::<InstructionAccount>::uninit() }; MAX_CPI_ACCOUNTS];
-        let mut accounts = Vec::with_capacity(1 + self.instruction_accounts.len());
-        accounts.push(&self.payer);
-        accounts.extend_from_slice(self.instruction_accounts);
+            [const { MaybeUninit::<InstructionAccount>::uninit() }; PINOCCHIO_MAX_CPI_ACCOUNTS];
+        let num_accounts = 1 + self.instruction_accounts.len();
+        if num_accounts > MAX_ACCOUNT_INFOS {
+            return Err(ProgramError::InvalidArgument);
+        }
 
-        let data = self.data()?;
+        let mut account_refs = [&self.payer; MAX_ACCOUNT_INFOS];
+        account_refs[1..num_accounts].copy_from_slice(self.instruction_accounts);
 
-        invoke_signed_with_slice(
-            &self.instruction(&data, &mut ix_accounts)?,
-            accounts.as_slice(),
+        let data_len = self.serialize_into(data_buf)?;
+        let ix = self.instruction(&data_buf[..data_len], &mut ix_accounts)?;
+        Self::do_invoke::<MAX_ACCOUNT_INFOS>(&ix, &account_refs[..num_accounts])
+    }
+
+    pub fn invoke_signed<const MAX_ACCOUNT_INFOS: usize>(
+        &self,
+        data_buf: &mut [u8],
+        signers_seeds: &[Signer<'_, '_>],
+    ) -> ProgramResult {
+        let mut ix_accounts =
+            [const { MaybeUninit::<InstructionAccount>::uninit() }; PINOCCHIO_MAX_CPI_ACCOUNTS];
+        let num_accounts = 1 + self.instruction_accounts.len();
+        if num_accounts > MAX_ACCOUNT_INFOS {
+            return Err(ProgramError::InvalidArgument);
+        }
+
+        let mut account_refs = [&self.payer; MAX_ACCOUNT_INFOS];
+        account_refs[1..num_accounts].copy_from_slice(self.instruction_accounts);
+
+        let data_len = self.serialize_into(data_buf)?;
+        let ix = self.instruction(&data_buf[..data_len], &mut ix_accounts)?;
+        Self::do_invoke_signed::<MAX_ACCOUNT_INFOS>(
+            &ix,
+            &account_refs[..num_accounts],
             signers_seeds,
         )
+    }
+
+    #[inline(never)]
+    fn do_invoke<const MAX_ACCOUNT_INFOS: usize>(
+        ix: &InstructionView,
+        account_refs: &[&AccountView],
+    ) -> ProgramResult {
+        invoke_with_bounds::<MAX_ACCOUNT_INFOS>(ix, account_refs)
+    }
+
+    #[inline(never)]
+    fn do_invoke_signed<const MAX_ACCOUNT_INFOS: usize>(
+        ix: &InstructionView,
+        account_refs: &[&AccountView],
+        signers_seeds: &[Signer<'_, '_>],
+    ) -> ProgramResult {
+        invoke_signed_with_bounds::<MAX_ACCOUNT_INFOS>(ix, account_refs, signers_seeds)
+    }
+}
+
+pub struct ScheduleCrankCpiBuilder<'a> {
+    payer: AccountView,
+    magic_program: AccountView,
+    instruction_accounts: Option<&'a [&'a AccountView]>,
+    task_id: Option<i64>,
+    execution_interval_millis: i64,
+    iterations: i64,
+    instructions: Option<&'a [CrankInstruction<'a>]>,
+}
+
+impl<'a> ScheduleCrankCpiBuilder<'a> {
+    #[inline(always)]
+    pub const fn new(payer: AccountView, magic_program: AccountView) -> Self {
+        Self {
+            payer,
+            magic_program,
+            instruction_accounts: None,
+            task_id: None,
+            execution_interval_millis: 0,
+            iterations: 1,
+            instructions: None,
+        }
+    }
+
+    #[inline(always)]
+    pub const fn instruction_accounts(
+        mut self,
+        instruction_accounts: &'a [&'a AccountView],
+    ) -> Self {
+        self.instruction_accounts = Some(instruction_accounts);
+        self
+    }
+
+    #[inline(always)]
+    pub const fn task_id(mut self, task_id: i64) -> Self {
+        self.task_id = Some(task_id);
+        self
+    }
+
+    #[inline(always)]
+    pub const fn execution_interval_millis(mut self, execution_interval_millis: i64) -> Self {
+        self.execution_interval_millis = execution_interval_millis;
+        self
+    }
+
+    #[inline(always)]
+    pub const fn iterations(mut self, iterations: i64) -> Self {
+        self.iterations = iterations;
+        self
+    }
+
+    #[inline(always)]
+    pub const fn instructions(mut self, instructions: &'a [CrankInstruction<'a>]) -> Self {
+        self.instructions = Some(instructions);
+        self
+    }
+
+    pub fn build(self) -> Result<ScheduleCrankCpi<'a>, ProgramError> {
+        let Some(task_id) = self.task_id else {
+            return Err(ProgramError::InvalidArgument);
+        };
+        let Some(instruction_accounts) = self.instruction_accounts else {
+            return Err(ProgramError::InvalidArgument);
+        };
+        let Some(instructions) = self.instructions else {
+            return Err(ProgramError::InvalidArgument);
+        };
+
+        Ok(ScheduleCrankCpi::new(
+            self.payer,
+            self.magic_program,
+            instruction_accounts,
+            ScheduleCrankArgs::new(task_id, instructions)
+                .execution_interval_millis(self.execution_interval_millis)
+                .iterations(self.iterations),
+        ))
+    }
+
+    #[inline(never)]
+    pub fn build_and_invoke<const MAX_ACCOUNT_INFOS: usize>(
+        self,
+        data_buf: &mut [u8],
+    ) -> ProgramResult {
+        self.build()?.invoke::<MAX_ACCOUNT_INFOS>(data_buf)
+    }
+
+    #[inline(never)]
+    pub fn build_and_invoke_signed<const MAX_ACCOUNT_INFOS: usize>(
+        self,
+        data_buf: &mut [u8],
+        signers_seeds: &[Signer<'_, '_>],
+    ) -> ProgramResult {
+        self.build()?
+            .invoke_signed::<MAX_ACCOUNT_INFOS>(data_buf, signers_seeds)
     }
 }
 
 pub struct CancelCrankCpi {
     pub authority: AccountView,
+    pub task_context: AccountView,
     pub magic_program: AccountView,
     pub crank_id: i64,
 }
 
 impl CancelCrankCpi {
-    fn instruction<'a, 'b>(
+    fn instruction<'a>(
         &'a self,
         data: &'a [u8],
-        accounts: &'b mut [MaybeUninit<InstructionAccount<'a>>; 1],
+        accounts: &mut [MaybeUninit<InstructionAccount<'a>>; 2],
     ) -> Result<InstructionView<'a, 'a, 'a, 'a>, ProgramError> {
         unsafe {
-            accounts.get_unchecked_mut(0).write(InstructionAccount {
-                address: self.authority.address(),
-                is_writable: self.authority.is_writable(),
-                is_signer: self.authority.is_signer(),
-            });
+            accounts
+                .get_unchecked_mut(0)
+                .write(InstructionAccount::writable_signer(
+                    self.authority.address(),
+                ));
+            accounts
+                .get_unchecked_mut(1)
+                .write(InstructionAccount::writable(self.task_context.address()));
         }
 
         Ok(InstructionView {
             program_id: self.magic_program.address(),
             data,
             accounts: unsafe {
-                core::slice::from_raw_parts(accounts.as_ptr() as *const InstructionAccount, 1)
+                core::slice::from_raw_parts(accounts.as_ptr() as *const InstructionAccount, 2)
             },
         })
     }
@@ -193,32 +413,49 @@ impl CancelCrankCpi {
     }
 
     pub fn invoke(&self) -> ProgramResult {
-        let mut ix_accounts = [const { MaybeUninit::<InstructionAccount>::uninit() }; 1];
-        let accounts = [&self.authority, &self.magic_program];
+        let mut ix_accounts = [const { MaybeUninit::<InstructionAccount>::uninit() }; 2];
+        let accounts = [&self.authority, &self.task_context];
         let data = self.data();
 
-        invoke_with_slice(
-            &self.instruction(&data, &mut ix_accounts)?,
-            accounts.as_slice(),
-        )
+        invoke_with_bounds::<2>(&self.instruction(&data, &mut ix_accounts)?, &accounts)
     }
 
     pub fn invoke_signed(&self, signers_seeds: &[Signer<'_, '_>]) -> ProgramResult {
-        let mut ix_accounts = [const { MaybeUninit::<InstructionAccount>::uninit() }; 1];
-        let accounts = [&self.authority, &self.magic_program];
+        let mut ix_accounts = [const { MaybeUninit::<InstructionAccount>::uninit() }; 2];
+        let accounts = [&self.authority, &self.task_context];
         let data = self.data();
 
-        invoke_signed_with_slice(
+        invoke_signed_with_bounds::<2>(
             &self.instruction(&data, &mut ix_accounts)?,
-            accounts.as_slice(),
+            &accounts,
             signers_seeds,
         )
     }
 }
 
+#[inline(always)]
+fn write_serialized_bytes(
+    data: &mut [u8],
+    offset: &mut usize,
+    bytes: &[u8],
+) -> Result<(), ProgramError> {
+    let end = offset
+        .checked_add(bytes.len())
+        .ok_or(ProgramError::InvalidInstructionData)?;
+    if end > data.len() {
+        return Err(ProgramError::InvalidInstructionData);
+    }
+
+    data[*offset..end].copy_from_slice(bytes);
+    *offset = end;
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
-    use alloc::vec;
+    extern crate alloc;
+
+    use alloc::{vec, vec::Vec};
     use magicblock_magic_program_api::{
         args::ScheduleTaskArgs, instruction::MagicBlockInstruction,
     };
@@ -227,14 +464,32 @@ mod tests {
 
     use super::*;
 
+    fn runtime_account(address: Address, is_signer: u8, is_writable: u8) -> RuntimeAccount {
+        RuntimeAccount {
+            borrow_state: 0,
+            is_signer,
+            is_writable,
+            executable: 0,
+            resize_delta: 0,
+            address,
+            owner: Address::new_from_array([0; 32]),
+            lamports: 0,
+            data_len: 0,
+        }
+    }
+
+    fn serialize_schedule_cpi(cpi: &ScheduleCrankCpi<'_>) -> Vec<u8> {
+        let mut data = vec![0; cpi.serialized_size()];
+        let len = cpi.serialize_into(&mut data).unwrap();
+        data.truncate(len);
+        data
+    }
+
     #[test]
     fn test_schedule_crank_cpi_no_instructions() {
-        let this_args = ScheduleCrankArgs {
-            task_id: 123,
-            execution_interval_millis: 123456,
-            iterations: 123456,
-            instructions: &[],
-        };
+        let this_args = ScheduleCrankArgs::new(123, &[])
+            .execution_interval_millis(123456)
+            .iterations(123456);
         let api_args = ScheduleTaskArgs {
             task_id: this_args.task_id,
             execution_interval_millis: this_args.execution_interval_millis,
@@ -242,8 +497,8 @@ mod tests {
             instructions: vec![],
         };
 
-        let this_instruction = ScheduleCrankCpi {
-            payer: unsafe {
+        let this_instruction = ScheduleCrankCpi::new(
+            unsafe {
                 AccountView::new_unchecked(&mut RuntimeAccount {
                     borrow_state: 0,
                     is_signer: 0,
@@ -256,7 +511,7 @@ mod tests {
                     data_len: 0,
                 } as *mut RuntimeAccount)
             },
-            magic_program: unsafe {
+            unsafe {
                 AccountView::new_unchecked(&mut RuntimeAccount {
                     borrow_state: 0,
                     is_signer: 0,
@@ -269,12 +524,12 @@ mod tests {
                     data_len: 0,
                 } as *mut RuntimeAccount)
             },
-            instruction_accounts: &[],
-            args: this_args,
-        };
+            &[],
+            this_args,
+        );
 
-        let data = this_instruction.data().unwrap();
-        let api_data = bincode::serialize(&MagicBlockInstruction::ScheduleTask(api_args)).unwrap();
+        let data = serialize_schedule_cpi(&this_instruction);
+        let api_data = bincode1::serialize(&MagicBlockInstruction::ScheduleTask(api_args)).unwrap();
 
         assert_eq!(data, api_data);
     }
@@ -284,20 +539,15 @@ mod tests {
         let program_id =
             Address::new_from_array(core::array::from_fn(|i| if i == 0 { 1 } else { 0 }));
         let acc1 = Address::new_from_array(core::array::from_fn(|i| if i == 0 { 2 } else { 0 }));
-        let this_args = ScheduleCrankArgs {
-            task_id: 123,
-            execution_interval_millis: 123,
-            iterations: 123,
-            instructions: &[CrankInstruction {
-                program_id: program_id.clone(),
-                data: &[1, 2, 3],
-                accounts: &[InstructionAccount {
-                    address: &acc1,
-                    is_writable: true,
-                    is_signer: false,
-                }],
-            }],
-        };
+        let instruction_accounts = [InstructionAccount::new(&acc1, true, false)];
+        let crank_instructions = [CrankInstruction::new(
+            program_id.clone(),
+            &instruction_accounts,
+            &[1, 2, 3],
+        )];
+        let this_args = ScheduleCrankArgs::new(123, &crank_instructions)
+            .execution_interval_millis(123)
+            .iterations(123);
         let api_args = ScheduleTaskArgs {
             task_id: this_args.task_id,
             execution_interval_millis: this_args.execution_interval_millis,
@@ -313,8 +563,8 @@ mod tests {
             }],
         };
 
-        let this_instruction = ScheduleCrankCpi {
-            payer: unsafe {
+        let this_instruction = ScheduleCrankCpi::new(
+            unsafe {
                 AccountView::new_unchecked(&mut RuntimeAccount {
                     borrow_state: 0,
                     is_signer: 0,
@@ -327,7 +577,7 @@ mod tests {
                     data_len: 0,
                 } as *mut RuntimeAccount)
             },
-            magic_program: unsafe {
+            unsafe {
                 AccountView::new_unchecked(&mut RuntimeAccount {
                     borrow_state: 0,
                     is_signer: 0,
@@ -340,12 +590,12 @@ mod tests {
                     data_len: 0,
                 } as *mut RuntimeAccount)
             },
-            instruction_accounts: &[],
-            args: this_args,
-        };
+            &[],
+            this_args,
+        );
 
-        let data = this_instruction.data().unwrap();
-        let api_data = bincode::serialize(&MagicBlockInstruction::ScheduleTask(api_args)).unwrap();
+        let data = serialize_schedule_cpi(&this_instruction);
+        let api_data = bincode1::serialize(&MagicBlockInstruction::ScheduleTask(api_args)).unwrap();
 
         assert_eq!(data, api_data);
     }
@@ -356,45 +606,21 @@ mod tests {
             Address::new_from_array(core::array::from_fn(|i| if i == 0 { 1 } else { 0 }));
         let acc1 = Address::new_from_array(core::array::from_fn(|i| if i == 0 { 2 } else { 0 }));
         let acc2 = Address::new_from_array(core::array::from_fn(|i| if i == 0 { 3 } else { 0 }));
-        let this_args = ScheduleCrankArgs {
-            task_id: 123,
-            execution_interval_millis: 123456,
-            iterations: 123456,
-            instructions: &[
-                CrankInstruction {
-                    program_id: program_id.clone(),
-                    data: &[1, 2, 3],
-                    accounts: &[
-                        InstructionAccount {
-                            address: &acc1,
-                            is_writable: true,
-                            is_signer: false,
-                        },
-                        InstructionAccount {
-                            address: &acc2,
-                            is_writable: true,
-                            is_signer: false,
-                        },
-                    ],
-                },
-                CrankInstruction {
-                    program_id: program_id.clone(),
-                    data: &[1, 2, 3],
-                    accounts: &[
-                        InstructionAccount {
-                            address: &acc1,
-                            is_writable: true,
-                            is_signer: false,
-                        },
-                        InstructionAccount {
-                            address: &acc2,
-                            is_writable: true,
-                            is_signer: false,
-                        },
-                    ],
-                },
-            ],
-        };
+        let first_accounts = [
+            InstructionAccount::new(&acc1, true, false),
+            InstructionAccount::new(&acc2, true, false),
+        ];
+        let second_accounts = [
+            InstructionAccount::new(&acc1, true, false),
+            InstructionAccount::new(&acc2, true, false),
+        ];
+        let crank_instructions = [
+            CrankInstruction::new(program_id.clone(), &first_accounts, &[1, 2, 3]),
+            CrankInstruction::new(program_id.clone(), &second_accounts, &[1, 2, 3]),
+        ];
+        let this_args = ScheduleCrankArgs::new(123, &crank_instructions)
+            .execution_interval_millis(123456)
+            .iterations(123456);
         let api_args = ScheduleTaskArgs {
             task_id: this_args.task_id,
             execution_interval_millis: this_args.execution_interval_millis,
@@ -435,8 +661,8 @@ mod tests {
             ],
         };
 
-        let this_instruction = ScheduleCrankCpi {
-            payer: unsafe {
+        let this_instruction = ScheduleCrankCpi::new(
+            unsafe {
                 AccountView::new_unchecked(&mut RuntimeAccount {
                     borrow_state: 0,
                     is_signer: 0,
@@ -449,7 +675,7 @@ mod tests {
                     data_len: 0,
                 } as *mut RuntimeAccount)
             },
-            magic_program: unsafe {
+            unsafe {
                 AccountView::new_unchecked(&mut RuntimeAccount {
                     borrow_state: 0,
                     is_signer: 0,
@@ -462,54 +688,110 @@ mod tests {
                     data_len: 0,
                 } as *mut RuntimeAccount)
             },
-            instruction_accounts: &[],
-            args: this_args,
-        };
+            &[],
+            this_args,
+        );
 
-        let data = this_instruction.data().unwrap();
-        let api_data = bincode::serialize(&MagicBlockInstruction::ScheduleTask(api_args)).unwrap();
+        let data = serialize_schedule_cpi(&this_instruction);
+        let api_data = bincode1::serialize(&MagicBlockInstruction::ScheduleTask(api_args)).unwrap();
 
         assert_eq!(data, api_data);
     }
 
     #[test]
-    fn test_cancel_crank_cpi() {
-        let this_instruction = CancelCrankCpi {
-            authority: unsafe {
-                AccountView::new_unchecked(&mut RuntimeAccount {
-                    borrow_state: 0,
-                    is_signer: 0,
-                    is_writable: 0,
-                    executable: 0,
-                    resize_delta: 0,
-                    address: Address::new_from_array([0; 32]),
-                    owner: Address::new_from_array([0; 32]),
-                    lamports: 0,
-                    data_len: 0,
-                } as *mut RuntimeAccount)
-            },
-            magic_program: unsafe {
-                AccountView::new_unchecked(&mut RuntimeAccount {
-                    borrow_state: 0,
-                    is_signer: 0,
-                    is_writable: 0,
-                    executable: 0,
-                    resize_delta: 0,
-                    address: Address::new_from_array([0; 32]),
-                    owner: Address::new_from_array([0; 32]),
-                    lamports: 0,
-                    data_len: 0,
-                } as *mut RuntimeAccount)
-            },
-            crank_id: 123,
+    fn test_schedule_crank_builder_matches_direct_construction() {
+        let mut payer_account = runtime_account(Address::new_from_array([1; 32]), 0, 0);
+        let mut magic_program_account = runtime_account(Address::new_from_array([2; 32]), 0, 0);
+        let mut task_context_account = runtime_account(Address::new_from_array([3; 32]), 0, 1);
+        let payer =
+            unsafe { AccountView::new_unchecked(&mut payer_account as *mut RuntimeAccount) };
+        let magic_program = unsafe {
+            AccountView::new_unchecked(&mut magic_program_account as *mut RuntimeAccount)
+        };
+        let task_context =
+            unsafe { AccountView::new_unchecked(&mut task_context_account as *mut RuntimeAccount) };
+        let task_context_accounts = [&task_context];
+        let target_program = Address::new_from_array([9; 32]);
+        let target_account = Address::new_from_array([8; 32]);
+        let execute_accounts = [InstructionAccount::new(&target_account, true, false)];
+        let crank_instructions = [CrankInstruction::new(
+            target_program,
+            &execute_accounts,
+            &[7],
+        )];
+
+        let direct = ScheduleCrankCpi::new(
+            payer.clone(),
+            magic_program.clone(),
+            &task_context_accounts,
+            ScheduleCrankArgs::new(55, &crank_instructions)
+                .execution_interval_millis(99)
+                .iterations(3),
+        );
+        let built = ScheduleCrankCpi::builder(payer, magic_program)
+            .instruction_accounts(&task_context_accounts)
+            .task_id(55)
+            .execution_interval_millis(99)
+            .iterations(3)
+            .instructions(&crank_instructions)
+            .build()
+            .unwrap();
+
+        assert_eq!(
+            serialize_schedule_cpi(&direct),
+            serialize_schedule_cpi(&built)
+        );
+    }
+
+    #[test]
+    fn test_schedule_crank_cpi_marks_payer_writable_signer() {
+        let mut payer_account = runtime_account(Address::new_from_array([1; 32]), 0, 0);
+        let mut magic_program_account = runtime_account(Address::new_from_array([2; 32]), 0, 0);
+        let payer =
+            unsafe { AccountView::new_unchecked(&mut payer_account as *mut RuntimeAccount) };
+        let magic_program = unsafe {
+            AccountView::new_unchecked(&mut magic_program_account as *mut RuntimeAccount)
+        };
+        let instruction = ScheduleCrankCpi::new(
+            payer,
+            magic_program,
+            &[],
+            ScheduleCrankArgs::new(1, &[])
+                .execution_interval_millis(5)
+                .iterations(1),
+        );
+        let mut data = vec![0; instruction.serialized_size()];
+        let data_len = instruction.serialize_into(&mut data).unwrap();
+        data.truncate(data_len);
+        let mut ix_accounts =
+            [const { MaybeUninit::<InstructionAccount>::uninit() }; PINOCCHIO_MAX_CPI_ACCOUNTS];
+        let view = instruction.instruction(&data, &mut ix_accounts).unwrap();
+
+        assert!(view.accounts[0].is_writable);
+        assert!(view.accounts[0].is_signer);
+    }
+
+    #[test]
+    fn test_cancel_crank_cpi_instruction_data() {
+        let mut authority_account = runtime_account(Address::new_from_array([1; 32]), 0, 0);
+        let mut task_context_account = runtime_account(Address::new_from_array([2; 32]), 0, 1);
+        let mut magic_program_account = runtime_account(Address::new_from_array([3; 32]), 0, 0);
+        let authority =
+            unsafe { AccountView::new_unchecked(&mut authority_account as *mut RuntimeAccount) };
+        let task_context =
+            unsafe { AccountView::new_unchecked(&mut task_context_account as *mut RuntimeAccount) };
+        let magic_program = unsafe {
+            AccountView::new_unchecked(&mut magic_program_account as *mut RuntimeAccount)
         };
 
-        let data = this_instruction.data();
-        let api_data = bincode::serialize(&MagicBlockInstruction::CancelTask {
-            task_id: this_instruction.crank_id,
-        })
-        .unwrap();
+        let instruction = CancelCrankCpi {
+            authority,
+            task_context,
+            magic_program,
+            crank_id: 42,
+        };
 
-        assert_eq!(&data[..], &api_data[..]);
+        assert_eq!(instruction.data()[..4], 7_u32.to_le_bytes());
+        assert_eq!(instruction.data()[4..], 42_i64.to_le_bytes());
     }
 }

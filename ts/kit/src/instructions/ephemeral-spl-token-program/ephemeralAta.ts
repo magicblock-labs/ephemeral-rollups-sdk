@@ -33,12 +33,9 @@ import {
   permissionPdaFromAccount,
 } from "../../pda";
 
-// Default validator for private delegation
-const DEFAULT_PRIVATE_VALIDATOR = address(
-  "FnE6VJT5QNZdedZPnCoLsARgBwoE6DeJNjBs2H1gySXA",
-);
-
 // SPL Token program IDs
+const U64_ENCODER = getU64Encoder();
+
 const TOKEN_PROGRAM_ADDRESS =
   "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA" as const;
 const ASSOCIATED_TOKEN_PROGRAM_ADDRESS =
@@ -358,18 +355,21 @@ export function initVaultAtaIx(
  * @param vaultAta - The vault ATA account
  * @returns The init vault account instruction
  */
-export function initVaultIx(
+export async function initVaultIx(
   vault: Address,
   mint: Address,
   payer: Address,
   bump: number,
   vaultAta: Address,
-): Instruction {
+): Promise<Instruction> {
+  const [vaultEphemeralAta] = await deriveEphemeralAta(vault, mint);
+
   return {
     accounts: [
       { address: vault, role: AccountRole.WRITABLE },
       { address: payer, role: AccountRole.WRITABLE_SIGNER },
       { address: mint, role: AccountRole.READONLY },
+      { address: vaultEphemeralAta, role: AccountRole.WRITABLE },
       { address: vaultAta, role: AccountRole.WRITABLE },
       { address: TOKEN_PROGRAM_ADDRESS as Address, role: AccountRole.READONLY },
       {
@@ -413,7 +413,7 @@ export function transferToVaultIx(
       { address: owner, role: AccountRole.READONLY_SIGNER },
       { address: TOKEN_PROGRAM_ADDRESS as Address, role: AccountRole.READONLY },
     ],
-    data: new Uint8Array([2, ...u64le(amount)]),
+    data: encodeAmountInstructionData(2, amount),
     programAddress: EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
   };
 }
@@ -626,18 +626,24 @@ export function undelegateAndCloseShuttleEphemeralAtaIx(
   shuttleEphemeralAta: Address,
   shuttleAta: Address,
   shuttleWalletAta: Address,
+  escrowIndex?: number,
 ): Instruction {
+  const data =
+    escrowIndex === undefined
+      ? new Uint8Array([14])
+      : new Uint8Array([14, escrowIndex]);
+
   return {
     accounts: [
       { address: payer, role: AccountRole.WRITABLE_SIGNER },
       { address: shuttleEphemeralAta, role: AccountRole.READONLY },
-      { address: shuttleAta, role: AccountRole.READONLY },
+      { address: shuttleAta, role: AccountRole.WRITABLE },
       { address: shuttleWalletAta, role: AccountRole.WRITABLE },
       { address: TOKEN_PROGRAM_ADDRESS as Address, role: AccountRole.READONLY },
       { address: MAGIC_CONTEXT_ID, role: AccountRole.WRITABLE },
       { address: MAGIC_PROGRAM_ID, role: AccountRole.READONLY },
     ],
-    data: new Uint8Array([14]),
+    data,
     programAddress: EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
   };
 }
@@ -669,7 +675,7 @@ export async function withdrawSplIx(
       { address: userDestAta, role: AccountRole.WRITABLE },
       { address: TOKEN_PROGRAM_ADDRESS as Address, role: AccountRole.READONLY },
     ],
-    data: new Uint8Array([3, ...u64le(amount), vaultBump]),
+    data: encodeAmountInstructionData(3, amount, vaultBump),
     programAddress: EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
   };
 }
@@ -848,36 +854,35 @@ export async function undelegateEataPermissionIx(
 // High-level SDK methods
 // ---------------------------------------------------------------------------
 
-/**
- * High-level method to delegate SPL tokens
- * @param owner - The owner account
- * @param mint - The mint account
- * @param amount - The amount of tokens to delegate
- * @param opts - The options
- * @returns The instructions to delegate SPL tokens
- */
-export async function delegateSpl(
+export type DelegateSplOptions = {
+  payer?: Address;
+  validator?: Address;
+  initIfMissing?: boolean;
+  initVaultIfMissing?: boolean;
+  initAtasIfMissing?: boolean;
+  shuttleId?: number;
+  escrowIndex?: number;
+  idempotent?: boolean;
+  private?: boolean;
+};
+
+async function buildDelegateSplInstructions(
   owner: Address,
   mint: Address,
   amount: bigint,
-  opts?: {
-    payer?: Address;
-    validator?: Address;
-    initIfMissing?: boolean;
-    initVaultIfMissing?: boolean;
-  },
+  opts?: DelegateSplOptions,
 ): Promise<Instruction[]> {
   const payer = opts?.payer ?? owner;
   const validator = opts?.validator;
   const initIfMissing = opts?.initIfMissing ?? true;
   const initVaultIfMissing = opts?.initVaultIfMissing ?? false;
+  const isPrivate = opts?.private ?? false;
 
   const instructions: Instruction[] = [];
 
   const [ephemeralAta, eataBump] = await deriveEphemeralAta(owner, mint);
   const [vault, vaultBump] = await deriveVault(mint);
   const vaultAta = await deriveVaultAta(mint, vault);
-
   const ownerAta = await getAssociatedTokenAddressSync(mint, owner);
 
   if (initIfMissing) {
@@ -888,7 +893,7 @@ export async function delegateSpl(
 
   if (initVaultIfMissing) {
     instructions.push(
-      initVaultIx(vault, mint, payer, vaultBump, vaultAta),
+      await initVaultIx(vault, mint, payer, vaultBump, vaultAta),
       initVaultAtaIx(payer, vaultAta, vault, mint),
     );
   }
@@ -905,44 +910,26 @@ export async function delegateSpl(
     ),
   );
 
+  if (isPrivate) {
+    instructions.push(await createEataPermissionIx(ephemeralAta, payer, eataBump));
+  }
+
   instructions.push(await delegateIx(payer, ephemeralAta, eataBump, validator));
 
   return instructions;
 }
 
-/**
- * High-level idempotent delegation flow using shuttle accounts.
- *
- * Emitted instructions:
- * 1) optionally initialize global vault + vault ATA
- * 2) optionally initialize owner/shuttle ATAs
- * 3) initialize ephemeral ATA (idempotent on-chain)
- * 4) initialize EATA permission
- * 5) delegate EATA
- * 6) initialize shuttle ephemeral ATA
- * 7) deposit SPL tokens from owner ATA into the vault for shuttle ATA
- * 8) delegate shuttle ephemeral ATA
- *
- * If no shuttleId is provided, a random u32 is used.
- */
-export async function delegateSplIdempotent(
+async function buildIdempotentDelegateSplInstructions(
   owner: Address,
   mint: Address,
   amount: bigint,
-  opts?: {
-    payer?: Address;
-    validator?: Address;
-    initIfMissing?: boolean;
-    initVaultIfMissing?: boolean;
-    initAtasIfMissing?: boolean;
-    shuttleId?: number;
-    escrowIndex?: number;
-  },
+  opts?: DelegateSplOptions,
 ): Promise<Instruction[]> {
   const payer = opts?.payer ?? owner;
   const validator = opts?.validator;
   const initVaultIfMissing = opts?.initVaultIfMissing ?? false;
   const initAtasIfMissing = opts?.initAtasIfMissing ?? false;
+  const isPrivate = opts?.private ?? false;
 
   const randomShuttleId = (): number => {
     const cryptoObj = (globalThis as any)?.crypto;
@@ -979,7 +966,7 @@ export async function delegateSplIdempotent(
 
   if (initVaultIfMissing) {
     instructions.push(
-      initVaultIx(vault, mint, payer, vaultBump, vaultAta),
+      await initVaultIx(vault, mint, payer, vaultBump, vaultAta),
       initVaultAtaIx(payer, vaultAta, vault, mint),
     );
   }
@@ -991,9 +978,13 @@ export async function delegateSplIdempotent(
     );
   }
 
+  instructions.push(initEphemeralAtaIx(ephemeralAta, owner, mint, payer, eataBump));
+
+  if (isPrivate) {
+    instructions.push(await createEataPermissionIx(ephemeralAta, payer, eataBump));
+  }
+
   instructions.push(
-    initEphemeralAtaIx(ephemeralAta, owner, mint, payer, eataBump),
-    await createEataPermissionIx(ephemeralAta, payer, eataBump),
     await delegateIx(payer, ephemeralAta, eataBump, validator),
     initShuttleEphemeralAtaIx(
       payer,
@@ -1035,101 +1026,40 @@ export async function delegateSplIdempotent(
 }
 
 /**
- * High-level method to delegate private SPL tokens
- * @param owner - The owner account
- * @param mint - The mint account
- * @param amount - The amount of tokens to delegate
- * @param opts - The options
- * @returns The instructions to delegate private SPL tokens
+ * High-level method to delegate SPL tokens.
+ *
+ * By default this uses the idempotent shuttle flow. Set `idempotent: false`
+ * to use the legacy direct delegation flow. Set `private: true` to add
+ * `createEataPermissionIx`.
  */
-export async function delegatePrivateSpl(
+export async function delegateSpl(
   owner: Address,
   mint: Address,
   amount: bigint,
-  opts?: {
-    payer?: Address;
-    validator?: Address;
-    initIfMissing?: boolean;
-    initVaultIfMissing?: boolean;
-    permissionFlags?: number;
-    delegatePermission?: boolean;
-  },
+  opts?: DelegateSplOptions,
 ): Promise<Instruction[]> {
-  const payer = opts?.payer ?? owner;
-  const validator = opts?.validator ?? DEFAULT_PRIVATE_VALIDATOR;
-  const initIfMissing = opts?.initIfMissing ?? true;
-  const initVaultIfMissing = opts?.initVaultIfMissing ?? false;
-  const permissionFlags = opts?.permissionFlags ?? 0;
-  const delegatePermission = opts?.delegatePermission ?? false;
-
-  const instructions: Instruction[] = [];
-
-  const [ephemeralAta, eataBump] = await deriveEphemeralAta(owner, mint);
-  const [vault, vaultBump] = await deriveVault(mint);
-  const vaultAta = await deriveVaultAta(mint, vault);
-
-  const ownerAta = await getAssociatedTokenAddressSync(mint, owner);
-
-  if (initIfMissing) {
-    instructions.push(
-      initEphemeralAtaIx(ephemeralAta, owner, mint, payer, eataBump),
-    );
+  if (opts?.idempotent === false) {
+    return buildDelegateSplInstructions(owner, mint, amount, opts);
   }
 
-  if (initVaultIfMissing) {
-    instructions.push(
-      initVaultIx(vault, mint, payer, vaultBump, vaultAta),
-      initVaultAtaIx(payer, vaultAta, vault, mint),
-    );
-  }
-
-  instructions.push(
-    transferToVaultIx(
-      ephemeralAta,
-      vault,
-      mint,
-      ownerAta,
-      vaultAta,
-      owner,
-      amount,
-    ),
-  );
-
-  instructions.push(await delegateIx(payer, ephemeralAta, eataBump, validator));
-
-  // Create the EATA permission
-  instructions.push(
-    await createEataPermissionIx(
-      ephemeralAta,
-      payer,
-      eataBump,
-      permissionFlags,
-    ),
-  );
-
-  // Optionally delegate the permission
-  if (delegatePermission) {
-    instructions.push(
-      await delegateEataPermissionIx(payer, ephemeralAta, eataBump, validator),
-    );
-  }
-
-  return instructions;
+  return buildIdempotentDelegateSplInstructions(owner, mint, amount, opts);
 }
 
 // ---------------------------------------------------------------------------
 // Internal helpers
 // ---------------------------------------------------------------------------
 
-function u64le(n: bigint): number[] {
-  if (n < 0n || n > 0xffff_ffff_ffff_ffffn) {
-    throw new Error("amount out of range for u64");
+function encodeAmountInstructionData(
+  discriminator: number,
+  amount: bigint,
+  ...suffix: number[]
+): Uint8Array {
+  const amountBytes = U64_ENCODER.encode(amount);
+  const data = new Uint8Array(1 + amountBytes.length + suffix.length);
+  data[0] = discriminator;
+  data.set(amountBytes, 1);
+  if (suffix.length > 0) {
+    data.set(suffix, 1 + amountBytes.length);
   }
-  const bytes = new Array<number>(8).fill(0);
-  let x = n;
-  for (let i = 0; i < 8; i++) {
-    bytes[i] = Number(x & 0xffn);
-    x >>= 8n;
-  }
-  return bytes; // little-endian
+  return data;
 }
