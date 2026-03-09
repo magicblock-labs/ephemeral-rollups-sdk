@@ -13,7 +13,7 @@ pub use crate::ephem::deprecated::v1::{
 use crate::solana_compat::solana::{
     invoke, AccountInfo, AccountMeta, Instruction, ProgramResult, Pubkey,
 };
-use magicblock_magic_program_api::args::{AddActionCallbackArgs, MagicIntentBundleArgs};
+use magicblock_magic_program_api::args::MagicIntentBundleArgs;
 use magicblock_magic_program_api::instruction::MagicBlockInstruction;
 use std::collections::HashMap;
 
@@ -403,6 +403,50 @@ impl<'info> MagicIntentBundle<'info> {
     }
 }
 
+/// Shared transition and terminal methods for intent sub-builders.
+///
+/// Implementors provide only `fold`, which collapses the sub-builder back into
+/// the parent [`MagicIntentBundleBuilder`]. All transition/terminal methods are
+/// then available as defaults.
+pub trait FoldableIntentBuilder<'info>: Sized {
+    fn fold(self) -> MagicIntentBundleBuilder<'info>;
+
+    fn commit(self, accounts: &[AccountInfo<'info>]) -> CommitIntentBuilder<'info> {
+        self.fold().commit(accounts)
+    }
+
+    fn commit_and_undelegate(
+        self,
+        accounts: &[AccountInfo<'info>],
+    ) -> CommitAndUndelegateIntentBuilder<'info> {
+        self.fold().commit_and_undelegate(accounts)
+    }
+
+    fn add_standalone_actions(
+        self,
+        actions: impl IntoIterator<Item = CallHandler<'info>>,
+    ) -> MagicIntentBundleBuilder<'info> {
+        self.fold().add_standalone_actions(actions)
+    }
+
+    fn add_standalone_action_with_callback(
+        self,
+        action: CallHandler<'info>,
+        callback: ActionCallback,
+    ) -> MagicIntentBundleBuilder<'info> {
+        self.fold()
+            .add_standalone_action_with_callback(action, callback)
+    }
+
+    fn build(self) -> IntentInstructions<'info> {
+        self.fold().build()
+    }
+
+    fn build_and_invoke(self) -> ProgramResult {
+        self.fold().build_and_invoke()
+    }
+}
+
 /// Builder of Commit Intent.
 ///
 /// Created via [`MagicIntentBundleBuilder::commit()`]. Owns the parent builder
@@ -436,45 +480,10 @@ impl<'info> CommitIntentBuilder<'info> {
         self.callbacks.push(Some(callback));
         self
     }
+}
 
-    /// Transition: finalizes this commit intent and starts a commit-and-undelegate intent.
-    pub fn commit_and_undelegate(
-        self,
-        accounts: &[AccountInfo<'info>],
-    ) -> CommitAndUndelegateIntentBuilder<'info> {
-        self.fold().commit_and_undelegate(accounts)
-    }
-
-    /// Transition: finalizes this commit intent and adds standalone base-layer actions.
-    pub fn add_standalone_actions(
-        self,
-        actions: impl IntoIterator<Item = CallHandler<'info>>,
-    ) -> MagicIntentBundleBuilder<'info> {
-        self.fold().add_standalone_actions(actions)
-    }
-
-    /// Transition: finalizes this commit intent and adds a standalone action with a callback.
-    pub fn add_standalone_action_with_callback(
-        self,
-        action: CallHandler<'info>,
-        callback: ActionCallback,
-    ) -> MagicIntentBundleBuilder<'info> {
-        self.fold()
-            .add_standalone_action_with_callback(action, callback)
-    }
-
-    /// Terminal: finalizes this commit intent and builds the full instruction set
-    pub fn build(self) -> IntentInstructions<'info> {
-        self.fold().build()
-    }
-
-    /// Terminal: finalizes this commit intent, builds the instruction and invokes it.
-    pub fn build_and_invoke(self) -> ProgramResult {
-        self.fold().build_and_invoke()
-    }
-
-    /// Finalizes this commit intent and folds it into the parent bundle.
-    pub fn fold(self) -> MagicIntentBundleBuilder<'info> {
+impl<'info> FoldableIntentBuilder<'info> for CommitIntentBuilder<'info> {
+    fn fold(self) -> MagicIntentBundleBuilder<'info> {
         let Self {
             mut parent,
             accounts,
@@ -555,42 +564,10 @@ impl<'info> CommitAndUndelegateIntentBuilder<'info> {
         self.post_undelegate_callbacks.push(Some(callback));
         self
     }
+}
 
-    /// Transition: finalizes this commit-and-undelegate intent and starts a new commit intent.
-    pub fn commit(self, accounts: &[AccountInfo<'info>]) -> CommitIntentBuilder<'info> {
-        self.fold().commit(accounts)
-    }
-
-    /// Transition: finalizes this commit-and-undelegate intent and adds standalone base-layer actions.
-    pub fn add_standalone_actions(
-        self,
-        actions: impl IntoIterator<Item = CallHandler<'info>>,
-    ) -> MagicIntentBundleBuilder<'info> {
-        self.fold().add_standalone_actions(actions)
-    }
-
-    /// Transition: finalizes this intent and adds a standalone action with a callback.
-    pub fn add_standalone_action_with_callback(
-        self,
-        action: CallHandler<'info>,
-        callback: ActionCallback,
-    ) -> MagicIntentBundleBuilder<'info> {
-        self.fold()
-            .add_standalone_action_with_callback(action, callback)
-    }
-
-    /// Terminal: finalizes this intent and builds the full instruction set.
-    pub fn build(self) -> IntentInstructions<'info> {
-        self.fold().build()
-    }
-
-    /// Terminal: finalizes this intent, builds the instruction and invokes it.
-    pub fn build_and_invoke(self) -> ProgramResult {
-        self.fold().build_and_invoke()
-    }
-
-    /// Finalizes this commit-and-undelegate intent and folds it into the parent bundle.
-    pub fn fold(self) -> MagicIntentBundleBuilder<'info> {
+impl<'info> FoldableIntentBuilder<'info> for CommitAndUndelegateIntentBuilder<'info> {
+    fn fold(self) -> MagicIntentBundleBuilder<'info> {
         let Self {
             mut parent,
             accounts,
@@ -633,9 +610,7 @@ mod tests {
     use crate::solana_compat::solana::{AccountInfo, Pubkey};
     use magicblock_magic_program_api::args::ActionArgs;
     use magicblock_magic_program_api::instruction::MagicBlockInstruction;
-    use std::borrow::Borrow;
     use std::cell::RefCell;
-    use std::ops::{Deref, DerefMut};
     use std::rc::Rc;
 
     /// Helper to create a mock AccountInfo for testing

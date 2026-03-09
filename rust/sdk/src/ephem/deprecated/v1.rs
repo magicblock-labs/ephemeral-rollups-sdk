@@ -5,8 +5,8 @@ use crate::solana_compat::solana::{
     invoke, AccountInfo, AccountMeta, Instruction, ProgramResult, Pubkey,
 };
 use magicblock_magic_program_api::args::{
-    ActionArgs, BaseActionArgs, CommitAndUndelegateArgs, CommitTypeArgs, MagicBaseIntentArgs,
-    ShortAccountMeta, UndelegateTypeArgs,
+    ActionArgs, AddActionCallbackArgs, BaseActionArgs, CommitAndUndelegateArgs, CommitTypeArgs,
+    MagicBaseIntentArgs, ShortAccountMeta, UndelegateTypeArgs,
 };
 use magicblock_magic_program_api::instruction::MagicBlockInstruction;
 use std::collections::{HashMap, HashSet};
