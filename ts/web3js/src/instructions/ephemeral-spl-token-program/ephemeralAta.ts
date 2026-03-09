@@ -502,7 +502,7 @@ export function initShuttleEphemeralAtaIx(
     keys: [
       { pubkey: payer, isSigner: true, isWritable: true },
       { pubkey: shuttleEphemeralAta, isSigner: false, isWritable: true },
-      { pubkey: shuttleAta, isSigner: false, isWritable: true },
+      { pubkey: shuttleAta, isSigner: false, isWritable: false },
       { pubkey: shuttleWalletAta, isSigner: false, isWritable: true },
       { pubkey: owner, isSigner: false, isWritable: false },
       { pubkey: mint, isSigner: false, isWritable: false },
@@ -543,7 +543,7 @@ export function delegateShuttleEphemeralAtaIx(
     keys: [
       { pubkey: payer, isSigner: true, isWritable: true },
       { pubkey: shuttleEphemeralAta, isSigner: false, isWritable: false },
-      { pubkey: shuttleAta, isSigner: false, isWritable: true },
+      { pubkey: shuttleAta, isSigner: false, isWritable: false },
       {
         pubkey: EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
         isSigner: false,
@@ -629,7 +629,7 @@ export function undelegateAndCloseShuttleEphemeralAtaIx(
     keys: [
       { pubkey: payer, isSigner: true, isWritable: true },
       { pubkey: shuttleEphemeralAta, isSigner: false, isWritable: false },
-      { pubkey: shuttleAta, isSigner: false, isWritable: true },
+      { pubkey: shuttleAta, isSigner: false, isWritable: false },
       { pubkey: shuttleWalletAta, isSigner: false, isWritable: true },
       { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
       { pubkey: MAGIC_CONTEXT_ID, isSigner: false, isWritable: true },

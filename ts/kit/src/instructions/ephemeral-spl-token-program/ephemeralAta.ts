@@ -511,7 +511,7 @@ export function initShuttleEphemeralAtaIx(
     accounts: [
       { address: payer, role: AccountRole.WRITABLE_SIGNER },
       { address: shuttleEphemeralAta, role: AccountRole.WRITABLE },
-      { address: shuttleAta, role: AccountRole.WRITABLE },
+      { address: shuttleAta, role: AccountRole.READONLY },
       { address: shuttleWalletAta, role: AccountRole.WRITABLE },
       { address: owner, role: AccountRole.READONLY },
       { address: mint, role: AccountRole.READONLY },
@@ -570,7 +570,7 @@ export async function delegateShuttleEphemeralAtaIx(
     accounts: [
       { address: payer, role: AccountRole.WRITABLE_SIGNER },
       { address: shuttleEphemeralAta, role: AccountRole.READONLY },
-      { address: shuttleAta, role: AccountRole.WRITABLE },
+      { address: shuttleAta, role: AccountRole.READONLY },
       { address: EPHEMERAL_SPL_TOKEN_PROGRAM_ID, role: AccountRole.READONLY },
       { address: delegateBuffer, role: AccountRole.WRITABLE },
       { address: delegationRecord, role: AccountRole.WRITABLE },
@@ -637,7 +637,7 @@ export function undelegateAndCloseShuttleEphemeralAtaIx(
     accounts: [
       { address: payer, role: AccountRole.WRITABLE_SIGNER },
       { address: shuttleEphemeralAta, role: AccountRole.READONLY },
-      { address: shuttleAta, role: AccountRole.WRITABLE },
+      { address: shuttleAta, role: AccountRole.READONLY },
       { address: shuttleWalletAta, role: AccountRole.WRITABLE },
       { address: TOKEN_PROGRAM_ADDRESS as Address, role: AccountRole.READONLY },
       { address: MAGIC_CONTEXT_ID, role: AccountRole.WRITABLE },
