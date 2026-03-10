@@ -48,9 +48,10 @@ export async function verifyTeeRpcIntegrity(rpcUrl: string): Promise<boolean> {
 /**
  * Verify the integrity of the RPC
  * @param rpcUrl - The URL of the RPC server
+ * @param validatorIdentity - The expected identity of the validator
  * @returns True if the quote is valid, false otherwise
  */
-export async function verifyTeeIntegrity(rpcUrl: string): Promise<boolean> {
+export async function verifyTeeIntegrity(rpcUrl: string, validatorIdentity: PublicKey): Promise<boolean> {
   const challengeBytes = Buffer.from(
     Uint8Array.from(
       Array(32)
@@ -69,11 +70,7 @@ export async function verifyTeeIntegrity(rpcUrl: string): Promise<boolean> {
     throw new Error(responseBody.error ?? "Failed to get quote");
   }
 
-  if (!await verifySolanaSignature({
-    message: base64ToBytes(responseBody.challenge),
-    signature: responseBody.signature,
-    publicKey: responseBody.pubkey,
-  })) {
+  if (!await verifyChallenge(responseBody, validatorIdentity)) {
     throw new Error("Invalid signature");
   }
 
@@ -114,31 +111,20 @@ async function verifyQuote(quote: string): Promise<boolean> {
   }
 }
 
-async function verifySolanaSignature({
-  message,
-  signature,
-  publicKey,
-}: {
-  message: string | Uint8Array;
-  signature: string | Uint8Array; // base58 string or raw bytes
-  publicKey: string | Uint8Array; // wallet address or raw 32-byte pubkey
-}) {
+async function verifyChallenge(response: FastQuoteResponse, validatorIdentity: PublicKey): Promise<boolean> {
   // Import this way because they are ECMAScript modules
   const bs58 = (await import("bs58")).default;
   const nacl = (await import("tweetnacl")).default;
 
-  const msgBytes =
-    typeof message === "string" ? new TextEncoder().encode(message) : message;
+  const msgBytes = base64ToBytes(response.challenge);
+  const sigBytes = bs58.decode(response.signature);
+  const pk = new PublicKey(response.pubkey);
 
-  const sigBytes =
-    typeof signature === "string" ? bs58.decode(signature) : signature;
+  if (pk !== validatorIdentity) {
+    throw new Error("Invalid validator identity");
+  }
 
-  const pubKeyBytes =
-    typeof publicKey === "string"
-      ? new PublicKey(publicKey).toBytes()
-      : publicKey;
-
-  return nacl.sign.detached.verify(msgBytes, sigBytes, pubKeyBytes);
+  return nacl.sign.detached.verify(msgBytes, sigBytes, validatorIdentity.toBytes());
 }
 
 function base64ToBytes(base64: string): Uint8Array {
