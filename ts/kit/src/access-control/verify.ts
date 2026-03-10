@@ -110,7 +110,7 @@ async function verifyChallenge(response: FastQuoteResponse, validatorIdentity: A
   const bs58 = (await import("bs58")).default;
   const nacl = (await import("tweetnacl")).default;
 
-  const msgBytes = base64ToBytes(response.challenge);
+  const msgBytes = Buffer.from(response.challenge, "base64");
   const sigBytes = bs58.decode(response.signature);
   const pk = address(response.pubkey);
 
@@ -119,9 +119,4 @@ async function verifyChallenge(response: FastQuoteResponse, validatorIdentity: A
   }
 
   return nacl.sign.detached.verify(msgBytes, sigBytes, Uint8Array.from(getBase58Encoder().encode(validatorIdentity)));
-}
-
-function base64ToBytes(base64: string): Uint8Array {
-  const bin = atob(base64);
-  return Uint8Array.from(bin, (c) => c.charCodeAt(0));
 }

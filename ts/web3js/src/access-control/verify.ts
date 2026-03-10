@@ -63,7 +63,6 @@ export async function verifyTeeIntegrity(rpcUrl: string, validatorIdentity: Publ
   const url = `${rpcUrl}/fast-quote?challenge=${encodeURIComponent(challenge)}`;
 
   const response = await fetch(url);
-  console.log(response);
   const responseBody: FastQuoteResponse | ErrorResponse = await response.json();
 
   if (response.status !== 200 || !("quote" in responseBody)) {
@@ -116,7 +115,7 @@ async function verifyChallenge(response: FastQuoteResponse, validatorIdentity: P
   const bs58 = (await import("bs58")).default;
   const nacl = (await import("tweetnacl")).default;
 
-  const msgBytes = base64ToBytes(response.challenge);
+  const msgBytes = Buffer.from(response.challenge, "base64");
   const sigBytes = bs58.decode(response.signature);
   const pk = new PublicKey(response.pubkey);
 
@@ -125,9 +124,4 @@ async function verifyChallenge(response: FastQuoteResponse, validatorIdentity: P
   }
 
   return nacl.sign.detached.verify(msgBytes, sigBytes, validatorIdentity.toBytes());
-}
-
-function base64ToBytes(base64: string): Uint8Array {
-  const bin = atob(base64);
-  return Uint8Array.from(bin, (c) => c.charCodeAt(0));
 }
