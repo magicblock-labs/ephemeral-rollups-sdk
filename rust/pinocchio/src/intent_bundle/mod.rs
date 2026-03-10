@@ -32,6 +32,7 @@ pub struct MagicIntentBundleBuilder<'acc, 'args> {
     payer: AccountView,
     magic_context: AccountView,
     magic_program: AccountView,
+    magic_fee_vault: Option<AccountView>,
     intent_bundle: MagicIntentBundle<'acc, 'args>,
 }
 
@@ -41,12 +42,20 @@ impl MagicIntentBundleBuilder<'static, 'static> {
             payer,
             magic_context,
             magic_program,
+            magic_fee_vault: None,
             intent_bundle: MagicIntentBundle::default(),
         }
     }
 }
 
 impl<'acc, 'args> MagicIntentBundleBuilder<'acc, 'args> {
+    /// Sets an optional magic fee vault account to be passed as the account at index 2
+    /// (right after payer and magic_context). Required when the payer is delegated.
+    pub fn magic_fee_vault(mut self, vault: AccountView) -> Self {
+        self.magic_fee_vault = Some(vault);
+        self
+    }
+
     /// Starts building a Commit intent. Returns a [`CommitIntentBuilder`] that owns this parent.
     ///
     /// The returned builder lets you chain `.add_post_commit_actions()`, transition to other
@@ -100,6 +109,7 @@ impl<'acc, 'args> MagicIntentBundleBuilder<'acc, 'args> {
             payer: self.payer,
             magic_program: self.magic_program,
             magic_context: self.magic_context,
+            magic_fee_vault: self.magic_fee_vault,
             intent_bundle: MagicIntentBundle {
                 standalone_actions: actions,
                 commit_intent,
@@ -147,6 +157,9 @@ impl<'acc, 'args> MagicIntentBundleBuilder<'acc, 'args> {
         // Collect all unique accounts (payer + context first, then from intents)
         let mut all_accounts = NoVec::<AccountView, MAX_STATIC_CPI_ACCOUNTS>::new();
         all_accounts.try_append([self.payer, self.magic_context])?;
+        if let Some(vault) = self.magic_fee_vault {
+            all_accounts.try_push(vault)?;
+        }
         self.intent_bundle
             .collect_unique_accounts(&mut all_accounts)?;
 
@@ -221,6 +234,9 @@ impl MagicIntentBundleBuilder<'_, '_> {
         self.intent_bundle.validate().unwrap();
         let mut all_accounts = NoVec::<AccountView, MAX_STATIC_CPI_ACCOUNTS>::new();
         all_accounts.append([self.payer, self.magic_context]);
+        if let Some(vault) = self.magic_fee_vault {
+            all_accounts.push(vault);
+        }
         self.intent_bundle
             .collect_unique_accounts(&mut all_accounts)
             .unwrap();

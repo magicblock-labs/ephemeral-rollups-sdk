@@ -141,6 +141,7 @@ impl<'acc, 'args>
             payer,
             magic_context,
             magic_program,
+            magic_fee_vault,
             intent_bundle,
         } = parent;
         let MagicIntentBundle {
@@ -158,6 +159,7 @@ impl<'acc, 'args>
             payer,
             magic_context,
             magic_program,
+            magic_fee_vault,
             intent_bundle: MagicIntentBundle {
                 standalone_actions,
                 commit_intent,
