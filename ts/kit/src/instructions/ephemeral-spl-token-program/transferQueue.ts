@@ -8,13 +8,20 @@ import {
 import { SYSTEM_PROGRAM_ADDRESS } from "@solana-program/system";
 
 import {
+  DELEGATION_PROGRAM_ID,
   EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
   MAGIC_CONTEXT_ID,
   MAGIC_PROGRAM_ID,
 } from "../../constants";
+import {
+  delegateBufferPdaFromDelegatedAccountAndOwnerProgram,
+  delegationMetadataPdaFromDelegatedAccount,
+  delegationRecordPdaFromDelegatedAccount,
+} from "../../pda";
 
 const INITIALIZE_TRANSFER_QUEUE_DISCRIMINATOR = 12;
 const ENSURE_TRANSFER_QUEUE_CRANK_DISCRIMINATOR = 17;
+const DELEGATE_TRANSFER_QUEUE_DISCRIMINATOR = 18;
 
 /**
  * Derive the transfer queue PDA for a mint.
@@ -34,22 +41,22 @@ export async function deriveTransferQueue(
 
 /**
  * Initialize the per-mint transfer queue.
- * @param queue - The transfer queue PDA
  * @param payer - The payer account
+ * @param queue - The transfer queue PDA
  * @param mint - The mint account
  * @param sizeBytes - Optional queue size in bytes. Omit to use the program default.
  * @returns The initialize transfer queue instruction
  */
 export function initTransferQueueIx(
-  queue: Address,
   payer: Address,
+  queue: Address,
   mint: Address,
   sizeBytes?: number,
 ): Instruction {
   return {
     accounts: [
-      { address: queue, role: AccountRole.WRITABLE },
       { address: payer, role: AccountRole.WRITABLE_SIGNER },
+      { address: queue, role: AccountRole.WRITABLE },
       { address: mint, role: AccountRole.READONLY },
       { address: SYSTEM_PROGRAM_ADDRESS, role: AccountRole.READONLY },
     ],
@@ -63,26 +70,77 @@ export function initTransferQueueIx(
 
 /**
  * Ensure the recurring transfer queue crank is scheduled.
- * @param queue - The transfer queue PDA
  * @param payer - The payer account
+ * @param queue - The transfer queue PDA
  * @param taskContext - The Magic task context account
  * @param magicProgram - The Magic program account
  * @returns The ensure transfer queue crank instruction
  */
 export function ensureTransferQueueCrankIx(
-  queue: Address,
   payer: Address,
+  queue: Address,
   taskContext: Address = MAGIC_CONTEXT_ID,
   magicProgram: Address = MAGIC_PROGRAM_ID,
 ): Instruction {
   return {
     accounts: [
-      { address: queue, role: AccountRole.WRITABLE },
       { address: payer, role: AccountRole.WRITABLE_SIGNER },
+      { address: queue, role: AccountRole.WRITABLE },
       { address: taskContext, role: AccountRole.WRITABLE },
       { address: magicProgram, role: AccountRole.READONLY },
     ],
     data: new Uint8Array([ENSURE_TRANSFER_QUEUE_CRANK_DISCRIMINATOR]),
+    programAddress: EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
+  };
+}
+
+/**
+ * Delegate the per-mint transfer queue PDA.
+ * @param payer - The payer account
+ * @param queue - The transfer queue PDA
+ * @param mint - The mint account
+ * @param validator - Optional validator address override
+ * @returns The delegate transfer queue instruction
+ */
+export async function delegateTransferQueueIx(
+  queue: Address,
+  payer: Address,
+  mint: Address,
+  validator?: Address,
+): Promise<Instruction> {
+  const addressEncoder = getAddressEncoder();
+  const validatorBytes = validator === undefined
+    ? []
+    : Array.from(addressEncoder.encode(validator));
+
+  return {
+    accounts: [
+      { address: payer, role: AccountRole.WRITABLE_SIGNER },
+      { address: queue, role: AccountRole.WRITABLE },
+      { address: mint, role: AccountRole.READONLY },
+      { address: EPHEMERAL_SPL_TOKEN_PROGRAM_ID, role: AccountRole.READONLY },
+      {
+        address: await delegateBufferPdaFromDelegatedAccountAndOwnerProgram(
+          queue,
+          EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
+        ),
+        role: AccountRole.WRITABLE,
+      },
+      {
+        address: await delegationRecordPdaFromDelegatedAccount(queue),
+        role: AccountRole.WRITABLE,
+      },
+      {
+        address: await delegationMetadataPdaFromDelegatedAccount(queue),
+        role: AccountRole.WRITABLE,
+      },
+      { address: DELEGATION_PROGRAM_ID, role: AccountRole.READONLY },
+      { address: SYSTEM_PROGRAM_ADDRESS, role: AccountRole.READONLY },
+    ],
+    data: new Uint8Array([
+      DELEGATE_TRANSFER_QUEUE_DISCRIMINATOR,
+      ...validatorBytes,
+    ]),
     programAddress: EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
   };
 }

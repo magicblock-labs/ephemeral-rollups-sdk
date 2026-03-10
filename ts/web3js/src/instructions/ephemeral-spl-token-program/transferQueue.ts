@@ -5,14 +5,21 @@ import {
 } from "@solana/web3.js";
 
 import {
+  DELEGATION_PROGRAM_ID,
   EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
   MAGIC_CONTEXT_ID,
   MAGIC_PROGRAM_ID,
 } from "../../constants.js";
+import {
+  delegateBufferPdaFromDelegatedAccountAndOwnerProgram,
+  delegationMetadataPdaFromDelegatedAccount,
+  delegationRecordPdaFromDelegatedAccount,
+} from "../../pda.js";
 
 const TRANSFER_QUEUE_SEED = Buffer.from("queue");
 const INITIALIZE_TRANSFER_QUEUE_DISCRIMINATOR = 12;
 const ENSURE_TRANSFER_QUEUE_CRANK_DISCRIMINATOR = 17;
+const DELEGATE_TRANSFER_QUEUE_DISCRIMINATOR = 19;
 
 /**
  * Derive the transfer queue PDA for a mint.
@@ -30,23 +37,23 @@ export function deriveTransferQueue(
 
 /**
  * Initialize the per-mint transfer queue.
- * @param queue - The transfer queue PDA
  * @param payer - The payer account
+ * @param queue - The transfer queue PDA
  * @param mint - The mint account
  * @param sizeBytes - Optional queue size in bytes. Omit to use the program default.
  * @returns The initialize transfer queue instruction
  */
 export function initTransferQueueIx(
-  queue: PublicKey,
   payer: PublicKey,
+  queue: PublicKey,
   mint: PublicKey,
   sizeBytes?: number,
 ): TransactionInstruction {
   return new TransactionInstruction({
     programId: EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
     keys: [
-      { pubkey: queue, isSigner: false, isWritable: true },
       { pubkey: payer, isSigner: true, isWritable: true },
+      { pubkey: queue, isSigner: false, isWritable: true },
       { pubkey: mint, isSigner: false, isWritable: false },
       { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
     ],
@@ -59,27 +66,75 @@ export function initTransferQueueIx(
 
 /**
  * Ensure the recurring transfer queue crank is scheduled.
- * @param queue - The transfer queue PDA
  * @param payer - The payer account
+ * @param queue - The transfer queue PDA
  * @param taskContext - The Magic task context account
  * @param magicProgram - The Magic program account
  * @returns The ensure transfer queue crank instruction
  */
 export function ensureTransferQueueCrankIx(
-  queue: PublicKey,
   payer: PublicKey,
+  queue: PublicKey,
   taskContext: PublicKey = MAGIC_CONTEXT_ID,
   magicProgram: PublicKey = MAGIC_PROGRAM_ID,
 ): TransactionInstruction {
   return new TransactionInstruction({
     programId: EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
     keys: [
-      { pubkey: queue, isSigner: false, isWritable: true },
       { pubkey: payer, isSigner: true, isWritable: true },
+      { pubkey: queue, isSigner: false, isWritable: true },
       { pubkey: taskContext, isSigner: false, isWritable: true },
       { pubkey: magicProgram, isSigner: false, isWritable: false },
     ],
     data: Buffer.from([ENSURE_TRANSFER_QUEUE_CRANK_DISCRIMINATOR]),
+  });
+}
+
+/**
+ * Delegate the per-mint transfer queue PDA.
+ * @param payer - The payer account
+ * @param queue - The transfer queue PDA
+ * @param mint - The mint account
+ * @returns The delegate transfer queue instruction
+ */
+export function delegateTransferQueueIx(
+  queue: PublicKey,
+  payer: PublicKey,
+  mint: PublicKey,
+): TransactionInstruction {
+  return new TransactionInstruction({
+    programId: EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
+    keys: [
+      { pubkey: payer, isSigner: true, isWritable: true },
+      { pubkey: queue, isSigner: false, isWritable: true },
+      { pubkey: mint, isSigner: false, isWritable: false },
+      {
+        pubkey: EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
+        isSigner: false,
+        isWritable: false,
+      },
+      {
+        pubkey: delegateBufferPdaFromDelegatedAccountAndOwnerProgram(
+          queue,
+          EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
+        ),
+        isSigner: false,
+        isWritable: true,
+      },
+      {
+        pubkey: delegationRecordPdaFromDelegatedAccount(queue),
+        isSigner: false,
+        isWritable: true,
+      },
+      {
+        pubkey: delegationMetadataPdaFromDelegatedAccount(queue),
+        isSigner: false,
+        isWritable: true,
+      },
+      { pubkey: DELEGATION_PROGRAM_ID, isSigner: false, isWritable: false },
+      { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+    ],
+    data: Buffer.from([DELEGATE_TRANSFER_QUEUE_DISCRIMINATOR]),
   });
 }
 
