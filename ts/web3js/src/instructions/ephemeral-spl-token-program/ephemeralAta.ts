@@ -882,6 +882,7 @@ async function buildDelegateSplInstructions(
 
   const [ephemeralAta, eataBump] = deriveEphemeralAta(owner, mint);
   const [vault, vaultBump] = deriveVault(mint);
+  const [vaultEphemeralAta, vaultEataBump] = deriveEphemeralAta(vault, mint);
   const vaultAta = deriveVaultAta(mint, vault);
   const ownerAta = getAssociatedTokenAddressSync(mint, owner);
 
@@ -895,6 +896,7 @@ async function buildDelegateSplInstructions(
     instructions.push(
       initVaultIx(vault, mint, payer, vaultBump),
       initVaultAtaIx(payer, vaultAta, vault, mint),
+      delegateEphemeralAtaIx(payer, vaultEphemeralAta, vaultEataBump, validator),
     );
   }
 
@@ -949,6 +951,7 @@ async function buildIdempotentDelegateSplInstructions(
 
   const [ephemeralAta, eataBump] = deriveEphemeralAta(owner, mint);
   const [vault, vaultBump] = deriveVault(mint);
+  const [vaultEphemeralAta, vaultEataBump] = deriveEphemeralAta(vault, mint);
   const vaultAta = deriveVaultAta(mint, vault);
   const ownerAta = getAssociatedTokenAddressSync(mint, owner);
 
@@ -967,6 +970,7 @@ async function buildIdempotentDelegateSplInstructions(
     instructions.push(
       initVaultIx(vault, mint, payer, vaultBump),
       initVaultAtaIx(payer, vaultAta, vault, mint),
+      delegateEphemeralAtaIx(payer, vaultEphemeralAta, vaultEataBump, validator),
     );
   }
 

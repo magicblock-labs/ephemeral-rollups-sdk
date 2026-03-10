@@ -11,6 +11,11 @@ import {
   createCommitAndUndelegateInstruction,
 } from "../instructions/magic-program";
 import {
+  delegateSpl,
+  deriveEphemeralAta,
+  deriveVault,
+} from "../instructions/ephemeral-spl-token-program";
+import {
   DELEGATION_PROGRAM_ID,
   MAGIC_PROGRAM_ID,
   MAGIC_CONTEXT_ID,
@@ -715,6 +720,49 @@ describe("Exposed Instructions (web3.js)", () => {
           account.toBase58(),
         );
       });
+    });
+  });
+
+  describe("delegateSpl (Ephemeral SPL Token Program)", () => {
+    const owner = new PublicKey("11111111111111111111111111111113");
+    const mint = new PublicKey("11111111111111111111111111111114");
+    const validator = new PublicKey("11111111111111111111111111111115");
+
+    it("should delegate the vault eata when initializing the vault in legacy flow", async () => {
+      const [vault] = deriveVault(mint);
+      const [vaultEphemeralAta, vaultEataBump] = deriveEphemeralAta(vault, mint);
+
+      const instructions = await delegateSpl(owner, mint, 1n, {
+        validator,
+        initIfMissing: true,
+        initVaultIfMissing: true,
+        idempotent: false,
+      });
+
+      expect(instructions[3].keys[1].pubkey.toBase58()).toBe(
+        vaultEphemeralAta.toBase58(),
+      );
+      expect(instructions[3].data[0]).toBe(4);
+      expect(instructions[3].data[1]).toBe(vaultEataBump);
+      expect(Buffer.from(instructions[3].data.subarray(2)).equals(validator.toBuffer())).toBe(true);
+    });
+
+    it("should delegate the vault eata when initializing the vault in idempotent flow", async () => {
+      const [vault] = deriveVault(mint);
+      const [vaultEphemeralAta, vaultEataBump] = deriveEphemeralAta(vault, mint);
+
+      const instructions = await delegateSpl(owner, mint, 1n, {
+        validator,
+        initVaultIfMissing: true,
+        shuttleId: 7,
+      });
+
+      expect(instructions[2].keys[1].pubkey.toBase58()).toBe(
+        vaultEphemeralAta.toBase58(),
+      );
+      expect(instructions[2].data[0]).toBe(4);
+      expect(instructions[2].data[1]).toBe(vaultEataBump);
+      expect(Buffer.from(instructions[2].data.subarray(2)).equals(validator.toBuffer())).toBe(true);
     });
   });
 });
