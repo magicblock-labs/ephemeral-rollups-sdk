@@ -10,12 +10,18 @@ import {
   createCommitInstruction,
   createCommitAndUndelegateInstruction,
 } from "../instructions/magic-program";
-import { type Address } from "@solana/kit";
+import { address, getAddressEncoder, type Address } from "@solana/kit";
+import {
+  delegateSpl,
+  deriveEphemeralAta,
+  deriveVault,
+} from "../instructions/ephemeral-spl-token-program";
 import { MAGIC_PROGRAM_ID, MAGIC_CONTEXT_ID } from "../constants";
 
 describe("Exposed Instructions (@solana/kit)", () => {
   const mockAddress = "11111111111111111111111111111111" as Address;
   const differentAddress = "11111111111111111111111111111112" as Address;
+  const addressEncoder = getAddressEncoder();
 
   describe("delegate instruction", () => {
     it("should create a delegate instruction with correct parameters", async () => {
@@ -678,6 +684,49 @@ describe("Exposed Instructions (@solana/kit)", () => {
       accounts.forEach((account, index) => {
         expect(instruction.accounts?.[2 + index].address).toBe(account);
       });
+    });
+  });
+
+  describe("delegateSpl (Ephemeral SPL Token Program)", () => {
+    const owner = address("11111111111111111111111111111113");
+    const mint = address("11111111111111111111111111111114");
+    const validator = address("11111111111111111111111111111115");
+
+    it("should delegate the vault eata when initializing the vault in legacy flow", async () => {
+      const [vault] = await deriveVault(mint);
+      const [vaultEphemeralAta, vaultEataBump] = await deriveEphemeralAta(vault, mint);
+
+      const instructions = await delegateSpl(owner, mint, 1n, {
+        validator,
+        initIfMissing: true,
+        initVaultIfMissing: true,
+        idempotent: false,
+      });
+
+      expect(instructions[3].accounts?.[1].address).toBe(vaultEphemeralAta);
+      expect(instructions[3].data?.[0]).toBe(4);
+      expect(instructions[3].data?.[1]).toBe(vaultEataBump);
+      expect(Array.from(instructions[3].data?.subarray(2) ?? [])).toEqual(
+        Array.from(addressEncoder.encode(validator)),
+      );
+    });
+
+    it("should delegate the vault eata when initializing the vault in idempotent flow", async () => {
+      const [vault] = await deriveVault(mint);
+      const [vaultEphemeralAta, vaultEataBump] = await deriveEphemeralAta(vault, mint);
+
+      const instructions = await delegateSpl(owner, mint, 1n, {
+        validator,
+        initVaultIfMissing: true,
+        shuttleId: 7,
+      });
+
+      expect(instructions[2].accounts?.[1].address).toBe(vaultEphemeralAta);
+      expect(instructions[2].data?.[0]).toBe(4);
+      expect(instructions[2].data?.[1]).toBe(vaultEataBump);
+      expect(Array.from(instructions[2].data?.subarray(2) ?? [])).toEqual(
+        Array.from(addressEncoder.encode(validator)),
+      );
     });
   });
 });
