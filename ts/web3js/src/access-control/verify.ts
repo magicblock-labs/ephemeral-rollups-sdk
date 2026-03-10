@@ -119,7 +119,7 @@ async function verifyChallenge(response: FastQuoteResponse, validatorIdentity: P
   const sigBytes = bs58.decode(response.signature);
   const pk = new PublicKey(response.pubkey);
 
-  if (pk !== validatorIdentity) {
+  if (!pk.equals(validatorIdentity)) {
     throw new Error("Invalid validator identity");
   }
 
