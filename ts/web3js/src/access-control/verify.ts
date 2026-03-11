@@ -78,7 +78,7 @@ export async function verifyTeeIntegrity(rpcUrl: string): Promise<boolean> {
     throw new Error("Invalid quote");
   }
 
-  await verifyChallenge(responseBody, quote, rawQuote, challengeBytes);
+  await verifyChallenge(responseBody, quote, challengeBytes);
   return true;
 }
 
@@ -103,26 +103,9 @@ async function verifyQuote(rawQuote: Uint8Array): Promise<Quote | null> {
   return Quote.parse(rawQuote);
 }
 
-function containsSubarray(haystack: Uint8Array, needle: Uint8Array): boolean {
-  if (needle.length === 0) return true;
-  if (needle.length > haystack.length) return false;
-
-  outer: for (let i = 0; i <= haystack.length - needle.length; i++) {
-    for (let j = 0; j < needle.length; j++) {
-      if (haystack[i + j] !== needle[j]) {
-        continue outer;
-      }
-    }
-    return true;
-  }
-
-  return false;
-}
-
 async function verifyChallenge(
   response: FastQuoteResponse,
   parsedQuote: Quote,
-  rawQuote: Uint8Array,
   challengeBytes: Uint8Array,
 ): Promise<boolean> {
   const msgBytes = Buffer.from(response.challenge, "base64");
