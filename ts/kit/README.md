@@ -14,8 +14,8 @@ npm install @magicblock-labs/ephemeral-rollups-kit
 yarn add @magicblock-labs/ephemeral-rollups-kit
 ```
 ## Usage (basic)
-```tsx
-import { MagicRouter } from "@magicblock-labs/ephemeral-rollups-kit";
+
+import { Connection } from "@magicblock-labs/ephemeral-rollups-kit";
 
 // See full examples and docs in the Quickstart link above.
 ```
