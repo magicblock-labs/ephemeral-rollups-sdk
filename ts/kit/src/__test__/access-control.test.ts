@@ -1,10 +1,19 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { address } from "@solana/kit";
 import { getAuthToken } from "../access-control/auth";
+import {
+  verifyTeeIntegrity,
+  verifyTeeRpcIntegrity,
+} from "../access-control/verify";
 
 describe("Access Control (@solana/kit)", () => {
   const mockRpcUrl = "http://localhost:8899";
   const mockAddress = address("11111111111111111111111111111111");
+  let originalFetch: typeof global.fetch;
+
+  beforeAll(() => {
+    originalFetch = global.fetch;
+  });
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -183,5 +192,31 @@ describe("Access Control (@solana/kit)", () => {
       expect(body.pubkey).toBe(mockAddress.toString());
       expect(body.challenge).toBe(mockChallenge);
     });
+  });
+
+  describe("verifyTeeIntegrity", () => {
+    beforeEach(() => {
+      vi.clearAllMocks();
+      global.fetch = originalFetch;
+    });
+
+    it("should return true if the quote is valid", async () => {
+      const rpcUrl = "https://tee.magicblock.app";
+      const result = await verifyTeeIntegrity(rpcUrl);
+      expect(result).toBe(true);
+    }, 15000); // increased timeout to 15 seconds
+  });
+
+  describe("verifyTeeRpcIntegrity", () => {
+    beforeEach(() => {
+      vi.clearAllMocks();
+      global.fetch = originalFetch;
+    });
+
+    it("should return true if the quote is valid", async () => {
+      const rpcUrl = "https://tee.magicblock.app";
+      const result = await verifyTeeRpcIntegrity(rpcUrl);
+      expect(result).toBe(true);
+    }, 15000); // increased timeout to 15 seconds
   });
 });

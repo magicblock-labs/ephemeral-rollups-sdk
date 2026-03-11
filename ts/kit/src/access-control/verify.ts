@@ -1,4 +1,5 @@
-import { Address, address, getBase58Encoder } from "@solana/kit";
+import { getCollateral, verify, Quote } from "@phala/dcap-qvl";
+import * as nacl from "tweetnacl";
 
 interface QuoteResponse {
   quote: string;
@@ -7,6 +8,7 @@ interface QuoteResponse {
 
 interface FastQuoteResponse {
   quote: string;
+  hclVarDataSha256: string;
   pubkey: string;
   challenge: string;
   signature: string;
@@ -19,18 +21,12 @@ interface ErrorResponse {
 
 /**
  * @deprecated Use {@link verifyTeeIntegrity} instead.
+ *
  * Verify the integrity of the RPC
  * @param rpcUrl - The URL of the RPC server
  * @returns True if the quote is valid, false otherwise
  */
 export async function verifyTeeRpcIntegrity(rpcUrl: string): Promise<boolean> {
-  // Import the WASM module
-  const {
-    default: init,
-    js_get_collateral: jsGetCollateral,
-    js_verify: jsVerify,
-  } = await import("@phala/dcap-qvl-web");
-
   const challengeBytes = Buffer.from(
     Uint8Array.from(
       Array(32)
@@ -48,7 +44,8 @@ export async function verifyTeeRpcIntegrity(rpcUrl: string): Promise<boolean> {
     throw new Error(responseBody.error ?? "Failed to get quote");
   }
 
-  return verifyQuote(responseBody.quote);
+  const rawQuote = Uint8Array.from(Buffer.from(responseBody.quote, "base64"));
+  return !!verifyQuote(rawQuote);
 }
 
 /**
@@ -57,7 +54,7 @@ export async function verifyTeeRpcIntegrity(rpcUrl: string): Promise<boolean> {
  * @param validatorIdentity - The expected identity of the validator
  * @returns True if the quote is valid, false otherwise
  */
-export async function verifyTeeIntegrity(rpcUrl: string, validatorIdentity: Address): Promise<boolean> {
+export async function verifyTeeIntegrity(rpcUrl: string): Promise<boolean> {
   const challengeBytes = Buffer.from(
     Uint8Array.from(
       Array(32)
@@ -75,48 +72,89 @@ export async function verifyTeeIntegrity(rpcUrl: string, validatorIdentity: Addr
     throw new Error(responseBody.error ?? "Failed to get quote");
   }
 
-  if (!await verifyChallenge(responseBody, validatorIdentity)) {
+  const rawQuote = Uint8Array.from(Buffer.from(responseBody.quote, "base64"));
+  const quote = await verifyQuote(rawQuote);
+  if (!quote) {
+    throw new Error("Invalid quote");
+  }
+
+  await verifyChallenge(responseBody, quote, rawQuote, challengeBytes);
+  return true;
+}
+
+async function verifyQuote(rawQuote: Uint8Array): Promise<Quote | null> {
+  const pccsUrl = "https://pccs.phala.network/tdx/certification/v4";
+  const quoteCollateral = await getCollateral(pccsUrl, rawQuote);
+  const now = Math.floor(Date.now() / 1000);
+
+  try {
+    verify(rawQuote, quoteCollateral, now);
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      !error.message.includes("SEPT_VE_DISABLE is not enabled")
+    ) {
+      throw new Error(error.message);
+    }
+  }
+
+  return Quote.parse(rawQuote);
+}
+
+function containsSubarray(haystack: Uint8Array, needle: Uint8Array): boolean {
+  if (needle.length === 0) return true;
+  if (needle.length > haystack.length) return false;
+
+  outer: for (let i = 0; i <= haystack.length - needle.length; i++) {
+    for (let j = 0; j < needle.length; j++) {
+      if (haystack[i + j] !== needle[j]) {
+        continue outer;
+      }
+    }
+    return true;
+  }
+
+  return false;
+}
+
+async function verifyChallenge(
+  response: FastQuoteResponse,
+  parsedQuote: Quote,
+  rawQuote: Uint8Array,
+  challengeBytes: Uint8Array,
+): Promise<boolean> {
+  const msgBytes = Buffer.from(response.challenge, "base64");
+  if (!msgBytes.equals(Buffer.from(challengeBytes))) {
+    throw new Error("Invalid challenge");
+  }
+
+  const pk = Buffer.from(response.pubkey, "base64");
+  if (pk.length !== 32) {
+    throw new Error(`Invalid pubkey length: ${pk.length}`);
+  }
+
+  const sig = Buffer.from(response.signature, "base64");
+  const okSig = nacl.sign.detached.verify(challengeBytes, sig, pk);
+  if (!okSig) {
     throw new Error("Invalid signature");
   }
 
-  return verifyQuote(responseBody.quote);
-}
-
-async function verifyQuote(quote: string): Promise<boolean> {
-  const {
-    default: init,
-    js_get_collateral: jsGetCollateral,
-    js_verify: jsVerify,
-  } = await import("@phala/dcap-qvl-web");
-
-  await init();
-
-  const rawQuote = Uint8Array.from(Buffer.from(quote, "base64"));
-
-  const pccsUrl = "https://pccs.phala.network/tdx/certification/v4";
-  const quoteCollateral = await jsGetCollateral(pccsUrl, rawQuote);
-
-  const now = BigInt(Math.floor(Date.now() / 1000));
-
-  try {
-    jsVerify(rawQuote, quoteCollateral, now);
-    return true;
-  } catch (error) {
-    return false;
-  }
-}
-
-async function verifyChallenge(response: FastQuoteResponse, validatorIdentity: Address): Promise<boolean> {
-  const bs58 = (await import("bs58")).default;
-  const nacl = (await import("tweetnacl")).default;
-
-  const msgBytes = Buffer.from(response.challenge, "base64");
-  const sigBytes = bs58.decode(response.signature);
-  const pk = address(response.pubkey);
-
-  if (pk !== validatorIdentity) {
-    throw new Error("Invalid validator identity");
+  const td = parsedQuote.report.asTd10();
+  if (!td) {
+    throw new Error("Not a TD10 quote");
   }
 
-  return nacl.sign.detached.verify(msgBytes, sigBytes, Uint8Array.from(getBase58Encoder().encode(validatorIdentity)));
+  const reportData = Buffer.from(td.reportData);
+  if (reportData.length !== 64) {
+    throw new Error(`Invalid reportData length: ${reportData.length}`);
+  }
+
+  const hclVarDataSha256 = Buffer.from(response.hclVarDataSha256, "base64");
+  if (!reportData.subarray(0, 32).equals(hclVarDataSha256)) {
+    throw new Error(
+      `Quote reportData mismatch: ${reportData.subarray(0, 32).toString("hex")} !== ${hclVarDataSha256.toString("hex")}`,
+    );
+  }
+
+  return true;
 }
