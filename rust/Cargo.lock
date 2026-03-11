@@ -2073,7 +2073,6 @@ dependencies = [
  "solana-curve25519",
  "solana-instruction 3.1.0",
  "solana-program",
- "solana-security-txt",
  "solana-sha256-hasher 3.1.0",
  "static_assertions",
  "strum",
