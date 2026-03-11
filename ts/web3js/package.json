@@ -40,7 +40,7 @@
     "vitest": "^3.2.4"
   },
   "dependencies": {
-    "@phala/dcap-qvl-web": "^0.2.7",
+    "@phala/dcap-qvl": "^0.3.9",
     "@solana/web3.js": "^1.98.0",
     "bs58": "^6.0.0",
     "rpc-websockets": "^9.0.4",
