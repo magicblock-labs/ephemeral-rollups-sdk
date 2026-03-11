@@ -351,18 +351,18 @@ export function initVaultAtaIx(
  * @param mint - The mint account
  * @param payer - The payer account
  * @param bump - The bump
+ * @param vaultEphemeralAta - The vault ephemeral ATA account
  * @param vaultAta - The vault ATA account
  * @returns The init vault account instruction
  */
-export async function initVaultIx(
+export function initVaultIx(
   vault: Address,
   mint: Address,
   payer: Address,
   bump: number,
+  vaultEphemeralAta: Address,
   vaultAta: Address,
-): Promise<Instruction> {
-  const [vaultEphemeralAta] = await deriveEphemeralAta(vault, mint);
-
+): Instruction {
   return {
     accounts: [
       { address: vault, role: AccountRole.WRITABLE },
@@ -510,7 +510,7 @@ export function initShuttleEphemeralAtaIx(
     accounts: [
       { address: payer, role: AccountRole.WRITABLE_SIGNER },
       { address: shuttleEphemeralAta, role: AccountRole.WRITABLE },
-      { address: shuttleAta, role: AccountRole.READONLY },
+      { address: shuttleAta, role: AccountRole.WRITABLE },
       { address: shuttleWalletAta, role: AccountRole.WRITABLE },
       { address: owner, role: AccountRole.READONLY },
       { address: mint, role: AccountRole.READONLY },
@@ -569,7 +569,7 @@ export async function delegateShuttleEphemeralAtaIx(
     accounts: [
       { address: payer, role: AccountRole.WRITABLE_SIGNER },
       { address: shuttleEphemeralAta, role: AccountRole.READONLY },
-      { address: shuttleAta, role: AccountRole.READONLY },
+      { address: shuttleAta, role: AccountRole.WRITABLE },
       { address: EPHEMERAL_SPL_TOKEN_PROGRAM_ID, role: AccountRole.READONLY },
       { address: delegateBuffer, role: AccountRole.WRITABLE },
       { address: delegationRecord, role: AccountRole.WRITABLE },
@@ -867,7 +867,6 @@ export interface DelegateSplOptions {
   initVaultIfMissing?: boolean;
   initAtasIfMissing?: boolean;
   shuttleId?: number;
-  escrowIndex?: number;
   idempotent?: boolean;
   private?: boolean;
 }
@@ -903,7 +902,7 @@ async function buildDelegateSplInstructions(
 
   if (initVaultIfMissing) {
     instructions.push(
-      await initVaultIx(vault, mint, payer, vaultBump, vaultAta),
+      initVaultIx(vault, mint, payer, vaultBump, vaultEphemeralAta, vaultAta),
       initVaultAtaIx(payer, vaultAta, vault, mint),
       await delegateIx(payer, vaultEphemeralAta, vaultEataBump, validator),
     );
@@ -940,6 +939,7 @@ async function buildIdempotentDelegateSplInstructions(
 ): Promise<Instruction[]> {
   const payer = opts?.payer ?? owner;
   const validator = opts?.validator;
+  const initIfMissing = opts?.initIfMissing ?? true;
   const initVaultIfMissing = opts?.initVaultIfMissing ?? false;
   const initAtasIfMissing = opts?.initAtasIfMissing ?? false;
   const isPrivate = opts?.private ?? false;
@@ -983,7 +983,7 @@ async function buildIdempotentDelegateSplInstructions(
 
   if (initVaultIfMissing) {
     instructions.push(
-      await initVaultIx(vault, mint, payer, vaultBump, vaultAta),
+      initVaultIx(vault, mint, payer, vaultBump, vaultEphemeralAta, vaultAta),
       initVaultAtaIx(payer, vaultAta, vault, mint),
       await delegateIx(payer, vaultEphemeralAta, vaultEataBump, validator),
     );
@@ -996,9 +996,11 @@ async function buildIdempotentDelegateSplInstructions(
     );
   }
 
-  instructions.push(
-    initEphemeralAtaIx(ephemeralAta, owner, mint, payer, eataBump),
-  );
+  if (initIfMissing) {
+    instructions.push(
+      initEphemeralAtaIx(ephemeralAta, owner, mint, payer, eataBump),
+    );
+  }
 
   if (isPrivate) {
     instructions.push(

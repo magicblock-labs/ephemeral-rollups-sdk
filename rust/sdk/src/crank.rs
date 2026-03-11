@@ -66,7 +66,11 @@ impl<'a> CancelCrankCpi<'a> {
                 task_id: self.crank_id,
             },
             vec![
-                AccountMeta::new(*self.authority.key, true),
+                if self.authority.is_writable {
+                    AccountMeta::new(*self.authority.key, true)
+                } else {
+                    AccountMeta::new_readonly(*self.authority.key, true)
+                },
                 AccountMeta::new(*self.task_context.key, false),
             ],
         )
@@ -169,7 +173,7 @@ mod tests {
     }
 
     #[test]
-    fn cancel_instruction_includes_task_context() {
+    fn cancel_instruction_marks_readonly_authority_signer() {
         let authority_key = Pubkey::new_unique();
         let task_context_key = Pubkey::new_unique();
         let magic_program_key = Pubkey::new_unique();
@@ -193,6 +197,63 @@ mod tests {
             &task_context_key,
             false,
             false,
+            &mut task_context_lamports,
+            &mut task_context_data,
+            &owner,
+        );
+        let magic_program = new_account_info(
+            &magic_program_key,
+            false,
+            false,
+            &mut program_lamports,
+            &mut program_data,
+            &owner,
+        );
+
+        let instruction = CancelCrankCpi {
+            authority: &authority,
+            task_context: &task_context,
+            magic_program: &magic_program,
+            crank_id: 11,
+        }
+        .instruction();
+
+        assert_eq!(instruction.accounts.len(), 2);
+        assert_eq!(
+            instruction.accounts[0],
+            AccountMeta::new_readonly(authority_key, true)
+        );
+        assert_eq!(
+            instruction.accounts[1],
+            AccountMeta::new(task_context_key, false)
+        );
+    }
+
+    #[test]
+    fn cancel_instruction_marks_writable_authority_signer() {
+        let authority_key = Pubkey::new_unique();
+        let task_context_key = Pubkey::new_unique();
+        let magic_program_key = Pubkey::new_unique();
+        let owner = Pubkey::new_unique();
+        let mut authority_lamports = 0;
+        let mut task_context_lamports = 0;
+        let mut program_lamports = 0;
+        let mut authority_data = [];
+        let mut task_context_data = [];
+        let mut program_data = [];
+
+        let authority = new_account_info(
+            &authority_key,
+            false,
+            true,
+            &mut authority_lamports,
+            &mut authority_data,
+            &owner,
+        );
+        let task_context = new_account_info(
+            &task_context_key,
+            false,
+            true,
             &mut task_context_lamports,
             &mut task_context_data,
             &owner,

@@ -804,12 +804,28 @@ describe("Exposed Instructions (web3.js)", () => {
   describe("delegateTransferQueueIx (Ephemeral SPL Token Program)", () => {
     const payer = mockPublicKey;
     const queue = differentKey;
+    const validator = new PublicKey("11111111111111111111111111111113");
 
     it("should serialize discriminator 19 for the delegated transfer queue opcode", () => {
       const instruction = delegateTransferQueueIx(queue, payer, mockPublicKey);
 
       expect(instruction.keys).toHaveLength(9);
       expect(Array.from(instruction.data)).toEqual([19]);
+    });
+
+    it("should append the validator pubkey when provided", () => {
+      const instruction = delegateTransferQueueIx(
+        queue,
+        payer,
+        mockPublicKey,
+        validator,
+      );
+
+      expect(instruction.keys).toHaveLength(9);
+      expect(Array.from(instruction.data)).toEqual([
+        19,
+        ...Array.from(validator.toBuffer()),
+      ]);
     });
   });
 });

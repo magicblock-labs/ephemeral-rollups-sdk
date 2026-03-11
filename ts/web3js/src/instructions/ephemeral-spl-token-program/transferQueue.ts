@@ -96,13 +96,22 @@ export function ensureTransferQueueCrankIx(
  * @param queue - The transfer queue PDA
  * @param payer - The payer account
  * @param mint - The mint account
+ * @param validator - Optional validator pubkey override
  * @returns The delegate transfer queue instruction
  */
 export function delegateTransferQueueIx(
   queue: PublicKey,
   payer: PublicKey,
   mint: PublicKey,
+  validator?: PublicKey,
 ): TransactionInstruction {
+  const data = validator
+    ? Buffer.concat([
+        Buffer.from([DELEGATE_TRANSFER_QUEUE_DISCRIMINATOR]),
+        validator.toBuffer(),
+      ])
+    : Buffer.from([DELEGATE_TRANSFER_QUEUE_DISCRIMINATOR]);
+
   return new TransactionInstruction({
     programId: EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
     keys: [
@@ -135,7 +144,7 @@ export function delegateTransferQueueIx(
       { pubkey: DELEGATION_PROGRAM_ID, isSigner: false, isWritable: false },
       { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
     ],
-    data: Buffer.from([DELEGATE_TRANSFER_QUEUE_DISCRIMINATOR]),
+    data,
   });
 }
 

@@ -17,6 +17,7 @@ import {
   deriveEphemeralAta,
   deriveVault,
   ensureTransferQueueCrankIx,
+  initVaultIx,
 } from "../instructions/ephemeral-spl-token-program";
 import { MAGIC_PROGRAM_ID, MAGIC_CONTEXT_ID } from "../constants";
 
@@ -735,6 +736,72 @@ describe("Exposed Instructions (@solana/kit)", () => {
       expect(Array.from(instructions[2].data?.subarray(2) ?? [])).toEqual(
         Array.from(addressEncoder.encode(validator)),
       );
+    });
+
+    it("should keep shuttleAta writable across the idempotent shuttle flow", async () => {
+      const instructions = await delegateSpl(owner, mint, 1n, {
+        validator,
+        shuttleId: 7,
+      });
+
+      const initShuttleInstruction = instructions.find(
+        (ix) => ix.data?.[0] === 11,
+      );
+      const delegateShuttleInstruction = instructions.find(
+        (ix) => ix.data?.[0] === 13,
+      );
+
+      expect(initShuttleInstruction).toBeDefined();
+      expect(initShuttleInstruction?.accounts?.[2].role).toBe(
+        AccountRole.WRITABLE,
+      );
+      expect(delegateShuttleInstruction).toBeDefined();
+      expect(delegateShuttleInstruction?.accounts?.[2].role).toBe(
+        AccountRole.WRITABLE,
+      );
+    });
+
+    it("should skip ephemeral ATA init in idempotent flow when initIfMissing is false", async () => {
+      const [ephemeralAta] = await deriveEphemeralAta(owner, mint);
+      const instructions = await delegateSpl(owner, mint, 1n, {
+        validator,
+        shuttleId: 7,
+        initIfMissing: false,
+      });
+
+      const initInstruction = instructions.find(
+        (ix) => ix.data?.[0] === 0 && ix.accounts?.[0].address === ephemeralAta,
+      );
+      const delegateInstruction = instructions.find(
+        (ix) => ix.data?.[0] === 4 && ix.accounts?.[1].address === ephemeralAta,
+      );
+
+      expect(initInstruction).toBeUndefined();
+      expect(delegateInstruction).toBeDefined();
+    });
+  });
+
+  describe("initVaultIx (Ephemeral SPL Token Program)", () => {
+    it("should use the provided vault ephemeral ATA synchronously", async () => {
+      const mint = address("11111111111111111111111111111114");
+      const payer = address("11111111111111111111111111111115");
+      const [vault, vaultBump] = await deriveVault(mint);
+      const [vaultEphemeralAta] = await deriveEphemeralAta(vault, mint);
+      const vaultAta = address("11111111111111111111111111111116");
+
+      const instruction = initVaultIx(
+        vault,
+        mint,
+        payer,
+        vaultBump,
+        vaultEphemeralAta,
+        vaultAta,
+      );
+
+      expect(instruction.accounts?.[0].address).toBe(vault);
+      expect(instruction.accounts?.[3].address).toBe(vaultEphemeralAta);
+      expect(instruction.accounts?.[4].address).toBe(vaultAta);
+      expect(Array.from(instruction.data ?? [])).toEqual([1, vaultBump]);
     });
   });
 
