@@ -627,6 +627,13 @@ export function undelegateAndCloseShuttleEphemeralAtaIx(
   shuttleWalletAta: Address,
   escrowIndex?: number,
 ): Instruction {
+  if (
+    escrowIndex !== undefined &&
+    (!Number.isInteger(escrowIndex) || escrowIndex < 0 || escrowIndex > 0xff)
+  ) {
+    throw new Error("escrowIndex must fit in u8");
+  }
+
   const data =
     escrowIndex === undefined
       ? new Uint8Array([14])

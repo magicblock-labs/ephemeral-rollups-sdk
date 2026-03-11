@@ -93,8 +93,8 @@ export function ensureTransferQueueCrankIx(
 
 /**
  * Delegate the per-mint transfer queue PDA.
- * @param payer - The payer account
  * @param queue - The transfer queue PDA
+ * @param payer - The payer account
  * @param mint - The mint account
  * @returns The delegate transfer queue instruction
  */

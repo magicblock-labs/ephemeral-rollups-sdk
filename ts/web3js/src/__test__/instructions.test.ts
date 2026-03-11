@@ -12,6 +12,7 @@ import {
 } from "../instructions/magic-program";
 import {
   delegateSpl,
+  delegateTransferQueueIx,
   deriveEphemeralAta,
   deriveVault,
   ensureTransferQueueCrankIx,
@@ -797,6 +798,18 @@ describe("Exposed Instructions (web3.js)", () => {
       expect(instruction.keys[3].pubkey.toBase58()).toBe(
         MAGIC_PROGRAM_ID.toBase58(),
       );
+    });
+  });
+
+  describe("delegateTransferQueueIx (Ephemeral SPL Token Program)", () => {
+    const payer = mockPublicKey;
+    const queue = differentKey;
+
+    it("should serialize discriminator 19 for the delegated transfer queue opcode", () => {
+      const instruction = delegateTransferQueueIx(queue, payer, mockPublicKey);
+
+      expect(instruction.keys).toHaveLength(9);
+      expect(Array.from(instruction.data)).toEqual([19]);
     });
   });
 });

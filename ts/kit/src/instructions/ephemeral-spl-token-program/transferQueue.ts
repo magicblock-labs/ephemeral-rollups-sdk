@@ -21,7 +21,8 @@ import {
 
 const INITIALIZE_TRANSFER_QUEUE_DISCRIMINATOR = 12;
 const ENSURE_TRANSFER_QUEUE_CRANK_DISCRIMINATOR = 17;
-const DELEGATE_TRANSFER_QUEUE_DISCRIMINATOR = 18;
+const DELEGATE_TRANSFER_QUEUE_DISCRIMINATOR = 19;
+const QUEUE_SEED = new TextEncoder().encode("queue");
 
 /**
  * Derive the transfer queue PDA for a mint.
@@ -34,7 +35,7 @@ export async function deriveTransferQueue(
   const addressEncoder = getAddressEncoder();
   const [queue, bump] = await getProgramDerivedAddress({
     programAddress: EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
-    seeds: [new Uint8Array(Buffer.from("queue")), addressEncoder.encode(mint)],
+    seeds: [QUEUE_SEED, addressEncoder.encode(mint)],
   });
   return [queue, bump];
 }
@@ -99,8 +100,8 @@ export function ensureTransferQueueCrankIx(
 
 /**
  * Delegate the per-mint transfer queue PDA.
- * @param payer - The payer account
  * @param queue - The transfer queue PDA
+ * @param payer - The payer account
  * @param mint - The mint account
  * @param validator - Optional validator address override
  * @returns The delegate transfer queue instruction

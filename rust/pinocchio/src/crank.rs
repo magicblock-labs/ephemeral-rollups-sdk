@@ -166,10 +166,10 @@ impl<'a> ScheduleCrankCpi<'a> {
         ScheduleCrankCpiBuilder::new(payer, magic_program)
     }
 
-    fn instruction<'b>(
+    fn instruction(
         &'a self,
         data: &'a [u8],
-        accounts: &'b mut [MaybeUninit<InstructionAccount<'a>>; PINOCCHIO_MAX_CPI_ACCOUNTS],
+        accounts: &'a mut [MaybeUninit<InstructionAccount<'a>>; PINOCCHIO_MAX_CPI_ACCOUNTS],
     ) -> Result<InstructionView<'a, 'a, 'a, 'a>, ProgramError> {
         let num_accounts = 1 + self.instruction_accounts.len();
         if num_accounts > PINOCCHIO_MAX_CPI_ACCOUNTS {
@@ -383,14 +383,16 @@ impl CancelCrankCpi {
     fn instruction<'a>(
         &'a self,
         data: &'a [u8],
-        accounts: &mut [MaybeUninit<InstructionAccount<'a>>; 2],
+        accounts: &'a mut [MaybeUninit<InstructionAccount<'a>>; 2],
     ) -> Result<InstructionView<'a, 'a, 'a, 'a>, ProgramError> {
         unsafe {
             accounts
                 .get_unchecked_mut(0)
-                .write(InstructionAccount::writable_signer(
-                    self.authority.address(),
-                ));
+                .write(if self.authority.is_writable() {
+                    InstructionAccount::writable_signer(self.authority.address())
+                } else {
+                    InstructionAccount::readonly_signer(self.authority.address())
+                });
             accounts
                 .get_unchecked_mut(1)
                 .write(InstructionAccount::writable(self.task_context.address()));
@@ -793,5 +795,58 @@ mod tests {
 
         assert_eq!(instruction.data()[..4], 7_u32.to_le_bytes());
         assert_eq!(instruction.data()[4..], 42_i64.to_le_bytes());
+    }
+
+    #[test]
+    fn test_cancel_crank_cpi_preserves_authority_writability() {
+        let mut readonly_authority_account =
+            runtime_account(Address::new_from_array([1; 32]), 1, 0);
+        let mut writable_authority_account =
+            runtime_account(Address::new_from_array([4; 32]), 1, 1);
+        let mut task_context_account = runtime_account(Address::new_from_array([2; 32]), 0, 1);
+        let mut magic_program_account = runtime_account(Address::new_from_array([3; 32]), 0, 0);
+
+        let readonly_authority = unsafe {
+            AccountView::new_unchecked(&mut readonly_authority_account as *mut RuntimeAccount)
+        };
+        let writable_authority = unsafe {
+            AccountView::new_unchecked(&mut writable_authority_account as *mut RuntimeAccount)
+        };
+        let task_context =
+            unsafe { AccountView::new_unchecked(&mut task_context_account as *mut RuntimeAccount) };
+        let magic_program = unsafe {
+            AccountView::new_unchecked(&mut magic_program_account as *mut RuntimeAccount)
+        };
+
+        let readonly_instruction = CancelCrankCpi {
+            authority: readonly_authority,
+            task_context,
+            magic_program,
+            crank_id: 1,
+        };
+        let writable_instruction = CancelCrankCpi {
+            authority: writable_authority,
+            task_context,
+            magic_program,
+            crank_id: 1,
+        };
+
+        let readonly_data = readonly_instruction.data();
+        let mut readonly_accounts = [const { MaybeUninit::<InstructionAccount>::uninit() }; 2];
+        let readonly_view = readonly_instruction
+            .instruction(&readonly_data, &mut readonly_accounts)
+            .unwrap();
+
+        assert!(!readonly_view.accounts[0].is_writable);
+        assert!(readonly_view.accounts[0].is_signer);
+
+        let writable_data = writable_instruction.data();
+        let mut writable_accounts = [const { MaybeUninit::<InstructionAccount>::uninit() }; 2];
+        let writable_view = writable_instruction
+            .instruction(&writable_data, &mut writable_accounts)
+            .unwrap();
+
+        assert!(writable_view.accounts[0].is_writable);
+        assert!(writable_view.accounts[0].is_signer);
     }
 }

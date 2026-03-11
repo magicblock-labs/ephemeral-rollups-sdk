@@ -13,6 +13,7 @@ import {
 import { address, getAddressEncoder, type Address } from "@solana/kit";
 import {
   delegateSpl,
+  delegateTransferQueueIx,
   deriveEphemeralAta,
   deriveVault,
   ensureTransferQueueCrankIx,
@@ -749,6 +750,22 @@ describe("Exposed Instructions (@solana/kit)", () => {
       expect(instruction.accounts?.[1].address).toBe(queue);
       expect(instruction.accounts?.[2].address).toBe(MAGIC_CONTEXT_ID);
       expect(instruction.accounts?.[3].address).toBe(MAGIC_PROGRAM_ID);
+    });
+  });
+
+  describe("delegateTransferQueueIx (Ephemeral SPL Token Program)", () => {
+    const payer = mockAddress;
+    const queue = differentAddress;
+
+    it("should serialize discriminator 19 for the delegated transfer queue opcode", async () => {
+      const instruction = await delegateTransferQueueIx(
+        queue,
+        payer,
+        mockAddress,
+      );
+
+      expect(instruction.accounts).toHaveLength(9);
+      expect(instruction.data).toEqual(new Uint8Array([19]));
     });
   });
 });
