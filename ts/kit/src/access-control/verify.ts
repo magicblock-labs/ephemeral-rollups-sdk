@@ -45,7 +45,7 @@ export async function verifyTeeRpcIntegrity(rpcUrl: string): Promise<boolean> {
   }
 
   const rawQuote = Uint8Array.from(Buffer.from(responseBody.quote, "base64"));
-  return !!verifyQuote(rawQuote);
+  return !!(await verifyQuote(rawQuote));
 }
 
 /**
