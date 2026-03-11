@@ -15,6 +15,7 @@ import {
   delegateSpl,
   deriveEphemeralAta,
   deriveVault,
+  ensureTransferQueueCrankIx,
 } from "../instructions/ephemeral-spl-token-program";
 import { MAGIC_PROGRAM_ID, MAGIC_CONTEXT_ID } from "../constants";
 
@@ -727,6 +728,21 @@ describe("Exposed Instructions (@solana/kit)", () => {
       expect(Array.from(instructions[2].data?.subarray(2) ?? [])).toEqual(
         Array.from(addressEncoder.encode(validator)),
       );
+    });
+  });
+
+  describe("ensureTransferQueueCrankIx (Ephemeral SPL Token Program)", () => {
+    const payer = mockAddress;
+    const queue = differentAddress;
+
+    it("should include queue, magic context, and magic program in order", () => {
+      const instruction = ensureTransferQueueCrankIx(payer, queue);
+
+      expect(instruction.accounts).toHaveLength(4);
+      expect(instruction.accounts?.[0].address).toBe(payer);
+      expect(instruction.accounts?.[1].address).toBe(queue);
+      expect(instruction.accounts?.[2].address).toBe(MAGIC_CONTEXT_ID);
+      expect(instruction.accounts?.[3].address).toBe(MAGIC_PROGRAM_ID);
     });
   });
 });

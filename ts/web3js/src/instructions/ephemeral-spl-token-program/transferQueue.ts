@@ -68,14 +68,14 @@ export function initTransferQueueIx(
  * Ensure the recurring transfer queue crank is scheduled.
  * @param payer - The payer account
  * @param queue - The transfer queue PDA
- * @param taskContext - The Magic task context account
+ * @param magicContext - The Magic context account
  * @param magicProgram - The Magic program account
  * @returns The ensure transfer queue crank instruction
  */
 export function ensureTransferQueueCrankIx(
   payer: PublicKey,
   queue: PublicKey,
-  taskContext: PublicKey = MAGIC_CONTEXT_ID,
+  magicContext: PublicKey = MAGIC_CONTEXT_ID,
   magicProgram: PublicKey = MAGIC_PROGRAM_ID,
 ): TransactionInstruction {
   return new TransactionInstruction({
@@ -83,7 +83,7 @@ export function ensureTransferQueueCrankIx(
     keys: [
       { pubkey: payer, isSigner: true, isWritable: true },
       { pubkey: queue, isSigner: false, isWritable: true },
-      { pubkey: taskContext, isSigner: false, isWritable: true },
+      { pubkey: magicContext, isSigner: false, isWritable: true },
       { pubkey: magicProgram, isSigner: false, isWritable: false },
     ],
     data: Buffer.from([ENSURE_TRANSFER_QUEUE_CRANK_DISCRIMINATOR]),

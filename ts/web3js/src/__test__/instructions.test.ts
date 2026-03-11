@@ -14,6 +14,7 @@ import {
   delegateSpl,
   deriveEphemeralAta,
   deriveVault,
+  ensureTransferQueueCrankIx,
 } from "../instructions/ephemeral-spl-token-program";
 import {
   DELEGATION_PROGRAM_ID,
@@ -763,6 +764,25 @@ describe("Exposed Instructions (web3.js)", () => {
       expect(instructions[2].data[0]).toBe(4);
       expect(instructions[2].data[1]).toBe(vaultEataBump);
       expect(Buffer.from(instructions[2].data.subarray(2)).equals(validator.toBuffer())).toBe(true);
+    });
+  });
+
+  describe("ensureTransferQueueCrankIx (Ephemeral SPL Token Program)", () => {
+    const payer = mockPublicKey;
+    const queue = differentKey;
+
+    it("should include queue, magic context, and magic program in order", () => {
+      const instruction = ensureTransferQueueCrankIx(payer, queue);
+
+      expect(instruction.keys).toHaveLength(4);
+      expect(instruction.keys[0].pubkey.toBase58()).toBe(payer.toBase58());
+      expect(instruction.keys[1].pubkey.toBase58()).toBe(queue.toBase58());
+      expect(instruction.keys[2].pubkey.toBase58()).toBe(
+        MAGIC_CONTEXT_ID.toBase58(),
+      );
+      expect(instruction.keys[3].pubkey.toBase58()).toBe(
+        MAGIC_PROGRAM_ID.toBase58(),
+      );
     });
   });
 });

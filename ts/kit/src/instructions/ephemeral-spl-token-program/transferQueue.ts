@@ -72,21 +72,21 @@ export function initTransferQueueIx(
  * Ensure the recurring transfer queue crank is scheduled.
  * @param payer - The payer account
  * @param queue - The transfer queue PDA
- * @param taskContext - The Magic task context account
+ * @param magicContext - The Magic context account
  * @param magicProgram - The Magic program account
  * @returns The ensure transfer queue crank instruction
  */
 export function ensureTransferQueueCrankIx(
   payer: Address,
   queue: Address,
-  taskContext: Address = MAGIC_CONTEXT_ID,
+  magicContext: Address = MAGIC_CONTEXT_ID,
   magicProgram: Address = MAGIC_PROGRAM_ID,
 ): Instruction {
   return {
     accounts: [
       { address: payer, role: AccountRole.WRITABLE_SIGNER },
       { address: queue, role: AccountRole.WRITABLE },
-      { address: taskContext, role: AccountRole.WRITABLE },
+      { address: magicContext, role: AccountRole.WRITABLE },
       { address: magicProgram, role: AccountRole.READONLY },
     ],
     data: new Uint8Array([ENSURE_TRANSFER_QUEUE_CRANK_DISCRIMINATOR]),
