@@ -90,6 +90,8 @@ async function verifyQuote(rawQuote: Uint8Array): Promise<Quote | null> {
   try {
     verify(rawQuote, quoteCollateral, now);
   } catch (error) {
+    // Ignore the error if the SEPT_VE_DISABLE is not enabled
+    // The bug has been reported to Azure.
     if (
       error instanceof Error &&
       !error.message.includes("SEPT_VE_DISABLE is not enabled")
