@@ -123,10 +123,12 @@ pub fn create_schedule_commit_ix<'a>(
     account_views: &'a [AccountView],
     magic_context: &'a AccountView,
     magic_program: &'a AccountView,
+    magic_fee_vault: Option<&'a AccountView>,
     allow_undelegation: bool,
     account_metas: &'a mut [MaybeUninit<InstructionAccount<'a>>],
 ) -> Result<InstructionView<'a, 'a, 'a, 'a>, ProgramError> {
-    let num_accounts = 2 + account_views.len();
+    let num_prefix_accounts = if magic_fee_vault.is_some() { 3 } else { 2 };
+    let num_accounts = num_prefix_accounts + account_views.len();
 
     if num_accounts > account_metas.len() {
         return Err(ProgramError::InvalidArgument);
@@ -156,10 +158,17 @@ pub fn create_schedule_commit_ix<'a>(
             .get_unchecked_mut(1)
             .write(InstructionAccount::writable(magic_context.address()));
 
+        // optional fee vault: writable, not signer
+        if let Some(vault) = magic_fee_vault {
+            account_metas
+                .get_unchecked_mut(2)
+                .write(InstructionAccount::writable(vault.address()));
+        }
+
         for i in 0..account_views.len() {
             let a = account_views.get_unchecked(i);
             account_metas
-                .get_unchecked_mut(2 + i)
+                .get_unchecked_mut(num_prefix_accounts + i)
                 .write(InstructionAccount::new(
                     a.address(),
                     a.is_writable(),

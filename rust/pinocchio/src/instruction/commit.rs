@@ -12,6 +12,7 @@ pub(crate) fn commit_accounts_internal(
     accounts: &[AccountView],
     magic_context: &AccountView,
     magic_program: &AccountView,
+    magic_fee_vault: Option<&AccountView>,
     allow_undelegation: bool,
 ) -> ProgramResult {
     let mut metas: [MaybeUninit<InstructionAccount>; MAX_LOCAL_CPI_ACCOUNTS] = unsafe {
@@ -24,26 +25,36 @@ pub(crate) fn commit_accounts_internal(
         accounts,
         magic_context,
         magic_program,
+        magic_fee_vault,
         allow_undelegation,
         &mut metas,
     )?;
 
-    let num_accounts = ix.accounts.len();
-    if num_accounts > MAX_LOCAL_CPI_ACCOUNTS || accounts.len() > MAX_LOCAL_CPI_ACCOUNTS - 2 {
+    let num_prefix_accounts = if magic_fee_vault.is_some() { 3 } else { 2 };
+    if ix.accounts.len() > MAX_LOCAL_CPI_ACCOUNTS
+        || accounts.len() > MAX_LOCAL_CPI_ACCOUNTS - num_prefix_accounts
+    {
         return Err(ProgramError::InvalidArgument);
     }
 
     let mut all_accounts: [&AccountView; MAX_LOCAL_CPI_ACCOUNTS] = [payer; MAX_LOCAL_CPI_ACCOUNTS];
     all_accounts[0] = payer;
     all_accounts[1] = magic_context;
+    if let Some(vault) = magic_fee_vault {
+        all_accounts[2] = vault;
+    }
 
     let mut i = 0;
     while i < accounts.len() {
-        all_accounts[2 + i] = &accounts[i];
+        all_accounts[num_prefix_accounts + i] = &accounts[i];
         i += 1;
     }
 
-    invoke_signed_with_bounds::<MAX_LOCAL_CPI_ACCOUNTS>(&ix, &all_accounts[..num_accounts], &[])?;
+    invoke_signed_with_bounds::<MAX_LOCAL_CPI_ACCOUNTS>(
+        &ix,
+        &all_accounts[..ix.accounts.len()],
+        &[],
+    )?;
 
     Ok(())
 }
@@ -53,6 +64,7 @@ pub fn commit_accounts(
     accounts: &[AccountView],
     magic_context: &AccountView,
     magic_program: &AccountView,
+    magic_fee_vault: Option<&AccountView>,
 ) -> ProgramResult {
-    commit_accounts_internal(payer, accounts, magic_context, magic_program, false)
+    commit_accounts_internal(payer, accounts, magic_context, magic_program, magic_fee_vault, false)
 }
