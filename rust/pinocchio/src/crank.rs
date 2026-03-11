@@ -820,8 +820,8 @@ mod tests {
 
         let readonly_instruction = CancelCrankCpi {
             authority: readonly_authority,
-            task_context,
-            magic_program,
+            task_context: task_context.clone(),
+            magic_program: magic_program.clone(),
             crank_id: 1,
         };
         let writable_instruction = CancelCrankCpi {
