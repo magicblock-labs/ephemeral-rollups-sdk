@@ -45,7 +45,7 @@ solana-instruction = { workspace = true }
 [features]
 default = []
 delegation-actions = ["borsh", "serde", "pinocchio/alloc", "pinocchio/cpi"]
-intent-bundle = ["bincode"]
+intent-bundle = ["bincode", "serde"]
 
 [lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = [
