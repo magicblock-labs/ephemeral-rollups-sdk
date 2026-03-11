@@ -8,7 +8,7 @@ use pinocchio_system::instructions::{Assign, CreateAccount};
 use crate::consts::DELEGATION_PROGRAM_ID;
 use crate::pda::find_program_address;
 use crate::types::DelegateAccountArgs;
-use crate::utils::{cpi_delegate, make_seed_buf};
+use crate::utils::{cpi_delegate, cpi_delegate_with_any_validator, make_seed_buf};
 use crate::{consts::BUFFER, types::DelegateConfig, utils::close_pda_acc};
 
 /// Find the bump for a buffer PDA using the pinocchio PDA derivation.
@@ -23,6 +23,27 @@ pub fn delegate_account(
     seeds: &[&[u8]],
     bump: u8,
     config: DelegateConfig,
+) -> ProgramResult {
+    delegate_account_inner(accounts, seeds, bump, config, false)
+}
+
+#[allow(unknown_lints, clippy::cloned_ref_to_slice_refs)]
+pub fn delegate_account_with_any_validator(
+    accounts: &[&AccountView],
+    seeds: &[&[u8]],
+    bump: u8,
+    config: DelegateConfig,
+) -> ProgramResult {
+    delegate_account_inner(accounts, seeds, bump, config, true)
+}
+
+#[allow(unknown_lints, clippy::cloned_ref_to_slice_refs)]
+fn delegate_account_inner(
+    accounts: &[&AccountView],
+    seeds: &[&[u8]],
+    bump: u8,
+    config: DelegateConfig,
+    any_validator: bool,
 ) -> ProgramResult {
     let [payer, pda_acc, owner_program, buffer_acc, delegation_record, delegation_metadata, system_program] =
         accounts
@@ -100,17 +121,31 @@ pub fn delegate_account(
         validator: config.validator,
     };
 
-    cpi_delegate(
-        payer,
-        pda_acc,
-        owner_program,
-        buffer_acc,
-        delegation_record,
-        delegation_metadata,
-        system_program,
-        delegate_args,
-        delegate_signer_seeds,
-    )?;
+    if any_validator {
+        cpi_delegate_with_any_validator(
+            payer,
+            pda_acc,
+            owner_program,
+            buffer_acc,
+            delegation_record,
+            delegation_metadata,
+            system_program,
+            delegate_args,
+            delegate_signer_seeds,
+        )?;
+    } else {
+        cpi_delegate(
+            payer,
+            pda_acc,
+            owner_program,
+            buffer_acc,
+            delegation_record,
+            delegation_metadata,
+            system_program,
+            delegate_args,
+            delegate_signer_seeds,
+        )?;
+    }
 
     // Close buffer PDA back to payer to reclaim lamports
     close_pda_acc(payer, buffer_acc)?;
@@ -171,26 +206,34 @@ impl<'a> DelegateAccountCpiBuilder<'a> {
     }
 
     pub fn invoke(self) -> ProgramResult {
+        self.invoke_inner(false)
+    }
+
+    pub fn invoke_with_any_validator(self) -> ProgramResult {
+        self.invoke_inner(true)
+    }
+
+    fn invoke_inner(self, any_validator: bool) -> ProgramResult {
         let seeds = self.seeds.ok_or(ProgramError::InvalidInstructionData)?;
         if seeds.len() > 15 {
             return Err(ProgramError::InvalidInstructionData);
         }
         let bump = self.bump.ok_or(ProgramError::InvalidInstructionData)?;
         let config = self.config.ok_or(ProgramError::InvalidInstructionData)?;
-        delegate_account(
-            &[
-                self.payer,
-                self.pda_acc,
-                self.owner_program,
-                self.buffer_acc,
-                self.delegation_record,
-                self.delegation_metadata,
-                self.system_program,
-            ],
-            seeds,
-            bump,
-            config,
-        )
+        let accounts = [
+            self.payer,
+            self.pda_acc,
+            self.owner_program,
+            self.buffer_acc,
+            self.delegation_record,
+            self.delegation_metadata,
+            self.system_program,
+        ];
+        if any_validator {
+            delegate_account_with_any_validator(&accounts, seeds, bump, config)
+        } else {
+            delegate_account(&accounts, seeds, bump, config)
+        }
     }
 }
 

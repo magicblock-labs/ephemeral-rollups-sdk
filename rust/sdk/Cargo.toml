@@ -16,6 +16,7 @@ default = ["solana-program", "solana-system-interface"]
 anchor = ["anchor-lang"]
 access-control = ["num-derive", "num-traits", "thiserror"]
 spl = ["spl-associated-token-account-interface"]
+crank = []
 disable-realloc = []
 modular-sdk = [
     "solana-account",
