@@ -11,6 +11,7 @@ import {
   createCommitAndUndelegateInstruction,
 } from "../instructions/magic-program";
 import {
+  depositAndQueueTransferIx,
   delegateSpl,
   delegateTransferQueueIx,
   deriveEphemeralAta,
@@ -801,31 +802,58 @@ describe("Exposed Instructions (web3.js)", () => {
     });
   });
 
+  describe("depositAndQueueTransferIx (Ephemeral SPL Token Program)", () => {
+    const queue = differentKey;
+    const vault = new PublicKey("11111111111111111111111111111113");
+    const mint = new PublicKey("11111111111111111111111111111114");
+    const source = new PublicKey("11111111111111111111111111111115");
+    const vaultAta = new PublicKey("11111111111111111111111111111116");
+    const destination = new PublicKey("11111111111111111111111111111117");
+
+    it("should serialize min/max delay ms and split", () => {
+      const instruction = depositAndQueueTransferIx(
+        queue,
+        vault,
+        mint,
+        source,
+        vaultAta,
+        destination,
+        mockPublicKey,
+        25n,
+        100n,
+        300n,
+        4,
+      );
+
+      expect(instruction.keys).toHaveLength(8);
+      expect(Array.from(instruction.data)).toEqual([
+        16,
+        ...Array.from(
+          Buffer.from(
+            [25n, 100n, 300n].flatMap((value) => {
+              const out = Buffer.alloc(8);
+              out.writeBigUInt64LE(value);
+              return Array.from(out);
+            }),
+          ),
+        ),
+        4,
+        0,
+        0,
+        0,
+      ]);
+    });
+  });
+
   describe("delegateTransferQueueIx (Ephemeral SPL Token Program)", () => {
     const payer = mockPublicKey;
     const queue = differentKey;
-    const validator = new PublicKey("11111111111111111111111111111113");
 
     it("should serialize discriminator 19 for the delegated transfer queue opcode", () => {
       const instruction = delegateTransferQueueIx(queue, payer, mockPublicKey);
 
       expect(instruction.keys).toHaveLength(9);
       expect(Array.from(instruction.data)).toEqual([19]);
-    });
-
-    it("should append the validator pubkey when provided", () => {
-      const instruction = delegateTransferQueueIx(
-        queue,
-        payer,
-        mockPublicKey,
-        validator,
-      );
-
-      expect(instruction.keys).toHaveLength(9);
-      expect(Array.from(instruction.data)).toEqual([
-        19,
-        ...Array.from(validator.toBuffer()),
-      ]);
     });
   });
 });

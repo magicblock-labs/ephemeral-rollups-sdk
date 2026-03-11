@@ -12,6 +12,7 @@ import {
 } from "../instructions/magic-program";
 import { address, getAddressEncoder, type Address } from "@solana/kit";
 import {
+  depositAndQueueTransferIx,
   delegateSpl,
   delegateTransferQueueIx,
   deriveEphemeralAta,
@@ -817,6 +818,49 @@ describe("Exposed Instructions (@solana/kit)", () => {
       expect(instruction.accounts?.[1].address).toBe(queue);
       expect(instruction.accounts?.[2].address).toBe(MAGIC_CONTEXT_ID);
       expect(instruction.accounts?.[3].address).toBe(MAGIC_PROGRAM_ID);
+    });
+  });
+
+  describe("depositAndQueueTransferIx (Ephemeral SPL Token Program)", () => {
+    const queue = differentAddress;
+    const vault = address("11111111111111111111111111111113");
+    const mint = address("11111111111111111111111111111114");
+    const source = address("11111111111111111111111111111115");
+    const vaultAta = address("11111111111111111111111111111116");
+    const destination = address("11111111111111111111111111111117");
+
+    it("should serialize min/max delay ms and split", () => {
+      const instruction = depositAndQueueTransferIx(
+        queue,
+        vault,
+        mint,
+        source,
+        vaultAta,
+        destination,
+        mockAddress,
+        25n,
+        100n,
+        300n,
+        4,
+      );
+
+      expect(instruction.accounts).toHaveLength(8);
+      expect(Array.from(instruction.data ?? [])).toEqual([
+        16,
+        ...Array.from(
+          Buffer.from(
+            [25n, 100n, 300n].flatMap((value) => {
+              const out = Buffer.alloc(8);
+              out.writeBigUInt64LE(value);
+              return Array.from(out);
+            }),
+          ),
+        ),
+        4,
+        0,
+        0,
+        0,
+      ]);
     });
   });
 
