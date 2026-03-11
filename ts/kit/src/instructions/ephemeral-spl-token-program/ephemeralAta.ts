@@ -3,7 +3,6 @@ import {
   Instruction,
   AccountRole,
   getAddressEncoder,
-  address,
   getProgramDerivedAddress,
   getAddressDecoder,
   getU64Encoder,
@@ -854,7 +853,7 @@ export async function undelegateEataPermissionIx(
 // High-level SDK methods
 // ---------------------------------------------------------------------------
 
-export type DelegateSplOptions = {
+export interface DelegateSplOptions {
   payer?: Address;
   validator?: Address;
   initIfMissing?: boolean;
@@ -864,7 +863,7 @@ export type DelegateSplOptions = {
   escrowIndex?: number;
   idempotent?: boolean;
   private?: boolean;
-};
+}
 
 async function buildDelegateSplInstructions(
   owner: Address,
@@ -882,7 +881,10 @@ async function buildDelegateSplInstructions(
 
   const [ephemeralAta, eataBump] = await deriveEphemeralAta(owner, mint);
   const [vault, vaultBump] = await deriveVault(mint);
-  const [vaultEphemeralAta, vaultEataBump] = await deriveEphemeralAta(vault, mint);
+  const [vaultEphemeralAta, vaultEataBump] = await deriveEphemeralAta(
+    vault,
+    mint,
+  );
   const vaultAta = await deriveVaultAta(mint, vault);
   const ownerAta = await getAssociatedTokenAddressSync(mint, owner);
 
@@ -913,7 +915,9 @@ async function buildDelegateSplInstructions(
   );
 
   if (isPrivate) {
-    instructions.push(await createEataPermissionIx(ephemeralAta, payer, eataBump));
+    instructions.push(
+      await createEataPermissionIx(ephemeralAta, payer, eataBump),
+    );
   }
 
   instructions.push(await delegateIx(payer, ephemeralAta, eataBump, validator));
@@ -949,7 +953,10 @@ async function buildIdempotentDelegateSplInstructions(
 
   const [ephemeralAta, eataBump] = await deriveEphemeralAta(owner, mint);
   const [vault, vaultBump] = await deriveVault(mint);
-  const [vaultEphemeralAta, vaultEataBump] = await deriveEphemeralAta(vault, mint);
+  const [vaultEphemeralAta, vaultEataBump] = await deriveEphemeralAta(
+    vault,
+    mint,
+  );
   const vaultAta = await deriveVaultAta(mint, vault);
   const ownerAta = await getAssociatedTokenAddressSync(mint, owner);
 
@@ -982,10 +989,14 @@ async function buildIdempotentDelegateSplInstructions(
     );
   }
 
-  instructions.push(initEphemeralAtaIx(ephemeralAta, owner, mint, payer, eataBump));
+  instructions.push(
+    initEphemeralAtaIx(ephemeralAta, owner, mint, payer, eataBump),
+  );
 
   if (isPrivate) {
-    instructions.push(await createEataPermissionIx(ephemeralAta, payer, eataBump));
+    instructions.push(
+      await createEataPermissionIx(ephemeralAta, payer, eataBump),
+    );
   }
 
   instructions.push(

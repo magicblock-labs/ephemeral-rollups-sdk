@@ -63,7 +63,10 @@ export function initTransferQueueIx(
     data:
       sizeBytes === undefined
         ? new Uint8Array([INITIALIZE_TRANSFER_QUEUE_DISCRIMINATOR])
-        : new Uint8Array([INITIALIZE_TRANSFER_QUEUE_DISCRIMINATOR, ...u32le(sizeBytes)]),
+        : new Uint8Array([
+            INITIALIZE_TRANSFER_QUEUE_DISCRIMINATOR,
+            ...u32le(sizeBytes),
+          ]),
     programAddress: EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
   };
 }
@@ -109,9 +112,8 @@ export async function delegateTransferQueueIx(
   validator?: Address,
 ): Promise<Instruction> {
   const addressEncoder = getAddressEncoder();
-  const validatorBytes = validator === undefined
-    ? []
-    : Array.from(addressEncoder.encode(validator));
+  const validatorBytes =
+    validator === undefined ? [] : Array.from(addressEncoder.encode(validator));
 
   return {
     accounts: [
@@ -150,10 +152,5 @@ function u32le(n: number): number[] {
     throw new Error("sizeBytes out of range for u32");
   }
 
-  return [
-    n & 0xff,
-    (n >>> 8) & 0xff,
-    (n >>> 16) & 0xff,
-    (n >>> 24) & 0xff,
-  ];
+  return [n & 0xff, (n >>> 8) & 0xff, (n >>> 16) & 0xff, (n >>> 24) & 0xff];
 }

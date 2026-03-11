@@ -854,7 +854,7 @@ export function undelegateEataPermissionIx(
 // High-level SDK methods
 // ---------------------------------------------------------------------------
 
-export type DelegateSplOptions = {
+export interface DelegateSplOptions {
   payer?: PublicKey;
   validator?: PublicKey;
   initIfMissing?: boolean;
@@ -864,7 +864,7 @@ export type DelegateSplOptions = {
   escrowIndex?: number;
   idempotent?: boolean;
   private?: boolean;
-};
+}
 
 async function buildDelegateSplInstructions(
   owner: PublicKey,
@@ -896,7 +896,12 @@ async function buildDelegateSplInstructions(
     instructions.push(
       initVaultIx(vault, mint, payer, vaultBump),
       initVaultAtaIx(payer, vaultAta, vault, mint),
-      delegateEphemeralAtaIx(payer, vaultEphemeralAta, vaultEataBump, validator),
+      delegateEphemeralAtaIx(
+        payer,
+        vaultEphemeralAta,
+        vaultEataBump,
+        validator,
+      ),
     );
   }
 
@@ -970,7 +975,12 @@ async function buildIdempotentDelegateSplInstructions(
     instructions.push(
       initVaultIx(vault, mint, payer, vaultBump),
       initVaultAtaIx(payer, vaultAta, vault, mint),
-      delegateEphemeralAtaIx(payer, vaultEphemeralAta, vaultEataBump, validator),
+      delegateEphemeralAtaIx(
+        payer,
+        vaultEphemeralAta,
+        vaultEataBump,
+        validator,
+      ),
     );
   }
 
@@ -991,7 +1001,9 @@ async function buildIdempotentDelegateSplInstructions(
     );
   }
 
-  instructions.push(initEphemeralAtaIx(ephemeralAta, owner, mint, payer, eataBump));
+  instructions.push(
+    initEphemeralAtaIx(ephemeralAta, owner, mint, payer, eataBump),
+  );
 
   if (isPrivate) {
     instructions.push(createEataPermissionIx(ephemeralAta, payer, eataBump));

@@ -26,9 +26,7 @@ const DELEGATE_TRANSFER_QUEUE_DISCRIMINATOR = 19;
  * @param mint - The mint account
  * @returns The transfer queue PDA and bump
  */
-export function deriveTransferQueue(
-  mint: PublicKey,
-): [PublicKey, number] {
+export function deriveTransferQueue(mint: PublicKey): [PublicKey, number] {
   return PublicKey.findProgramAddressSync(
     [TRANSFER_QUEUE_SEED, mint.toBuffer()],
     EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
@@ -60,7 +58,10 @@ export function initTransferQueueIx(
     data:
       sizeBytes === undefined
         ? Buffer.from([INITIALIZE_TRANSFER_QUEUE_DISCRIMINATOR])
-        : Buffer.from([INITIALIZE_TRANSFER_QUEUE_DISCRIMINATOR, ...u32le(sizeBytes)]),
+        : Buffer.from([
+            INITIALIZE_TRANSFER_QUEUE_DISCRIMINATOR,
+            ...u32le(sizeBytes),
+          ]),
   });
 }
 
@@ -143,10 +144,5 @@ function u32le(n: number): number[] {
     throw new Error("sizeBytes out of range for u32");
   }
 
-  return [
-    n & 0xff,
-    (n >>> 8) & 0xff,
-    (n >>> 16) & 0xff,
-    (n >>> 24) & 0xff,
-  ];
+  return [n & 0xff, (n >>> 8) & 0xff, (n >>> 16) & 0xff, (n >>> 24) & 0xff];
 }

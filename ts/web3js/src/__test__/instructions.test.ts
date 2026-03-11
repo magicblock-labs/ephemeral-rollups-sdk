@@ -731,7 +731,10 @@ describe("Exposed Instructions (web3.js)", () => {
 
     it("should delegate the vault eata when initializing the vault in legacy flow", async () => {
       const [vault] = deriveVault(mint);
-      const [vaultEphemeralAta, vaultEataBump] = deriveEphemeralAta(vault, mint);
+      const [vaultEphemeralAta, vaultEataBump] = deriveEphemeralAta(
+        vault,
+        mint,
+      );
 
       const instructions = await delegateSpl(owner, mint, 1n, {
         validator,
@@ -745,12 +748,19 @@ describe("Exposed Instructions (web3.js)", () => {
       );
       expect(instructions[3].data[0]).toBe(4);
       expect(instructions[3].data[1]).toBe(vaultEataBump);
-      expect(Buffer.from(instructions[3].data.subarray(2)).equals(validator.toBuffer())).toBe(true);
+      expect(
+        Buffer.from(instructions[3].data.subarray(2)).equals(
+          validator.toBuffer(),
+        ),
+      ).toBe(true);
     });
 
     it("should delegate the vault eata when initializing the vault in idempotent flow", async () => {
       const [vault] = deriveVault(mint);
-      const [vaultEphemeralAta, vaultEataBump] = deriveEphemeralAta(vault, mint);
+      const [vaultEphemeralAta, vaultEataBump] = deriveEphemeralAta(
+        vault,
+        mint,
+      );
 
       const instructions = await delegateSpl(owner, mint, 1n, {
         validator,
@@ -763,7 +773,11 @@ describe("Exposed Instructions (web3.js)", () => {
       );
       expect(instructions[2].data[0]).toBe(4);
       expect(instructions[2].data[1]).toBe(vaultEataBump);
-      expect(Buffer.from(instructions[2].data.subarray(2)).equals(validator.toBuffer())).toBe(true);
+      expect(
+        Buffer.from(instructions[2].data.subarray(2)).equals(
+          validator.toBuffer(),
+        ),
+      ).toBe(true);
     });
   });
 

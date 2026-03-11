@@ -695,7 +695,10 @@ describe("Exposed Instructions (@solana/kit)", () => {
 
     it("should delegate the vault eata when initializing the vault in legacy flow", async () => {
       const [vault] = await deriveVault(mint);
-      const [vaultEphemeralAta, vaultEataBump] = await deriveEphemeralAta(vault, mint);
+      const [vaultEphemeralAta, vaultEataBump] = await deriveEphemeralAta(
+        vault,
+        mint,
+      );
 
       const instructions = await delegateSpl(owner, mint, 1n, {
         validator,
@@ -714,7 +717,10 @@ describe("Exposed Instructions (@solana/kit)", () => {
 
     it("should delegate the vault eata when initializing the vault in idempotent flow", async () => {
       const [vault] = await deriveVault(mint);
-      const [vaultEphemeralAta, vaultEataBump] = await deriveEphemeralAta(vault, mint);
+      const [vaultEphemeralAta, vaultEataBump] = await deriveEphemeralAta(
+        vault,
+        mint,
+      );
 
       const instructions = await delegateSpl(owner, mint, 1n, {
         validator,
