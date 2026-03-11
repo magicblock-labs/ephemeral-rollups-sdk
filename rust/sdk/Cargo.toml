@@ -12,11 +12,11 @@ edition = { workspace = true }
 readme = "README.md"
 
 [features]
-default = ["solana-program", "solana-system-interface", "crank"]
+default = ["solana-program", "solana-system-interface"]
 anchor = ["anchor-lang"]
 access-control = ["num-derive", "num-traits", "thiserror"]
 spl = ["spl-associated-token-account-interface"]
-crank = ["bincode"]
+crank = []
 disable-realloc = []
 modular-sdk = [
     "solana-account",
@@ -37,7 +37,6 @@ serde = []
 
 [dependencies]
 anchor-lang = { workspace = true, optional = true }
-bincode = { workspace = true, optional = true }
 borsh = "0.10.4"
 ephemeral-rollups-sdk-attribute-delegate = { workspace = true }
 ephemeral-rollups-sdk-attribute-ephemeral = { workspace = true }

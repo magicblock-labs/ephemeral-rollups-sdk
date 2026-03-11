@@ -2,7 +2,6 @@
 pub mod anchor;
 pub mod consts;
 pub mod cpi;
-#[cfg(feature = "crank")]
 pub mod crank;
 pub mod delegate_args;
 pub mod ephem;

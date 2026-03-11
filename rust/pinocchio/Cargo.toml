@@ -11,9 +11,6 @@ readme = "README.md"
 license = { workspace = true }
 edition = { workspace = true }
 
-[features]
-default = []
-
 [dependencies]
 pinocchio = { workspace = true }
 pinocchio-pubkey  = { workspace = true }

@@ -166,13 +166,13 @@ impl<'a> ScheduleCrankCpi<'a> {
         ScheduleCrankCpiBuilder::new(payer, magic_program)
     }
 
-    fn instruction(
+    fn instruction<const MAX_ACCOUNTS: usize>(
         &'a self,
         data: &'a [u8],
-        accounts: &'a mut [MaybeUninit<InstructionAccount<'a>>; PINOCCHIO_MAX_CPI_ACCOUNTS],
+        accounts: &'a mut [MaybeUninit<InstructionAccount<'a>>; MAX_ACCOUNTS],
     ) -> Result<InstructionView<'a, 'a, 'a, 'a>, ProgramError> {
         let num_accounts = 1 + self.instruction_accounts.len();
-        if num_accounts > PINOCCHIO_MAX_CPI_ACCOUNTS {
+        if num_accounts > MAX_ACCOUNTS || MAX_ACCOUNTS > PINOCCHIO_MAX_CPI_ACCOUNTS {
             return Err(ProgramError::InvalidArgument);
         }
 
@@ -219,9 +219,9 @@ impl<'a> ScheduleCrankCpi<'a> {
 
     pub fn invoke<const MAX_ACCOUNT_INFOS: usize>(&self, data_buf: &mut [u8]) -> ProgramResult {
         let mut ix_accounts =
-            [const { MaybeUninit::<InstructionAccount>::uninit() }; PINOCCHIO_MAX_CPI_ACCOUNTS];
+            [const { MaybeUninit::<InstructionAccount>::uninit() }; MAX_ACCOUNT_INFOS];
         let num_accounts = 1 + self.instruction_accounts.len();
-        if num_accounts > MAX_ACCOUNT_INFOS {
+        if num_accounts > MAX_ACCOUNT_INFOS || MAX_ACCOUNT_INFOS > PINOCCHIO_MAX_CPI_ACCOUNTS {
             return Err(ProgramError::InvalidArgument);
         }
 
@@ -239,9 +239,9 @@ impl<'a> ScheduleCrankCpi<'a> {
         signers_seeds: &[Signer<'_, '_>],
     ) -> ProgramResult {
         let mut ix_accounts =
-            [const { MaybeUninit::<InstructionAccount>::uninit() }; PINOCCHIO_MAX_CPI_ACCOUNTS];
+            [const { MaybeUninit::<InstructionAccount>::uninit() }; MAX_ACCOUNT_INFOS];
         let num_accounts = 1 + self.instruction_accounts.len();
-        if num_accounts > MAX_ACCOUNT_INFOS {
+        if num_accounts > MAX_ACCOUNT_INFOS || MAX_ACCOUNT_INFOS > PINOCCHIO_MAX_CPI_ACCOUNTS {
             return Err(ProgramError::InvalidArgument);
         }
 
@@ -769,6 +769,34 @@ mod tests {
             [const { MaybeUninit::<InstructionAccount>::uninit() }; PINOCCHIO_MAX_CPI_ACCOUNTS];
         let view = instruction.instruction(&data, &mut ix_accounts).unwrap();
 
+        assert!(view.accounts[0].is_writable);
+        assert!(view.accounts[0].is_signer);
+    }
+
+    #[test]
+    fn test_schedule_crank_cpi_instruction_accepts_exact_account_buffer() {
+        let mut payer_account = runtime_account(Address::new_from_array([1; 32]), 0, 0);
+        let mut magic_program_account = runtime_account(Address::new_from_array([2; 32]), 0, 0);
+        let payer =
+            unsafe { AccountView::new_unchecked(&mut payer_account as *mut RuntimeAccount) };
+        let magic_program = unsafe {
+            AccountView::new_unchecked(&mut magic_program_account as *mut RuntimeAccount)
+        };
+        let instruction = ScheduleCrankCpi::new(
+            payer,
+            magic_program,
+            &[],
+            ScheduleCrankArgs::new(1, &[])
+                .execution_interval_millis(5)
+                .iterations(1),
+        );
+        let mut data = vec![0; instruction.serialized_size()];
+        let data_len = instruction.serialize_into(&mut data).unwrap();
+        data.truncate(data_len);
+        let mut ix_accounts = [const { MaybeUninit::<InstructionAccount>::uninit() }; 1];
+        let view = instruction.instruction(&data, &mut ix_accounts).unwrap();
+
+        assert_eq!(view.accounts.len(), 1);
         assert!(view.accounts[0].is_writable);
         assert!(view.accounts[0].is_signer);
     }
