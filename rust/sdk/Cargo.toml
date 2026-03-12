@@ -16,6 +16,7 @@ default = ["solana-program", "solana-system-interface"]
 anchor = ["anchor-lang"]
 access-control = ["num-derive", "num-traits", "thiserror"]
 spl = ["spl-associated-token-account-interface"]
+encryption = ["magicblock-delegation-program-api/encryption"]
 crank = []
 disable-realloc = []
 modular-sdk = [
@@ -37,7 +38,8 @@ serde = []
 
 [dependencies]
 anchor-lang = { workspace = true, optional = true }
-borsh = "0.10.4"
+borsh = { workspace = true }
+bincode = { workspace = true }
 ephemeral-rollups-sdk-attribute-delegate = { workspace = true }
 ephemeral-rollups-sdk-attribute-ephemeral = { workspace = true }
 ephemeral-rollups-sdk-attribute-ephemeral-accounts = { workspace = true }
@@ -55,10 +57,7 @@ solana-system-interface = { workspace = true, optional = true }
 solana-sysvar = { workspace = true, optional = true }
 spl-associated-token-account-interface = { workspace = true, optional = true }
 magicblock-magic-program-api = { workspace = true }
-magicblock-delegation-program = { workspace = true, features = [
-    "no-entrypoint",
-    "core",
-], default-features = false }
+magicblock-delegation-program-api = { workspace = true, default-features = false }
 num-derive = { workspace = true, optional = true }
 num-traits = { workspace = true, optional = true }
 thiserror = { workspace = true, optional = true }

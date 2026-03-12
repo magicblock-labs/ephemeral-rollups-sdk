@@ -6,6 +6,7 @@ pub mod acl;
 pub mod consts;
 pub mod crank;
 pub mod instruction;
+#[cfg(feature = "intent-bundle")]
 pub mod intent_bundle;
 pub mod pda;
 pub mod seeds;
