@@ -3,7 +3,7 @@
 
 #[cfg(test)]
 mod tests {
-    use dlp::{
+    use dlp_api::dlp::{
         consts::DELEGATION_PROGRAM_ID,
         pda::{
             delegate_buffer_pda_from_delegated_account_and_owner_program,

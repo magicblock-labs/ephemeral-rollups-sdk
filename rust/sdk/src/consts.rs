@@ -1,6 +1,6 @@
 use crate::solana_compat::solana::Pubkey;
 
-pub use dlp::consts::*;
+pub use dlp_api::dlp::consts::*;
 use magicblock_magic_program_api::{EPHEMERAL_VAULT_PUBKEY, MAGIC_CONTEXT_PUBKEY};
 
 /// The magic program ID.

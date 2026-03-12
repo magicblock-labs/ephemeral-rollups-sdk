@@ -56,9 +56,7 @@ solana-system-interface = { workspace = true, optional = true }
 solana-sysvar = { workspace = true, optional = true }
 spl-associated-token-account-interface = { workspace = true, optional = true }
 magicblock-magic-program-api = { workspace = true }
-magicblock-delegation-program = { workspace = true, features = [
-    "no-entrypoint",
-], default-features = false }
+magicblock-delegation-program-api = { workspace = true }
 num-derive = { workspace = true, optional = true }
 num-traits = { workspace = true, optional = true }
 thiserror = { workspace = true, optional = true }

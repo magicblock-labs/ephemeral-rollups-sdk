@@ -29,10 +29,7 @@ bincode = { version = "2.0.1", default-features = false, features = [
     "derive",
     "serde",
 ], optional = true }
-magicblock-delegation-program = { workspace = true, features = [
-    "no-entrypoint",
-    "program",
-], default-features = false }
+magicblock-delegation-program-api = { workspace = true, optional = true }
 borsh = { workspace = true, optional = true }
 
 [dev-dependencies]
@@ -44,7 +41,13 @@ solana-instruction = { workspace = true }
 
 [features]
 default = []
-delegation-actions = ["borsh", "serde", "pinocchio/alloc", "pinocchio/cpi"]
+delegation-actions = [
+    "borsh",
+    "serde",
+    "pinocchio/alloc",
+    "pinocchio/cpi",
+    "magicblock-delegation-program-api",
+]
 intent-bundle = ["bincode", "serde"]
 
 [lints.rust]

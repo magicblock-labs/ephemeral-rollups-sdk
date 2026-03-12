@@ -11,7 +11,7 @@ use crate::pda::find_program_address;
 use crate::types::DelegateAccountArgs;
 use crate::utils::{cpi_delegate_with_actions, make_seed_buf};
 use crate::{consts::BUFFER, types::DelegateConfig, utils::close_pda_acc};
-pub use dlp::{
+pub use dlp_api::dlp::{
     args::{
         EncryptedBuffer, MaybeEncryptedAccountMeta, MaybeEncryptedInstruction,
         MaybeEncryptedIxData, MaybeEncryptedPubkey, PostDelegationActions,

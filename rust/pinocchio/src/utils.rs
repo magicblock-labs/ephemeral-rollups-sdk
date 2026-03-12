@@ -181,13 +181,13 @@ pub fn cpi_delegate_with_actions(
     delegation_metadata: &AccountView,
     system_program: &AccountView,
     delegate_args: DelegateAccountArgs,
-    actions: dlp::args::PostDelegationActions,
+    actions: dlp_api::dlp::args::PostDelegationActions,
     action_signer_accounts: &[&AccountView],
     signer_seeds: Signer<'_, '_>,
 ) -> Result<(), ProgramError> {
     use alloc::vec::Vec;
-    use dlp::args::{DelegateArgs, DelegateWithActionsArgs};
-    use dlp::discriminator::DlpDiscriminator;
+    use dlp_api::dlp::args::{DelegateArgs, DelegateWithActionsArgs};
+    use dlp_api::dlp::discriminator::DlpDiscriminator;
     use pinocchio::cpi::invoke_signed_with_bounds;
     use solana_program::pubkey::Pubkey;
 

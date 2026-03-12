@@ -1,9 +1,9 @@
 use crate::types::DelegateAccountArgs;
 use crate::utils::{close_pda_with_system_transfer, create_pda, seeds_with_bump};
 use borsh::{to_vec, BorshSerialize};
-use dlp::args::{DelegateArgs, DelegateWithActionsArgs, PostDelegationActions};
-use dlp::delegate_buffer_seeds_from_delegated_account;
-use dlp::discriminator::DlpDiscriminator;
+use dlp_api::dlp::args::{DelegateArgs, DelegateWithActionsArgs, PostDelegationActions};
+use dlp_api::dlp::delegate_buffer_seeds_from_delegated_account;
+use dlp_api::dlp::discriminator::DlpDiscriminator;
 
 use crate::solana_compat::solana::{
     invoke_signed, sol_memset, system_instruction, AccountInfo, AccountMeta, Instruction,
@@ -11,7 +11,7 @@ use crate::solana_compat::solana::{
 };
 
 pub const DELEGATION_PROGRAM_ID: Pubkey =
-    Pubkey::new_from_array(dlp::consts::DELEGATION_PROGRAM_ID.to_bytes());
+    Pubkey::new_from_array(dlp_api::dlp::consts::DELEGATION_PROGRAM_ID.to_bytes());
 
 pub struct DelegateAccounts<'a, 'info> {
     pub payer: &'a AccountInfo<'info>,
