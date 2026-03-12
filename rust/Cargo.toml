@@ -33,7 +33,7 @@ ephemeral-rollups-sdk-attribute-action = { path = "action-attribute", version = 
 
 
 # Magicblock
-magicblock-delegation-program-api = { git = "https://github.com/magicblock-labs/delegation-program.git", rev = "abf340536e88740c290b2b3af4e3d1ff38240f63" }
+magicblock-delegation-program-api = { git = "https://github.com/magicblock-labs/delegation-program.git", rev = "abf340536e88740c290b2b3af4e3d1ff38240f63", default-features = false }
 
 magicblock-magic-program-api = { version = "0.8.1", default-features = false }
 
