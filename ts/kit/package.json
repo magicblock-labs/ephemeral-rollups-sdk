@@ -1,6 +1,6 @@
 {
   "name": "@magicblock-labs/ephemeral-rollups-kit",
-  "version": "0.8.6",
+  "version": "0.8.8",
   "author": "MagicBlock Labs",
   "license": "MIT",
   "publishConfig": {
@@ -40,12 +40,13 @@
     "vitest": "^3.2.4"
   },
   "dependencies": {
-    "@phala/dcap-qvl-web": "^0.2.7",
+    "@phala/dcap-qvl": "^0.3.9",
     "@solana-program/system": "^0.9.0",
     "@solana/kit": "^4.0.0",
     "@solana/transaction-confirmation": "^4.0.0",
     "bs58": "^6.0.0",
     "rpc-websockets": "^9.0.4",
+    "tweetnacl": "^1.0.3",
     "typescript": "^5.3.0"
   },
   "packageManager": "yarn@1.22.22+sha512.a6b2f7906b721bba3d67d4aff083df04dad64c399707841b7acf00f6b133b7ac24255f2652fa22ae3534329dc6180534e98d17432037ff6fd140556e2bb3137e"

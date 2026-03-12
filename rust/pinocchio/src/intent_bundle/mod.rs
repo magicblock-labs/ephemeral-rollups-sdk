@@ -1,5 +1,7 @@
 use crate::intent_bundle::no_vec::{CapacityError, NoVec};
-use pinocchio::cpi::{invoke_with_bounds, MAX_STATIC_CPI_ACCOUNTS};
+use pinocchio::cpi::{
+    invoke_signed_with_bounds, invoke_with_bounds, Signer, MAX_STATIC_CPI_ACCOUNTS,
+};
 use pinocchio::error::ProgramError;
 use pinocchio::instruction::{InstructionAccount, InstructionView};
 use pinocchio::{AccountView, ProgramResult};
@@ -173,6 +175,36 @@ impl<'acc, 'args> MagicIntentBundleBuilder<'acc, 'args> {
         )
     }
 
+    /// Equivalent to [`Self::build_and_invoke`], but signs the CPI with the
+    /// provided PDA seeds.
+    #[inline(never)]
+    pub fn build_and_invoke_signed(
+        self,
+        data_buf: &mut [u8],
+        signers_seeds: &[Signer<'_, '_>],
+    ) -> ProgramResult {
+        if data_buf.len() <= OFFSET {
+            return Err(ProgramError::InvalidInstructionData);
+        }
+
+        self.intent_bundle.validate()?;
+
+        let mut all_accounts = NoVec::<AccountView, MAX_STATIC_CPI_ACCOUNTS>::new();
+        all_accounts.try_append([self.payer, self.magic_context])?;
+        self.intent_bundle
+            .collect_unique_accounts(&mut all_accounts)?;
+
+        let data_len =
+            Self::encode_into_slice(all_accounts.as_slice(), self.intent_bundle, data_buf)?;
+
+        Self::invoke_cpi_signed(
+            all_accounts.as_slice(),
+            self.magic_program.address(),
+            &data_buf[..data_len],
+            signers_seeds,
+        )
+    }
+
     /// Builds `instruction_accounts` + `ix`, then delegates to [`Self::do_invoke`].
     ///
     /// Split from [`Self::build_and_invoke`] so these `NoVec` allocations live in
@@ -183,10 +215,7 @@ impl<'acc, 'args> MagicIntentBundleBuilder<'acc, 'args> {
         program_id: &Address,
         data: &[u8],
     ) -> ProgramResult {
-        let mut instruction_accounts = NoVec::<InstructionAccount, MAX_STATIC_CPI_ACCOUNTS>::new();
-        for account in all_accounts.iter() {
-            instruction_accounts.try_push(InstructionAccount::from(account))?;
-        }
+        let instruction_accounts = Self::instruction_accounts(all_accounts)?;
 
         let mut account_refs = NoVec::<&AccountView, MAX_STATIC_CPI_ACCOUNTS>::new();
         for account in all_accounts.iter() {
@@ -202,12 +231,73 @@ impl<'acc, 'args> MagicIntentBundleBuilder<'acc, 'args> {
         Self::do_invoke(&ix, account_refs.as_slice())
     }
 
+    /// Builds `instruction_accounts` + `ix`, then delegates to
+    /// [`Self::do_invoke_signed`].
+    #[inline(never)]
+    fn invoke_cpi_signed(
+        all_accounts: &[AccountView],
+        program_id: &Address,
+        data: &[u8],
+        signers_seeds: &[Signer<'_, '_>],
+    ) -> ProgramResult {
+        let instruction_accounts = Self::instruction_accounts(all_accounts)?;
+
+        let mut account_refs = NoVec::<&AccountView, MAX_STATIC_CPI_ACCOUNTS>::new();
+        for account in all_accounts.iter() {
+            account_refs.try_push(account)?;
+        }
+
+        let ix = InstructionView {
+            program_id,
+            data,
+            accounts: instruction_accounts.as_slice(),
+        };
+
+        Self::do_invoke_signed(&ix, account_refs.as_slice(), signers_seeds)
+    }
+
+    /// Builds the CPI account metas for the magic program.
+    ///
+    /// The first account is always the magic payer, so it must be marked as a
+    /// signer in the CPI instruction even when the backing `AccountView` is a
+    /// PDA that will sign via `invoke_signed`.
+    fn instruction_accounts(
+        all_accounts: &[AccountView],
+    ) -> Result<NoVec<InstructionAccount<'_>, MAX_STATIC_CPI_ACCOUNTS>, ProgramError> {
+        let mut instruction_accounts = NoVec::<InstructionAccount, MAX_STATIC_CPI_ACCOUNTS>::new();
+        let Some((payer, remaining_accounts)) = all_accounts.split_first() else {
+            return Err(ProgramError::NotEnoughAccountKeys);
+        };
+
+        instruction_accounts.try_push(InstructionAccount::new(
+            payer.address(),
+            payer.is_writable(),
+            true,
+        ))?;
+
+        for account in remaining_accounts.iter() {
+            instruction_accounts.try_push(InstructionAccount::from(account))?;
+        }
+
+        Ok(instruction_accounts)
+    }
+
     /// Thin `#[inline(never)]` wrapper around [`invoke_with_bounds`] so its internal
     /// locals (large fixed-size arrays) live in their own stack frame, separate from
     /// [`Self::invoke_cpi`].
     #[inline(never)]
     fn do_invoke(ix: &InstructionView, account_refs: &[&AccountView]) -> ProgramResult {
         invoke_with_bounds::<MAX_STATIC_CPI_ACCOUNTS>(ix, account_refs)
+    }
+
+    /// Signed variant of [`Self::do_invoke`].
+    #[inline(never)]
+    fn do_invoke_signed(
+        ix: &InstructionView,
+        account_refs: &[&AccountView],
+        signers_seeds: &[Signer<'_, '_>],
+    ) -> ProgramResult {
+        invoke_signed_with_bounds::<MAX_STATIC_CPI_ACCOUNTS>(ix, account_refs, signers_seeds)
     }
 }
 
@@ -727,5 +817,31 @@ mod tests {
 
         let (_len, _accounts) = builder.build_serialized(&mut buf);
         std::hint::black_box(&buf);
+    }
+
+    #[test]
+    fn test_instruction_accounts_force_payer_signer() {
+        let payer_addr = [0x01; 32];
+        let ctx_addr = [0x02; 32];
+        let program_addr = [0x03; 32];
+
+        let mut payer = MockRuntimeAccount::new(payer_addr);
+        let mut context = MockRuntimeAccount::new(ctx_addr);
+        let mut program = MockRuntimeAccount::new(program_addr);
+
+        let all_accounts = [
+            payer.as_account_view(),
+            context.as_account_view(),
+            program.as_account_view(),
+        ];
+
+        let instruction_accounts =
+            MagicIntentBundleBuilder::instruction_accounts(&all_accounts).unwrap();
+
+        assert_eq!(instruction_accounts.as_slice().len(), 3);
+        assert!(instruction_accounts.as_slice()[0].is_signer);
+        assert!(instruction_accounts.as_slice()[0].is_writable);
+        assert!(!instruction_accounts.as_slice()[1].is_signer);
+        assert!(!instruction_accounts.as_slice()[2].is_signer);
     }
 }

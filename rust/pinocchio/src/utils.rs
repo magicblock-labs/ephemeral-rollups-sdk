@@ -54,6 +54,59 @@ pub fn cpi_delegate(
     delegate_args: DelegateAccountArgs,
     signer_seeds: Signer<'_, '_>,
 ) -> Result<(), ProgramError> {
+    cpi_delegate_with_discriminator(
+        0,
+        payer,
+        pda_acc,
+        owner_program,
+        buffer_acc,
+        delegation_record,
+        delegation_metadata,
+        system_program,
+        delegate_args,
+        signer_seeds,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+pub fn cpi_delegate_with_any_validator(
+    payer: &AccountView,
+    pda_acc: &AccountView,
+    owner_program: &AccountView,
+    buffer_acc: &AccountView,
+    delegation_record: &AccountView,
+    delegation_metadata: &AccountView,
+    system_program: &AccountView,
+    delegate_args: DelegateAccountArgs,
+    signer_seeds: Signer<'_, '_>,
+) -> Result<(), ProgramError> {
+    cpi_delegate_with_discriminator(
+        19,
+        payer,
+        pda_acc,
+        owner_program,
+        buffer_acc,
+        delegation_record,
+        delegation_metadata,
+        system_program,
+        delegate_args,
+        signer_seeds,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+fn cpi_delegate_with_discriminator(
+    discriminator: u64,
+    payer: &AccountView,
+    pda_acc: &AccountView,
+    owner_program: &AccountView,
+    buffer_acc: &AccountView,
+    delegation_record: &AccountView,
+    delegation_metadata: &AccountView,
+    system_program: &AccountView,
+    delegate_args: DelegateAccountArgs,
+    signer_seeds: Signer<'_, '_>,
+) -> Result<(), ProgramError> {
     const UNINIT_ACCOUNT: MaybeUninit<InstructionAccount> =
         MaybeUninit::<InstructionAccount>::uninit();
     let mut account_metas = [UNINIT_ACCOUNT; MAX_CPI_ACCOUNTS];
@@ -85,10 +138,9 @@ pub fn cpi_delegate(
             .write(InstructionAccount::readonly(&pinocchio_system::ID));
     }
 
-    // Prepare instruction data with 8-byte discriminator prefix followed by serialized args
     let mut data = [0u8; 8 + MAX_DELEGATE_ACCOUNT_ARGS_SIZE];
+    data[..8].copy_from_slice(&discriminator.to_le_bytes());
 
-    // Serialize args into the slice after the discriminator
     let args_slice = delegate_args.try_to_slice(&mut data[8..])?;
     let total_len = 8 + args_slice.len();
     let data_slice = &data[..total_len];

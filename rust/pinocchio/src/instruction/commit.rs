@@ -1,7 +1,9 @@
 use crate::utils::create_schedule_commit_ix;
 use core::mem::MaybeUninit;
 use pinocchio::{
-    cpi::invoke_signed_with_bounds, error::ProgramError, instruction::InstructionAccount,
+    cpi::{invoke_signed_with_bounds, Signer},
+    error::ProgramError,
+    instruction::InstructionAccount,
     AccountView, ProgramResult,
 };
 
@@ -14,6 +16,7 @@ pub(crate) fn commit_accounts_internal(
     magic_program: &AccountView,
     magic_fee_vault: Option<&AccountView>,
     allow_undelegation: bool,
+    signer_seeds: Option<&[Signer<'_, '_>]>,
 ) -> ProgramResult {
     let mut metas: [MaybeUninit<InstructionAccount>; MAX_LOCAL_CPI_ACCOUNTS] = unsafe {
         MaybeUninit::<[MaybeUninit<InstructionAccount>; MAX_LOCAL_CPI_ACCOUNTS]>::uninit()
@@ -53,7 +56,7 @@ pub(crate) fn commit_accounts_internal(
     invoke_signed_with_bounds::<MAX_LOCAL_CPI_ACCOUNTS>(
         &ix,
         &all_accounts[..ix.accounts.len()],
-        &[],
+        signer_seeds.unwrap_or(&[]),
     )?;
 
     Ok(())
@@ -65,6 +68,15 @@ pub fn commit_accounts(
     magic_context: &AccountView,
     magic_program: &AccountView,
     magic_fee_vault: Option<&AccountView>,
+    signer_seeds: Option<&[Signer<'_, '_>]>,
 ) -> ProgramResult {
-    commit_accounts_internal(payer, accounts, magic_context, magic_program, magic_fee_vault, false)
+    commit_accounts_internal(
+        payer,
+        accounts,
+        magic_context,
+        magic_program,
+        magic_fee_vault,
+        false,
+        signer_seeds,
+    )
 }
