@@ -339,15 +339,6 @@ impl<T: core::fmt::Debug, const N: usize> core::fmt::Debug for NoVec<T, N> {
     }
 }
 
-impl<T: serde::Serialize, const N: usize> serde::Serialize for NoVec<T, N> {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        serde::Serialize::serialize(self.as_slice(), serializer)
-    }
-}
-
 impl<T: bincode::Encode, const N: usize> bincode::Encode for NoVec<T, N> {
     fn encode<E: Encoder>(&self, encoder: &mut E) -> Result<(), EncodeError> {
         bincode::Encode::encode(self.as_slice(), encoder)

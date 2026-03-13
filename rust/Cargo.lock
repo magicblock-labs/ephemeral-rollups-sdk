@@ -498,7 +498,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "36eaf5d7b090263e8150820482d5d93cd964a81e4019913c972f4edcc6edb740"
 dependencies = [
  "bincode_derive",
- "serde",
  "unty",
 ]
 
@@ -1163,7 +1162,6 @@ dependencies = [
  "pinocchio 0.10.1",
  "pinocchio-pubkey",
  "pinocchio-system",
- "serde",
  "solana-address",
  "solana-instruction 2.3.3",
  "solana-program",
@@ -3541,7 +3539,6 @@ dependencies = [
  "five8 1.0.0",
  "five8_const 1.0.0",
  "serde",
- "serde_derive",
  "sha2-const-stable",
  "solana-define-syscall 5.0.0",
  "solana-program-error 3.0.0",
