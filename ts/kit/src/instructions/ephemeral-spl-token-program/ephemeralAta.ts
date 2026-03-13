@@ -583,6 +583,75 @@ export async function delegateShuttleEphemeralAtaIx(
 }
 
 /**
+ * Delegate shuttle ephemeral ATA and schedule implicit merge and shuttle cleanup.
+ * @param payer - The payer account
+ * @param shuttleEphemeralAta - The shuttle metadata account
+ * @param shuttleAta - The shuttle EATA account
+ * @param owner - The shuttle owner signer
+ * @param destinationAta - The destination token account for the merge
+ * @param shuttleWalletAta - The shuttle wallet ATA account
+ * @param mint - The mint account
+ * @param bump - The shuttle EATA bump
+ * @param validator - Optional validator address
+ * @returns The delegate shuttle-with-merge instruction
+ */
+export async function delegateShuttleEphemeralAtaWithMergeIx(
+  payer: Address,
+  shuttleEphemeralAta: Address,
+  shuttleAta: Address,
+  owner: Address,
+  destinationAta: Address,
+  shuttleWalletAta: Address,
+  mint: Address,
+  bump: number,
+  validator?: Address,
+): Promise<Instruction> {
+  const delegateBuffer =
+    await delegateBufferPdaFromDelegatedAccountAndOwnerProgram(
+      shuttleAta,
+      EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
+    );
+  const delegationRecord =
+    await delegationRecordPdaFromDelegatedAccount(shuttleAta);
+  const delegationMetadata =
+    await delegationMetadataPdaFromDelegatedAccount(shuttleAta);
+
+  const addressEncoder = getAddressEncoder();
+  let data: Uint8Array;
+  if (validator) {
+    data = new Uint8Array(34);
+    data[0] = 18;
+    data[1] = bump;
+    data.set(addressEncoder.encode(validator), 2);
+  } else {
+    data = new Uint8Array(2);
+    data[0] = 18;
+    data[1] = bump;
+  }
+
+  return {
+    accounts: [
+      { address: payer, role: AccountRole.WRITABLE_SIGNER },
+      { address: shuttleEphemeralAta, role: AccountRole.READONLY },
+      { address: shuttleAta, role: AccountRole.WRITABLE },
+      { address: EPHEMERAL_SPL_TOKEN_PROGRAM_ID, role: AccountRole.READONLY },
+      { address: delegateBuffer, role: AccountRole.WRITABLE },
+      { address: delegationRecord, role: AccountRole.WRITABLE },
+      { address: delegationMetadata, role: AccountRole.WRITABLE },
+      { address: DELEGATION_PROGRAM_ID, role: AccountRole.READONLY },
+      { address: SYSTEM_PROGRAM_ADDRESS, role: AccountRole.READONLY },
+      { address: owner, role: AccountRole.READONLY_SIGNER },
+      { address: destinationAta, role: AccountRole.WRITABLE },
+      { address: shuttleWalletAta, role: AccountRole.WRITABLE },
+      { address: mint, role: AccountRole.READONLY },
+      { address: TOKEN_PROGRAM_ADDRESS as Address, role: AccountRole.READONLY },
+    ],
+    data,
+    programAddress: EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
+  };
+}
+
+/**
  * Merge shuttle wallet ATA into owner ATA
  * @param owner - The owner account
  * @param ownerAta - The owner ATA destination
@@ -1037,13 +1106,25 @@ async function buildIdempotentDelegateSplInstructions(
   }
 
   instructions.push(
-    await delegateShuttleEphemeralAtaIx(
-      payer,
-      shuttleEphemeralAta,
-      shuttleAta,
-      shuttleAtaBump,
-      validator,
-    ),
+    amount > 0n
+      ? await delegateShuttleEphemeralAtaWithMergeIx(
+          payer,
+          shuttleEphemeralAta,
+          shuttleAta,
+          owner,
+          ownerAta,
+          shuttleWalletAta,
+          mint,
+          shuttleAtaBump,
+          validator,
+        )
+      : await delegateShuttleEphemeralAtaIx(
+          payer,
+          shuttleEphemeralAta,
+          shuttleAta,
+          shuttleAtaBump,
+          validator,
+        ),
   );
 
   return instructions;

@@ -575,6 +575,75 @@ export function delegateShuttleEphemeralAtaIx(
 }
 
 /**
+ * Delegate shuttle ephemeral ATA and schedule implicit merge and shuttle cleanup.
+ * @param payer - The payer account
+ * @param shuttleEphemeralAta - The shuttle metadata account
+ * @param shuttleAta - The shuttle EATA account
+ * @param owner - The shuttle owner signer
+ * @param destinationAta - The destination token account for the merge
+ * @param shuttleWalletAta - The shuttle wallet ATA account
+ * @param mint - The mint account
+ * @param bump - The shuttle EATA bump
+ * @param validator - Optional validator pubkey
+ * @returns The delegate shuttle-with-merge instruction
+ */
+export function delegateShuttleEphemeralAtaWithMergeIx(
+  payer: PublicKey,
+  shuttleEphemeralAta: PublicKey,
+  shuttleAta: PublicKey,
+  owner: PublicKey,
+  destinationAta: PublicKey,
+  shuttleWalletAta: PublicKey,
+  mint: PublicKey,
+  bump: number,
+  validator?: PublicKey,
+): TransactionInstruction {
+  const data = validator
+    ? Buffer.concat([Buffer.from([18, bump]), validator.toBuffer()])
+    : Buffer.from([18, bump]);
+
+  return new TransactionInstruction({
+    programId: EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
+    keys: [
+      { pubkey: payer, isSigner: true, isWritable: true },
+      { pubkey: shuttleEphemeralAta, isSigner: false, isWritable: false },
+      { pubkey: shuttleAta, isSigner: false, isWritable: true },
+      {
+        pubkey: EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
+        isSigner: false,
+        isWritable: false,
+      },
+      {
+        pubkey: delegateBufferPdaFromDelegatedAccountAndOwnerProgram(
+          shuttleAta,
+          EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
+        ),
+        isSigner: false,
+        isWritable: true,
+      },
+      {
+        pubkey: delegationRecordPdaFromDelegatedAccount(shuttleAta),
+        isSigner: false,
+        isWritable: true,
+      },
+      {
+        pubkey: delegationMetadataPdaFromDelegatedAccount(shuttleAta),
+        isSigner: false,
+        isWritable: true,
+      },
+      { pubkey: DELEGATION_PROGRAM_ID, isSigner: false, isWritable: false },
+      { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+      { pubkey: owner, isSigner: true, isWritable: false },
+      { pubkey: destinationAta, isSigner: false, isWritable: true },
+      { pubkey: shuttleWalletAta, isSigner: false, isWritable: true },
+      { pubkey: mint, isSigner: false, isWritable: false },
+      { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
+    ],
+    data,
+  });
+}
+
+/**
  * Merge shuttle wallet ATA balance into destination ATA.
  * @param owner - The shuttle owner signer
  * @param destinationAta - Destination token account
@@ -1038,13 +1107,25 @@ async function buildIdempotentDelegateSplInstructions(
   }
 
   instructions.push(
-    delegateShuttleEphemeralAtaIx(
-      payer,
-      shuttleEphemeralAta,
-      shuttleAta,
-      shuttleAtaBump,
-      validator,
-    ),
+    amount > 0n
+      ? delegateShuttleEphemeralAtaWithMergeIx(
+          payer,
+          shuttleEphemeralAta,
+          shuttleAta,
+          owner,
+          ownerAta,
+          shuttleWalletAta,
+          mint,
+          shuttleAtaBump,
+          validator,
+        )
+      : delegateShuttleEphemeralAtaIx(
+          payer,
+          shuttleEphemeralAta,
+          shuttleAta,
+          shuttleAtaBump,
+          validator,
+        ),
   );
 
   return instructions;

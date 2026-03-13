@@ -739,7 +739,7 @@ describe("Exposed Instructions (@solana/kit)", () => {
       );
     });
 
-    it("should keep shuttleAta writable across the idempotent shuttle flow", async () => {
+    it("should use delegate_shuttle_with_merge across the idempotent shuttle flow", async () => {
       const instructions = await delegateSpl(owner, mint, 1n, {
         validator,
         shuttleId: 7,
@@ -748,16 +748,16 @@ describe("Exposed Instructions (@solana/kit)", () => {
       const initShuttleInstruction = instructions.find(
         (ix) => ix.data?.[0] === 11,
       );
-      const delegateShuttleInstruction = instructions.find(
-        (ix) => ix.data?.[0] === 13,
+      const delegateShuttleWithMergeInstruction = instructions.find(
+        (ix) => ix.data?.[0] === 18,
       );
 
       expect(initShuttleInstruction).toBeDefined();
       expect(initShuttleInstruction?.accounts?.[2].role).toBe(
         AccountRole.WRITABLE,
       );
-      expect(delegateShuttleInstruction).toBeDefined();
-      expect(delegateShuttleInstruction?.accounts?.[2].role).toBe(
+      expect(delegateShuttleWithMergeInstruction).toBeDefined();
+      expect(delegateShuttleWithMergeInstruction?.accounts?.[2].role).toBe(
         AccountRole.WRITABLE,
       );
     });

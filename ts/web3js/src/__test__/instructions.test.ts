@@ -781,6 +781,22 @@ describe("Exposed Instructions (web3.js)", () => {
         ),
       ).toBe(true);
     });
+
+    it("should use delegate_shuttle_with_merge in idempotent flow when amount is nonzero", async () => {
+      const instructions = await delegateSpl(owner, mint, 1n, {
+        validator,
+        shuttleId: 7,
+      });
+
+      const delegateShuttleWithMergeInstruction = instructions.find(
+        (ix) => ix.data[0] === 18,
+      );
+
+      expect(delegateShuttleWithMergeInstruction).toBeDefined();
+      expect(delegateShuttleWithMergeInstruction?.keys[2].isWritable).toBe(
+        true,
+      );
+    });
   });
 
   describe("ensureTransferQueueCrankIx (Ephemeral SPL Token Program)", () => {
