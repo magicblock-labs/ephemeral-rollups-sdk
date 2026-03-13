@@ -1,6 +1,11 @@
 use crate::solana_compat::solana::{invoke, AccountInfo, AccountMeta, Instruction, ProgramResult};
 use magicblock_magic_program_api::instruction::MagicBlockInstruction;
 
+/// CPI to trigger a commit of one or more accounts in the ER.
+/// Pass `magic_fee_vault` when the payer is a delegated ephemeral balance account
+/// so that commit fees can be collected by the magic program. The vault must be
+/// the writable magic fee vault PDA for the current validator. Pass `None` when
+/// no fee collection is required (e.g. the payer is not delegated).
 #[inline(always)]
 pub fn commit_accounts<'a, 'info>(
     payer: &'a AccountInfo<'info>,

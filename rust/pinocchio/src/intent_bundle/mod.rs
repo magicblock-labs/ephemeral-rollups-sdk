@@ -191,6 +191,9 @@ impl<'acc, 'args> MagicIntentBundleBuilder<'acc, 'args> {
 
         let mut all_accounts = NoVec::<AccountView, MAX_STATIC_CPI_ACCOUNTS>::new();
         all_accounts.try_append([self.payer, self.magic_context])?;
+        if let Some(vault) = self.magic_fee_vault {
+            all_accounts.try_push(vault)?;
+        }
         self.intent_bundle
             .collect_unique_accounts(&mut all_accounts)?;
 
@@ -817,6 +820,81 @@ mod tests {
 
         let (_len, _accounts) = builder.build_serialized(&mut buf);
         std::hint::black_box(&buf);
+    }
+
+    /// Verifies pinocchio-vs-SDK parity when magic_fee_vault is set:
+    /// the vault must appear at index 2 in both the serialized payload and the CPI account list.
+    #[test]
+    fn test_compat_commit_with_magic_fee_vault() {
+        let payer_addr = [0x01; 32];
+        let ctx_addr = [0x02; 32];
+        let vault_addr = [0x0F; 32];
+        let acc1_addr = [0x03; 32];
+        let prog_addr = [0xFF; 32];
+
+        // --- Pinocchio ---
+        let mut p_payer = MockRuntimeAccount::new(payer_addr);
+        let mut p_ctx = MockRuntimeAccount::new(ctx_addr);
+        let mut p_vault = MockRuntimeAccount::new(vault_addr);
+        let mut p_acc1 = MockRuntimeAccount::new(acc1_addr);
+        let mut p_prog = MockRuntimeAccount::new(prog_addr);
+
+        let commit_accs = [p_acc1.as_account_view()];
+        let mut buf = [0u8; CPI_DATA_BUF_SIZE];
+
+        let (pino_len, pino_accounts) = MagicIntentBundleBuilder::new(
+            p_payer.as_account_view(),
+            p_ctx.as_account_view(),
+            p_prog.as_account_view(),
+        )
+        .magic_fee_vault(p_vault.as_account_view())
+        .commit(&commit_accs)
+        .fold()
+        .build_serialized(&mut buf);
+
+        // Vault must be at index 2 in the CPI account list
+        assert_eq!(
+            pino_accounts.as_slice()[2],
+            Address::new_from_array(vault_addr),
+            "vault should be at index 2 in pinocchio account list"
+        );
+
+        // --- SDK ---
+        let mut s_payer = SdkTestAccount::new(payer_addr);
+        let mut s_ctx = SdkTestAccount::new(ctx_addr);
+        let mut s_vault = SdkTestAccount::new(vault_addr);
+        let mut s_acc1 = SdkTestAccount::new(acc1_addr);
+        let mut s_prog = SdkTestAccount::new(prog_addr);
+
+        let (accounts, ix) = SdkBuilder::new(
+            s_payer.as_account_info(),
+            s_ctx.as_account_info(),
+            s_prog.as_account_info(),
+        )
+        .magic_fee_vault(s_vault.as_account_info())
+        .commit(&[s_acc1.as_account_info()])
+        .build();
+
+        assert_eq!(
+            &buf[..pino_len],
+            &ix.data,
+            "commit with magic_fee_vault: serialized data mismatch"
+        );
+
+        let sdk_addrs: Vec<Address> = accounts
+            .iter()
+            .map(|a| Address::new_from_array(a.key.to_bytes()))
+            .collect();
+        assert_eq!(
+            pino_accounts.as_slice(),
+            sdk_addrs.as_slice(),
+            "commit with magic_fee_vault: account list mismatch"
+        );
+        assert_eq!(
+            sdk_addrs[2],
+            Address::new_from_array(vault_addr),
+            "vault should be at index 2 in SDK account list"
+        );
     }
 
     #[test]
