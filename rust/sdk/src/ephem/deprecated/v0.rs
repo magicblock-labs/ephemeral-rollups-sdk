@@ -1,30 +1,57 @@
 use crate::solana_compat::solana::{invoke, AccountInfo, AccountMeta, Instruction, ProgramResult};
 use magicblock_magic_program_api::instruction::MagicBlockInstruction;
 
-/// CPI to trigger a commit for one or more accounts in the ER
+/// CPI to trigger a commit of one or more accounts in the ER.
+/// Pass `magic_fee_vault` when the payer is a delegated ephemeral balance account
+/// so that commit fees can be collected by the magic program. The vault must be
+/// the writable magic fee vault PDA for the current validator. Pass `None` when
+/// no fee collection is required (e.g. the payer is not delegated).
 #[inline(always)]
 pub fn commit_accounts<'a, 'info>(
     payer: &'a AccountInfo<'info>,
     account_infos: Vec<&'a AccountInfo<'info>>,
     magic_context: &'a AccountInfo<'info>,
     magic_program: &'a AccountInfo<'info>,
+    magic_fee_vault: Option<&'a AccountInfo<'info>>,
 ) -> ProgramResult {
-    let ix = create_schedule_commit_ix(payer, &account_infos, magic_context, magic_program, false);
+    let ix = create_schedule_commit_ix(
+        payer,
+        &account_infos,
+        magic_context,
+        magic_program,
+        magic_fee_vault,
+        false,
+    );
     let mut all_accounts = vec![payer.clone(), magic_context.clone()];
+    if let Some(vault) = magic_fee_vault {
+        all_accounts.push(vault.clone());
+    }
     all_accounts.extend(account_infos.into_iter().cloned());
     invoke(&ix, &all_accounts)
 }
 
-/// CPI to trigger a commit and undelegate one or more accounts in the ER
+/// CPI to trigger a commit and undelegate one or more accounts in the ER.
+/// Pass `magic_fee_vault` when the payer is a delegated ephemeral balance account.
 #[inline(always)]
 pub fn commit_and_undelegate_accounts<'a, 'info>(
     payer: &'a AccountInfo<'info>,
     account_infos: Vec<&'a AccountInfo<'info>>,
     magic_context: &'a AccountInfo<'info>,
     magic_program: &'a AccountInfo<'info>,
+    magic_fee_vault: Option<&'a AccountInfo<'info>>,
 ) -> ProgramResult {
-    let ix = create_schedule_commit_ix(payer, &account_infos, magic_context, magic_program, true);
+    let ix = create_schedule_commit_ix(
+        payer,
+        &account_infos,
+        magic_context,
+        magic_program,
+        magic_fee_vault,
+        true,
+    );
     let mut all_accounts = vec![payer.clone(), magic_context.clone()];
+    if let Some(vault) = magic_fee_vault {
+        all_accounts.push(vault.clone());
+    }
     all_accounts.extend(account_infos.into_iter().cloned());
     invoke(&ix, &all_accounts)
 }
@@ -34,6 +61,7 @@ pub fn create_schedule_commit_ix<'a, 'info>(
     account_infos: &[&'a AccountInfo<'info>],
     magic_context: &'a AccountInfo<'info>,
     magic_program: &'a AccountInfo<'info>,
+    magic_fee_vault: Option<&'a AccountInfo<'info>>,
     allow_undelegation: bool,
 ) -> Instruction {
     let instruction = if allow_undelegation {
@@ -53,6 +81,13 @@ pub fn create_schedule_commit_ix<'a, 'info>(
             is_writable: true,
         },
     ];
+    if let Some(vault) = magic_fee_vault {
+        account_metas.push(AccountMeta {
+            pubkey: *vault.key,
+            is_signer: false,
+            is_writable: true,
+        });
+    }
     account_metas.extend(account_infos.iter().map(|x| AccountMeta {
         pubkey: *x.key,
         is_signer: x.is_signer,

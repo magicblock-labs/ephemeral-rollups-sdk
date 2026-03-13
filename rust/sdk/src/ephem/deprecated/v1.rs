@@ -19,14 +19,25 @@ pub struct MagicInstructionBuilder<'info> {
     pub payer: AccountInfo<'info>,
     pub magic_context: AccountInfo<'info>,
     pub magic_program: AccountInfo<'info>,
+    pub magic_fee_vault: Option<AccountInfo<'info>>,
     pub magic_action: MagicAction<'info>,
 }
 
 impl<'info> MagicInstructionBuilder<'info> {
+    /// Sets an optional magic fee vault account to be passed at index 2
+    /// (right after payer and magic_context). Required when the payer is delegated.
+    pub fn magic_fee_vault(mut self, vault: AccountInfo<'info>) -> Self {
+        self.magic_fee_vault = Some(vault);
+        self
+    }
+
     /// Build instruction for supplied an action and prepares accounts
     pub fn build(self) -> (Vec<AccountInfo<'info>>, Instruction) {
         // set those to be first
         let mut all_accounts = vec![self.payer, self.magic_context];
+        if let Some(vault) = self.magic_fee_vault {
+            all_accounts.push(vault);
+        }
         // collect all accounts to be used in instruction
         self.magic_action.collect_accounts(&mut all_accounts);
         // filter duplicates & get indices map
