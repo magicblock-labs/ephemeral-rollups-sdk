@@ -42,6 +42,7 @@ delegation-actions = [
     "pinocchio/cpi",
     "magicblock-delegation-program-api",
 ]
+# Compatibility no-op for downstream manifests; remove in the next breaking release.
 intent-bundle = []
 
 [lints.rust]
