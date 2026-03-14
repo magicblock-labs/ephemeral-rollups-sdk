@@ -16,11 +16,17 @@ import {
   delegateSpl,
   delegateTransferQueueIx,
   deriveEphemeralAta,
+  deriveRentPda,
   deriveVault,
   ensureTransferQueueCrankIx,
   initVaultIx,
+  initRentPdaIx,
 } from "../instructions/ephemeral-spl-token-program";
-import { MAGIC_PROGRAM_ID, MAGIC_CONTEXT_ID } from "../constants";
+import {
+  MAGIC_PROGRAM_ID,
+  MAGIC_CONTEXT_ID,
+  EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
+} from "../constants";
 
 describe("Exposed Instructions (@solana/kit)", () => {
   const mockAddress = "11111111111111111111111111111111" as Address;
@@ -263,6 +269,25 @@ describe("Exposed Instructions (@solana/kit)", () => {
       // Offset 12 should have seeds array length = 2
       const view = new DataView(instruction.data?.buffer as ArrayBuffer, 12, 4);
       expect(view.getUint32(0, true)).toBe(2);
+    });
+  });
+
+  describe("initRentPdaIx (Ephemeral SPL Token Program)", () => {
+    it("should derive and initialize the global rent PDA", async () => {
+      const [rentPda] = await deriveRentPda();
+      const instruction = initRentPdaIx(mockAddress, rentPda);
+
+      expect(instruction.programAddress).toBe(EPHEMERAL_SPL_TOKEN_PROGRAM_ID);
+      expect(instruction.accounts).toHaveLength(3);
+      expect(instruction.accounts?.[0]).toEqual({
+        address: mockAddress,
+        role: AccountRole.WRITABLE_SIGNER,
+      });
+      expect(instruction.accounts?.[1]).toEqual({
+        address: rentPda,
+        role: AccountRole.WRITABLE,
+      });
+      expect(instruction.data).toEqual(new Uint8Array([23]));
     });
   });
 

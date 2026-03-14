@@ -15,11 +15,14 @@ import {
   delegateSpl,
   delegateTransferQueueIx,
   deriveEphemeralAta,
+  deriveRentPda,
   deriveVault,
   ensureTransferQueueCrankIx,
+  initRentPdaIx,
 } from "../instructions/ephemeral-spl-token-program";
 import {
   DELEGATION_PROGRAM_ID,
+  EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
   MAGIC_PROGRAM_ID,
   MAGIC_CONTEXT_ID,
 } from "../constants";
@@ -273,6 +276,22 @@ describe("Exposed Instructions (web3.js)", () => {
       expect(instruction.data).toBeDefined();
       // Offset 12 should have seeds array length = 2
       expect(instruction.data.readUInt32LE(12)).toBe(2);
+    });
+  });
+
+  describe("initRentPdaIx (Ephemeral SPL Token Program)", () => {
+    it("should derive and initialize the global rent PDA", () => {
+      const [rentPda] = deriveRentPda();
+      const instruction = initRentPdaIx(mockPublicKey, rentPda);
+
+      expect(instruction.programId.toBase58()).toBe(
+        EPHEMERAL_SPL_TOKEN_PROGRAM_ID.toBase58(),
+      );
+      expect(instruction.keys).toHaveLength(3);
+      expect(instruction.keys[0].pubkey.toBase58()).toBe(mockPublicKey.toBase58());
+      expect(instruction.keys[0].isSigner).toBe(true);
+      expect(instruction.keys[1].pubkey.toBase58()).toBe(rentPda.toBase58());
+      expect(instruction.data).toEqual(Buffer.from([23]));
     });
   });
 

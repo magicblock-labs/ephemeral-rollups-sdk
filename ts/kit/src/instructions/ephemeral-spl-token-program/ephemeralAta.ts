@@ -200,6 +200,18 @@ export async function deriveVault(mint: Address): Promise<[Address, number]> {
 }
 
 /**
+ * Derive global rent PDA
+ * @returns The rent PDA account and bump
+ */
+export async function deriveRentPda(): Promise<[Address, number]> {
+  const [rentPda, bump] = await getProgramDerivedAddress({
+    programAddress: EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
+    seeds: [new Uint8Array([114, 101, 110, 116])],
+  });
+  return [rentPda, bump];
+}
+
+/**
  * Derive vault ATA
  * @param mint - The mint account
  * @param vault - The vault account
@@ -378,6 +390,27 @@ export function initVaultIx(
       { address: SYSTEM_PROGRAM_ADDRESS, role: AccountRole.READONLY },
     ],
     data: new Uint8Array([1, bump]),
+    programAddress: EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
+  };
+}
+
+/**
+ * Init global rent PDA
+ * @param payer - The payer account
+ * @param rentPda - The rent PDA account
+ * @returns The init rent PDA instruction
+ */
+export function initRentPdaIx(
+  payer: Address,
+  rentPda: Address,
+): Instruction {
+  return {
+    accounts: [
+      { address: payer, role: AccountRole.WRITABLE_SIGNER },
+      { address: rentPda, role: AccountRole.WRITABLE },
+      { address: SYSTEM_PROGRAM_ADDRESS, role: AccountRole.READONLY },
+    ],
+    data: new Uint8Array([23]),
     programAddress: EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
   };
 }

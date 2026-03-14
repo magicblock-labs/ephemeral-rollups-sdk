@@ -193,6 +193,17 @@ export function deriveVault(mint: PublicKey): [PublicKey, number] {
 }
 
 /**
+ * Derive global rent PDA
+ * @returns The rent PDA account and bump
+ */
+export function deriveRentPda(): [PublicKey, number] {
+  return PublicKey.findProgramAddressSync(
+    [Buffer.from("rent")],
+    EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
+  );
+}
+
+/**
  * Derive vault ATA
  * @param mint - The mint account
  * @param vault - The vault account
@@ -348,6 +359,27 @@ export function initVaultIx(
       { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
     ],
     data: Buffer.from([1, bump]),
+  });
+}
+
+/**
+ * Init global rent PDA
+ * @param payer - The payer account
+ * @param rentPda - The rent PDA account
+ * @returns The init rent PDA instruction
+ */
+export function initRentPdaIx(
+  payer: PublicKey,
+  rentPda: PublicKey,
+): TransactionInstruction {
+  return new TransactionInstruction({
+    programId: EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
+    keys: [
+      { pubkey: payer, isSigner: true, isWritable: true },
+      { pubkey: rentPda, isSigner: false, isWritable: true },
+      { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+    ],
+    data: Buffer.from([23]),
   });
 }
 
