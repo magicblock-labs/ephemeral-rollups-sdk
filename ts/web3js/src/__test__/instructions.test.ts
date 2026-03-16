@@ -13,12 +13,14 @@ import {
 import {
   depositAndQueueTransferIx,
   delegateSpl,
+  delegateSplWithPrivateTransfer,
   delegateTransferQueueIx,
   deriveEphemeralAta,
   deriveRentPda,
   deriveVault,
   ensureTransferQueueCrankIx,
   initRentPdaIx,
+  withdrawSpl,
 } from "../instructions/ephemeral-spl-token-program";
 import {
   DELEGATION_PROGRAM_ID,
@@ -288,7 +290,9 @@ describe("Exposed Instructions (web3.js)", () => {
         EPHEMERAL_SPL_TOKEN_PROGRAM_ID.toBase58(),
       );
       expect(instruction.keys).toHaveLength(3);
-      expect(instruction.keys[0].pubkey.toBase58()).toBe(mockPublicKey.toBase58());
+      expect(instruction.keys[0].pubkey.toBase58()).toBe(
+        mockPublicKey.toBase58(),
+      );
       expect(instruction.keys[0].isSigner).toBe(true);
       expect(instruction.keys[1].pubkey.toBase58()).toBe(rentPda.toBase58());
       expect(instruction.data).toEqual(Buffer.from([23]));
@@ -801,20 +805,103 @@ describe("Exposed Instructions (web3.js)", () => {
       ).toBe(true);
     });
 
-    it("should use delegate_shuttle_with_merge in idempotent flow when amount is nonzero", async () => {
+    it("should use setup_and_delegate_shuttle_with_merge in idempotent flow when amount is nonzero", async () => {
       const instructions = await delegateSpl(owner, mint, 1n, {
         validator,
         shuttleId: 7,
       });
 
-      const delegateShuttleWithMergeInstruction = instructions.find(
-        (ix) => ix.data[0] === 18,
+      const setupAndDelegateInstruction = instructions.find(
+        (ix) => ix.data[0] === 24,
       );
 
-      expect(delegateShuttleWithMergeInstruction).toBeDefined();
-      expect(delegateShuttleWithMergeInstruction?.keys[2].isWritable).toBe(
-        true,
+      expect(setupAndDelegateInstruction).toBeDefined();
+      if (setupAndDelegateInstruction == null) {
+        throw new Error("Expected setup_and_delegate instruction");
+      }
+      expect(setupAndDelegateInstruction?.keys).toHaveLength(19);
+      expect(instructions.find((ix) => ix.data[0] === 11)).toBeUndefined();
+      expect(
+        Buffer.from(setupAndDelegateInstruction.data).readBigUInt64LE(6),
+      ).toBe(1n);
+      expect(
+        Buffer.from(setupAndDelegateInstruction.data.subarray(14)).equals(
+          validator.toBuffer(),
+        ),
+      ).toBe(true);
+    });
+  });
+
+  describe("delegateSplWithPrivateTransfer (Ephemeral SPL Token Program)", () => {
+    const owner = new PublicKey("11111111111111111111111111111113");
+    const mint = new PublicKey("11111111111111111111111111111114");
+    const validator = new PublicKey("11111111111111111111111111111115");
+
+    it("should use the private transfer shuttle flow", async () => {
+      const instructions = await delegateSplWithPrivateTransfer(
+        owner,
+        mint,
+        1n,
+        {
+          validator,
+          shuttleId: 7,
+          initTransferQueueIfMissing: true,
+          minDelayMs: 100n,
+          maxDelayMs: 300n,
+          split: 4,
+        },
       );
+
+      const privateTransferInstruction = instructions.find(
+        (ix) => ix.data[0] === 25,
+      );
+
+      expect(instructions.find((ix) => ix.data[0] === 12)).toBeDefined();
+      expect(privateTransferInstruction).toBeDefined();
+      if (privateTransferInstruction == null) {
+        throw new Error("Expected private transfer instruction");
+      }
+      expect(privateTransferInstruction?.keys).toHaveLength(20);
+      expect(
+        Buffer.from(privateTransferInstruction.data).readBigUInt64LE(6),
+      ).toBe(1n);
+      expect(
+        Buffer.from(privateTransferInstruction.data).readBigUInt64LE(14),
+      ).toBe(100n);
+      expect(
+        Buffer.from(privateTransferInstruction.data).readBigUInt64LE(22),
+      ).toBe(300n);
+      expect(
+        Buffer.from(privateTransferInstruction.data).readUInt32LE(30),
+      ).toBe(4);
+    });
+  });
+
+  describe("withdrawSpl (Ephemeral SPL Token Program)", () => {
+    const owner = new PublicKey("11111111111111111111111111111113");
+    const mint = new PublicKey("11111111111111111111111111111114");
+    const validator = new PublicKey("11111111111111111111111111111115");
+
+    it("should use the delegated shuttle withdrawal flow when idempotent", async () => {
+      const instructions = await withdrawSpl(owner, mint, 1n, {
+        validator,
+        shuttleId: 7,
+      });
+
+      const withdrawInstruction = instructions.find((ix) => ix.data[0] === 26);
+
+      expect(withdrawInstruction).toBeDefined();
+      expect(withdrawInstruction?.keys).toHaveLength(16);
+      expect(instructions.find((ix) => ix.data[0] === 3)).toBeUndefined();
+    });
+
+    it("should fall back to the legacy withdraw instruction when idempotent is false", async () => {
+      const instructions = await withdrawSpl(owner, mint, 1n, {
+        idempotent: false,
+      });
+
+      expect(instructions).toHaveLength(1);
+      expect(instructions[0].data[0]).toBe(3);
     });
   });
 

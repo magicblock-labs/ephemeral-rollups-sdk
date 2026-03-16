@@ -171,6 +171,32 @@ fn cpi_delegate_with_discriminator(
 }
 
 #[cfg(feature = "delegation-actions")]
+pub fn serialize_delegate_with_actions_data(
+    delegate_args: DelegateAccountArgs,
+    actions: dlp_api::dlp::args::PostDelegationActions,
+) -> Result<alloc::vec::Vec<u8>, ProgramError> {
+    use alloc::vec::Vec;
+    use dlp_api::dlp::args::{DelegateArgs, DelegateWithActionsArgs};
+    use dlp_api::dlp::discriminator::DlpDiscriminator;
+    use solana_program::pubkey::Pubkey;
+
+    let seeds_vec: Vec<Vec<u8>> = delegate_args.seeds.iter().map(|s| s.to_vec()).collect();
+    let delegate = DelegateArgs {
+        commit_frequency_ms: delegate_args.commit_frequency_ms,
+        seeds: seeds_vec,
+        validator: delegate_args
+            .validator
+            .map(|v| Pubkey::new_from_array(*v.as_array())),
+    };
+    let args = DelegateWithActionsArgs { delegate, actions };
+
+    let mut data = DlpDiscriminator::DelegateWithActions.to_vec();
+    let payload = borsh::to_vec(&args).map_err(|_| ProgramError::InvalidInstructionData)?;
+    data.extend_from_slice(&payload);
+    Ok(data)
+}
+
+#[cfg(feature = "delegation-actions")]
 #[allow(clippy::too_many_arguments)]
 pub fn cpi_delegate_with_actions(
     payer: &AccountView,
@@ -185,11 +211,7 @@ pub fn cpi_delegate_with_actions(
     action_signer_accounts: &[&AccountView],
     signer_seeds: Signer<'_, '_>,
 ) -> Result<(), ProgramError> {
-    use alloc::vec::Vec;
-    use dlp_api::dlp::args::{DelegateArgs, DelegateWithActionsArgs};
-    use dlp_api::dlp::discriminator::DlpDiscriminator;
     use pinocchio::cpi::invoke_signed_with_bounds;
-    use solana_program::pubkey::Pubkey;
 
     use crate::consts::MAX_POST_DELEGATION_SIGNERS;
 
@@ -246,19 +268,7 @@ pub fn cpi_delegate_with_actions(
         i += 1;
     }
 
-    let seeds_vec: Vec<Vec<u8>> = delegate_args.seeds.iter().map(|s| s.to_vec()).collect();
-    let delegate = DelegateArgs {
-        commit_frequency_ms: delegate_args.commit_frequency_ms,
-        seeds: seeds_vec,
-        validator: delegate_args
-            .validator
-            .map(|v| Pubkey::new_from_array(*v.as_array())),
-    };
-    let args = DelegateWithActionsArgs { delegate, actions };
-
-    let mut data = DlpDiscriminator::DelegateWithActions.to_vec();
-    let payload = borsh::to_vec(&args).map_err(|_| ProgramError::InvalidInstructionData)?;
-    data.extend_from_slice(&payload);
+    let data = serialize_delegate_with_actions_data(delegate_args, actions)?;
 
     let instruction = InstructionView {
         program_id: &DELEGATION_PROGRAM_ID,
