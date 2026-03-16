@@ -11,6 +11,14 @@ import {
   createCommitAndUndelegateInstruction,
 } from "../instructions/magic-program";
 import {
+  depositAndQueueTransferIx,
+  delegateSpl,
+  delegateTransferQueueIx,
+  deriveEphemeralAta,
+  deriveVault,
+  ensureTransferQueueCrankIx,
+} from "../instructions/ephemeral-spl-token-program";
+import {
   DELEGATION_PROGRAM_ID,
   MAGIC_PROGRAM_ID,
   MAGIC_CONTEXT_ID,
@@ -715,6 +723,137 @@ describe("Exposed Instructions (web3.js)", () => {
           account.toBase58(),
         );
       });
+    });
+  });
+
+  describe("delegateSpl (Ephemeral SPL Token Program)", () => {
+    const owner = new PublicKey("11111111111111111111111111111113");
+    const mint = new PublicKey("11111111111111111111111111111114");
+    const validator = new PublicKey("11111111111111111111111111111115");
+
+    it("should delegate the vault eata when initializing the vault in legacy flow", async () => {
+      const [vault] = deriveVault(mint);
+      const [vaultEphemeralAta, vaultEataBump] = deriveEphemeralAta(
+        vault,
+        mint,
+      );
+
+      const instructions = await delegateSpl(owner, mint, 1n, {
+        validator,
+        initIfMissing: true,
+        initVaultIfMissing: true,
+        idempotent: false,
+      });
+
+      expect(instructions[3].keys[1].pubkey.toBase58()).toBe(
+        vaultEphemeralAta.toBase58(),
+      );
+      expect(instructions[3].data[0]).toBe(4);
+      expect(instructions[3].data[1]).toBe(vaultEataBump);
+      expect(
+        Buffer.from(instructions[3].data.subarray(2)).equals(
+          validator.toBuffer(),
+        ),
+      ).toBe(true);
+    });
+
+    it("should delegate the vault eata when initializing the vault in idempotent flow", async () => {
+      const [vault] = deriveVault(mint);
+      const [vaultEphemeralAta, vaultEataBump] = deriveEphemeralAta(
+        vault,
+        mint,
+      );
+
+      const instructions = await delegateSpl(owner, mint, 1n, {
+        validator,
+        initVaultIfMissing: true,
+        shuttleId: 7,
+      });
+
+      expect(instructions[2].keys[1].pubkey.toBase58()).toBe(
+        vaultEphemeralAta.toBase58(),
+      );
+      expect(instructions[2].data[0]).toBe(4);
+      expect(instructions[2].data[1]).toBe(vaultEataBump);
+      expect(
+        Buffer.from(instructions[2].data.subarray(2)).equals(
+          validator.toBuffer(),
+        ),
+      ).toBe(true);
+    });
+  });
+
+  describe("ensureTransferQueueCrankIx (Ephemeral SPL Token Program)", () => {
+    const payer = mockPublicKey;
+    const queue = differentKey;
+
+    it("should include queue, magic context, and magic program in order", () => {
+      const instruction = ensureTransferQueueCrankIx(payer, queue);
+
+      expect(instruction.keys).toHaveLength(4);
+      expect(instruction.keys[0].pubkey.toBase58()).toBe(payer.toBase58());
+      expect(instruction.keys[1].pubkey.toBase58()).toBe(queue.toBase58());
+      expect(instruction.keys[2].pubkey.toBase58()).toBe(
+        MAGIC_CONTEXT_ID.toBase58(),
+      );
+      expect(instruction.keys[3].pubkey.toBase58()).toBe(
+        MAGIC_PROGRAM_ID.toBase58(),
+      );
+    });
+  });
+
+  describe("depositAndQueueTransferIx (Ephemeral SPL Token Program)", () => {
+    const queue = differentKey;
+    const vault = new PublicKey("11111111111111111111111111111113");
+    const mint = new PublicKey("11111111111111111111111111111114");
+    const source = new PublicKey("11111111111111111111111111111115");
+    const vaultAta = new PublicKey("11111111111111111111111111111116");
+    const destination = new PublicKey("11111111111111111111111111111117");
+
+    it("should serialize min/max delay ms and split", () => {
+      const instruction = depositAndQueueTransferIx(
+        queue,
+        vault,
+        mint,
+        source,
+        vaultAta,
+        destination,
+        mockPublicKey,
+        25n,
+        100n,
+        300n,
+        4,
+      );
+
+      expect(instruction.keys).toHaveLength(8);
+      expect(Array.from(instruction.data)).toEqual([
+        16,
+        ...Array.from(
+          Buffer.from(
+            [25n, 100n, 300n].flatMap((value) => {
+              const out = Buffer.alloc(8);
+              out.writeBigUInt64LE(value);
+              return Array.from(out);
+            }),
+          ),
+        ),
+        4,
+        0,
+        0,
+        0,
+      ]);
+    });
+  });
+
+  describe("delegateTransferQueueIx (Ephemeral SPL Token Program)", () => {
+    const payer = mockPublicKey;
+    const queue = differentKey;
+
+    it("should serialize discriminator 19 for the delegated transfer queue opcode", () => {
+      const instruction = delegateTransferQueueIx(queue, payer, mockPublicKey);
+
+      expect(instruction.keys).toHaveLength(9);
+      expect(Array.from(instruction.data)).toEqual([19]);
     });
   });
 });

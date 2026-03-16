@@ -158,7 +158,7 @@ fn encode_handler<E: Encoder>(
     BaseActionArgs {
         args: handler.args.clone(),
         compute_units: handler.compute_units,
-        destination_program: handler.destination_program.clone(),
+        destination_program: handler.destination_program,
         escrow_authority: get_index(indices_map, handler.escrow_authority.address())
             .ok_or(EncodeError::Other("escrow not in indices_map"))?,
         accounts: handler.accounts,

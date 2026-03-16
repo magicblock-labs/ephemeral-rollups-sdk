@@ -2,6 +2,7 @@
 pub mod anchor;
 pub mod consts;
 pub mod cpi;
+pub mod crank;
 pub mod delegate_args;
 pub mod ephem;
 #[cfg(any(
@@ -19,9 +20,10 @@ pub mod access_control;
 #[cfg(feature = "spl")]
 pub mod spl;
 
-pub use dlp::args::CallHandlerArgs;
-pub use dlp::pda;
-pub use dlp::{
+pub use dlp_api;
+pub use dlp_api::dlp::args::CallHandlerArgs;
+pub use dlp_api::dlp::pda;
+pub use dlp_api::dlp::{
     commit_record_seeds_from_delegated_account, commit_state_seeds_from_delegated_account,
     delegate_buffer_seeds_from_delegated_account, delegation_metadata_seeds_from_delegated_account,
     delegation_record_seeds_from_delegated_account, ephemeral_balance_seeds_from_payer,

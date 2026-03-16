@@ -10,12 +10,22 @@ import {
   createCommitInstruction,
   createCommitAndUndelegateInstruction,
 } from "../instructions/magic-program";
-import { type Address } from "@solana/kit";
+import { address, getAddressEncoder, type Address } from "@solana/kit";
+import {
+  depositAndQueueTransferIx,
+  delegateSpl,
+  delegateTransferQueueIx,
+  deriveEphemeralAta,
+  deriveVault,
+  ensureTransferQueueCrankIx,
+  initVaultIx,
+} from "../instructions/ephemeral-spl-token-program";
 import { MAGIC_PROGRAM_ID, MAGIC_CONTEXT_ID } from "../constants";
 
 describe("Exposed Instructions (@solana/kit)", () => {
   const mockAddress = "11111111111111111111111111111111" as Address;
   const differentAddress = "11111111111111111111111111111112" as Address;
+  const addressEncoder = getAddressEncoder();
 
   describe("delegate instruction", () => {
     it("should create a delegate instruction with correct parameters", async () => {
@@ -678,6 +688,195 @@ describe("Exposed Instructions (@solana/kit)", () => {
       accounts.forEach((account, index) => {
         expect(instruction.accounts?.[2 + index].address).toBe(account);
       });
+    });
+  });
+
+  describe("delegateSpl (Ephemeral SPL Token Program)", () => {
+    const owner = address("11111111111111111111111111111113");
+    const mint = address("11111111111111111111111111111114");
+    const validator = address("11111111111111111111111111111115");
+
+    it("should delegate the vault eata when initializing the vault in legacy flow", async () => {
+      const [vault] = await deriveVault(mint);
+      const [vaultEphemeralAta, vaultEataBump] = await deriveEphemeralAta(
+        vault,
+        mint,
+      );
+
+      const instructions = await delegateSpl(owner, mint, 1n, {
+        validator,
+        initIfMissing: true,
+        initVaultIfMissing: true,
+        idempotent: false,
+      });
+
+      expect(instructions[3].accounts?.[1].address).toBe(vaultEphemeralAta);
+      expect(instructions[3].data?.[0]).toBe(4);
+      expect(instructions[3].data?.[1]).toBe(vaultEataBump);
+      expect(Array.from(instructions[3].data?.subarray(2) ?? [])).toEqual(
+        Array.from(addressEncoder.encode(validator)),
+      );
+    });
+
+    it("should delegate the vault eata when initializing the vault in idempotent flow", async () => {
+      const [vault] = await deriveVault(mint);
+      const [vaultEphemeralAta, vaultEataBump] = await deriveEphemeralAta(
+        vault,
+        mint,
+      );
+
+      const instructions = await delegateSpl(owner, mint, 1n, {
+        validator,
+        initVaultIfMissing: true,
+        shuttleId: 7,
+      });
+
+      expect(instructions[2].accounts?.[1].address).toBe(vaultEphemeralAta);
+      expect(instructions[2].data?.[0]).toBe(4);
+      expect(instructions[2].data?.[1]).toBe(vaultEataBump);
+      expect(Array.from(instructions[2].data?.subarray(2) ?? [])).toEqual(
+        Array.from(addressEncoder.encode(validator)),
+      );
+    });
+
+    it("should keep shuttleAta writable across the idempotent shuttle flow", async () => {
+      const instructions = await delegateSpl(owner, mint, 1n, {
+        validator,
+        shuttleId: 7,
+      });
+
+      const initShuttleInstruction = instructions.find(
+        (ix) => ix.data?.[0] === 11,
+      );
+      const delegateShuttleInstruction = instructions.find(
+        (ix) => ix.data?.[0] === 13,
+      );
+
+      expect(initShuttleInstruction).toBeDefined();
+      expect(initShuttleInstruction?.accounts?.[2].role).toBe(
+        AccountRole.WRITABLE,
+      );
+      expect(delegateShuttleInstruction).toBeDefined();
+      expect(delegateShuttleInstruction?.accounts?.[2].role).toBe(
+        AccountRole.WRITABLE,
+      );
+    });
+
+    it("should skip ephemeral ATA init in idempotent flow when initIfMissing is false", async () => {
+      const [ephemeralAta] = await deriveEphemeralAta(owner, mint);
+      const instructions = await delegateSpl(owner, mint, 1n, {
+        validator,
+        shuttleId: 7,
+        initIfMissing: false,
+      });
+
+      const initInstruction = instructions.find(
+        (ix) => ix.data?.[0] === 0 && ix.accounts?.[0].address === ephemeralAta,
+      );
+      const delegateInstruction = instructions.find(
+        (ix) => ix.data?.[0] === 4 && ix.accounts?.[1].address === ephemeralAta,
+      );
+
+      expect(initInstruction).toBeUndefined();
+      expect(delegateInstruction).toBeDefined();
+    });
+  });
+
+  describe("initVaultIx (Ephemeral SPL Token Program)", () => {
+    it("should use the provided vault ephemeral ATA synchronously", async () => {
+      const mint = address("11111111111111111111111111111114");
+      const payer = address("11111111111111111111111111111115");
+      const [vault, vaultBump] = await deriveVault(mint);
+      const [vaultEphemeralAta] = await deriveEphemeralAta(vault, mint);
+      const vaultAta = address("11111111111111111111111111111116");
+
+      const instruction = initVaultIx(
+        vault,
+        mint,
+        payer,
+        vaultBump,
+        vaultEphemeralAta,
+        vaultAta,
+      );
+
+      expect(instruction.accounts?.[0].address).toBe(vault);
+      expect(instruction.accounts?.[3].address).toBe(vaultEphemeralAta);
+      expect(instruction.accounts?.[4].address).toBe(vaultAta);
+      expect(Array.from(instruction.data ?? [])).toEqual([1, vaultBump]);
+    });
+  });
+
+  describe("ensureTransferQueueCrankIx (Ephemeral SPL Token Program)", () => {
+    const payer = mockAddress;
+    const queue = differentAddress;
+
+    it("should include queue, magic context, and magic program in order", () => {
+      const instruction = ensureTransferQueueCrankIx(payer, queue);
+
+      expect(instruction.accounts).toHaveLength(4);
+      expect(instruction.accounts?.[0].address).toBe(payer);
+      expect(instruction.accounts?.[1].address).toBe(queue);
+      expect(instruction.accounts?.[2].address).toBe(MAGIC_CONTEXT_ID);
+      expect(instruction.accounts?.[3].address).toBe(MAGIC_PROGRAM_ID);
+    });
+  });
+
+  describe("depositAndQueueTransferIx (Ephemeral SPL Token Program)", () => {
+    const queue = differentAddress;
+    const vault = address("11111111111111111111111111111113");
+    const mint = address("11111111111111111111111111111114");
+    const source = address("11111111111111111111111111111115");
+    const vaultAta = address("11111111111111111111111111111116");
+    const destination = address("11111111111111111111111111111117");
+
+    it("should serialize min/max delay ms and split", () => {
+      const instruction = depositAndQueueTransferIx(
+        queue,
+        vault,
+        mint,
+        source,
+        vaultAta,
+        destination,
+        mockAddress,
+        25n,
+        100n,
+        300n,
+        4,
+      );
+
+      expect(instruction.accounts).toHaveLength(8);
+      expect(Array.from(instruction.data ?? [])).toEqual([
+        16,
+        ...Array.from(
+          Buffer.from(
+            [25n, 100n, 300n].flatMap((value) => {
+              const out = Buffer.alloc(8);
+              out.writeBigUInt64LE(value);
+              return Array.from(out);
+            }),
+          ),
+        ),
+        4,
+        0,
+        0,
+        0,
+      ]);
+    });
+  });
+
+  describe("delegateTransferQueueIx (Ephemeral SPL Token Program)", () => {
+    const payer = mockAddress;
+    const queue = differentAddress;
+
+    it("should serialize discriminator 19 for the delegated transfer queue opcode", async () => {
+      const instruction = await delegateTransferQueueIx(
+        queue,
+        payer,
+        mockAddress,
+      );
+
+      expect(instruction.accounts).toHaveLength(9);
+      expect(instruction.data).toEqual(new Uint8Array([19]));
     });
   });
 });

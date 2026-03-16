@@ -141,7 +141,7 @@ impl<'args> CallHandler<'args> {
         Ok(BaseActionArgs {
             args: self.args.clone(),
             compute_units: self.compute_units,
-            destination_program: self.destination_program.clone(),
+            destination_program: self.destination_program,
             escrow_authority: escrow_authority_index,
             accounts: self.accounts,
         })
@@ -177,7 +177,7 @@ impl<'args> CommitIntent<'_, 'args> {
             if seen.contains(addr) {
                 return Err(ProgramError::InvalidArgument);
             }
-            seen.try_push(addr.clone())?;
+            seen.try_push(*addr)?;
         }
         Ok(())
     }
@@ -254,7 +254,7 @@ impl<'args> CommitAndUndelegateIntent<'_, 'args> {
             if seen.contains(addr) {
                 return Err(ProgramError::InvalidArgument);
             }
-            seen.try_push(addr.clone())?;
+            seen.try_push(*addr)?;
         }
         Ok(())
     }
