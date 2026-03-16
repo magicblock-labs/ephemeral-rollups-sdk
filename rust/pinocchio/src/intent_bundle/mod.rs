@@ -358,7 +358,8 @@ mod tests {
 
     // SDK builder
     use ephemeral_rollups_sdk::ephem::{
-        CallHandler as SdkCallHandler, MagicIntentBundleBuilder as SdkBuilder,
+        CallHandler as SdkCallHandler, FoldableIntentBuilder,
+        MagicIntentBundleBuilder as SdkBuilder,
     };
     use magicblock_magic_program_api::args::ActionArgs as SdkActionArgs;
     use magicblock_magic_program_api::Pubkey;
@@ -514,7 +515,8 @@ mod tests {
         )
         .commit(&[s_acc1.as_account_info()])
         .add_post_commit_actions([sdk_handler])
-        .build();
+        .build()
+        .schedule_intent_ix;
 
         assert_eq!(&buf[..pino_len], &ix.data, "commit with handler mismatch");
         let sdk_addrs: Vec<Address> = accounts
@@ -606,7 +608,8 @@ mod tests {
         .commit_and_undelegate(&[s_acc1.as_account_info()])
         .add_post_commit_actions([sdk_post_commit])
         .add_post_undelegate_actions([sdk_post_undelegate])
-        .build();
+        .build()
+        .schedule_intent_ix;
 
         assert_eq!(
             &buf[..pino_len],
@@ -708,7 +711,8 @@ mod tests {
         .add_post_commit_actions([sdk_commit_handler])
         .commit_and_undelegate(&[s_cau.as_account_info()])
         .add_post_undelegate_actions([sdk_undelegate_handler])
-        .build();
+        .build()
+        .schedule_intent_ix;
 
         assert_eq!(
             &buf[..pino_len],

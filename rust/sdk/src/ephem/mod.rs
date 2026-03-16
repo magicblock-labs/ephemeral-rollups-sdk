@@ -634,6 +634,17 @@ mod tests {
         }
     }
 
+    fn make_info(acc: &mut TestAccount) -> AccountInfo<'_> {
+        create_mock_account_info(
+            &acc.key,
+            &mut acc.lamports,
+            &mut acc.data,
+            &acc.owner,
+            true,
+            false,
+        )
+    }
+
     /// Helper struct to hold account data for tests
     #[allow(dead_code)]
     struct TestAccount {
@@ -1596,17 +1607,6 @@ mod tests {
         let mut escrow_standalone = TestAccount::new();
 
         let (builder, _) = create_test_builder(&mut payer, &mut magic_ctx, &mut magic_prog, &owner);
-
-        let make_info = |acc: &mut TestAccount| {
-            create_mock_account_info(
-                &acc.key,
-                &mut acc.lamports,
-                &mut acc.data,
-                &owner,
-                true,
-                false,
-            )
-        };
 
         let make_callback = || ActionCallback {
             destination_program: Pubkey::new_unique(),
