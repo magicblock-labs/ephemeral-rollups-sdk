@@ -13,6 +13,7 @@ pub use crate::ephem::deprecated::v1::{
 use crate::solana_compat::solana::{
     invoke, AccountInfo, AccountMeta, Instruction, ProgramResult, Pubkey,
 };
+pub use magicblock_magic_program_api::response::MagicResponse;
 use magicblock_magic_program_api::args::MagicIntentBundleArgs;
 use magicblock_magic_program_api::instruction::MagicBlockInstruction;
 use std::collections::HashMap;
