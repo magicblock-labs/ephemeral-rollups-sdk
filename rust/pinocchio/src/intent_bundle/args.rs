@@ -1,7 +1,8 @@
 use crate::intent_bundle::no_vec::NoVec;
 use crate::intent_bundle::MAX_ACTIONS_NUM;
+use bincode::enc::Encoder;
+use bincode::error::EncodeError;
 use pinocchio::cpi::MAX_STATIC_CPI_ACCOUNTS;
-use serde::Serialize;
 use solana_address::Address;
 
 // ---------------------------------------------------------
@@ -9,7 +10,7 @@ use solana_address::Address;
 // ---------------------------------------------------------
 
 /// Action arguments containing escrow index and instruction data.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, bincode::Encode)]
+#[derive(Debug, Clone, PartialEq, Eq, bincode::Encode)]
 pub struct ActionArgs<'a> {
     pub escrow_index: u8,
     pub data: &'a [u8],
@@ -38,12 +39,11 @@ impl<'a> ActionArgs<'a> {
 }
 
 /// Base action arguments for serialization.
-#[derive(Clone, Debug, Serialize, bincode::Encode)]
+#[derive(Clone, Debug)]
 pub struct BaseActionArgs<'args> {
     pub args: ActionArgs<'args>,
     pub compute_units: u32,
     pub escrow_authority: u8,
-    #[bincode(with_serde)]
     pub destination_program: Address,
     pub accounts: &'args [ShortAccountMeta],
 }
@@ -53,15 +53,33 @@ pub struct BaseActionArgs<'args> {
 /// Unlike `solana_instruction::AccountMeta`, this type **does not** carry an
 /// `is_signer` flag. Users cannot request signatures: the only signer available
 /// is the validator.
-#[derive(Debug, Default, Clone, Serialize, bincode::Encode)]
+#[derive(Debug, Default, Clone)]
 pub struct ShortAccountMeta {
-    #[bincode(with_serde)]
     pub pubkey: Address,
     pub is_writable: bool,
 }
 
+impl bincode::Encode for BaseActionArgs<'_> {
+    #[inline]
+    fn encode<E: Encoder>(&self, encoder: &mut E) -> Result<(), EncodeError> {
+        self.args.encode(encoder)?;
+        self.compute_units.encode(encoder)?;
+        self.escrow_authority.encode(encoder)?;
+        self.destination_program.to_bytes().encode(encoder)?;
+        self.accounts.encode(encoder)
+    }
+}
+
+impl bincode::Encode for ShortAccountMeta {
+    #[inline]
+    fn encode<E: Encoder>(&self, encoder: &mut E) -> Result<(), EncodeError> {
+        self.pubkey.to_bytes().encode(encoder)?;
+        self.is_writable.encode(encoder)
+    }
+}
+
 /// Commit type arguments for serialization.
-#[derive(Serialize, bincode::Encode)]
+#[derive(bincode::Encode)]
 #[allow(clippy::large_enum_variant)]
 pub enum CommitTypeArgs<'args> {
     Standalone(NoVec<u8, MAX_STATIC_CPI_ACCOUNTS>),
@@ -72,7 +90,7 @@ pub enum CommitTypeArgs<'args> {
 }
 
 /// Undelegate type arguments for serialization.
-#[derive(Serialize, bincode::Encode)]
+#[derive(bincode::Encode)]
 #[allow(clippy::large_enum_variant)]
 pub enum UndelegateTypeArgs<'args> {
     Standalone,
@@ -82,7 +100,7 @@ pub enum UndelegateTypeArgs<'args> {
 }
 
 /// Commit and undelegate arguments for serialization.
-#[derive(Serialize, bincode::Encode)]
+#[derive(bincode::Encode)]
 pub struct CommitAndUndelegateArgs<'args> {
     pub commit_type: CommitTypeArgs<'args>,
     pub undelegate_type: UndelegateTypeArgs<'args>,
@@ -90,7 +108,7 @@ pub struct CommitAndUndelegateArgs<'args> {
 
 /// Magic intent bundle arguments for serialization.
 #[allow(dead_code)]
-#[derive(Serialize, bincode::Encode)]
+#[derive(bincode::Encode)]
 pub struct MagicIntentBundleArgs<'args> {
     pub commit: Option<CommitTypeArgs<'args>>,
     pub commit_and_undelegate: Option<CommitAndUndelegateArgs<'args>>,

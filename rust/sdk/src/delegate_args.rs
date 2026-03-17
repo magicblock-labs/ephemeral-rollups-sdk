@@ -1,5 +1,5 @@
 use crate::solana_compat::solana::{system_program, AccountMeta, Pubkey};
-use dlp::pda::{
+use dlp_api::dlp::pda::{
     delegate_buffer_pda_from_delegated_account_and_owner_program,
     delegation_metadata_pda_from_delegated_account, delegation_record_pda_from_delegated_account,
 };
