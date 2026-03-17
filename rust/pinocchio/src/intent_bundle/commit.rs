@@ -50,6 +50,7 @@ impl<'acc, 'args> CommitIntentBuilder<'acc, 'args, &'static [CallHandler<'static
             payer: self.parent.payer,
             magic_context: self.parent.magic_context,
             magic_program: self.parent.magic_program,
+            magic_fee_vault: self.parent.magic_fee_vault,
             intent_bundle: MagicIntentBundle {
                 standalone_actions,
                 commit_intent: Some(CommitIntent {
@@ -78,6 +79,7 @@ impl<'acc, 'args> CommitIntentBuilder<'acc, 'args, &'args [CallHandler<'args>]> 
             payer: self.parent.payer,
             magic_context: self.parent.magic_context,
             magic_program: self.parent.magic_program,
+            magic_fee_vault: self.parent.magic_fee_vault,
             intent_bundle: MagicIntentBundle {
                 standalone_actions,
                 commit_intent,

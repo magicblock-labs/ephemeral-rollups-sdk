@@ -132,6 +132,7 @@ impl<'args> CallHandler<'args> {
         Ok(())
     }
 
+    #[allow(clippy::clone_on_copy)]
     pub(crate) fn args(
         &self,
         indices_map: &[&Address],
@@ -141,7 +142,7 @@ impl<'args> CallHandler<'args> {
         Ok(BaseActionArgs {
             args: self.args.clone(),
             compute_units: self.compute_units,
-            destination_program: self.destination_program,
+            destination_program: self.destination_program.clone(),
             escrow_authority: escrow_authority_index,
             accounts: self.accounts,
         })
@@ -168,6 +169,7 @@ impl<'args> CommitIntent<'_, 'args> {
     /// then appends each address to `seen`.
     /// Returns `Err(InvalidArgument)` on duplicates within this intent or
     /// overlap with addresses already in `seen` (e.g. from another intent).
+    #[allow(clippy::clone_on_copy)]
     fn try_collect_unique_addresses(
         &self,
         seen: &mut NoVec<Address, MAX_STATIC_CPI_ACCOUNTS>,
@@ -177,7 +179,7 @@ impl<'args> CommitIntent<'_, 'args> {
             if seen.contains(addr) {
                 return Err(ProgramError::InvalidArgument);
             }
-            seen.try_push(*addr)?;
+            seen.try_push(addr.clone())?;
         }
         Ok(())
     }
@@ -245,6 +247,7 @@ impl<'args> CommitAndUndelegateIntent<'_, 'args> {
     /// then appends each address to `seen`.
     /// Returns `Err(InvalidArgument)` on duplicates within this intent or
     /// overlap with addresses already in `seen` (e.g. from another intent).
+    #[allow(clippy::clone_on_copy)]
     fn try_collect_unique_addresses(
         &self,
         seen: &mut NoVec<Address, MAX_STATIC_CPI_ACCOUNTS>,
@@ -254,7 +257,7 @@ impl<'args> CommitAndUndelegateIntent<'_, 'args> {
             if seen.contains(addr) {
                 return Err(ProgramError::InvalidArgument);
             }
-            seen.try_push(*addr)?;
+            seen.try_push(addr.clone())?;
         }
         Ok(())
     }

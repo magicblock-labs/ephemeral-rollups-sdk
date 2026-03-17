@@ -43,6 +43,7 @@ pub struct MagicIntentBundleBuilder<'info> {
     payer: AccountInfo<'info>,
     magic_context: AccountInfo<'info>,
     magic_program: AccountInfo<'info>,
+    magic_fee_vault: Option<AccountInfo<'info>>,
     intent_bundle: MagicIntentBundle<'info>,
 }
 
@@ -56,8 +57,16 @@ impl<'info> MagicIntentBundleBuilder<'info> {
             payer,
             magic_context,
             magic_program,
+            magic_fee_vault: None,
             intent_bundle: MagicIntentBundle::default(),
         }
+    }
+
+    /// Sets an optional magic fee vault account to be passed at index 2
+    /// (right after payer and magic_context). Required when the payer is delegated.
+    pub fn magic_fee_vault(mut self, vault: AccountInfo<'info>) -> Self {
+        self.magic_fee_vault = Some(vault);
+        self
     }
 
     /// Starts building a Commit intent. Returns a [`CommitIntentBuilder`] that owns this parent.
@@ -139,6 +148,9 @@ impl<'info> MagicIntentBundleBuilder<'info> {
 
         // Collect all accounts used by the bundle, then dedup them + create index map.
         let mut all_accounts = vec![self.payer, self.magic_context];
+        if let Some(vault) = self.magic_fee_vault {
+            all_accounts.push(vault);
+        }
         self.intent_bundle.collect_accounts(&mut all_accounts);
         let indices_map = utils::filter_duplicates_with_map(&mut all_accounts);
 

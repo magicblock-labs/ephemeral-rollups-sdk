@@ -150,6 +150,7 @@ fn encode_handler_slice<E: Encoder>(
 /// derived [`bincode::Encode`] impl, so field order cannot silently diverge
 /// from the canonical serialization type.
 #[inline(never)]
+#[allow(clippy::clone_on_copy)]
 fn encode_handler<E: Encoder>(
     handler: &CallHandler<'_>,
     indices_map: &[&Address],
@@ -158,7 +159,7 @@ fn encode_handler<E: Encoder>(
     BaseActionArgs {
         args: handler.args.clone(),
         compute_units: handler.compute_units,
-        destination_program: handler.destination_program,
+        destination_program: handler.destination_program.clone(),
         escrow_authority: get_index(indices_map, handler.escrow_authority.address())
             .ok_or(EncodeError::Other("escrow not in indices_map"))?,
         accounts: handler.accounts,
