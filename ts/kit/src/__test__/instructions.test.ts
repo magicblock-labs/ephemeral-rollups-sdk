@@ -960,6 +960,24 @@ describe("Exposed Instructions (@solana/kit)", () => {
       expect(Buffer.from(instructions[0].data ?? []).readUInt32LE(25)).toBe(4);
     });
 
+    it("should reject private base-to-base transfers when maxDelayMs is less than minDelayMs", async () => {
+      await expect(
+        transferSpl(from, to, mint, 25n, {
+          visibility: "private",
+          fromBalance: "base",
+          toBalance: "base",
+          shuttleId: 7,
+          privateTransfer: {
+            minDelayMs: 300n,
+            maxDelayMs: 100n,
+            split: 4,
+          },
+        }),
+      ).rejects.toThrow(
+        "maxDelayMs must be greater than or equal to minDelayMs",
+      );
+    });
+
     it("should use a normal transfer for public base-to-base transfers", async () => {
       const instructions = await transferSpl(from, to, mint, 25n, {
         visibility: "public",

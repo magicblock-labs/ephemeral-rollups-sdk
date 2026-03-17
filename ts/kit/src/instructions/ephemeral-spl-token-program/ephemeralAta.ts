@@ -777,6 +777,9 @@ export async function depositAndDelegateShuttleEphemeralAtaWithMergeAndPrivateTr
   if (minDelayMs < 0n || maxDelayMs < 0n) {
     throw new Error("delay values must be non-negative");
   }
+  if (maxDelayMs < minDelayMs) {
+    throw new Error("maxDelayMs must be greater than or equal to minDelayMs");
+  }
   if (!Number.isInteger(split) || split <= 0 || split > 0xffff_ffff) {
     throw new Error("split must fit in u32 and be positive");
   }
