@@ -33,9 +33,9 @@ ephemeral-rollups-sdk-attribute-action = { path = "action-attribute", version = 
 
 
 # Magicblock
-magicblock-delegation-program-api = { git = "https://github.com/magicblock-labs/delegation-program.git", rev = "abf340536e88740c290b2b3af4e3d1ff38240f63", default-features = false }
+magicblock-delegation-program-api = { git = "https://github.com/magicblock-labs/delegation-program.git", rev = "293e922", default-features = false }
 #magicblock-magic-program-api = { version = "0.8.1", default-features = false }
-magicblock-magic-program-api = { git = "https://github.com/magicblock-labs/magicblock-validator.git", rev = "88041e", default-features = false}
+magicblock-magic-program-api = { git = "https://github.com/magicblock-labs/magicblock-validator.git", rev = "b5b4de5", default-features = false}
 ## External crates
 anchor-lang = { version = ">=0.28.0" }
 proc-macro2 = "1.0"
