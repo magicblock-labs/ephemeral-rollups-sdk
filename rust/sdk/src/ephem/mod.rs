@@ -13,6 +13,7 @@ pub use crate::ephem::deprecated::v1::{
 use crate::solana_compat::solana::{
     invoke, AccountInfo, AccountMeta, Instruction, ProgramResult, Pubkey,
 };
+use anchor_lang::Key;
 use magicblock_magic_program_api::args::MagicIntentBundleArgs;
 use magicblock_magic_program_api::instruction::MagicBlockInstruction;
 pub use magicblock_magic_program_api::response::MagicResponse;
@@ -194,13 +195,19 @@ impl<'info> MagicIntentBundleBuilder<'info> {
                     is_signer: false,
                     is_writable: true,
                 };
+                let mut accounts = vec![payer_meta, ctx_meta];
+                let mut account_infos = vec![self.payer.clone(), self.magic_context.clone()];
+                self.magic_fee_vault.as_ref().map(|el| {
+                    account_infos.push(el.clone());
+                    accounts.push(AccountMeta::new(magic_fee_vault.key(), false));
+                });
 
                 let ix = Instruction::new_with_bincode(
                     *self.magic_program.key,
                     &MagicBlockInstruction::AddActionCallback(args),
-                    vec![payer_meta, ctx_meta],
+                    accounts,
                 );
-                (vec![self.payer.clone(), self.magic_context.clone()], ix)
+                (account_infos, ix)
             })
             .collect()
     }
