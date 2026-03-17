@@ -21,9 +21,9 @@ pub mod access_control;
 pub mod spl;
 
 pub use dlp_api;
-pub use dlp_api::dlp::args::CallHandlerArgs;
-pub use dlp_api::dlp::pda;
-pub use dlp_api::dlp::{
+pub use dlp_api::args::CallHandlerArgs;
+pub use dlp_api::pda;
+pub use dlp_api::{
     commit_record_seeds_from_delegated_account, commit_state_seeds_from_delegated_account,
     delegate_buffer_seeds_from_delegated_account, delegation_metadata_seeds_from_delegated_account,
     delegation_record_seeds_from_delegated_account, ephemeral_balance_seeds_from_payer,
