@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { PublicKey } from "@solana/web3.js";
+import { Keypair, PublicKey } from "@solana/web3.js";
 import {
   createDelegateInstruction,
   createTopUpEscrowInstruction,
@@ -20,6 +20,7 @@ import {
   deriveVault,
   ensureTransferQueueCrankIx,
   initRentPdaIx,
+  transferSpl,
   withdrawSpl,
 } from "../instructions/ephemeral-spl-token-program";
 import {
@@ -902,6 +903,108 @@ describe("Exposed Instructions (web3.js)", () => {
 
       expect(instructions).toHaveLength(1);
       expect(instructions[0].data[0]).toBe(3);
+    });
+  });
+
+  describe("transferSpl (Ephemeral SPL Token Program)", () => {
+    const from = Keypair.generate().publicKey;
+    const to = Keypair.generate().publicKey;
+    const mint = Keypair.generate().publicKey;
+    const validator = Keypair.generate().publicKey;
+
+    it("should use the shuttle private transfer instruction for private base-to-base transfers", async () => {
+      const instructions = await transferSpl(from, to, mint, 25n, {
+        visibility: "private",
+        fromBalance: "base",
+        toBalance: "base",
+        validator,
+        shuttleId: 7,
+        privateTransfer: {
+          minDelayMs: 100n,
+          maxDelayMs: 300n,
+          split: 4,
+        },
+      });
+
+      expect(instructions).toHaveLength(1);
+      expect(instructions[0].data[0]).toBe(25);
+      expect(instructions[0].keys).toHaveLength(20);
+      expect(Buffer.from(instructions[0].data).readBigUInt64LE(6)).toBe(25n);
+      expect(Buffer.from(instructions[0].data).readBigUInt64LE(14)).toBe(100n);
+      expect(Buffer.from(instructions[0].data).readBigUInt64LE(22)).toBe(300n);
+      expect(Buffer.from(instructions[0].data).readUInt32LE(30)).toBe(4);
+    });
+
+    it("should use depositAndQueueTransferIx for private ephemeral-to-base transfers", async () => {
+      const instructions = await transferSpl(from, to, mint, 25n, {
+        visibility: "private",
+        fromBalance: "ephemeral",
+        toBalance: "base",
+        privateTransfer: {
+          minDelayMs: 100n,
+          maxDelayMs: 300n,
+          split: 4,
+        },
+      });
+
+      expect(instructions).toHaveLength(1);
+      expect(instructions[0].data[0]).toBe(16);
+      expect(instructions[0].keys).toHaveLength(8);
+      expect(Buffer.from(instructions[0].data).readBigUInt64LE(1)).toBe(25n);
+      expect(Buffer.from(instructions[0].data).readBigUInt64LE(9)).toBe(100n);
+      expect(Buffer.from(instructions[0].data).readBigUInt64LE(17)).toBe(300n);
+      expect(Buffer.from(instructions[0].data).readUInt32LE(25)).toBe(4);
+    });
+
+    it("should use a normal transfer for public base-to-base transfers", async () => {
+      const instructions = await transferSpl(from, to, mint, 25n, {
+        visibility: "public",
+        fromBalance: "base",
+        toBalance: "base",
+      });
+
+      expect(instructions).toHaveLength(1);
+      expect(instructions[0].data[0]).toBe(3);
+      expect(instructions[0].keys).toHaveLength(3);
+      expect(Buffer.from(instructions[0].data).readBigUInt64LE(1)).toBe(25n);
+    });
+
+    it("should use a normal transfer for public ephemeral-to-ephemeral transfers", async () => {
+      const instructions = await transferSpl(from, to, mint, 25n, {
+        visibility: "public",
+        fromBalance: "ephemeral",
+        toBalance: "ephemeral",
+      });
+
+      expect(instructions).toHaveLength(1);
+      expect(instructions[0].data[0]).toBe(3);
+      expect(instructions[0].keys).toHaveLength(3);
+      expect(Buffer.from(instructions[0].data).readBigUInt64LE(1)).toBe(25n);
+    });
+
+    it("should use a normal transfer for private ephemeral-to-ephemeral transfers", async () => {
+      const instructions = await transferSpl(from, to, mint, 25n, {
+        visibility: "private",
+        fromBalance: "ephemeral",
+        toBalance: "ephemeral",
+      });
+
+      expect(instructions).toHaveLength(1);
+      expect(instructions[0].data[0]).toBe(3);
+      expect(instructions[0].keys).toHaveLength(3);
+      expect(Buffer.from(instructions[0].data).readBigUInt64LE(1)).toBe(25n);
+    });
+
+    it("should reject unsupported routes", async () => {
+      await expect(
+        transferSpl(from, to, mint, 25n, {
+          visibility: "public",
+          fromBalance: "base",
+          toBalance: "ephemeral",
+        }),
+      ).rejects.toThrow(
+        "transferSpl route not implemented: visibility=public, fromBalance=base, toBalance=ephemeral",
+      );
     });
   });
 

@@ -31,7 +31,11 @@ import {
   delegationMetadataPdaFromDelegatedAccount,
   permissionPdaFromAccount,
 } from "../../pda";
-import { deriveTransferQueue, initTransferQueueIx } from "./transferQueue";
+import {
+  depositAndQueueTransferIx,
+  deriveTransferQueue,
+  initTransferQueueIx,
+} from "./transferQueue";
 
 // SPL Token program IDs
 const U64_ENCODER = getU64Encoder();
@@ -64,6 +68,23 @@ async function getAssociatedTokenAddressSync(
     ],
   });
   return ata;
+}
+
+function createTransferInstruction(
+  source: Address,
+  destination: Address,
+  owner: Address,
+  amount: bigint,
+): Instruction {
+  return {
+    accounts: [
+      { address: source, role: AccountRole.WRITABLE },
+      { address: destination, role: AccountRole.WRITABLE },
+      { address: owner, role: AccountRole.READONLY_SIGNER },
+    ],
+    data: encodeAmountInstructionData(3, amount),
+    programAddress: TOKEN_PROGRAM_ADDRESS as Address,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -1196,6 +1217,26 @@ export interface DelegateSplWithPrivateTransferOptions
 export interface WithdrawSplOptions
   extends Omit<DelegateSplOptions, "private" | "initVaultIfMissing"> {}
 
+export type TransferBalance = "base" | "ephemeral";
+
+export type TransferVisibility = "public" | "private";
+
+export interface TransferSplPrivateOptions {
+  minDelayMs?: bigint;
+  maxDelayMs?: bigint;
+  split?: number;
+}
+
+export interface TransferSplOptions {
+  visibility: TransferVisibility;
+  fromBalance: TransferBalance;
+  toBalance: TransferBalance;
+  payer?: Address;
+  validator?: Address;
+  shuttleId?: number;
+  privateTransfer?: TransferSplPrivateOptions;
+}
+
 function randomShuttleId(): number {
   const cryptoObj = (globalThis as any)?.crypto;
   if (cryptoObj?.getRandomValues !== undefined) {
@@ -1477,6 +1518,100 @@ export async function delegateSplWithPrivateTransfer(
   );
 
   return instructions;
+}
+
+export async function transferSpl(
+  from: Address,
+  to: Address,
+  mint: Address,
+  amount: bigint,
+  opts: TransferSplOptions,
+): Promise<Instruction[]> {
+  const payer = opts.payer ?? from;
+  const validator = opts.validator;
+  const shuttleId = opts.shuttleId ?? randomShuttleId();
+  const minDelayMs = opts.privateTransfer?.minDelayMs ?? 0n;
+  const maxDelayMs = opts.privateTransfer?.maxDelayMs ?? minDelayMs;
+  const split = opts.privateTransfer?.split ?? 1;
+
+  const fromAta = await getAssociatedTokenAddressSync(mint, from);
+  const toAta = await getAssociatedTokenAddressSync(mint, to);
+
+  switch (opts.visibility) {
+    case "private":
+      if (opts.fromBalance === "base" && opts.toBalance === "base") {
+        const [shuttleEphemeralAta, shuttleBump] =
+          await deriveShuttleEphemeralAta(from, mint, shuttleId);
+        const [shuttleAta] = await deriveShuttleAta(shuttleEphemeralAta, mint);
+        const shuttleWalletAta = await deriveShuttleWalletAta(
+          mint,
+          shuttleEphemeralAta,
+        );
+
+        return [
+          await depositAndDelegateShuttleEphemeralAtaWithMergeAndPrivateTransferIx(
+            payer,
+            shuttleEphemeralAta,
+            shuttleAta,
+            from,
+            fromAta,
+            toAta,
+            shuttleWalletAta,
+            mint,
+            shuttleId,
+            shuttleBump,
+            amount,
+            minDelayMs,
+            maxDelayMs,
+            split,
+            validator,
+          ),
+        ];
+      }
+
+      if (opts.fromBalance === "ephemeral" && opts.toBalance === "base") {
+        const [queue] = await deriveTransferQueue(mint);
+        const [vault] = await deriveVault(mint);
+        const vaultAta = await deriveVaultAta(mint, vault);
+
+        return [
+          depositAndQueueTransferIx(
+            queue,
+            vault,
+            mint,
+            fromAta,
+            vaultAta,
+            toAta,
+            from,
+            amount,
+            minDelayMs,
+            maxDelayMs,
+            split,
+          ),
+        ];
+      }
+
+      if (opts.fromBalance === "ephemeral" && opts.toBalance === "ephemeral") {
+        return [createTransferInstruction(fromAta, toAta, from, amount)];
+      }
+
+      break;
+
+    case "public":
+      if (opts.fromBalance === "base" && opts.toBalance === "base") {
+        return [createTransferInstruction(fromAta, toAta, from, amount)];
+      }
+
+      if (opts.fromBalance === "ephemeral" && opts.toBalance === "ephemeral") {
+        return [createTransferInstruction(fromAta, toAta, from, amount)];
+      }
+
+      break;
+  }
+
+  throw new Error(
+    `transferSpl route not implemented: visibility=${opts.visibility}, fromBalance=${opts.fromBalance}, toBalance=${opts.toBalance}`,
+  );
 }
 
 async function buildIdempotentWithdrawSplInstructions(
