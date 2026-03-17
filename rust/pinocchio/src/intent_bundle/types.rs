@@ -169,6 +169,7 @@ impl<'args> CommitIntent<'_, 'args> {
     /// then appends each address to `seen`.
     /// Returns `Err(InvalidArgument)` on duplicates within this intent or
     /// overlap with addresses already in `seen` (e.g. from another intent).
+    #[allow(clippy::clone_on_copy)]
     fn try_collect_unique_addresses(
         &self,
         seen: &mut NoVec<Address, MAX_STATIC_CPI_ACCOUNTS>,
