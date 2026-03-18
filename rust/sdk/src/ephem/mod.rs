@@ -747,9 +747,6 @@ mod tests {
         let (accounts, _ix) = builder
             .commit_and_undelegate(&[info1])
             .add_post_commit_action(post_commit_handler)
-            // .then(ActionCallback {
-            //     //
-            // })
             .add_post_undelegate_actions([post_undelegate_handler])
             .build()
             .schedule_intent_ix;
