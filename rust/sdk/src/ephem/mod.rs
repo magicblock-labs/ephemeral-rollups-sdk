@@ -13,11 +13,16 @@ pub use crate::ephem::deprecated::v1::{
 use crate::solana_compat::solana::{
     invoke, AccountInfo, AccountMeta, Instruction, ProgramResult, Pubkey,
 };
+pub use cau_intent_builder::CommitAndUndelegateIntentBuilder;
+pub use commit_intent_builder::CommitIntentBuilder;
 use magicblock_magic_program_api::args::MagicIntentBundleArgs;
 use magicblock_magic_program_api::instruction::MagicBlockInstruction;
 pub use magicblock_magic_program_api::response::MagicResponse;
 use std::collections::HashMap;
 
+pub mod action_builder;
+pub mod cau_intent_builder;
+pub mod commit_intent_builder;
 pub mod deprecated;
 
 /// Intent to be scheduled for execution on the base layer.
@@ -466,166 +471,10 @@ pub trait FoldableIntentBuilder<'info>: Sized {
     }
 }
 
-/// Builder of Commit Intent.
-///
-/// Created via [`MagicIntentBundleBuilder::commit()`]. Owns the parent builder
-/// and returns it (or a sibling sub-builder) on every transition/terminal call.
-pub struct CommitIntentBuilder<'info> {
-    parent: MagicIntentBundleBuilder<'info>,
-    accounts: Vec<AccountInfo<'info>>,
-    actions: Vec<CallHandler<'info>>,
-    callbacks: Vec<Option<ActionCallback>>,
-}
-
-impl<'info> CommitIntentBuilder<'info> {
-    /// Adds post-commit actions. Chainable.
-    pub fn add_post_commit_actions(
-        mut self,
-        actions: impl IntoIterator<Item = CallHandler<'info>>,
-    ) -> Self {
-        let actions: Vec<_> = actions.into_iter().collect();
-        self.callbacks.extend((0..actions.len()).map(|_| None));
-        self.actions.extend(actions);
-        self
-    }
-
-    /// Adds a single post-commit action with a callback. Chainable.
-    pub fn add_post_commit_action_with_callback(
-        mut self,
-        action: CallHandler<'info>,
-        callback: ActionCallback,
-    ) -> Self {
-        self.actions.push(action);
-        self.callbacks.push(Some(callback));
-        self
-    }
-}
-
-impl<'info> FoldableIntentBuilder<'info> for CommitIntentBuilder<'info> {
-    fn fold_builder(self) -> MagicIntentBundleBuilder<'info> {
-        let Self {
-            mut parent,
-            accounts,
-            actions,
-            callbacks,
-        } = self;
-        let commit = if actions.is_empty() {
-            CommitType::Standalone(accounts)
-        } else {
-            CommitType::WithHandler {
-                commited_accounts: accounts,
-                call_handlers: actions,
-                callbacks,
-            }
-        };
-        parent.intent_bundle.add_intent(MagicIntent::Commit(commit));
-        parent
-    }
-}
-
-/// Builder of CommitAndUndelegate Intent.
-///
-/// Created via [`MagicIntentBundleBuilder::commit_and_undelegate()`] or
-/// [`CommitIntentBuilder::commit_and_undelegate()`]. Owns the parent builder
-/// and returns it (or a sibling sub-builder) on every transition/terminal call.
-pub struct CommitAndUndelegateIntentBuilder<'info> {
-    parent: MagicIntentBundleBuilder<'info>,
-    accounts: Vec<AccountInfo<'info>>,
-    post_commit_actions: Vec<CallHandler<'info>>,
-    post_commit_callbacks: Vec<Option<ActionCallback>>,
-    post_undelegate_actions: Vec<CallHandler<'info>>,
-    post_undelegate_callbacks: Vec<Option<ActionCallback>>,
-}
-
-impl<'info> CommitAndUndelegateIntentBuilder<'info> {
-    /// Adds post-commit actions. Chainable.
-    pub fn add_post_commit_actions(
-        mut self,
-        actions: impl IntoIterator<Item = CallHandler<'info>>,
-    ) -> Self {
-        let actions: Vec<_> = actions.into_iter().collect();
-        self.post_commit_callbacks
-            .extend((0..actions.len()).map(|_| None));
-        self.post_commit_actions.extend(actions);
-        self
-    }
-
-    /// Adds a single post-commit action with a callback. Chainable.
-    pub fn add_post_commit_action_with_callback(
-        mut self,
-        action: CallHandler<'info>,
-        callback: ActionCallback,
-    ) -> Self {
-        self.post_commit_actions.push(action);
-        self.post_commit_callbacks.push(Some(callback));
-        self
-    }
-
-    /// Adds post-undelegate actions. Chainable.
-    pub fn add_post_undelegate_actions(
-        mut self,
-        actions: impl IntoIterator<Item = CallHandler<'info>>,
-    ) -> Self {
-        let actions: Vec<_> = actions.into_iter().collect();
-        self.post_undelegate_callbacks
-            .extend((0..actions.len()).map(|_| None));
-        self.post_undelegate_actions.extend(actions);
-        self
-    }
-
-    /// Adds a single post-undelegate action with a callback. Chainable.
-    pub fn add_post_undelegate_action_with_callback(
-        mut self,
-        action: CallHandler<'info>,
-        callback: ActionCallback,
-    ) -> Self {
-        self.post_undelegate_actions.push(action);
-        self.post_undelegate_callbacks.push(Some(callback));
-        self
-    }
-}
-
-impl<'info> FoldableIntentBuilder<'info> for CommitAndUndelegateIntentBuilder<'info> {
-    fn fold_builder(self) -> MagicIntentBundleBuilder<'info> {
-        let Self {
-            mut parent,
-            accounts,
-            post_commit_actions,
-            post_commit_callbacks,
-            post_undelegate_actions,
-            post_undelegate_callbacks,
-        } = self;
-        let commit_type = if post_commit_actions.is_empty() {
-            CommitType::Standalone(accounts)
-        } else {
-            CommitType::WithHandler {
-                commited_accounts: accounts,
-                call_handlers: post_commit_actions,
-                callbacks: post_commit_callbacks,
-            }
-        };
-        let undelegate_type = if post_undelegate_actions.is_empty() {
-            UndelegateType::Standalone
-        } else {
-            UndelegateType::WithHandler {
-                call_handlers: post_undelegate_actions,
-                callbacks: post_undelegate_callbacks,
-            }
-        };
-        let cau = CommitAndUndelegate {
-            commit_type,
-            undelegate_type,
-        };
-        parent
-            .intent_bundle
-            .add_intent(MagicIntent::CommitAndUndelegate(cau));
-        parent
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::ephem::cau_intent_builder::FoldableCauIntentBuilder;
     use crate::solana_compat::solana::{AccountInfo, Pubkey};
     use magicblock_magic_program_api::args::ActionArgs;
     use magicblock_magic_program_api::instruction::MagicBlockInstruction;
@@ -891,7 +740,10 @@ mod tests {
 
         let (accounts, _ix) = builder
             .commit_and_undelegate(&[info1])
-            .add_post_commit_actions([post_commit_handler])
+            .add_post_commit_action(post_commit_handler)
+            // .then(ActionCallback {
+            //     //
+            // })
             .add_post_undelegate_actions([post_undelegate_handler])
             .build()
             .schedule_intent_ix;
@@ -1639,19 +1491,15 @@ mod tests {
             add_callback_ixs, ..
         } = builder
             .commit(&[make_info(&mut commit_acc)])
-            .add_post_commit_action_with_callback(
-                create_test_call_handler(make_info(&mut escrow_commit)),
-                make_callback(),
-            )
+            .add_post_commit_action(create_test_call_handler(make_info(&mut escrow_commit)))
+            .then(make_callback())
             .commit_and_undelegate(&[make_info(&mut cau_acc)])
-            .add_post_commit_action_with_callback(
-                create_test_call_handler(make_info(&mut escrow_cau_commit)),
-                make_callback(),
-            )
-            .add_post_undelegate_action_with_callback(
-                create_test_call_handler(make_info(&mut escrow_cau_undelegate)),
-                make_callback(),
-            )
+            .add_post_commit_action(create_test_call_handler(make_info(&mut escrow_cau_commit)))
+            .then(make_callback())
+            .add_post_undelegate_action(create_test_call_handler(make_info(
+                &mut escrow_cau_undelegate,
+            )))
+            .then(make_callback())
             .add_standalone_action_with_callback(
                 create_test_call_handler(make_info(&mut escrow_standalone)),
                 make_callback(),
