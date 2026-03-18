@@ -48,8 +48,7 @@ impl<'info> CommitAndUndelegateIntentBuilder<'info> {
         ActionBuilder::new(
             self,
             action,
-            |parent: CommitAndUndelegateIntentBuilder<'info>, action, callback| {
-                let mut parent = parent;
+            |mut parent: CommitAndUndelegateIntentBuilder<'info>, action, callback| {
                 parent.post_commit_actions.push(action);
                 parent.post_commit_callbacks.push(callback);
                 parent
@@ -69,7 +68,8 @@ impl<'info> CommitAndUndelegateIntentBuilder<'info> {
         self
     }
 
-    /// Adds a single post-commit action with a callback. Chainable.
+    /// Adds a single post-undelegate action. Returns an [`ActionBuilder`] that lets you
+    /// optionally attach a callback via `.then()` before continuing the chain.
     pub fn add_post_undelegate_action(
         self,
         action: CallHandler<'info>,
@@ -85,8 +85,7 @@ impl<'info> CommitAndUndelegateIntentBuilder<'info> {
         ActionBuilder::new(
             self,
             action,
-            |parent: CommitAndUndelegateIntentBuilder<'info>, action, callback| {
-                let mut parent = parent;
+            |mut parent: CommitAndUndelegateIntentBuilder<'info>, action, callback| {
                 parent.post_undelegate_actions.push(action);
                 parent.post_undelegate_callbacks.push(callback);
                 parent
