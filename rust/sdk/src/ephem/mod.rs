@@ -326,6 +326,12 @@ impl<'info> MagicIntentBundle<'info> {
         self.commit_and_undelegate_intent
             .iter_mut()
             .for_each(|cau| cau.extract_callbacks(&mut idx, &mut out));
+        self.commit_finalize_intent
+            .iter_mut()
+            .for_each(|c| c.extract_callbacks(&mut idx, &mut out));
+        self.commit_finalize_and_undelegate_intent
+            .iter_mut()
+            .for_each(|cau| cau.extract_callbacks(&mut idx, &mut out));
         self.standalone_callbacks
             .iter_mut()
             .take(self.standalone_actions.len())
