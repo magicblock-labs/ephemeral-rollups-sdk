@@ -380,6 +380,12 @@ impl<'info> MagicIntentBundle<'info> {
         if let Some(cau) = &self.commit_and_undelegate_intent {
             cau.collect_accounts(all_accounts);
         }
+        if let Some(commit_finalize) = &self.commit_finalize_intent {
+            commit_finalize.collect_accounts(all_accounts);
+        }
+        if let Some(cau_finalize) = &self.commit_finalize_and_undelegate_intent {
+            cau_finalize.collect_accounts(all_accounts);
+        }
     }
 
     /// Normalizes the bundle into a valid, canonical form.
