@@ -877,7 +877,8 @@ mod tests {
         )
         .magic_fee_vault(s_vault.as_account_info())
         .commit(&[s_acc1.as_account_info()])
-        .build();
+        .build()
+        .schedule_intent_ix;
 
         assert_eq!(
             &buf[..pino_len],
