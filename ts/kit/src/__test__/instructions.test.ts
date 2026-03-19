@@ -933,11 +933,115 @@ describe("Exposed Instructions (@solana/kit)", () => {
       expect(Buffer.from(instructions[0].data ?? []).readUInt32LE(30)).toBe(4);
     });
 
+    it("should initialize the destination ATA and vault when requested", async () => {
+      const [vault] = await deriveVault(mint);
+      const [vaultEphemeralAta, vaultEataBump] = await deriveEphemeralAta(
+        vault,
+        mint,
+      );
+
+      const instructions = await transferSpl(from, to, mint, 25n, {
+        visibility: "private",
+        fromBalance: "base",
+        toBalance: "base",
+        validator,
+        shuttleId: 7,
+        initIfMissing: true,
+        initVaultIfMissing: true,
+        privateTransfer: {
+          minDelayMs: 100n,
+          maxDelayMs: 300n,
+          split: 4,
+        },
+      });
+
+      expect(instructions).toHaveLength(5);
+      expect(instructions[2].accounts?.[1].address).toBe(vaultEphemeralAta);
+      expect(instructions[2].data?.[0]).toBe(4);
+      expect(instructions[2].data?.[1]).toBe(vaultEataBump);
+      expect(instructions[3].accounts?.[2].address).toBe(to);
+      expect(instructions[3].data?.[0]).toBe(1);
+      expect(instructions[4].data?.[0]).toBe(25);
+    });
+
+    it("should prepend source ATA creation when initAtasIfMissing is set on base-source transfers", async () => {
+      const instructions = await transferSpl(from, to, mint, 25n, {
+        visibility: "public",
+        fromBalance: "base",
+        toBalance: "base",
+        initAtasIfMissing: true,
+      });
+
+      expect(instructions).toHaveLength(2);
+      expect(instructions[0].data?.[0]).toBe(1);
+      expect(instructions[0].accounts?.[2].address).toBe(from);
+      expect(instructions[1].data?.[0]).toBe(3);
+    });
+
+    it("should use the shuttle merge instruction for private base-to-ephemeral transfers", async () => {
+      const instructions = await transferSpl(from, to, mint, 25n, {
+        visibility: "private",
+        fromBalance: "base",
+        toBalance: "ephemeral",
+        validator,
+        shuttleId: 7,
+      });
+
+      expect(instructions).toHaveLength(1);
+      expect(instructions[0].data?.[0]).toBe(24);
+      expect(instructions[0].accounts).toHaveLength(19);
+      expect(Buffer.from(instructions[0].data ?? []).readBigUInt64LE(6)).toBe(
+        25n,
+      );
+    });
+
+    it("should initialize and delegate the receiver eata for private base-to-ephemeral transfers when requested", async () => {
+      const [toEphemeralAta, toEataBump] = await deriveEphemeralAta(to, mint);
+
+      const instructions = await transferSpl(from, to, mint, 25n, {
+        visibility: "private",
+        fromBalance: "base",
+        toBalance: "ephemeral",
+        validator,
+        shuttleId: 7,
+        initIfMissing: true,
+      });
+
+      expect(instructions).toHaveLength(4);
+      expect(instructions[0].data?.[0]).toBe(1);
+      expect(instructions[0].accounts?.[2].address).toBe(to);
+      expect(instructions[1].data?.[0]).toBe(0);
+      expect(instructions[1].accounts?.[0].address).toBe(toEphemeralAta);
+      expect(instructions[2].data?.[0]).toBe(4);
+      expect(instructions[2].data?.[1]).toBe(toEataBump);
+      expect(instructions[2].accounts?.[1].address).toBe(toEphemeralAta);
+      expect(instructions[3].data?.[0]).toBe(24);
+    });
+
+    it("should ignore initAtasIfMissing on ephemeral-source transfers", async () => {
+      const instructions = await transferSpl(from, to, mint, 25n, {
+        visibility: "private",
+        fromBalance: "ephemeral",
+        toBalance: "base",
+        initAtasIfMissing: true,
+        privateTransfer: {
+          minDelayMs: 100n,
+          maxDelayMs: 300n,
+          split: 4,
+        },
+      });
+
+      expect(instructions).toHaveLength(1);
+      expect(instructions[0].data?.[0]).toBe(16);
+    });
+
     it("should use depositAndQueueTransferIx for private ephemeral-to-base transfers", async () => {
       const instructions = await transferSpl(from, to, mint, 25n, {
         visibility: "private",
         fromBalance: "ephemeral",
         toBalance: "base",
+        initIfMissing: true,
+        initVaultIfMissing: true,
         privateTransfer: {
           minDelayMs: 100n,
           maxDelayMs: 300n,
@@ -1013,6 +1117,8 @@ describe("Exposed Instructions (@solana/kit)", () => {
         visibility: "private",
         fromBalance: "ephemeral",
         toBalance: "ephemeral",
+        initIfMissing: true,
+        initVaultIfMissing: true,
       });
 
       expect(instructions).toHaveLength(1);

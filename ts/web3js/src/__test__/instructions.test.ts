@@ -17,6 +17,8 @@ import {
   delegateTransferQueueIx,
   deriveEphemeralAta,
   deriveRentPda,
+  deriveShuttleAta,
+  deriveShuttleEphemeralAta,
   deriveVault,
   ensureTransferQueueCrankIx,
   initRentPdaIx,
@@ -831,6 +833,34 @@ describe("Exposed Instructions (web3.js)", () => {
         ),
       ).toBe(true);
     });
+
+    it("should keep the shuttle eata writable in the zero-amount shuttle setup flow", async () => {
+      const [shuttleEphemeralAta] = deriveShuttleEphemeralAta(owner, mint, 7);
+      const [shuttleAta] = deriveShuttleAta(shuttleEphemeralAta, mint);
+
+      const instructions = await delegateSpl(owner, mint, 0n, {
+        validator,
+        shuttleId: 7,
+      });
+
+      const initShuttleInstruction = instructions.find(
+        (ix) => ix.data[0] === 11,
+      );
+      const delegateShuttleInstruction = instructions.find(
+        (ix) => ix.data[0] === 13,
+      );
+
+      expect(initShuttleInstruction).toBeDefined();
+      expect(delegateShuttleInstruction).toBeDefined();
+      expect(initShuttleInstruction?.keys[2].pubkey.toBase58()).toBe(
+        shuttleAta.toBase58(),
+      );
+      expect(delegateShuttleInstruction?.keys[2].pubkey.toBase58()).toBe(
+        shuttleAta.toBase58(),
+      );
+      expect(initShuttleInstruction?.keys[2].isWritable).toBe(true);
+      expect(delegateShuttleInstruction?.keys[2].isWritable).toBe(true);
+    });
   });
 
   describe("delegateSplWithPrivateTransfer (Ephemeral SPL Token Program)", () => {
@@ -935,11 +965,119 @@ describe("Exposed Instructions (web3.js)", () => {
       expect(Buffer.from(instructions[0].data).readUInt32LE(30)).toBe(4);
     });
 
+    it("should initialize the destination ATA and vault when requested", async () => {
+      const [vault] = deriveVault(mint);
+      const [vaultEphemeralAta, vaultEataBump] = deriveEphemeralAta(
+        vault,
+        mint,
+      );
+
+      const instructions = await transferSpl(from, to, mint, 25n, {
+        visibility: "private",
+        fromBalance: "base",
+        toBalance: "base",
+        validator,
+        shuttleId: 7,
+        initIfMissing: true,
+        initVaultIfMissing: true,
+        privateTransfer: {
+          minDelayMs: 100n,
+          maxDelayMs: 300n,
+          split: 4,
+        },
+      });
+
+      expect(instructions).toHaveLength(5);
+      expect(instructions[2].keys[1].pubkey.toBase58()).toBe(
+        vaultEphemeralAta.toBase58(),
+      );
+      expect(instructions[2].data[0]).toBe(4);
+      expect(instructions[2].data[1]).toBe(vaultEataBump);
+      expect(instructions[3].keys[2].pubkey.toBase58()).toBe(to.toBase58());
+      expect(instructions[3].data[0]).toBe(1);
+      expect(instructions[4].data[0]).toBe(25);
+    });
+
+    it("should prepend source ATA creation when initAtasIfMissing is set on base-source transfers", async () => {
+      const instructions = await transferSpl(from, to, mint, 25n, {
+        visibility: "public",
+        fromBalance: "base",
+        toBalance: "base",
+        initAtasIfMissing: true,
+      });
+
+      expect(instructions).toHaveLength(2);
+      expect(instructions[0].data[0]).toBe(1);
+      expect(instructions[0].keys[2].pubkey.toBase58()).toBe(from.toBase58());
+      expect(instructions[1].data[0]).toBe(3);
+    });
+
+    it("should use the shuttle merge instruction for private base-to-ephemeral transfers", async () => {
+      const instructions = await transferSpl(from, to, mint, 25n, {
+        visibility: "private",
+        fromBalance: "base",
+        toBalance: "ephemeral",
+        validator,
+        shuttleId: 7,
+      });
+
+      expect(instructions).toHaveLength(1);
+      expect(instructions[0].data[0]).toBe(24);
+      expect(instructions[0].keys).toHaveLength(19);
+      expect(Buffer.from(instructions[0].data).readBigUInt64LE(6)).toBe(25n);
+    });
+
+    it("should initialize and delegate the receiver eata for private base-to-ephemeral transfers when requested", async () => {
+      const [toEphemeralAta, toEataBump] = deriveEphemeralAta(to, mint);
+
+      const instructions = await transferSpl(from, to, mint, 25n, {
+        visibility: "private",
+        fromBalance: "base",
+        toBalance: "ephemeral",
+        validator,
+        shuttleId: 7,
+        initIfMissing: true,
+      });
+
+      expect(instructions).toHaveLength(4);
+      expect(instructions[0].data[0]).toBe(1);
+      expect(instructions[0].keys[2].pubkey.toBase58()).toBe(to.toBase58());
+      expect(instructions[1].data[0]).toBe(0);
+      expect(instructions[1].keys[0].pubkey.toBase58()).toBe(
+        toEphemeralAta.toBase58(),
+      );
+      expect(instructions[2].data[0]).toBe(4);
+      expect(instructions[2].data[1]).toBe(toEataBump);
+      expect(instructions[2].keys[1].pubkey.toBase58()).toBe(
+        toEphemeralAta.toBase58(),
+      );
+      expect(instructions[3].data[0]).toBe(24);
+    });
+
+    it("should ignore initAtasIfMissing on ephemeral-source transfers", async () => {
+      const instructions = await transferSpl(from, to, mint, 25n, {
+        visibility: "private",
+        fromBalance: "ephemeral",
+        toBalance: "base",
+        initAtasIfMissing: true,
+        privateTransfer: {
+          minDelayMs: 100n,
+          maxDelayMs: 300n,
+          split: 4,
+        },
+      });
+
+      expect(instructions).toHaveLength(1);
+      expect(instructions[0].data[0]).toBe(16);
+    });
+
     it("should use depositAndQueueTransferIx for private ephemeral-to-base transfers", async () => {
       const instructions = await transferSpl(from, to, mint, 25n, {
         visibility: "private",
         fromBalance: "ephemeral",
         toBalance: "base",
+        initIfMissing: true,
+        initVaultIfMissing: true,
         privateTransfer: {
           minDelayMs: 100n,
           maxDelayMs: 300n,
@@ -987,6 +1125,8 @@ describe("Exposed Instructions (web3.js)", () => {
         visibility: "private",
         fromBalance: "ephemeral",
         toBalance: "ephemeral",
+        initIfMissing: true,
+        initVaultIfMissing: true,
       });
 
       expect(instructions).toHaveLength(1);

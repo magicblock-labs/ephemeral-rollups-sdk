@@ -572,7 +572,7 @@ export function initShuttleEphemeralAtaIx(
     keys: [
       { pubkey: payer, isSigner: true, isWritable: true },
       { pubkey: shuttleEphemeralAta, isSigner: false, isWritable: true },
-      { pubkey: shuttleAta, isSigner: false, isWritable: false },
+      { pubkey: shuttleAta, isSigner: false, isWritable: true },
       { pubkey: shuttleWalletAta, isSigner: false, isWritable: true },
       { pubkey: owner, isSigner: false, isWritable: false },
       { pubkey: mint, isSigner: false, isWritable: false },
@@ -613,7 +613,7 @@ export function delegateShuttleEphemeralAtaIx(
     keys: [
       { pubkey: payer, isSigner: true, isWritable: true },
       { pubkey: shuttleEphemeralAta, isSigner: false, isWritable: false },
-      { pubkey: shuttleAta, isSigner: false, isWritable: false },
+      { pubkey: shuttleAta, isSigner: false, isWritable: true },
       {
         pubkey: EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
         isSigner: false,
@@ -1256,6 +1256,9 @@ export interface TransferSplOptions {
   toBalance: TransferBalance;
   payer?: PublicKey;
   validator?: PublicKey;
+  initIfMissing?: boolean;
+  initAtasIfMissing?: boolean;
+  initVaultIfMissing?: boolean;
   shuttleId?: number;
   privateTransfer?: TransferSplPrivateOptions;
 }
@@ -1565,6 +1568,9 @@ export async function transferSpl(
 ): Promise<TransactionInstruction[]> {
   const payer = opts.payer ?? from;
   const validator = opts.validator;
+  const initIfMissing = opts.initIfMissing ?? false;
+  const initAtasIfMissing = opts.initAtasIfMissing ?? false;
+  const initVaultIfMissing = opts.initVaultIfMissing ?? false;
   const shuttleId = opts.shuttleId ?? randomShuttleId();
   const minDelayMs = opts.privateTransfer?.minDelayMs ?? 0n;
   const maxDelayMs = opts.privateTransfer?.maxDelayMs ?? minDelayMs;
@@ -1573,9 +1579,90 @@ export async function transferSpl(
   const fromAta = getAssociatedTokenAddressSync(mint, from);
   const toAta = getAssociatedTokenAddressSync(mint, to);
 
+  if (opts.fromBalance === "ephemeral") {
+    switch (opts.visibility) {
+      case "private":
+        if (opts.toBalance === "base") {
+          const [queue] = deriveTransferQueue(mint);
+          const [vault] = deriveVault(mint);
+          const vaultAta = deriveVaultAta(mint, vault);
+
+          return [
+            depositAndQueueTransferIx(
+              queue,
+              vault,
+              mint,
+              fromAta,
+              vaultAta,
+              toAta,
+              from,
+              amount,
+              minDelayMs,
+              maxDelayMs,
+              split,
+            ),
+          ];
+        }
+
+        if (opts.toBalance === "ephemeral") {
+          return [createTransferInstruction(fromAta, toAta, from, amount)];
+        }
+
+        break;
+
+      case "public":
+        if (opts.toBalance === "ephemeral") {
+          return [createTransferInstruction(fromAta, toAta, from, amount)];
+        }
+
+        break;
+    }
+  }
+
+  const instructions: TransactionInstruction[] = [];
+
+  if (initVaultIfMissing) {
+    const [vault, vaultBump] = deriveVault(mint);
+    const [vaultEphemeralAta, vaultEataBump] = deriveEphemeralAta(vault, mint);
+    const vaultAta = deriveVaultAta(mint, vault);
+
+    instructions.push(
+      initVaultIx(vault, mint, payer, vaultBump),
+      initVaultAtaIx(payer, vaultAta, vault, mint),
+      delegateEphemeralAtaIx(
+        payer,
+        vaultEphemeralAta,
+        vaultEataBump,
+        validator,
+      ),
+    );
+  }
+
+  if (opts.fromBalance === "base" && initAtasIfMissing) {
+    instructions.push(
+      createAssociatedTokenAccountIdempotentInstruction(
+        payer,
+        fromAta,
+        from,
+        mint,
+      ),
+    );
+  }
+
   switch (opts.visibility) {
     case "private":
       if (opts.fromBalance === "base" && opts.toBalance === "base") {
+        if (initIfMissing) {
+          instructions.push(
+            createAssociatedTokenAccountIdempotentInstruction(
+              payer,
+              toAta,
+              to,
+              mint,
+            ),
+          );
+        }
+
         const [shuttleEphemeralAta, shuttleBump] = deriveShuttleEphemeralAta(
           from,
           mint,
@@ -1588,6 +1675,7 @@ export async function transferSpl(
         );
 
         return [
+          ...instructions,
           depositAndDelegateShuttleEphemeralAtaWithMergeAndPrivateTransferIx(
             payer,
             shuttleEphemeralAta,
@@ -1608,30 +1696,55 @@ export async function transferSpl(
         ];
       }
 
-      if (opts.fromBalance === "ephemeral" && opts.toBalance === "base") {
-        const [queue] = deriveTransferQueue(mint);
-        const [vault] = deriveVault(mint);
-        const vaultAta = deriveVaultAta(mint, vault);
+      if (opts.fromBalance === "base" && opts.toBalance === "ephemeral") {
+        if (initIfMissing) {
+          const [toEphemeralAta, toEataBump] = deriveEphemeralAta(to, mint);
+
+          instructions.push(
+            createAssociatedTokenAccountIdempotentInstruction(
+              payer,
+              toAta,
+              to,
+              mint,
+            ),
+            initEphemeralAtaIx(toEphemeralAta, to, mint, payer, toEataBump),
+            delegateEphemeralAtaIx(
+              payer,
+              toEphemeralAta,
+              toEataBump,
+              validator,
+            ),
+          );
+        }
+
+        const [shuttleEphemeralAta, shuttleBump] = deriveShuttleEphemeralAta(
+          from,
+          mint,
+          shuttleId,
+        );
+        const [shuttleAta] = deriveShuttleAta(shuttleEphemeralAta, mint);
+        const shuttleWalletAta = deriveShuttleWalletAta(
+          mint,
+          shuttleEphemeralAta,
+        );
 
         return [
-          depositAndQueueTransferIx(
-            queue,
-            vault,
-            mint,
-            fromAta,
-            vaultAta,
-            toAta,
+          ...instructions,
+          setupAndDelegateShuttleEphemeralAtaWithMergeIx(
+            payer,
+            shuttleEphemeralAta,
+            shuttleAta,
             from,
+            fromAta,
+            toAta,
+            shuttleWalletAta,
+            mint,
+            shuttleId,
+            shuttleBump,
             amount,
-            minDelayMs,
-            maxDelayMs,
-            split,
+            validator,
           ),
         ];
-      }
-
-      if (opts.fromBalance === "ephemeral" && opts.toBalance === "ephemeral") {
-        return [createTransferInstruction(fromAta, toAta, from, amount)];
       }
 
       // TODO: support private transfers from base balance to ephemeral balance.
@@ -1639,11 +1752,10 @@ export async function transferSpl(
 
     case "public":
       if (opts.fromBalance === "base" && opts.toBalance === "base") {
-        return [createTransferInstruction(fromAta, toAta, from, amount)];
-      }
-
-      if (opts.fromBalance === "ephemeral" && opts.toBalance === "ephemeral") {
-        return [createTransferInstruction(fromAta, toAta, from, amount)];
+        return [
+          ...instructions,
+          createTransferInstruction(fromAta, toAta, from, amount),
+        ];
       }
 
       // TODO: support public transfers across base/ephemeral balance boundaries.
