@@ -36,7 +36,7 @@ mod tests {
     fn test_initialize_global_vault() {
         let payer = Pubkey::new_unique();
         let mint = Pubkey::new_unique();
-        let (vault, vault_bump) = GlobalVault::find_pda(&mint);
+        let (vault, _vault_bump) = GlobalVault::find_pda(&mint);
         let (vault_ephemeral_ata, _vault_eata_bump) = EphemeralAta::find_pda(&vault, &mint);
         let vault_ata = get_associated_token_address(&vault, &mint);
 
@@ -81,7 +81,7 @@ mod tests {
             instruction.data[0],
             EphemeralSplDiscriminator::InitializeGlobalVault as u8
         );
-        assert_eq!(instruction.data[1], vault_bump);
+        assert_eq!(instruction.data.len(), 1);
     }
 
     #[test]
@@ -89,7 +89,7 @@ mod tests {
         let payer = Pubkey::new_unique();
         let user = Pubkey::new_unique();
         let mint = Pubkey::new_unique();
-        let (eata, eata_bump) = EphemeralAta::find_pda(&user, &mint);
+        let (eata, _eata_bump) = EphemeralAta::find_pda(&user, &mint);
 
         let instruction = InitializeEphemeralAtaBuilder { payer, user, mint }.instruction();
 
@@ -119,7 +119,7 @@ mod tests {
             instruction.data[0],
             EphemeralSplDiscriminator::InitializeEphemeralAta as u8
         );
-        assert_eq!(instruction.data[1], eata_bump);
+        assert_eq!(instruction.data.len(), 1);
     }
 
     #[test]

@@ -16,7 +16,6 @@ pub struct InitializeGlobalVault<'a> {
     pub token_program: AccountInfo<'a>,
     pub associated_token_program: AccountInfo<'a>,
     pub system_program: AccountInfo<'a>,
-    pub vault_bump: u8,
 }
 
 impl<'a> InitializeGlobalVault<'a> {
@@ -34,10 +33,7 @@ impl<'a> InitializeGlobalVault<'a> {
                 AccountMeta::new_readonly(*self.associated_token_program.key, false),
                 AccountMeta::new_readonly(*self.system_program.key, false),
             ],
-            data: vec![
-                EphemeralSplDiscriminator::InitializeGlobalVault as u8,
-                self.vault_bump,
-            ],
+            data: vec![EphemeralSplDiscriminator::InitializeGlobalVault as u8],
         }
     }
 

@@ -22,6 +22,8 @@ import {
   deriveShuttleEphemeralAta,
   deriveVault,
   ensureTransferQueueCrankIx,
+  initEphemeralAtaIx,
+  initVaultIx,
   initRentPdaIx,
   transferSpl,
   withdrawSplIx,
@@ -1220,6 +1222,33 @@ describe("Exposed Instructions (web3.js)", () => {
       );
 
       expect(Array.from(instruction.data)).toEqual([7]);
+    });
+  });
+
+  describe("initEphemeralAtaIx (Ephemeral SPL Token Program)", () => {
+    it("should serialize only the discriminator", () => {
+      const instruction = initEphemeralAtaIx(
+        mockPublicKey,
+        differentKey,
+        mockPublicKey,
+        differentKey,
+      );
+
+      expect(Array.from(instruction.data)).toEqual([0]);
+    });
+  });
+
+  describe("initVaultIx (Ephemeral SPL Token Program)", () => {
+    it("should serialize only the discriminator", () => {
+      const vault = new PublicKey("11111111111111111111111111111113");
+      const mint = new PublicKey("11111111111111111111111111111114");
+      const payer = new PublicKey("11111111111111111111111111111115");
+      const instruction = initVaultIx(vault, mint, payer);
+
+      expect(Array.from(instruction.data)).toEqual([1]);
+      expect(instruction.keys[3].pubkey.toBase58()).toBe(
+        deriveEphemeralAta(vault, mint)[0].toBase58(),
+      );
     });
   });
 

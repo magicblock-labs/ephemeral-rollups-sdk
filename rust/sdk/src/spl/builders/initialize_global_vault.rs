@@ -14,7 +14,7 @@ pub struct InitializeGlobalVaultBuilder {
 impl InitializeGlobalVaultBuilder {
     #[inline(always)]
     pub fn instruction(&self) -> Instruction {
-        let (vault, vault_bump) = GlobalVault::find_pda(&self.mint);
+        let (vault, _vault_bump) = GlobalVault::find_pda(&self.mint);
         let (vault_ephemeral_ata, _vault_eata_bump) = EphemeralAta::find_pda(&vault, &self.mint);
         let vault_ata = get_associated_token_address(&vault, &self.mint);
         Instruction {
@@ -29,10 +29,7 @@ impl InitializeGlobalVaultBuilder {
                 AccountMeta::new_readonly(ASSOCIATED_TOKEN_PROGRAM_ID, false),
                 AccountMeta::new_readonly(system_program::id(), false),
             ],
-            data: vec![
-                EphemeralSplDiscriminator::InitializeGlobalVault as u8,
-                vault_bump,
-            ],
+            data: vec![EphemeralSplDiscriminator::InitializeGlobalVault as u8],
         }
     }
 }

@@ -21,6 +21,7 @@ import {
   deriveRentPda,
   deriveVault,
   ensureTransferQueueCrankIx,
+  initEphemeralAtaIx,
   initVaultIx,
   initRentPdaIx,
   transferSpl,
@@ -1135,7 +1136,7 @@ describe("Exposed Instructions (@solana/kit)", () => {
     it("should use the provided vault ephemeral ATA synchronously", async () => {
       const mint = address("11111111111111111111111111111114");
       const payer = address("11111111111111111111111111111115");
-      const [vault, vaultBump] = await deriveVault(mint);
+      const [vault] = await deriveVault(mint);
       const [vaultEphemeralAta] = await deriveEphemeralAta(vault, mint);
       const vaultAta = address("11111111111111111111111111111116");
 
@@ -1143,7 +1144,6 @@ describe("Exposed Instructions (@solana/kit)", () => {
         vault,
         mint,
         payer,
-        vaultBump,
         vaultEphemeralAta,
         vaultAta,
       );
@@ -1151,7 +1151,7 @@ describe("Exposed Instructions (@solana/kit)", () => {
       expect(instruction.accounts?.[0].address).toBe(vault);
       expect(instruction.accounts?.[3].address).toBe(vaultEphemeralAta);
       expect(instruction.accounts?.[4].address).toBe(vaultAta);
-      expect(Array.from(instruction.data ?? [])).toEqual([1, vaultBump]);
+      expect(Array.from(instruction.data ?? [])).toEqual([1]);
     });
   });
 
@@ -1238,6 +1238,19 @@ describe("Exposed Instructions (@solana/kit)", () => {
       );
 
       expect(Array.from(instruction.data ?? [])).toEqual([7]);
+    });
+  });
+
+  describe("initEphemeralAtaIx (Ephemeral SPL Token Program)", () => {
+    it("should serialize only the discriminator", () => {
+      const instruction = initEphemeralAtaIx(
+        mockAddress,
+        differentAddress,
+        mockAddress,
+        differentAddress,
+      );
+
+      expect(Array.from(instruction.data ?? [])).toEqual([0]);
     });
   });
 
