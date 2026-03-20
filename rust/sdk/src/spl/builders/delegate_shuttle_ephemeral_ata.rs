@@ -31,7 +31,7 @@ impl DelegateShuttleEphemeralAtaBuilder {
         let delegation_record = delegation_record_pda_from_delegated_account(&shuttle_ata);
         let delegation_metadata = delegation_metadata_pda_from_delegated_account(&shuttle_ata);
 
-        let mut data = Vec::with_capacity(33);
+        let mut data = Vec::with_capacity(if self.validator.is_some() { 33 } else { 1 });
         data.push(EphemeralSplDiscriminator::DelegateShuttleEphemeralAta as u8);
         if let Some(validator) = self.validator {
             data.extend_from_slice(validator.as_ref());
