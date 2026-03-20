@@ -59,7 +59,7 @@ impl<'a> DelegateEphemeralAtaPermission<'a> {
         let mut accounts = [const { MaybeUninit::<&AccountView>::uninit() }; NUM_ACCOUNTS];
         accounts[0].write(self.payer);
         accounts[1].write(self.eata);
-        accounts[2].write(self.payer);
+        accounts[2].write(self.permission_program);
         accounts[3].write(self.permission);
         accounts[4].write(self.system_program);
         accounts[5].write(self.delegation_buffer);
@@ -68,10 +68,7 @@ impl<'a> DelegateEphemeralAtaPermission<'a> {
         accounts[8].write(self.delegation_program);
         accounts[9].write(self.validator);
 
-        let instruction_data = [
-            EphemeralSplDiscriminator::DelegateEphemeralAtaPermission as u8,
-            self.eata_bump,
-        ];
+        let instruction_data = [EphemeralSplDiscriminator::DelegateEphemeralAtaPermission as u8];
 
         invoke_signed_with_bounds::<NUM_ACCOUNTS>(
             &InstructionView {

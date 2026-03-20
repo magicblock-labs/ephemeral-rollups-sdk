@@ -1005,7 +1005,7 @@ export function withdrawSplIx(
   amount: bigint,
 ): TransactionInstruction {
   const [ephemeralAta] = deriveEphemeralAta(owner, mint);
-  const [vault, vaultBump] = deriveVault(mint);
+  const [vault] = deriveVault(mint);
   const vaultAta = deriveVaultAta(mint, vault);
   const userDestAta = getAssociatedTokenAddressSync(mint, owner);
 
@@ -1020,8 +1020,8 @@ export function withdrawSplIx(
       { pubkey: userDestAta, isSigner: false, isWritable: true },
       { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
     ],
-    // [WITHDRAW_OPCODE, amount(le u64), vault_bump]
-    data: encodeAmountInstructionData(3, amount, vaultBump),
+    // [WITHDRAW_OPCODE, amount(le u64)]
+    data: encodeAmountInstructionData(3, amount),
   });
 }
 
@@ -1130,14 +1130,12 @@ export function resetEataPermissionIx(
  * Delegate EATA permission
  * @param payer - The payer account
  * @param ephemeralAta - The ephemeral ATA account
- * @param bump - The bump
  * @param validator - The validator account
  * @returns The delegate EATA permission instruction
  */
 export function delegateEataPermissionIx(
   payer: PublicKey,
   ephemeralAta: PublicKey,
-  bump: number,
   validator: PublicKey,
 ): TransactionInstruction {
   const permission = permissionPdaFromAccount(ephemeralAta);
@@ -1171,7 +1169,7 @@ export function delegateEataPermissionIx(
       { pubkey: DELEGATION_PROGRAM_ID, isSigner: false, isWritable: false },
       { pubkey: validator, isSigner: false, isWritable: false },
     ],
-    data: Buffer.from([7, bump]),
+    data: Buffer.from([7]),
   });
 }
 

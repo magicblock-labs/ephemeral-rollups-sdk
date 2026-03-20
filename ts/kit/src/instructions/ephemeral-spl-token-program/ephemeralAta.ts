@@ -991,7 +991,7 @@ export async function withdrawSplIx(
   amount: bigint,
 ): Promise<Instruction> {
   const [ephemeralAta] = await deriveEphemeralAta(owner, mint);
-  const [vault, vaultBump] = await deriveVault(mint);
+  const [vault] = await deriveVault(mint);
   const vaultAta = await deriveVaultAta(mint, vault);
   const userDestAta = await getAssociatedTokenAddressSync(mint, owner);
 
@@ -1005,7 +1005,7 @@ export async function withdrawSplIx(
       { address: userDestAta, role: AccountRole.WRITABLE },
       { address: TOKEN_PROGRAM_ADDRESS as Address, role: AccountRole.READONLY },
     ],
-    data: encodeAmountInstructionData(3, amount, vaultBump),
+    data: encodeAmountInstructionData(3, amount),
     programAddress: EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
   };
 }
@@ -1110,14 +1110,12 @@ export async function resetEataPermissionIx(
  * Delegate EATA permission
  * @param payer - The payer account
  * @param ephemeralAta - The ephemeral ATA account
- * @param bump - The bump
  * @param validator - The validator account
  * @returns The delegate EATA permission instruction
  */
 export async function delegateEataPermissionIx(
   payer: Address,
   ephemeralAta: Address,
-  bump: number,
   validator: Address,
 ): Promise<Instruction> {
   const permission = await permissionPdaFromAccount(ephemeralAta);
@@ -1147,7 +1145,7 @@ export async function delegateEataPermissionIx(
       { address: DELEGATION_PROGRAM_ID, role: AccountRole.READONLY },
       { address: validator, role: AccountRole.READONLY },
     ],
-    data: new Uint8Array([7, bump]),
+    data: new Uint8Array([7]),
     programAddress: EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
   };
 }

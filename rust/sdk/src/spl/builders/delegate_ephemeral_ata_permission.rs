@@ -21,7 +21,7 @@ pub struct DelegateEphemeralAtaPermissionBuilder {
 impl DelegateEphemeralAtaPermissionBuilder {
     #[inline(always)]
     pub fn instruction(&self) -> Instruction {
-        let (eata, eata_bump) = EphemeralAta::find_pda(&self.user, &self.mint);
+        let (eata, _eata_bump) = EphemeralAta::find_pda(&self.user, &self.mint);
         let (permission, _permission_bump) = Permission::find_pda(&eata);
         let delegation_buffer = delegate_buffer_pda_from_delegated_account_and_owner_program(
             &permission,
@@ -44,10 +44,7 @@ impl DelegateEphemeralAtaPermissionBuilder {
                 AccountMeta::new_readonly(DELEGATION_PROGRAM_ID, false),
                 AccountMeta::new_readonly(self.validator, false),
             ],
-            data: vec![
-                EphemeralSplDiscriminator::DelegateEphemeralAtaPermission as u8,
-                eata_bump,
-            ],
+            data: vec![EphemeralSplDiscriminator::DelegateEphemeralAtaPermission as u8],
         }
     }
 }

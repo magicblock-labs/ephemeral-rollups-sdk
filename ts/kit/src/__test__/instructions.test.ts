@@ -12,6 +12,7 @@ import {
 } from "../instructions/magic-program";
 import { address, getAddressEncoder, type Address } from "@solana/kit";
 import {
+  delegateEataPermissionIx,
   depositAndQueueTransferIx,
   delegateSpl,
   delegateSplWithPrivateTransfer,
@@ -23,6 +24,7 @@ import {
   initVaultIx,
   initRentPdaIx,
   transferSpl,
+  withdrawSplIx,
   withdrawSpl,
 } from "../instructions/ephemeral-spl-token-program";
 import {
@@ -1224,6 +1226,44 @@ describe("Exposed Instructions (@solana/kit)", () => {
 
       expect(instruction.accounts).toHaveLength(9);
       expect(instruction.data).toEqual(new Uint8Array([19]));
+    });
+  });
+
+  describe("delegateEataPermissionIx (Ephemeral SPL Token Program)", () => {
+    it("should serialize only the discriminator", async () => {
+      const instruction = await delegateEataPermissionIx(
+        mockAddress,
+        differentAddress,
+        mockAddress,
+      );
+
+      expect(Array.from(instruction.data ?? [])).toEqual([7]);
+    });
+  });
+
+  describe("withdrawSplIx (Ephemeral SPL Token Program)", () => {
+    it("should encode only discriminator plus amount", async () => {
+      const owner = address("11111111111111111111111111111113");
+      const mint = address("11111111111111111111111111111114");
+      const instruction = await withdrawSplIx(owner, mint, 1n);
+
+      expect(instruction.data).toHaveLength(9);
+      expect(instruction.data?.[0]).toBe(3);
+
+      const data = instruction.data;
+      expect(data).toBeDefined();
+
+      if (data === undefined) {
+        throw new Error("Expected withdraw instruction data");
+      }
+
+      expect(
+        new DataView(
+          data.buffer,
+          data.byteOffset,
+          data.byteLength,
+        ).getBigUint64(1, true),
+      ).toBe(1n);
     });
   });
 });

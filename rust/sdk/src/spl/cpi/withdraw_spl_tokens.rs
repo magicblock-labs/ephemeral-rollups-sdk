@@ -22,10 +22,9 @@ pub struct WithdrawSplTokens<'a> {
 impl<'a> WithdrawSplTokens<'a> {
     #[inline(always)]
     pub fn instruction(&self) -> Instruction {
-        let mut data = Vec::with_capacity(10);
+        let mut data = Vec::with_capacity(9);
         data.push(EphemeralSplDiscriminator::WithdrawSplTokens as u8);
         data.extend_from_slice(self.amount.to_le_bytes().as_ref());
-        data.push(self.vault_bump);
         Instruction {
             program_id: ESPL_TOKEN_PROGRAM_ID,
             accounts: vec![

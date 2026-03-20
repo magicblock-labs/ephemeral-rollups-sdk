@@ -11,6 +11,7 @@ import {
   createCommitAndUndelegateInstruction,
 } from "../instructions/magic-program";
 import {
+  delegateEataPermissionIx,
   depositAndQueueTransferIx,
   delegateSpl,
   delegateSplWithPrivateTransfer,
@@ -23,6 +24,7 @@ import {
   ensureTransferQueueCrankIx,
   initRentPdaIx,
   transferSpl,
+  withdrawSplIx,
   withdrawSpl,
 } from "../instructions/ephemeral-spl-token-program";
 import {
@@ -1206,6 +1208,30 @@ describe("Exposed Instructions (web3.js)", () => {
 
       expect(instruction.keys).toHaveLength(9);
       expect(Array.from(instruction.data)).toEqual([19]);
+    });
+  });
+
+  describe("delegateEataPermissionIx (Ephemeral SPL Token Program)", () => {
+    it("should serialize only the discriminator", () => {
+      const instruction = delegateEataPermissionIx(
+        mockPublicKey,
+        differentKey,
+        mockPublicKey,
+      );
+
+      expect(Array.from(instruction.data)).toEqual([7]);
+    });
+  });
+
+  describe("withdrawSplIx (Ephemeral SPL Token Program)", () => {
+    it("should encode only discriminator plus amount", () => {
+      const owner = new PublicKey("11111111111111111111111111111113");
+      const mint = new PublicKey("11111111111111111111111111111114");
+      const instruction = withdrawSplIx(owner, mint, 1n);
+
+      expect(instruction.data).toHaveLength(9);
+      expect(instruction.data[0]).toBe(3);
+      expect(Buffer.from(instruction.data).readBigUInt64LE(1)).toBe(1n);
     });
   });
 });

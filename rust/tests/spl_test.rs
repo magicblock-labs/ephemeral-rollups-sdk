@@ -187,7 +187,7 @@ mod tests {
         let mint = Pubkey::new_unique();
         let user = Pubkey::new_unique();
         let (eata, _eata_bump) = EphemeralAta::find_pda(&user, &mint);
-        let (vault, vault_bump) = GlobalVault::find_pda(&mint);
+        let (vault, _vault_bump) = GlobalVault::find_pda(&mint);
         let amount = 1000u64;
 
         let instruction = WithdrawSplTokensBuilder {
@@ -237,7 +237,7 @@ mod tests {
             u64::from_le_bytes(instruction.data[1..9].try_into().unwrap()),
             amount
         );
-        assert_eq!(instruction.data[9], vault_bump);
+        assert_eq!(instruction.data.len(), 9);
     }
 
     #[test]
@@ -461,7 +461,7 @@ mod tests {
         let payer = Pubkey::new_unique();
         let user = Pubkey::new_unique();
         let mint = Pubkey::new_unique();
-        let (eata, eata_bump) = EphemeralAta::find_pda(&user, &mint);
+        let (eata, _eata_bump) = EphemeralAta::find_pda(&user, &mint);
         let (permission, _permission_bump) = Permission::find_pda(&eata);
         let validator = Pubkey::new_unique();
 
@@ -525,7 +525,7 @@ mod tests {
             instruction.data[0],
             EphemeralSplDiscriminator::DelegateEphemeralAtaPermission as u8
         );
-        assert_eq!(instruction.data[1], eata_bump);
+        assert_eq!(instruction.data.len(), 1);
     }
 
     #[test]
