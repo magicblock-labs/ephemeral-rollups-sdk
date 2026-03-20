@@ -1277,7 +1277,7 @@ async function buildDelegateSplInstructions(
 
   const [ephemeralAta, eataBump] = deriveEphemeralAta(owner, mint);
   const [vault, vaultBump] = deriveVault(mint);
-  const [vaultEphemeralAta, vaultEataBump] = deriveEphemeralAta(vault, mint);
+  const [vaultEphemeralAta] = deriveEphemeralAta(vault, mint);
   const vaultAta = deriveVaultAta(mint, vault);
   const ownerAta = getAssociatedTokenAddressSync(mint, owner);
 
@@ -1334,11 +1334,15 @@ async function buildIdempotentDelegateSplInstructions(
 
   const [ephemeralAta, eataBump] = deriveEphemeralAta(owner, mint);
   const [vault, vaultBump] = deriveVault(mint);
-  const [vaultEphemeralAta, vaultEataBump] = deriveEphemeralAta(vault, mint);
+  const [vaultEphemeralAta] = deriveEphemeralAta(vault, mint);
   const vaultAta = deriveVaultAta(mint, vault);
   const ownerAta = getAssociatedTokenAddressSync(mint, owner);
 
-  const [shuttleEphemeralAta] = deriveShuttleEphemeralAta(owner, mint, shuttleId);
+  const [shuttleEphemeralAta] = deriveShuttleEphemeralAta(
+    owner,
+    mint,
+    shuttleId,
+  );
   const [shuttleAta] = deriveShuttleAta(shuttleEphemeralAta, mint);
   const shuttleWalletAta = deriveShuttleWalletAta(mint, shuttleEphemeralAta);
 
@@ -1453,11 +1457,15 @@ export async function delegateSplWithPrivateTransfer(
 
   const [ephemeralAta, eataBump] = deriveEphemeralAta(owner, mint);
   const [vault, vaultBump] = deriveVault(mint);
-  const [vaultEphemeralAta, vaultEataBump] = deriveEphemeralAta(vault, mint);
+  const [vaultEphemeralAta] = deriveEphemeralAta(vault, mint);
   const vaultAta = deriveVaultAta(mint, vault);
   const [queue] = deriveTransferQueue(mint);
   const ownerAta = getAssociatedTokenAddressSync(mint, owner);
-  const [shuttleEphemeralAta] = deriveShuttleEphemeralAta(owner, mint, shuttleId);
+  const [shuttleEphemeralAta] = deriveShuttleEphemeralAta(
+    owner,
+    mint,
+    shuttleId,
+  );
   const [shuttleAta] = deriveShuttleAta(shuttleEphemeralAta, mint);
   const shuttleWalletAta = deriveShuttleWalletAta(mint, shuttleEphemeralAta);
 
@@ -1577,7 +1585,7 @@ export async function transferSpl(
 
   if (initVaultIfMissing) {
     const [vault, vaultBump] = deriveVault(mint);
-    const [vaultEphemeralAta, vaultEataBump] = deriveEphemeralAta(vault, mint);
+    const [vaultEphemeralAta] = deriveEphemeralAta(vault, mint);
     const vaultAta = deriveVaultAta(mint, vault);
 
     instructions.push(
@@ -1725,7 +1733,11 @@ async function buildIdempotentWithdrawSplInstructions(
 
   const [ephemeralAta, eataBump] = deriveEphemeralAta(owner, mint);
   const ownerAta = getAssociatedTokenAddressSync(mint, owner);
-  const [shuttleEphemeralAta] = deriveShuttleEphemeralAta(owner, mint, shuttleId);
+  const [shuttleEphemeralAta] = deriveShuttleEphemeralAta(
+    owner,
+    mint,
+    shuttleId,
+  );
   const [shuttleAta] = deriveShuttleAta(shuttleEphemeralAta, mint);
   const shuttleWalletAta = deriveShuttleWalletAta(mint, shuttleEphemeralAta);
 

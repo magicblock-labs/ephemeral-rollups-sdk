@@ -23,7 +23,7 @@ impl<'a> UndelegateEphemeralAtaPermission<'a> {
             program_id: ESPL_TOKEN_PROGRAM_ID,
             accounts: vec![
                 AccountMeta::new_readonly(*self.payer.key, true),
-                AccountMeta::new_readonly(*self.eata.key, false),
+                AccountMeta::new(*self.eata.key, false),
                 AccountMeta::new(*self.permission.key, false),
                 AccountMeta::new_readonly(*self.permission_program.key, false),
                 AccountMeta::new_readonly(*self.magic_program.key, false),

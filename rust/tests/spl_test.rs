@@ -3,7 +3,7 @@
 
 #[cfg(test)]
 mod tests {
-    use dlp_api::dlp::{
+    use dlp_api::{
         consts::DELEGATION_PROGRAM_ID,
         pda::{
             delegate_buffer_pda_from_delegated_account_and_owner_program,
@@ -37,12 +37,13 @@ mod tests {
         let payer = Pubkey::new_unique();
         let mint = Pubkey::new_unique();
         let (vault, vault_bump) = GlobalVault::find_pda(&mint);
+        let (vault_ephemeral_ata, _vault_eata_bump) = EphemeralAta::find_pda(&vault, &mint);
         let vault_ata = get_associated_token_address(&vault, &mint);
 
         let instruction = InitializeGlobalVaultBuilder { payer, mint }.instruction();
 
         assert_eq!(instruction.program_id, ESPL_TOKEN_PROGRAM_ID);
-        assert_eq!(instruction.accounts.len(), 7);
+        assert_eq!(instruction.accounts.len(), 8);
         // vault (writable, not signer)
         assert_eq!(instruction.accounts[0].pubkey, vault);
         assert!(instruction.accounts[0].is_writable);
@@ -55,22 +56,26 @@ mod tests {
         assert_eq!(instruction.accounts[2].pubkey, mint);
         assert!(!instruction.accounts[2].is_writable);
         assert!(!instruction.accounts[2].is_signer);
-        // vault_ata (writable)
-        assert_eq!(instruction.accounts[3].pubkey, vault_ata);
+        // vault_ephemeral_ata (writable)
+        assert_eq!(instruction.accounts[3].pubkey, vault_ephemeral_ata);
         assert!(instruction.accounts[3].is_writable);
         assert!(!instruction.accounts[3].is_signer);
-        // token_program (readonly)
-        assert_eq!(instruction.accounts[4].pubkey, TOKEN_PROGRAM_ID);
-        assert!(!instruction.accounts[4].is_writable);
+        // vault_ata (writable)
+        assert_eq!(instruction.accounts[4].pubkey, vault_ata);
+        assert!(instruction.accounts[4].is_writable);
         assert!(!instruction.accounts[4].is_signer);
-        // associated_token_program (readonly)
-        assert_eq!(instruction.accounts[5].pubkey, ASSOCIATED_TOKEN_PROGRAM_ID);
+        // token_program (readonly)
+        assert_eq!(instruction.accounts[5].pubkey, TOKEN_PROGRAM_ID);
         assert!(!instruction.accounts[5].is_writable);
         assert!(!instruction.accounts[5].is_signer);
-        // system_program (readonly)
-        assert_eq!(instruction.accounts[6].pubkey, system_program::id());
+        // associated_token_program (readonly)
+        assert_eq!(instruction.accounts[6].pubkey, ASSOCIATED_TOKEN_PROGRAM_ID);
         assert!(!instruction.accounts[6].is_writable);
         assert!(!instruction.accounts[6].is_signer);
+        // system_program (readonly)
+        assert_eq!(instruction.accounts[7].pubkey, system_program::id());
+        assert!(!instruction.accounts[7].is_writable);
+        assert!(!instruction.accounts[7].is_signer);
 
         assert_eq!(
             instruction.data[0],
@@ -181,8 +186,8 @@ mod tests {
         let payer = Pubkey::new_unique();
         let mint = Pubkey::new_unique();
         let user = Pubkey::new_unique();
-        let (eata, eata_bump) = EphemeralAta::find_pda(&user, &mint);
-        let (vault, _vault_bump) = GlobalVault::find_pda(&mint);
+        let (eata, _eata_bump) = EphemeralAta::find_pda(&user, &mint);
+        let (vault, vault_bump) = GlobalVault::find_pda(&mint);
         let amount = 1000u64;
 
         let instruction = WithdrawSplTokensBuilder {
@@ -232,7 +237,7 @@ mod tests {
             u64::from_le_bytes(instruction.data[1..9].try_into().unwrap()),
             amount
         );
-        assert_eq!(instruction.data[9], eata_bump);
+        assert_eq!(instruction.data[9], vault_bump);
     }
 
     #[test]
@@ -240,7 +245,7 @@ mod tests {
         let payer = Pubkey::new_unique();
         let user = Pubkey::new_unique();
         let mint = Pubkey::new_unique();
-        let (eata, eata_bump) = EphemeralAta::find_pda(&user, &mint);
+        let (eata, _eata_bump) = EphemeralAta::find_pda(&user, &mint);
 
         let instruction = DelegateEphemeralAtaBuilder {
             payer,
@@ -288,7 +293,7 @@ mod tests {
             instruction.data[0],
             EphemeralSplDiscriminator::DelegateEphemeralAta as u8
         );
-        assert_eq!(instruction.data[1], eata_bump);
+        assert_eq!(instruction.data.len(), 1);
     }
 
     #[test]
@@ -297,7 +302,7 @@ mod tests {
         let user = Pubkey::new_unique();
         let mint = Pubkey::new_unique();
         let validator = Pubkey::new_unique();
-        let (eata, eata_bump) = EphemeralAta::find_pda(&user, &mint);
+        let (eata, _eata_bump) = EphemeralAta::find_pda(&user, &mint);
 
         let instruction = DelegateEphemeralAtaBuilder {
             payer,
@@ -355,8 +360,7 @@ mod tests {
             instruction.data[0],
             EphemeralSplDiscriminator::DelegateEphemeralAta as u8
         );
-        assert_eq!(instruction.data[1], eata_bump);
-        assert_eq!(instruction.data[2..34], validator.to_bytes());
+        assert_eq!(instruction.data[1..33], validator.to_bytes());
     }
 
     #[test]
@@ -407,7 +411,7 @@ mod tests {
         let payer = Pubkey::new_unique();
         let user = Pubkey::new_unique();
         let mint = Pubkey::new_unique();
-        let (eata, eata_bump) = EphemeralAta::find_pda(&user, &mint);
+        let (eata, _eata_bump) = EphemeralAta::find_pda(&user, &mint);
         let (permission, _permission_bump) = Permission::find_pda(&eata);
         let flag_byte = 0u8;
 
@@ -449,8 +453,7 @@ mod tests {
             instruction.data[0],
             EphemeralSplDiscriminator::CreateEphemeralAtaPermission as u8
         );
-        assert_eq!(instruction.data[1], eata_bump);
-        assert_eq!(instruction.data[2], flag_byte);
+        assert_eq!(instruction.data[1], flag_byte);
     }
 
     #[test]
@@ -547,7 +550,7 @@ mod tests {
             instruction.accounts[1].pubkey,
             EphemeralAta::find_pda(&user, &mint).0
         );
-        assert!(!instruction.accounts[1].is_writable);
+        assert!(instruction.accounts[1].is_writable);
         assert!(!instruction.accounts[1].is_signer);
         // permission (writable, not signer)
         assert_eq!(instruction.accounts[2].pubkey, permission);
@@ -574,7 +577,7 @@ mod tests {
     fn test_reset_ephemeral_ata_permission() {
         let user = Pubkey::new_unique();
         let mint = Pubkey::new_unique();
-        let (eata, eata_bump) = EphemeralAta::find_pda(&user, &mint);
+        let (eata, _eata_bump) = EphemeralAta::find_pda(&user, &mint);
         let (permission, _) = Permission::find_pda(&eata);
         let flag_byte = 0u8;
 
@@ -587,12 +590,12 @@ mod tests {
 
         assert_eq!(instruction.program_id, ESPL_TOKEN_PROGRAM_ID);
         assert_eq!(instruction.accounts.len(), 4);
-        // eata (writable, not signer)
+        // eata (readonly, not signer)
         assert_eq!(
             instruction.accounts[0].pubkey,
             EphemeralAta::find_pda(&user, &mint).0
         );
-        assert!(instruction.accounts[0].is_writable);
+        assert!(!instruction.accounts[0].is_writable);
         assert!(!instruction.accounts[0].is_signer);
         // permission (writable, not signer)
         assert_eq!(instruction.accounts[1].pubkey, permission);
@@ -611,7 +614,6 @@ mod tests {
             instruction.data[0],
             EphemeralSplDiscriminator::ResetEphemeralAtaPermission as u8
         );
-        assert_eq!(instruction.data[1], eata_bump);
-        assert_eq!(instruction.data[2], flag_byte);
+        assert_eq!(instruction.data[1], flag_byte);
     }
 }

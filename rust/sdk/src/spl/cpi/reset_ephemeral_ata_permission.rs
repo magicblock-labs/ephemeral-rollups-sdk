@@ -14,7 +14,6 @@ pub struct ResetEphemeralAtaPermission<'a> {
     pub permission: AccountInfo<'a>,
     pub owner: AccountInfo<'a>,
     pub permission_program: AccountInfo<'a>,
-    pub bump: u8,
     pub flag_byte: u8,
 }
 
@@ -24,14 +23,13 @@ impl<'a> ResetEphemeralAtaPermission<'a> {
         Instruction {
             program_id: ESPL_TOKEN_PROGRAM_ID,
             accounts: vec![
-                AccountMeta::new(*self.eata.key, false),
+                AccountMeta::new_readonly(*self.eata.key, false),
                 AccountMeta::new(*self.permission.key, false),
                 AccountMeta::new_readonly(*self.owner.key, true),
                 AccountMeta::new_readonly(*self.permission_program.key, false),
             ],
             data: vec![
                 EphemeralSplDiscriminator::ResetEphemeralAtaPermission as u8,
-                self.bump,
                 self.flag_byte,
             ],
         }

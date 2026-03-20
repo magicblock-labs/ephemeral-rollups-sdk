@@ -1253,10 +1253,7 @@ async function buildDelegateSplInstructions(
 
   const [ephemeralAta, eataBump] = await deriveEphemeralAta(owner, mint);
   const [vault, vaultBump] = await deriveVault(mint);
-  const [vaultEphemeralAta, vaultEataBump] = await deriveEphemeralAta(
-    vault,
-    mint,
-  );
+  const [vaultEphemeralAta] = await deriveEphemeralAta(vault, mint);
   const vaultAta = await deriveVaultAta(mint, vault);
   const ownerAta = await getAssociatedTokenAddressSync(mint, owner);
 
@@ -1314,10 +1311,7 @@ async function buildIdempotentDelegateSplInstructions(
 
   const [ephemeralAta, eataBump] = await deriveEphemeralAta(owner, mint);
   const [vault, vaultBump] = await deriveVault(mint);
-  const [vaultEphemeralAta, vaultEataBump] = await deriveEphemeralAta(
-    vault,
-    mint,
-  );
+  const [vaultEphemeralAta] = await deriveEphemeralAta(vault, mint);
   const vaultAta = await deriveVaultAta(mint, vault);
   const ownerAta = await getAssociatedTokenAddressSync(mint, owner);
 
@@ -1436,10 +1430,7 @@ export async function delegateSplWithPrivateTransfer(
 
   const [ephemeralAta, eataBump] = await deriveEphemeralAta(owner, mint);
   const [vault, vaultBump] = await deriveVault(mint);
-  const [vaultEphemeralAta, vaultEataBump] = await deriveEphemeralAta(
-    vault,
-    mint,
-  );
+  const [vaultEphemeralAta] = await deriveEphemeralAta(vault, mint);
   const vaultAta = await deriveVaultAta(mint, vault);
   const [queue] = await deriveTransferQueue(mint);
   const ownerAta = await getAssociatedTokenAddressSync(mint, owner);
@@ -1563,10 +1554,7 @@ export async function transferSpl(
 
   if (initVaultIfMissing) {
     const [vault, vaultBump] = await deriveVault(mint);
-    const [vaultEphemeralAta, vaultEataBump] = await deriveEphemeralAta(
-      vault,
-      mint,
-    );
+    const [vaultEphemeralAta] = await deriveEphemeralAta(vault, mint);
     const vaultAta = await deriveVaultAta(mint, vault);
 
     instructions.push(
@@ -1587,8 +1575,11 @@ export async function transferSpl(
           instructions.push(initVaultAtaIx(payer, toAta, to, mint));
         }
 
-        const [shuttleEphemeralAta] =
-          await deriveShuttleEphemeralAta(from, mint, shuttleId);
+        const [shuttleEphemeralAta] = await deriveShuttleEphemeralAta(
+          from,
+          mint,
+          shuttleId,
+        );
         const [shuttleAta] = await deriveShuttleAta(shuttleEphemeralAta, mint);
         const shuttleWalletAta = await deriveShuttleWalletAta(
           mint,
@@ -1630,8 +1621,11 @@ export async function transferSpl(
           );
         }
 
-        const [shuttleEphemeralAta] =
-          await deriveShuttleEphemeralAta(from, mint, shuttleId);
+        const [shuttleEphemeralAta] = await deriveShuttleEphemeralAta(
+          from,
+          mint,
+          shuttleId,
+        );
         const [shuttleAta] = await deriveShuttleAta(shuttleEphemeralAta, mint);
         const shuttleWalletAta = await deriveShuttleWalletAta(
           mint,

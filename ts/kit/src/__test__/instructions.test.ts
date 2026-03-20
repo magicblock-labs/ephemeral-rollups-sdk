@@ -726,10 +726,7 @@ describe("Exposed Instructions (@solana/kit)", () => {
 
     it("should delegate the vault eata when initializing the vault in legacy flow", async () => {
       const [vault] = await deriveVault(mint);
-      const [vaultEphemeralAta, vaultEataBump] = await deriveEphemeralAta(
-        vault,
-        mint,
-      );
+      const [vaultEphemeralAta] = await deriveEphemeralAta(vault, mint);
 
       const instructions = await delegateSpl(owner, mint, 1n, {
         validator,
@@ -740,18 +737,14 @@ describe("Exposed Instructions (@solana/kit)", () => {
 
       expect(instructions[3].accounts?.[1].address).toBe(vaultEphemeralAta);
       expect(instructions[3].data?.[0]).toBe(4);
-      expect(instructions[3].data?.[1]).toBe(vaultEataBump);
-      expect(Array.from(instructions[3].data?.subarray(2) ?? [])).toEqual(
+      expect(Array.from(instructions[3].data?.subarray(1) ?? [])).toEqual(
         Array.from(addressEncoder.encode(validator)),
       );
     });
 
     it("should delegate the vault eata when initializing the vault in idempotent flow", async () => {
       const [vault] = await deriveVault(mint);
-      const [vaultEphemeralAta, vaultEataBump] = await deriveEphemeralAta(
-        vault,
-        mint,
-      );
+      const [vaultEphemeralAta] = await deriveEphemeralAta(vault, mint);
 
       const instructions = await delegateSpl(owner, mint, 1n, {
         validator,
@@ -761,8 +754,7 @@ describe("Exposed Instructions (@solana/kit)", () => {
 
       expect(instructions[2].accounts?.[1].address).toBe(vaultEphemeralAta);
       expect(instructions[2].data?.[0]).toBe(4);
-      expect(instructions[2].data?.[1]).toBe(vaultEataBump);
-      expect(Array.from(instructions[2].data?.subarray(2) ?? [])).toEqual(
+      expect(Array.from(instructions[2].data?.subarray(1) ?? [])).toEqual(
         Array.from(addressEncoder.encode(validator)),
       );
     });
@@ -793,9 +785,9 @@ describe("Exposed Instructions (@solana/kit)", () => {
           setupAndDelegateData.buffer,
           setupAndDelegateData.byteOffset,
           setupAndDelegateData.byteLength,
-        ).getBigUint64(6, true),
+        ).getBigUint64(5, true),
       ).toBe(1n);
-      expect(Array.from(setupAndDelegateData.subarray(14))).toEqual(
+      expect(Array.from(setupAndDelegateData.subarray(13))).toEqual(
         Array.from(addressEncoder.encode(validator)),
       );
     });
@@ -861,10 +853,10 @@ describe("Exposed Instructions (@solana/kit)", () => {
         privateTransferData.byteLength,
       );
 
-      expect(dataView.getBigUint64(6, true)).toBe(1n);
-      expect(dataView.getBigUint64(14, true)).toBe(100n);
-      expect(dataView.getBigUint64(22, true)).toBe(300n);
-      expect(dataView.getUint32(30, true)).toBe(4);
+      expect(dataView.getBigUint64(5, true)).toBe(1n);
+      expect(dataView.getBigUint64(13, true)).toBe(100n);
+      expect(dataView.getBigUint64(21, true)).toBe(300n);
+      expect(dataView.getUint32(29, true)).toBe(4);
     });
   });
 
@@ -921,24 +913,21 @@ describe("Exposed Instructions (@solana/kit)", () => {
       expect(instructions).toHaveLength(1);
       expect(instructions[0].data?.[0]).toBe(25);
       expect(instructions[0].accounts).toHaveLength(20);
-      expect(Buffer.from(instructions[0].data ?? []).readBigUInt64LE(6)).toBe(
+      expect(Buffer.from(instructions[0].data ?? []).readBigUInt64LE(5)).toBe(
         25n,
       );
-      expect(Buffer.from(instructions[0].data ?? []).readBigUInt64LE(14)).toBe(
+      expect(Buffer.from(instructions[0].data ?? []).readBigUInt64LE(13)).toBe(
         100n,
       );
-      expect(Buffer.from(instructions[0].data ?? []).readBigUInt64LE(22)).toBe(
+      expect(Buffer.from(instructions[0].data ?? []).readBigUInt64LE(21)).toBe(
         300n,
       );
-      expect(Buffer.from(instructions[0].data ?? []).readUInt32LE(30)).toBe(4);
+      expect(Buffer.from(instructions[0].data ?? []).readUInt32LE(29)).toBe(4);
     });
 
     it("should initialize the destination ATA and vault when requested", async () => {
       const [vault] = await deriveVault(mint);
-      const [vaultEphemeralAta, vaultEataBump] = await deriveEphemeralAta(
-        vault,
-        mint,
-      );
+      const [vaultEphemeralAta] = await deriveEphemeralAta(vault, mint);
 
       const instructions = await transferSpl(from, to, mint, 25n, {
         visibility: "private",
@@ -958,7 +947,6 @@ describe("Exposed Instructions (@solana/kit)", () => {
       expect(instructions).toHaveLength(5);
       expect(instructions[2].accounts?.[1].address).toBe(vaultEphemeralAta);
       expect(instructions[2].data?.[0]).toBe(4);
-      expect(instructions[2].data?.[1]).toBe(vaultEataBump);
       expect(instructions[3].accounts?.[2].address).toBe(to);
       expect(instructions[3].data?.[0]).toBe(1);
       expect(instructions[4].data?.[0]).toBe(25);
@@ -990,13 +978,13 @@ describe("Exposed Instructions (@solana/kit)", () => {
       expect(instructions).toHaveLength(1);
       expect(instructions[0].data?.[0]).toBe(24);
       expect(instructions[0].accounts).toHaveLength(19);
-      expect(Buffer.from(instructions[0].data ?? []).readBigUInt64LE(6)).toBe(
+      expect(Buffer.from(instructions[0].data ?? []).readBigUInt64LE(5)).toBe(
         25n,
       );
     });
 
     it("should initialize and delegate the receiver eata for private base-to-ephemeral transfers when requested", async () => {
-      const [toEphemeralAta, toEataBump] = await deriveEphemeralAta(to, mint);
+      const [toEphemeralAta] = await deriveEphemeralAta(to, mint);
 
       const instructions = await transferSpl(from, to, mint, 25n, {
         visibility: "private",
@@ -1013,7 +1001,6 @@ describe("Exposed Instructions (@solana/kit)", () => {
       expect(instructions[1].data?.[0]).toBe(0);
       expect(instructions[1].accounts?.[0].address).toBe(toEphemeralAta);
       expect(instructions[2].data?.[0]).toBe(4);
-      expect(instructions[2].data?.[1]).toBe(toEataBump);
       expect(instructions[2].accounts?.[1].address).toBe(toEphemeralAta);
       expect(instructions[3].data?.[0]).toBe(24);
     });

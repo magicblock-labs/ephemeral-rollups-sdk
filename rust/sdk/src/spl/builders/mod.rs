@@ -1,10 +1,18 @@
 pub mod close_ephemeral_ata;
 pub mod delegate_ephemeral_ata;
+pub mod delegate_shuttle_ephemeral_ata;
+pub mod deposit_and_delegate_shuttle_ephemeral_ata_with_merge_and_private_transfer;
 pub mod deposit_spl_tokens;
 pub mod initialize_ephemeral_ata;
 pub mod initialize_global_vault;
+pub mod initialize_rent_pda;
+pub mod initialize_shuttle_ephemeral_ata;
+pub mod merge_shuttle_into_ata;
+pub mod setup_and_delegate_shuttle_ephemeral_ata_with_merge;
+pub mod undelegate_and_close_shuttle_ephemeral_ata;
 pub mod undelegate_ephemeral_ata;
 pub mod withdraw_spl_tokens;
+pub mod withdraw_through_delegated_shuttle_with_merge;
 
 #[cfg(feature = "access-control")]
 pub mod create_ephemeral_ata_permission;
@@ -17,11 +25,19 @@ pub mod undelegate_ephemeral_ata_permission;
 
 pub use close_ephemeral_ata::*;
 pub use delegate_ephemeral_ata::*;
+pub use delegate_shuttle_ephemeral_ata::*;
+pub use deposit_and_delegate_shuttle_ephemeral_ata_with_merge_and_private_transfer::*;
 pub use deposit_spl_tokens::*;
 pub use initialize_ephemeral_ata::*;
 pub use initialize_global_vault::*;
+pub use initialize_rent_pda::*;
+pub use initialize_shuttle_ephemeral_ata::*;
+pub use merge_shuttle_into_ata::*;
+pub use setup_and_delegate_shuttle_ephemeral_ata_with_merge::*;
+pub use undelegate_and_close_shuttle_ephemeral_ata::*;
 pub use undelegate_ephemeral_ata::*;
 pub use withdraw_spl_tokens::*;
+pub use withdraw_through_delegated_shuttle_with_merge::*;
 
 #[cfg(feature = "access-control")]
 pub use create_ephemeral_ata_permission::*;
