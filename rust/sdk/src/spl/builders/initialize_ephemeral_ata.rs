@@ -13,7 +13,7 @@ pub struct InitializeEphemeralAtaBuilder {
 impl InitializeEphemeralAtaBuilder {
     #[inline(always)]
     pub fn instruction(&self) -> Instruction {
-        let (eata, eata_bump) = EphemeralAta::find_pda(&self.user, &self.mint);
+        let (eata, _eata_bump) = EphemeralAta::find_pda(&self.user, &self.mint);
         Instruction {
             program_id: ESPL_TOKEN_PROGRAM_ID,
             accounts: vec![
@@ -23,10 +23,7 @@ impl InitializeEphemeralAtaBuilder {
                 AccountMeta::new_readonly(self.mint, false),
                 AccountMeta::new_readonly(system_program::id(), false),
             ],
-            data: vec![
-                EphemeralSplDiscriminator::InitializeEphemeralAta as u8,
-                eata_bump,
-            ],
+            data: vec![EphemeralSplDiscriminator::InitializeEphemeralAta as u8],
         }
     }
 }

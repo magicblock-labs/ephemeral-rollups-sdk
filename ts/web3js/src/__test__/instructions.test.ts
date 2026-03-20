@@ -11,6 +11,7 @@ import {
   createCommitAndUndelegateInstruction,
 } from "../instructions/magic-program";
 import {
+  delegateEataPermissionIx,
   depositAndQueueTransferIx,
   delegateSpl,
   delegateSplWithPrivateTransfer,
@@ -21,8 +22,11 @@ import {
   deriveShuttleEphemeralAta,
   deriveVault,
   ensureTransferQueueCrankIx,
+  initEphemeralAtaIx,
+  initVaultIx,
   initRentPdaIx,
   transferSpl,
+  withdrawSplIx,
   withdrawSpl,
 } from "../instructions/ephemeral-spl-token-program";
 import {
@@ -759,10 +763,7 @@ describe("Exposed Instructions (web3.js)", () => {
 
     it("should delegate the vault eata when initializing the vault in legacy flow", async () => {
       const [vault] = deriveVault(mint);
-      const [vaultEphemeralAta, vaultEataBump] = deriveEphemeralAta(
-        vault,
-        mint,
-      );
+      const [vaultEphemeralAta] = deriveEphemeralAta(vault, mint);
 
       const instructions = await delegateSpl(owner, mint, 1n, {
         validator,
@@ -775,9 +776,8 @@ describe("Exposed Instructions (web3.js)", () => {
         vaultEphemeralAta.toBase58(),
       );
       expect(instructions[3].data[0]).toBe(4);
-      expect(instructions[3].data[1]).toBe(vaultEataBump);
       expect(
-        Buffer.from(instructions[3].data.subarray(2)).equals(
+        Buffer.from(instructions[3].data.subarray(1)).equals(
           validator.toBuffer(),
         ),
       ).toBe(true);
@@ -785,10 +785,7 @@ describe("Exposed Instructions (web3.js)", () => {
 
     it("should delegate the vault eata when initializing the vault in idempotent flow", async () => {
       const [vault] = deriveVault(mint);
-      const [vaultEphemeralAta, vaultEataBump] = deriveEphemeralAta(
-        vault,
-        mint,
-      );
+      const [vaultEphemeralAta] = deriveEphemeralAta(vault, mint);
 
       const instructions = await delegateSpl(owner, mint, 1n, {
         validator,
@@ -800,9 +797,8 @@ describe("Exposed Instructions (web3.js)", () => {
         vaultEphemeralAta.toBase58(),
       );
       expect(instructions[2].data[0]).toBe(4);
-      expect(instructions[2].data[1]).toBe(vaultEataBump);
       expect(
-        Buffer.from(instructions[2].data.subarray(2)).equals(
+        Buffer.from(instructions[2].data.subarray(1)).equals(
           validator.toBuffer(),
         ),
       ).toBe(true);
@@ -825,10 +821,10 @@ describe("Exposed Instructions (web3.js)", () => {
       expect(setupAndDelegateInstruction?.keys).toHaveLength(19);
       expect(instructions.find((ix) => ix.data[0] === 11)).toBeUndefined();
       expect(
-        Buffer.from(setupAndDelegateInstruction.data).readBigUInt64LE(6),
+        Buffer.from(setupAndDelegateInstruction.data).readBigUInt64LE(5),
       ).toBe(1n);
       expect(
-        Buffer.from(setupAndDelegateInstruction.data.subarray(14)).equals(
+        Buffer.from(setupAndDelegateInstruction.data.subarray(13)).equals(
           validator.toBuffer(),
         ),
       ).toBe(true);
@@ -894,16 +890,16 @@ describe("Exposed Instructions (web3.js)", () => {
       }
       expect(privateTransferInstruction?.keys).toHaveLength(20);
       expect(
-        Buffer.from(privateTransferInstruction.data).readBigUInt64LE(6),
+        Buffer.from(privateTransferInstruction.data).readBigUInt64LE(5),
       ).toBe(1n);
       expect(
-        Buffer.from(privateTransferInstruction.data).readBigUInt64LE(14),
+        Buffer.from(privateTransferInstruction.data).readBigUInt64LE(13),
       ).toBe(100n);
       expect(
-        Buffer.from(privateTransferInstruction.data).readBigUInt64LE(22),
+        Buffer.from(privateTransferInstruction.data).readBigUInt64LE(21),
       ).toBe(300n);
       expect(
-        Buffer.from(privateTransferInstruction.data).readUInt32LE(30),
+        Buffer.from(privateTransferInstruction.data).readUInt32LE(29),
       ).toBe(4);
     });
   });
@@ -959,18 +955,15 @@ describe("Exposed Instructions (web3.js)", () => {
       expect(instructions).toHaveLength(1);
       expect(instructions[0].data[0]).toBe(25);
       expect(instructions[0].keys).toHaveLength(20);
-      expect(Buffer.from(instructions[0].data).readBigUInt64LE(6)).toBe(25n);
-      expect(Buffer.from(instructions[0].data).readBigUInt64LE(14)).toBe(100n);
-      expect(Buffer.from(instructions[0].data).readBigUInt64LE(22)).toBe(300n);
-      expect(Buffer.from(instructions[0].data).readUInt32LE(30)).toBe(4);
+      expect(Buffer.from(instructions[0].data).readBigUInt64LE(5)).toBe(25n);
+      expect(Buffer.from(instructions[0].data).readBigUInt64LE(13)).toBe(100n);
+      expect(Buffer.from(instructions[0].data).readBigUInt64LE(21)).toBe(300n);
+      expect(Buffer.from(instructions[0].data).readUInt32LE(29)).toBe(4);
     });
 
     it("should initialize the destination ATA and vault when requested", async () => {
       const [vault] = deriveVault(mint);
-      const [vaultEphemeralAta, vaultEataBump] = deriveEphemeralAta(
-        vault,
-        mint,
-      );
+      const [vaultEphemeralAta] = deriveEphemeralAta(vault, mint);
 
       const instructions = await transferSpl(from, to, mint, 25n, {
         visibility: "private",
@@ -992,7 +985,6 @@ describe("Exposed Instructions (web3.js)", () => {
         vaultEphemeralAta.toBase58(),
       );
       expect(instructions[2].data[0]).toBe(4);
-      expect(instructions[2].data[1]).toBe(vaultEataBump);
       expect(instructions[3].keys[2].pubkey.toBase58()).toBe(to.toBase58());
       expect(instructions[3].data[0]).toBe(1);
       expect(instructions[4].data[0]).toBe(25);
@@ -1024,11 +1016,11 @@ describe("Exposed Instructions (web3.js)", () => {
       expect(instructions).toHaveLength(1);
       expect(instructions[0].data[0]).toBe(24);
       expect(instructions[0].keys).toHaveLength(19);
-      expect(Buffer.from(instructions[0].data).readBigUInt64LE(6)).toBe(25n);
+      expect(Buffer.from(instructions[0].data).readBigUInt64LE(5)).toBe(25n);
     });
 
     it("should initialize and delegate the receiver eata for private base-to-ephemeral transfers when requested", async () => {
-      const [toEphemeralAta, toEataBump] = deriveEphemeralAta(to, mint);
+      const [toEphemeralAta] = deriveEphemeralAta(to, mint);
 
       const instructions = await transferSpl(from, to, mint, 25n, {
         visibility: "private",
@@ -1047,7 +1039,6 @@ describe("Exposed Instructions (web3.js)", () => {
         toEphemeralAta.toBase58(),
       );
       expect(instructions[2].data[0]).toBe(4);
-      expect(instructions[2].data[1]).toBe(toEataBump);
       expect(instructions[2].keys[1].pubkey.toBase58()).toBe(
         toEphemeralAta.toBase58(),
       );
@@ -1219,6 +1210,57 @@ describe("Exposed Instructions (web3.js)", () => {
 
       expect(instruction.keys).toHaveLength(9);
       expect(Array.from(instruction.data)).toEqual([19]);
+    });
+  });
+
+  describe("delegateEataPermissionIx (Ephemeral SPL Token Program)", () => {
+    it("should serialize only the discriminator", () => {
+      const instruction = delegateEataPermissionIx(
+        mockPublicKey,
+        differentKey,
+        mockPublicKey,
+      );
+
+      expect(Array.from(instruction.data)).toEqual([7]);
+    });
+  });
+
+  describe("initEphemeralAtaIx (Ephemeral SPL Token Program)", () => {
+    it("should serialize only the discriminator", () => {
+      const instruction = initEphemeralAtaIx(
+        mockPublicKey,
+        differentKey,
+        mockPublicKey,
+        differentKey,
+      );
+
+      expect(Array.from(instruction.data)).toEqual([0]);
+    });
+  });
+
+  describe("initVaultIx (Ephemeral SPL Token Program)", () => {
+    it("should serialize only the discriminator", () => {
+      const vault = new PublicKey("11111111111111111111111111111113");
+      const mint = new PublicKey("11111111111111111111111111111114");
+      const payer = new PublicKey("11111111111111111111111111111115");
+      const instruction = initVaultIx(vault, mint, payer);
+
+      expect(Array.from(instruction.data)).toEqual([1]);
+      expect(instruction.keys[3].pubkey.toBase58()).toBe(
+        deriveEphemeralAta(vault, mint)[0].toBase58(),
+      );
+    });
+  });
+
+  describe("withdrawSplIx (Ephemeral SPL Token Program)", () => {
+    it("should encode only discriminator plus amount", () => {
+      const owner = new PublicKey("11111111111111111111111111111113");
+      const mint = new PublicKey("11111111111111111111111111111114");
+      const instruction = withdrawSplIx(owner, mint, 1n);
+
+      expect(instruction.data).toHaveLength(9);
+      expect(instruction.data[0]).toBe(3);
+      expect(Buffer.from(instruction.data).readBigUInt64LE(1)).toBe(1n);
     });
   });
 });

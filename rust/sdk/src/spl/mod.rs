@@ -19,4 +19,12 @@ pub enum EphemeralSplDiscriminator {
     UndelegateEphemeralAtaPermission = 8,
     ResetEphemeralAtaPermission = 9,
     CloseEphemeralAta = 10,
+    InitializeShuttleEphemeralAta = 11,
+    DelegateShuttleEphemeralAta = 13,
+    UndelegateAndCloseShuttleEphemeralAta = 14,
+    MergeShuttleIntoAta = 15,
+    InitializeRentPda = 23,
+    SetupAndDelegateShuttleEphemeralAtaWithMerge = 24,
+    DepositAndDelegateShuttleEphemeralAtaWithMergeAndPrivateTransfer = 25,
+    WithdrawThroughDelegatedShuttleWithMerge = 26,
 }

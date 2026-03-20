@@ -38,10 +38,7 @@ impl<'a> DelegateEphemeralAtaPermission<'a> {
                 AccountMeta::new_readonly(*self.delegation_program.key, false),
                 AccountMeta::new_readonly(*self.validator.key, false),
             ],
-            data: vec![
-                EphemeralSplDiscriminator::DelegateEphemeralAtaPermission as u8,
-                self.eata_bump,
-            ],
+            data: vec![EphemeralSplDiscriminator::DelegateEphemeralAtaPermission as u8],
         }
     }
 

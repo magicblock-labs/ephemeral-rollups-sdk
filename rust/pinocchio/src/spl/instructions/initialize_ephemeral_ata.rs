@@ -15,7 +15,6 @@ pub struct InitializeEphemeralAta<'a> {
     pub user: &'a AccountView,
     pub mint: &'a AccountView,
     pub system_program: &'a AccountView,
-    pub eata_bump: u8,
 }
 
 impl<'a> InitializeEphemeralAta<'a> {
@@ -43,10 +42,7 @@ impl<'a> InitializeEphemeralAta<'a> {
         accounts[3].write(self.mint);
         accounts[4].write(self.system_program);
 
-        let instruction_data = [
-            EphemeralSplDiscriminator::InitializeEphemeralAta as u8,
-            self.eata_bump,
-        ];
+        let instruction_data = [EphemeralSplDiscriminator::InitializeEphemeralAta as u8];
 
         invoke_signed_with_bounds::<NUM_ACCOUNTS>(
             &InstructionView {

@@ -16,16 +16,14 @@ pub struct DelegateEphemeralAta<'a> {
     pub delegation_metadata: AccountInfo<'a>,
     pub delegation_program: AccountInfo<'a>,
     pub system_program: AccountInfo<'a>,
-    pub eata_bump: u8,
     pub validator: Option<Pubkey>,
 }
 
 impl<'a> DelegateEphemeralAta<'a> {
     #[inline(always)]
     pub fn instruction(&self) -> Instruction {
-        let mut data = Vec::with_capacity(34);
+        let mut data = Vec::with_capacity(33);
         data.push(EphemeralSplDiscriminator::DelegateEphemeralAta as u8);
-        data.push(self.eata_bump);
         if let Some(validator) = self.validator {
             data.extend_from_slice(validator.to_bytes().as_ref());
         }

@@ -21,7 +21,7 @@ impl UndelegateEphemeralAtaPermissionBuilder {
             program_id: ESPL_TOKEN_PROGRAM_ID,
             accounts: vec![
                 AccountMeta::new_readonly(self.payer, true),
-                AccountMeta::new_readonly(eata, false),
+                AccountMeta::new(eata, false),
                 AccountMeta::new(permission, false),
                 AccountMeta::new_readonly(PERMISSION_PROGRAM_ID, false),
                 AccountMeta::new_readonly(MAGIC_PROGRAM_ID, false),

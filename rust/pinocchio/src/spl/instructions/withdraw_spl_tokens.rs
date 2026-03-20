@@ -50,10 +50,9 @@ impl<'a> WithdrawSplTokens<'a> {
         accounts[5].write(self.payer);
         accounts[6].write(self.token_program);
 
-        let mut instruction_data = [0_u8; 10];
+        let mut instruction_data = [0_u8; 9];
         instruction_data[0] = EphemeralSplDiscriminator::WithdrawSplTokens as u8;
         instruction_data[1..9].copy_from_slice(&self.amount.to_le_bytes());
-        instruction_data[9] = self.eata_bump;
 
         invoke_signed_with_bounds::<NUM_ACCOUNTS>(
             &InstructionView {

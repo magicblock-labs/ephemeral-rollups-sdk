@@ -11,11 +11,11 @@ pub struct InitializeGlobalVault<'a> {
     pub payer: AccountInfo<'a>,
     pub vault: AccountInfo<'a>,
     pub mint: AccountInfo<'a>,
+    pub vault_ephemeral_ata: AccountInfo<'a>,
     pub vault_ata: AccountInfo<'a>,
     pub token_program: AccountInfo<'a>,
     pub associated_token_program: AccountInfo<'a>,
     pub system_program: AccountInfo<'a>,
-    pub vault_bump: u8,
 }
 
 impl<'a> InitializeGlobalVault<'a> {
@@ -25,17 +25,15 @@ impl<'a> InitializeGlobalVault<'a> {
             program_id: ESPL_TOKEN_PROGRAM_ID,
             accounts: vec![
                 AccountMeta::new(*self.vault.key, false),
-                AccountMeta::new(*self.payer.key, false),
+                AccountMeta::new(*self.payer.key, true),
                 AccountMeta::new_readonly(*self.mint.key, false),
+                AccountMeta::new(*self.vault_ephemeral_ata.key, false),
                 AccountMeta::new(*self.vault_ata.key, false),
                 AccountMeta::new_readonly(*self.token_program.key, false),
                 AccountMeta::new_readonly(*self.associated_token_program.key, false),
                 AccountMeta::new_readonly(*self.system_program.key, false),
             ],
-            data: vec![
-                EphemeralSplDiscriminator::InitializeGlobalVault as u8,
-                self.vault_bump,
-            ],
+            data: vec![EphemeralSplDiscriminator::InitializeGlobalVault as u8],
         }
     }
 
@@ -47,6 +45,7 @@ impl<'a> InitializeGlobalVault<'a> {
                 self.vault.clone(),
                 self.payer.clone(),
                 self.mint.clone(),
+                self.vault_ephemeral_ata.clone(),
                 self.vault_ata.clone(),
                 self.token_program.clone(),
                 self.associated_token_program.clone(),
@@ -63,6 +62,7 @@ impl<'a> InitializeGlobalVault<'a> {
                 self.vault.clone(),
                 self.payer.clone(),
                 self.mint.clone(),
+                self.vault_ephemeral_ata.clone(),
                 self.vault_ata.clone(),
                 self.token_program.clone(),
                 self.associated_token_program.clone(),
