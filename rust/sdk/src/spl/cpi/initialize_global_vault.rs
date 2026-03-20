@@ -26,7 +26,7 @@ impl<'a> InitializeGlobalVault<'a> {
             program_id: ESPL_TOKEN_PROGRAM_ID,
             accounts: vec![
                 AccountMeta::new(*self.vault.key, false),
-                AccountMeta::new(*self.payer.key, false),
+                AccountMeta::new(*self.payer.key, true),
                 AccountMeta::new_readonly(*self.mint.key, false),
                 AccountMeta::new(*self.vault_ephemeral_ata.key, false),
                 AccountMeta::new(*self.vault_ata.key, false),
