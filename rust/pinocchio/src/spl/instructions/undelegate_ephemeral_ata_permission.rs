@@ -31,7 +31,7 @@ impl<'a> UndelegateEphemeralAtaPermission<'a> {
         let mut instruction_accounts =
             [const { MaybeUninit::<InstructionAccount>::uninit() }; NUM_ACCOUNTS];
         instruction_accounts[0].write(InstructionAccount::readonly_signer(self.payer.address()));
-        instruction_accounts[1].write(InstructionAccount::readonly(self.eata.address()));
+        instruction_accounts[1].write(InstructionAccount::writable(self.eata.address()));
         instruction_accounts[2].write(InstructionAccount::writable(self.permission.address()));
         instruction_accounts[3].write(InstructionAccount::readonly(
             self.permission_program.address(),
