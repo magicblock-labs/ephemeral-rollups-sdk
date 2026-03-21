@@ -144,21 +144,27 @@ export class ConnectionMagicRouter extends Connection {
     signersOrOptions?: Signer[] | SendOptions,
     options?: SendOptions,
   ): Promise<TransactionSignature> {
-    // ✅ Implementation goes here
-    // You can check the type dynamically:
     if (transaction instanceof Transaction) {
-      // Legacy
+      // Legacy: mirror @solana/web3.js overloads - second arg may be Signer[] or SendOptions.
       const latestBlockhash =
         await this.getLatestBlockhashForTransaction(transaction);
       transaction.recentBlockhash = latestBlockhash.blockhash;
       transaction.lastValidBlockHeight = latestBlockhash.lastValidBlockHeight;
-
+      
+      let sendOptions: SendOptions | undefined;
       if (Array.isArray(signersOrOptions)) {
-        transaction.sign(...signersOrOptions);
+        if (signersOrOptions.length > 0) {
+          transaction.sign(...signersOrOptions);
+        }
+        sendOptions = options;
+      } else {
+        // e.g. sendTransaction(tx, { skipPreflight: true })
+        sendOptions =
+          options !== undefined ? options : signersOrOptions as SendOptions | undefined;
       }
 
       const wireTx = transaction.serialize();
-      return this.sendRawTransaction(wireTx, options);
+      return this.sendRawTransaction(wireTx, sendOptions);
     } else {
       // VersionedTransaction
       return super.sendTransaction(
