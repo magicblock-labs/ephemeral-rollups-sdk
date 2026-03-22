@@ -15,8 +15,11 @@ readme = "README.md"
 default = ["solana-program", "solana-system-interface"]
 anchor = ["anchor-lang"]
 access-control = ["num-derive", "num-traits", "thiserror"]
-spl = ["spl-associated-token-account-interface"]
-encryption = ["magicblock-delegation-program-api/encryption"]
+spl = ["spl-associated-token-account-interface", "encryption"]
+encryption = [
+    "magicblock-delegation-program-api/encryption",
+    "magicblock-delegation-program-api/instruction",
+]
 crank = []
 disable-realloc = []
 modular-sdk = [
@@ -102,3 +105,4 @@ required-features = ["spl", "access-control", "modular-sdk"]
 
 [dev-dependencies]
 bincode = { workspace = true }
+sdk = { workspace = true }

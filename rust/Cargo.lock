@@ -1192,6 +1192,7 @@ dependencies = [
  "solana-program-error 2.2.2",
  "solana-program-memory",
  "solana-pubkey 2.4.0",
+ "solana-sdk",
  "solana-system-interface",
  "solana-sysvar",
  "spl-associated-token-account-interface",

@@ -13,12 +13,14 @@ use crate::{
     },
 };
 
+const QUEUED_TRANSFER_FLAG_CREATE_IDEMPOTENT_ATA: u8 = 1 << 0;
+
 pub struct DepositAndDelegateShuttleEphemeralAtaWithMergeAndPrivateTransferBuilder {
     pub payer: Pubkey,
     pub owner: Pubkey,
     pub mint: Pubkey,
     pub source_ata: Pubkey,
-    pub destination_ata: Pubkey,
+    pub destination_owner: Pubkey,
     pub shuttle_id: u32,
     pub amount: u64,
     pub min_delay_ms: u64,
@@ -44,20 +46,33 @@ impl DepositAndDelegateShuttleEphemeralAtaWithMergeAndPrivateTransferBuilder {
         let (vault, _vault_bump) = GlobalVault::find_pda(&self.mint);
         let vault_ata = find_vault_ata(&self.mint, &vault);
         let (queue, _queue_bump) = find_transfer_queue(&self.mint);
+        let validator = self
+            .validator
+            .expect("validator is required for encrypted private transfers");
+        let encrypted_destination =
+            encrypt_private_transfer_field(self.destination_owner.as_ref(), &validator);
+        let encrypted_suffix = encrypt_private_transfer_field(
+            &pack_private_transfer_suffix(
+                self.min_delay_ms,
+                self.max_delay_ms,
+                self.split,
+                QUEUED_TRANSFER_FLAG_CREATE_IDEMPOTENT_ATA,
+            ),
+            &validator,
+        );
 
-        let mut data = Vec::with_capacity(if self.validator.is_some() { 65 } else { 33 });
+        let mut data = Vec::with_capacity(
+            1 + 4 + 8 + 1 + 32 + 1 + encrypted_destination.len() + 1 + encrypted_suffix.len(),
+        );
         data.push(
             EphemeralSplDiscriminator::DepositAndDelegateShuttleEphemeralAtaWithMergeAndPrivateTransfer
                 as u8,
         );
         data.extend_from_slice(&self.shuttle_id.to_le_bytes());
         data.extend_from_slice(&self.amount.to_le_bytes());
-        data.extend_from_slice(&self.min_delay_ms.to_le_bytes());
-        data.extend_from_slice(&self.max_delay_ms.to_le_bytes());
-        data.extend_from_slice(&self.split.to_le_bytes());
-        if let Some(validator) = self.validator {
-            data.extend_from_slice(validator.as_ref());
-        }
+        push_length_prefixed(&mut data, validator.as_ref());
+        push_length_prefixed(&mut data, &encrypted_destination);
+        push_length_prefixed(&mut data, &encrypted_suffix);
 
         Instruction {
             program_id: ESPL_TOKEN_PROGRAM_ID,
@@ -75,7 +90,6 @@ impl DepositAndDelegateShuttleEphemeralAtaWithMergeAndPrivateTransferBuilder {
                 AccountMeta::new_readonly(DELEGATION_PROGRAM_ID, false),
                 AccountMeta::new_readonly(ASSOCIATED_TOKEN_PROGRAM_ID, false),
                 AccountMeta::new_readonly(system_program::id(), false),
-                AccountMeta::new(self.destination_ata, false),
                 AccountMeta::new_readonly(self.mint, false),
                 AccountMeta::new_readonly(TOKEN_PROGRAM_ID, false),
                 AccountMeta::new_readonly(vault, false),
@@ -86,4 +100,40 @@ impl DepositAndDelegateShuttleEphemeralAtaWithMergeAndPrivateTransferBuilder {
             data,
         }
     }
+}
+
+#[inline(always)]
+fn pack_private_transfer_suffix(
+    min_delay_ms: u64,
+    max_delay_ms: u64,
+    split: u32,
+    flags: u8,
+) -> [u8; 21] {
+    let mut suffix = [0u8; 21];
+    suffix[..8].copy_from_slice(&min_delay_ms.to_le_bytes());
+    suffix[8..16].copy_from_slice(&max_delay_ms.to_le_bytes());
+    suffix[16..20].copy_from_slice(&split.to_le_bytes());
+    suffix[20] = flags;
+    suffix
+}
+
+#[inline(always)]
+fn push_length_prefixed(data: &mut Vec<u8>, bytes: &[u8]) {
+    let len =
+        u8::try_from(bytes.len()).expect("encrypted private transfer payload exceeds u8 length");
+    data.push(len);
+    data.extend_from_slice(bytes);
+}
+
+#[cfg(feature = "encryption")]
+#[inline(always)]
+fn encrypt_private_transfer_field(plaintext: &[u8], validator: &Pubkey) -> Vec<u8> {
+    dlp_api::encryption::encrypt_ed25519_recipient(plaintext, validator.as_array())
+        .expect("private transfer encryption failed")
+}
+
+#[cfg(not(feature = "encryption"))]
+#[inline(always)]
+fn encrypt_private_transfer_field(_plaintext: &[u8], _validator: &Pubkey) -> Vec<u8> {
+    panic!("enable the `encryption` feature for encrypted private transfers")
 }

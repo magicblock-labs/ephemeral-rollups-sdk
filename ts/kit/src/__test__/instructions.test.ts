@@ -1,5 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { AccountRole } from "@solana/instructions";
+import bs58 from "bs58";
+import * as nacl from "tweetnacl";
 import {
   createDelegateInstruction,
   createTopUpEscrowInstruction,
@@ -33,6 +35,16 @@ import {
   MAGIC_CONTEXT_ID,
   EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
 } from "../constants";
+
+function readLengthPrefixedField(
+  data: Uint8Array,
+  offset: number,
+): [Buffer, number] {
+  const len = data[offset];
+  const start = offset + 1;
+  const end = start + len;
+  return [Buffer.from(data.subarray(start, end)), end];
+}
 
 describe("Exposed Instructions (@solana/kit)", () => {
   const mockAddress = "11111111111111111111111111111111" as Address;
@@ -818,7 +830,7 @@ describe("Exposed Instructions (@solana/kit)", () => {
   describe("delegateSplWithPrivateTransfer (Ephemeral SPL Token Program)", () => {
     const owner = address("11111111111111111111111111111113");
     const mint = address("11111111111111111111111111111114");
-    const validator = address("11111111111111111111111111111115");
+    const validator = address(bs58.encode(nacl.sign.keyPair().publicKey));
 
     it("should use the private transfer shuttle flow", async () => {
       const instructions = await delegateSplWithPrivateTransfer(
@@ -841,7 +853,7 @@ describe("Exposed Instructions (@solana/kit)", () => {
 
       expect(instructions.find((ix) => ix.data?.[0] === 12)).toBeDefined();
       expect(privateTransferInstruction).toBeDefined();
-      expect(privateTransferInstruction?.accounts).toHaveLength(20);
+      expect(privateTransferInstruction?.accounts).toHaveLength(19);
 
       const privateTransferData = privateTransferInstruction?.data;
       expect(privateTransferData).toBeDefined();
@@ -850,16 +862,26 @@ describe("Exposed Instructions (@solana/kit)", () => {
         throw new Error("Expected private transfer instruction data");
       }
 
-      const dataView = new DataView(
-        privateTransferData.buffer,
-        privateTransferData.byteOffset,
-        privateTransferData.byteLength,
+      const data = Buffer.from(privateTransferData);
+      expect(data.readUInt32LE(1)).toBe(7);
+      expect(data.readBigUInt64LE(5)).toBe(1n);
+
+      const [validatorField, nextOffset] = readLengthPrefixedField(data, 13);
+      const [destinationField, suffixOffset] = readLengthPrefixedField(
+        data,
+        nextOffset,
+      );
+      const [suffixField, endOffset] = readLengthPrefixedField(
+        data,
+        suffixOffset,
       );
 
-      expect(dataView.getBigUint64(5, true)).toBe(1n);
-      expect(dataView.getBigUint64(13, true)).toBe(100n);
-      expect(dataView.getBigUint64(21, true)).toBe(300n);
-      expect(dataView.getUint32(29, true)).toBe(4);
+      expect(
+        validatorField.equals(Buffer.from(addressEncoder.encode(validator))),
+      ).toBe(true);
+      expect(destinationField).toHaveLength(80);
+      expect(suffixField).toHaveLength(69);
+      expect(endOffset).toBe(data.length);
     });
   });
 
@@ -897,7 +919,7 @@ describe("Exposed Instructions (@solana/kit)", () => {
     const from = address("11111111111111111111111111111113");
     const to = address("11111111111111111111111111111114");
     const mint = address("11111111111111111111111111111115");
-    const validator = address("11111111111111111111111111111116");
+    const validator = address(bs58.encode(nacl.sign.keyPair().publicKey));
 
     it("should use the shuttle private transfer instruction for private base-to-base transfers", async () => {
       const instructions = await transferSpl(from, to, mint, 25n, {
@@ -914,18 +936,28 @@ describe("Exposed Instructions (@solana/kit)", () => {
       });
 
       expect(instructions).toHaveLength(1);
-      expect(instructions[0].data?.[0]).toBe(25);
-      expect(instructions[0].accounts).toHaveLength(20);
-      expect(Buffer.from(instructions[0].data ?? []).readBigUInt64LE(5)).toBe(
-        25n,
+      const data = Buffer.from(instructions[0].data ?? []);
+      expect(data[0]).toBe(25);
+      expect(instructions[0].accounts).toHaveLength(19);
+      expect(data.readUInt32LE(1)).toBe(7);
+      expect(data.readBigUInt64LE(5)).toBe(25n);
+
+      const [validatorField, nextOffset] = readLengthPrefixedField(data, 13);
+      const [destinationField, suffixOffset] = readLengthPrefixedField(
+        data,
+        nextOffset,
       );
-      expect(Buffer.from(instructions[0].data ?? []).readBigUInt64LE(13)).toBe(
-        100n,
+      const [suffixField, endOffset] = readLengthPrefixedField(
+        data,
+        suffixOffset,
       );
-      expect(Buffer.from(instructions[0].data ?? []).readBigUInt64LE(21)).toBe(
-        300n,
-      );
-      expect(Buffer.from(instructions[0].data ?? []).readUInt32LE(29)).toBe(4);
+
+      expect(
+        validatorField.equals(Buffer.from(addressEncoder.encode(validator))),
+      ).toBe(true);
+      expect(destinationField).toHaveLength(80);
+      expect(suffixField).toHaveLength(69);
+      expect(endOffset).toBe(data.length);
     });
 
     it("should initialize the destination ATA and vault when requested", async () => {
@@ -947,12 +979,10 @@ describe("Exposed Instructions (@solana/kit)", () => {
         },
       });
 
-      expect(instructions).toHaveLength(5);
+      expect(instructions).toHaveLength(4);
       expect(instructions[2].accounts?.[1].address).toBe(vaultEphemeralAta);
       expect(instructions[2].data?.[0]).toBe(4);
-      expect(instructions[3].accounts?.[2].address).toBe(to);
-      expect(instructions[3].data?.[0]).toBe(1);
-      expect(instructions[4].data?.[0]).toBe(25);
+      expect(instructions[3].data?.[0]).toBe(25);
     });
 
     it("should prepend source ATA creation when initAtasIfMissing is set on base-source transfers", async () => {

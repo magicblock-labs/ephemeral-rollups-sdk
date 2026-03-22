@@ -17,6 +17,9 @@ import {
   AccountInfoBase,
 } from "@solana/kit";
 import { SYSTEM_PROGRAM_ADDRESS } from "@solana-program/system";
+import { blake2b } from "@noble/hashes/blake2b";
+import { edwardsToMontgomeryPub } from "@noble/curves/ed25519";
+import * as nacl from "tweetnacl";
 
 import {
   DELEGATION_PROGRAM_ID,
@@ -44,6 +47,7 @@ const TOKEN_PROGRAM_ADDRESS =
   "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA" as const;
 const ASSOCIATED_TOKEN_PROGRAM_ADDRESS =
   "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL" as const;
+const QUEUED_TRANSFER_FLAG_CREATE_IDEMPOTENT_ATA = 1 << 0;
 
 /**
  * Derive the Associated Token Account for a given mint/owner pair.
@@ -85,6 +89,69 @@ function createTransferInstruction(
     data: encodeAmountInstructionData(3, amount),
     programAddress: TOKEN_PROGRAM_ADDRESS as Address,
   };
+}
+
+function encryptEd25519Recipient(
+  plaintext: Uint8Array,
+  recipient: Address,
+): Buffer {
+  const recipientBytes = getAddressEncoder().encode(recipient);
+  const recipientX25519 = edwardsToMontgomeryPub(
+    new Uint8Array(recipientBytes),
+  );
+  const ephemeral = nacl.box.keyPair();
+  const nonce = blake2b(
+    Buffer.concat([
+      Buffer.from(ephemeral.publicKey),
+      Buffer.from(recipientX25519),
+    ]),
+    { dkLen: nacl.box.nonceLength },
+  );
+  const ciphertext = nacl.box(
+    plaintext,
+    nonce,
+    recipientX25519,
+    ephemeral.secretKey,
+  );
+
+  return Buffer.concat([
+    Buffer.from(ephemeral.publicKey),
+    Buffer.from(ciphertext),
+  ]);
+}
+
+function encodeLengthPrefixedBytes(bytes: Uint8Array): Buffer {
+  if (bytes.length > 0xff) {
+    throw new Error("encrypted private transfer payload exceeds u8 length");
+  }
+
+  return Buffer.concat([Buffer.from([bytes.length]), Buffer.from(bytes)]);
+}
+
+function packPrivateTransferSuffix(
+  minDelayMs: bigint,
+  maxDelayMs: bigint,
+  split: number,
+  flags: number = 0,
+): Buffer {
+  const suffix = Buffer.alloc(8 + 8 + 4 + 1);
+  suffix.writeBigUInt64LE(minDelayMs, 0);
+  suffix.writeBigUInt64LE(maxDelayMs, 8);
+  suffix.writeUInt32LE(split, 16);
+  suffix.writeUInt8(flags, 20);
+  return suffix;
+}
+
+function u32leBuffer(value: number): Buffer {
+  const out = Buffer.alloc(4);
+  out.writeUInt32LE(value, 0);
+  return out;
+}
+
+function u64leBuffer(value: bigint): Buffer {
+  const out = Buffer.alloc(8);
+  out.writeBigUInt64LE(value, 0);
+  return out;
 }
 
 // ---------------------------------------------------------------------------
@@ -716,12 +783,14 @@ export async function setupAndDelegateShuttleEphemeralAtaWithMergeIx(
 /**
  * Initialize shuttle metadata/EATA/wallet ATA, deposit into the shuttle EATA,
  * delegate it, then queue a private transfer as a third post-delegation action.
+ * The destination owner is only carried inside the encrypted post-delegation action
+ * and is not passed as a cleartext account to this outer instruction.
  * @param payer - The payer account
  * @param shuttleEphemeralAta - The shuttle metadata account
  * @param shuttleAta - The shuttle EATA account
  * @param owner - The shuttle owner signer and deposit authority
  * @param sourceAta - The owner source token account
- * @param destinationAta - The destination token account for the merge/private transfer
+ * @param destinationOwner - The destination owner for the delayed private transfer
  * @param shuttleWalletAta - The shuttle wallet ATA account
  * @param mint - The mint account
  * @param shuttleId - The shuttle id (u32)
@@ -739,7 +808,7 @@ export async function depositAndDelegateShuttleEphemeralAtaWithMergeAndPrivateTr
   shuttleAta: Address,
   owner: Address,
   sourceAta: Address,
-  destinationAta: Address,
+  destinationOwner: Address,
   shuttleWalletAta: Address,
   mint: Address,
   shuttleId: number,
@@ -765,6 +834,9 @@ export async function depositAndDelegateShuttleEphemeralAtaWithMergeAndPrivateTr
   if (maxDelayMs < minDelayMs) {
     throw new Error("maxDelayMs must be greater than or equal to minDelayMs");
   }
+  if (validator == null) {
+    throw new Error("validator is required for encrypted private transfers");
+  }
   if (!Number.isInteger(split) || split <= 0 || split > 0xffff_ffff) {
     throw new Error("split must fit in u32 and be positive");
   }
@@ -784,17 +856,27 @@ export async function depositAndDelegateShuttleEphemeralAtaWithMergeAndPrivateTr
     await delegationMetadataPdaFromDelegatedAccount(shuttleAta);
 
   const addressEncoder = getAddressEncoder();
-  const data = new Uint8Array(validator ? 65 : 33);
-  const dataView = new DataView(data.buffer, data.byteOffset, data.byteLength);
-  data[0] = 25;
-  dataView.setUint32(1, shuttleId, true);
-  dataView.setBigUint64(5, amount, true);
-  dataView.setBigUint64(13, minDelayMs, true);
-  dataView.setBigUint64(21, maxDelayMs, true);
-  dataView.setUint32(29, split, true);
-  if (validator) {
-    data.set(addressEncoder.encode(validator), 33);
-  }
+  const encryptedDestination = encryptEd25519Recipient(
+    new Uint8Array(addressEncoder.encode(destinationOwner)),
+    validator,
+  );
+  const encryptedSuffix = encryptEd25519Recipient(
+    packPrivateTransferSuffix(
+      minDelayMs,
+      maxDelayMs,
+      split,
+      QUEUED_TRANSFER_FLAG_CREATE_IDEMPOTENT_ATA,
+    ),
+    validator,
+  );
+  const data = Buffer.concat([
+    Buffer.from([25]),
+    u32leBuffer(shuttleId),
+    u64leBuffer(amount),
+    encodeLengthPrefixedBytes(new Uint8Array(addressEncoder.encode(validator))),
+    encodeLengthPrefixedBytes(encryptedDestination),
+    encodeLengthPrefixedBytes(encryptedSuffix),
+  ]);
 
   return {
     accounts: [
@@ -814,7 +896,6 @@ export async function depositAndDelegateShuttleEphemeralAtaWithMergeAndPrivateTr
         role: AccountRole.READONLY,
       },
       { address: SYSTEM_PROGRAM_ADDRESS, role: AccountRole.READONLY },
-      { address: destinationAta, role: AccountRole.WRITABLE },
       { address: mint, role: AccountRole.READONLY },
       { address: TOKEN_PROGRAM_ADDRESS as Address, role: AccountRole.READONLY },
       { address: vault, role: AccountRole.READONLY },
@@ -1463,7 +1544,7 @@ export async function delegateSplWithPrivateTransfer(
       shuttleAta,
       owner,
       ownerAta,
-      ownerAta,
+      owner,
       shuttleWalletAta,
       mint,
       shuttleId,
@@ -1559,10 +1640,6 @@ export async function transferSpl(
   switch (opts.visibility) {
     case "private":
       if (opts.fromBalance === "base" && opts.toBalance === "base") {
-        if (initIfMissing) {
-          instructions.push(initVaultAtaIx(payer, toAta, to, mint));
-        }
-
         const [shuttleEphemeralAta] = await deriveShuttleEphemeralAta(
           from,
           mint,
@@ -1582,7 +1659,7 @@ export async function transferSpl(
             shuttleAta,
             from,
             fromAta,
-            toAta,
+            to,
             shuttleWalletAta,
             mint,
             shuttleId,

@@ -20,15 +20,23 @@ mod tests {
         spl::{
             builders::{
                 CreateEphemeralAtaPermissionBuilder, DelegateEphemeralAtaBuilder,
-                DelegateEphemeralAtaPermissionBuilder, DepositSplTokensBuilder,
-                InitializeEphemeralAtaBuilder, InitializeGlobalVaultBuilder,
-                ResetEphemeralAtaPermissionBuilder, UndelegateEphemeralAtaBuilder,
-                UndelegateEphemeralAtaPermissionBuilder, WithdrawSplTokensBuilder,
+                DelegateEphemeralAtaPermissionBuilder,
+                DepositAndDelegateShuttleEphemeralAtaWithMergeAndPrivateTransferBuilder,
+                DepositSplTokensBuilder, InitializeEphemeralAtaBuilder,
+                InitializeGlobalVaultBuilder, ResetEphemeralAtaPermissionBuilder,
+                UndelegateEphemeralAtaBuilder, UndelegateEphemeralAtaPermissionBuilder,
+                WithdrawSplTokensBuilder,
             },
-            EphemeralAta, EphemeralSplDiscriminator, GlobalVault,
+            find_rent_pda, find_shuttle_ata, find_shuttle_ephemeral_ata, find_shuttle_wallet_ata,
+            find_transfer_queue, find_vault_ata, EphemeralAta, EphemeralSplDiscriminator,
+            GlobalVault,
         },
     };
     use magicblock_magic_program_api::Pubkey;
+    #[cfg(feature = "encryption")]
+    use sdk::signature::Keypair;
+    #[cfg(feature = "encryption")]
+    use sdk::signer::Signer;
     use solana_system_interface::program as system_program;
     use spl_associated_token_account_interface::address::get_associated_token_address;
 
@@ -615,5 +623,83 @@ mod tests {
             EphemeralSplDiscriminator::ResetEphemeralAtaPermission as u8
         );
         assert_eq!(instruction.data[1], flag_byte);
+    }
+
+    #[cfg(feature = "encryption")]
+    #[test]
+    fn test_deposit_and_delegate_shuttle_private_transfer_instruction_layout() {
+        let payer = Pubkey::new_unique();
+        let owner = Pubkey::new_unique();
+        let mint = Pubkey::new_unique();
+        let source_ata = Pubkey::new_unique();
+        let destination_owner = Pubkey::new_unique();
+        let validator = Keypair::new().pubkey();
+        let shuttle_id = 7;
+        let amount = 25_u64;
+        let min_delay_ms = 100_u64;
+        let max_delay_ms = 300_u64;
+        let split = 4_u32;
+
+        let instruction = DepositAndDelegateShuttleEphemeralAtaWithMergeAndPrivateTransferBuilder {
+            payer,
+            owner,
+            mint,
+            source_ata,
+            destination_owner,
+            shuttle_id,
+            amount,
+            min_delay_ms,
+            max_delay_ms,
+            split,
+            validator: Some(validator),
+        }
+        .instruction();
+
+        let (rent_pda, _) = find_rent_pda();
+        let (shuttle_ephemeral_ata, _) = find_shuttle_ephemeral_ata(&owner, &mint, shuttle_id);
+        let (shuttle_ata, _) = find_shuttle_ata(&shuttle_ephemeral_ata, &mint);
+        let shuttle_wallet_ata = find_shuttle_wallet_ata(&mint, &shuttle_ephemeral_ata);
+        let (vault, _) = GlobalVault::find_pda(&mint);
+        let vault_ata = find_vault_ata(&mint, &vault);
+        let (queue, _) = find_transfer_queue(&mint);
+
+        assert_eq!(instruction.program_id, ESPL_TOKEN_PROGRAM_ID);
+        assert_eq!(instruction.accounts.len(), 19);
+        assert_eq!(instruction.accounts[0].pubkey, payer);
+        assert_eq!(instruction.accounts[1].pubkey, rent_pda);
+        assert_eq!(instruction.accounts[2].pubkey, shuttle_ephemeral_ata);
+        assert_eq!(instruction.accounts[3].pubkey, shuttle_ata);
+        assert_eq!(instruction.accounts[4].pubkey, shuttle_wallet_ata);
+        assert_eq!(instruction.accounts[5].pubkey, owner);
+        assert_eq!(instruction.accounts[13].pubkey, mint);
+        assert_eq!(instruction.accounts[16].pubkey, source_ata);
+        assert_eq!(instruction.accounts[17].pubkey, vault_ata);
+        assert_eq!(instruction.accounts[18].pubkey, queue);
+
+        assert_eq!(
+            instruction.data[0],
+            EphemeralSplDiscriminator::DepositAndDelegateShuttleEphemeralAtaWithMergeAndPrivateTransfer
+                as u8
+        );
+        assert_eq!(
+            u32::from_le_bytes(instruction.data[1..5].try_into().unwrap()),
+            shuttle_id
+        );
+        assert_eq!(
+            u64::from_le_bytes(instruction.data[5..13].try_into().unwrap()),
+            amount
+        );
+
+        let validator_len = instruction.data[13] as usize;
+        assert_eq!(validator_len, 32);
+        assert_eq!(&instruction.data[14..46], validator.as_ref());
+
+        let destination_len = instruction.data[46] as usize;
+        assert_eq!(destination_len, 80);
+
+        let suffix_offset = 47 + destination_len;
+        let suffix_len = instruction.data[suffix_offset] as usize;
+        assert_eq!(suffix_len, 69);
+        assert_eq!(suffix_offset + 1 + suffix_len, instruction.data.len());
     }
 }
