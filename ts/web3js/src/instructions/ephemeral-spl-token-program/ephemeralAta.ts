@@ -4,6 +4,9 @@ import {
   SystemProgram,
   AccountInfo,
 } from "@solana/web3.js";
+import { blake2b } from "@noble/hashes/blake2b";
+import { edwardsToMontgomeryPub } from "@noble/curves/ed25519";
+import * as nacl from "tweetnacl";
 
 import {
   DELEGATION_PROGRAM_ID,
@@ -35,6 +38,7 @@ const TOKEN_PROGRAM_ID = new PublicKey(
 const ASSOCIATED_TOKEN_PROGRAM_ID = new PublicKey(
   "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL",
 );
+const QUEUED_TRANSFER_FLAG_CREATE_IDEMPOTENT_ATA = 1 << 0;
 
 // Derive the Associated Token Account for a given mint/owner pair. Mirrors the
 // behavior of @solana/spl-token's getAssociatedTokenAddressSync.
@@ -116,6 +120,66 @@ function createTransferInstruction(
     keys,
     data,
   });
+}
+
+function encryptEd25519Recipient(
+  plaintext: Uint8Array,
+  recipient: PublicKey,
+): Buffer {
+  const recipientX25519 = edwardsToMontgomeryPub(recipient.toBytes());
+  const ephemeral = nacl.box.keyPair();
+  const nonce = blake2b(
+    Buffer.concat([
+      Buffer.from(ephemeral.publicKey),
+      Buffer.from(recipientX25519),
+    ]),
+    { dkLen: nacl.box.nonceLength },
+  );
+  const ciphertext = nacl.box(
+    plaintext,
+    nonce,
+    recipientX25519,
+    ephemeral.secretKey,
+  );
+
+  return Buffer.concat([
+    Buffer.from(ephemeral.publicKey),
+    Buffer.from(ciphertext),
+  ]);
+}
+
+function encodeLengthPrefixedBytes(bytes: Uint8Array): Buffer {
+  if (bytes.length > 0xff) {
+    throw new Error("encrypted private transfer payload exceeds u8 length");
+  }
+
+  return Buffer.concat([Buffer.from([bytes.length]), Buffer.from(bytes)]);
+}
+
+function packPrivateTransferSuffix(
+  minDelayMs: bigint,
+  maxDelayMs: bigint,
+  split: number,
+  flags: number = 0,
+): Buffer {
+  const suffix = Buffer.alloc(8 + 8 + 4 + 1);
+  suffix.writeBigUInt64LE(minDelayMs, 0);
+  suffix.writeBigUInt64LE(maxDelayMs, 8);
+  suffix.writeUInt32LE(split, 16);
+  suffix.writeUInt8(flags, 20);
+  return suffix;
+}
+
+function u32leBuffer(value: number): Buffer {
+  const out = Buffer.alloc(4);
+  out.writeUInt32LE(value, 0);
+  return out;
+}
+
+function u64leBuffer(value: bigint): Buffer {
+  const out = Buffer.alloc(8);
+  out.writeBigUInt64LE(value, 0);
+  return out;
 }
 
 // ---------------------------------------------------------------------------
@@ -739,6 +803,8 @@ export function setupAndDelegateShuttleEphemeralAtaWithMergeIx(
 /**
  * Initialize shuttle metadata/EATA/wallet ATA, deposit into the shuttle EATA,
  * then delegate it with implicit merge, cleanup, and delayed private transfer.
+ * The destination owner is only carried inside the encrypted post-delegation action
+ * and is not passed as a cleartext account to this outer instruction.
  */
 export function depositAndDelegateShuttleEphemeralAtaWithMergeAndPrivateTransferIx(
   payer: PublicKey,
@@ -746,7 +812,7 @@ export function depositAndDelegateShuttleEphemeralAtaWithMergeAndPrivateTransfer
   shuttleAta: PublicKey,
   owner: PublicKey,
   sourceAta: PublicKey,
-  destinationAta: PublicKey,
+  destinationOwner: PublicKey,
   shuttleWalletAta: PublicKey,
   mint: PublicKey,
   shuttleId: number,
@@ -772,22 +838,35 @@ export function depositAndDelegateShuttleEphemeralAtaWithMergeAndPrivateTransfer
   if (maxDelayMs < minDelayMs) {
     throw new Error("maxDelayMs must be greater than or equal to minDelayMs");
   }
+  if (validator == null) {
+    throw new Error("validator is required for encrypted private transfers");
+  }
 
   const [rentPda] = deriveRentPda();
   const [vault] = deriveVault(mint);
   const vaultAta = deriveVaultAta(mint, vault);
   const [queue] = deriveTransferQueue(mint);
-
-  const data = validator ? Buffer.alloc(65) : Buffer.alloc(33);
-  data[0] = 25;
-  data.writeUInt32LE(shuttleId, 1);
-  data.writeBigUInt64LE(amount, 5);
-  data.writeBigUInt64LE(minDelayMs, 13);
-  data.writeBigUInt64LE(maxDelayMs, 21);
-  data.writeUInt32LE(split, 29);
-  if (validator) {
-    validator.toBuffer().copy(data, 33);
-  }
+  const encryptedDestination = encryptEd25519Recipient(
+    destinationOwner.toBytes(),
+    validator,
+  );
+  const encryptedSuffix = encryptEd25519Recipient(
+    packPrivateTransferSuffix(
+      minDelayMs,
+      maxDelayMs,
+      split,
+      QUEUED_TRANSFER_FLAG_CREATE_IDEMPOTENT_ATA,
+    ),
+    validator,
+  );
+  const data = Buffer.concat([
+    Buffer.from([25]),
+    u32leBuffer(shuttleId),
+    u64leBuffer(amount),
+    encodeLengthPrefixedBytes(validator.toBytes()),
+    encodeLengthPrefixedBytes(encryptedDestination),
+    encodeLengthPrefixedBytes(encryptedSuffix),
+  ]);
 
   return new TransactionInstruction({
     programId: EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
@@ -828,7 +907,6 @@ export function depositAndDelegateShuttleEphemeralAtaWithMergeAndPrivateTransfer
         isWritable: false,
       },
       { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
-      { pubkey: destinationAta, isSigner: false, isWritable: true },
       { pubkey: mint, isSigner: false, isWritable: false },
       { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
       { pubkey: vault, isSigner: false, isWritable: false },
@@ -1494,7 +1572,7 @@ export async function delegateSplWithPrivateTransfer(
       shuttleAta,
       owner,
       ownerAta,
-      ownerAta,
+      owner,
       shuttleWalletAta,
       mint,
       shuttleId,
@@ -1597,17 +1675,6 @@ export async function transferSpl(
   switch (opts.visibility) {
     case "private":
       if (opts.fromBalance === "base" && opts.toBalance === "base") {
-        if (initIfMissing) {
-          instructions.push(
-            createAssociatedTokenAccountIdempotentInstruction(
-              payer,
-              toAta,
-              to,
-              mint,
-            ),
-          );
-        }
-
         const [shuttleEphemeralAta] = deriveShuttleEphemeralAta(
           from,
           mint,
@@ -1627,7 +1694,7 @@ export async function transferSpl(
             shuttleAta,
             from,
             fromAta,
-            toAta,
+            to,
             shuttleWalletAta,
             mint,
             shuttleId,

@@ -36,6 +36,16 @@ import {
   MAGIC_CONTEXT_ID,
 } from "../constants";
 
+function readLengthPrefixedField(
+  data: Uint8Array,
+  offset: number,
+): [Buffer, number] {
+  const len = data[offset];
+  const start = offset + 1;
+  const end = start + len;
+  return [Buffer.from(data.subarray(start, end)), end];
+}
+
 describe("Exposed Instructions (web3.js)", () => {
   const mockPublicKey = new PublicKey("11111111111111111111111111111111");
 
@@ -862,7 +872,7 @@ describe("Exposed Instructions (web3.js)", () => {
   describe("delegateSplWithPrivateTransfer (Ephemeral SPL Token Program)", () => {
     const owner = new PublicKey("11111111111111111111111111111113");
     const mint = new PublicKey("11111111111111111111111111111114");
-    const validator = new PublicKey("11111111111111111111111111111115");
+    const validator = Keypair.generate().publicKey;
 
     it("should use the private transfer shuttle flow", async () => {
       const instructions = await delegateSplWithPrivateTransfer(
@@ -888,19 +898,25 @@ describe("Exposed Instructions (web3.js)", () => {
       if (privateTransferInstruction == null) {
         throw new Error("Expected private transfer instruction");
       }
-      expect(privateTransferInstruction?.keys).toHaveLength(20);
-      expect(
-        Buffer.from(privateTransferInstruction.data).readBigUInt64LE(5),
-      ).toBe(1n);
-      expect(
-        Buffer.from(privateTransferInstruction.data).readBigUInt64LE(13),
-      ).toBe(100n);
-      expect(
-        Buffer.from(privateTransferInstruction.data).readBigUInt64LE(21),
-      ).toBe(300n);
-      expect(
-        Buffer.from(privateTransferInstruction.data).readUInt32LE(29),
-      ).toBe(4);
+      expect(privateTransferInstruction?.keys).toHaveLength(19);
+      const data = Buffer.from(privateTransferInstruction.data);
+      expect(data.readUInt32LE(1)).toBe(7);
+      expect(data.readBigUInt64LE(5)).toBe(1n);
+
+      const [validatorField, nextOffset] = readLengthPrefixedField(data, 13);
+      const [destinationField, suffixOffset] = readLengthPrefixedField(
+        data,
+        nextOffset,
+      );
+      const [suffixField, endOffset] = readLengthPrefixedField(
+        data,
+        suffixOffset,
+      );
+
+      expect(validatorField.equals(validator.toBuffer())).toBe(true);
+      expect(destinationField).toHaveLength(80);
+      expect(suffixField).toHaveLength(69);
+      expect(endOffset).toBe(data.length);
     });
   });
 
@@ -953,12 +969,26 @@ describe("Exposed Instructions (web3.js)", () => {
       });
 
       expect(instructions).toHaveLength(1);
-      expect(instructions[0].data[0]).toBe(25);
-      expect(instructions[0].keys).toHaveLength(20);
-      expect(Buffer.from(instructions[0].data).readBigUInt64LE(5)).toBe(25n);
-      expect(Buffer.from(instructions[0].data).readBigUInt64LE(13)).toBe(100n);
-      expect(Buffer.from(instructions[0].data).readBigUInt64LE(21)).toBe(300n);
-      expect(Buffer.from(instructions[0].data).readUInt32LE(29)).toBe(4);
+      const data = Buffer.from(instructions[0].data);
+      expect(data[0]).toBe(25);
+      expect(instructions[0].keys).toHaveLength(19);
+      expect(data.readUInt32LE(1)).toBe(7);
+      expect(data.readBigUInt64LE(5)).toBe(25n);
+
+      const [validatorField, nextOffset] = readLengthPrefixedField(data, 13);
+      const [destinationField, suffixOffset] = readLengthPrefixedField(
+        data,
+        nextOffset,
+      );
+      const [suffixField, endOffset] = readLengthPrefixedField(
+        data,
+        suffixOffset,
+      );
+
+      expect(validatorField.equals(validator.toBuffer())).toBe(true);
+      expect(destinationField).toHaveLength(80);
+      expect(suffixField).toHaveLength(69);
+      expect(endOffset).toBe(data.length);
     });
 
     it("should initialize the destination ATA and vault when requested", async () => {
@@ -980,14 +1010,12 @@ describe("Exposed Instructions (web3.js)", () => {
         },
       });
 
-      expect(instructions).toHaveLength(5);
+      expect(instructions).toHaveLength(4);
       expect(instructions[2].keys[1].pubkey.toBase58()).toBe(
         vaultEphemeralAta.toBase58(),
       );
       expect(instructions[2].data[0]).toBe(4);
-      expect(instructions[3].keys[2].pubkey.toBase58()).toBe(to.toBase58());
-      expect(instructions[3].data[0]).toBe(1);
-      expect(instructions[4].data[0]).toBe(25);
+      expect(instructions[3].data[0]).toBe(25);
     });
 
     it("should prepend source ATA creation when initAtasIfMissing is set on base-source transfers", async () => {
