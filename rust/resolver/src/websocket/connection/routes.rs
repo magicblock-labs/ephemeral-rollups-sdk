@@ -152,8 +152,14 @@ impl WsRoutesConnection {
             {{
                 "jsonrpc": "2.0",
                 "id": 1,
-                "method": "getProgramAccounts",
-                "params": ["{}"]
+                "method": "programSubscribe",
+                "params": [
+                    "{}",
+                    {{
+                        "encoding": "base64",
+                        "commitment": "confirmed"
+                    }}
+                ]
             }}
             "#,
             mdp::id()
