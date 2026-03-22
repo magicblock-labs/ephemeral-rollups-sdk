@@ -22,6 +22,7 @@ mod tests {
                 CreateEphemeralAtaPermissionBuilder, DelegateEphemeralAtaBuilder,
                 DelegateEphemeralAtaPermissionBuilder,
                 DepositAndDelegateShuttleEphemeralAtaWithMergeAndPrivateTransferBuilder,
+                DepositAndDelegateShuttleEphemeralAtaWithMergeAndPrivateTransferBuilderError,
                 DepositSplTokensBuilder, InitializeEphemeralAtaBuilder,
                 InitializeGlobalVaultBuilder, ResetEphemeralAtaPermissionBuilder,
                 UndelegateEphemeralAtaBuilder, UndelegateEphemeralAtaPermissionBuilder,
@@ -627,6 +628,32 @@ mod tests {
 
     #[cfg(feature = "encryption")]
     #[test]
+    fn test_deposit_and_delegate_shuttle_private_transfer_requires_validator() {
+        let instruction = DepositAndDelegateShuttleEphemeralAtaWithMergeAndPrivateTransferBuilder {
+            payer: Pubkey::new_unique(),
+            owner: Pubkey::new_unique(),
+            mint: Pubkey::new_unique(),
+            source_ata: Pubkey::new_unique(),
+            destination_owner: Pubkey::new_unique(),
+            shuttle_id: 7,
+            amount: 25_u64,
+            min_delay_ms: 100_u64,
+            max_delay_ms: 300_u64,
+            split: 4_u32,
+            validator: None,
+        }
+        .instruction();
+
+        assert!(matches!(
+            instruction,
+            Err(
+                DepositAndDelegateShuttleEphemeralAtaWithMergeAndPrivateTransferBuilderError::MissingValidator
+            )
+        ));
+    }
+
+    #[cfg(feature = "encryption")]
+    #[test]
     fn test_deposit_and_delegate_shuttle_private_transfer_instruction_layout() {
         let payer = Pubkey::new_unique();
         let owner = Pubkey::new_unique();
@@ -653,7 +680,8 @@ mod tests {
             split,
             validator: Some(validator),
         }
-        .instruction();
+        .instruction()
+        .unwrap();
 
         let (rent_pda, _) = find_rent_pda();
         let (shuttle_ephemeral_ata, _) = find_shuttle_ephemeral_ata(&owner, &mint, shuttle_id);
