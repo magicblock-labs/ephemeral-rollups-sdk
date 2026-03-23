@@ -12,15 +12,12 @@ pub struct Permission<'a> {
 impl<'a> Permission<'a> {
     /// Calculate the exact size needed to serialize this Permission
     pub fn serialized_size(&self) -> usize {
-        // discriminator (1) + bump (1) + address (32) = 34 bytes
-        let mut size = 34;
+        // discriminator (1) + bump (1) + address (32) = 34
+        // + 1 byte option flag
+        let mut size = 34 + 1;
 
-        // If members exist: member_count (4) + members data
         if let Some(members) = self.members {
             size += 4 + members.len() * MAX_MEMBER_SIZE;
-        } else {
-            // If no members: just the member count (0)
-            size += 4;
         }
 
         size
@@ -28,52 +25,67 @@ impl<'a> Permission<'a> {
 
     /// Deserialize Permission from a data slice
     pub fn try_from_slice(data: &'a [u8]) -> Result<Self, ProgramError> {
-        if data.len() < 38 {
-            // discriminator (1) + bump (1) + address (32) + member_count (4)
+        // minimum: 34 (base) + 1 (option)
+        if data.len() < 35 {
             return Err(ProgramError::InvalidAccountData);
         }
 
         let discriminator = data[0];
         let bump = data[1];
+
         let permissioned_account =
             Address::try_from(&data[2..34]).map_err(|_| ProgramError::InvalidAccountData)?;
 
-        // Check if there are members
-        let members_exists = data[34] == 1;
-        let members = if members_exists {
-            let member_count_bytes: [u8; 4] = data[35..39]
-                .try_into()
-                .map_err(|_| ProgramError::InvalidAccountData)?;
-            let member_count = u32::from_le_bytes(member_count_bytes) as usize;
+        let members_flag = data[34];
 
-            Some(if member_count == 0 {
-                &[]
-            } else {
+        let members = match members_flag {
+            0 => None,
+            1 => {
+                // need at least count
+                if data.len() < 39 {
+                    return Err(ProgramError::InvalidAccountData);
+                }
+
+                let member_count_bytes: [u8; 4] = data[35..39]
+                    .try_into()
+                    .map_err(|_| ProgramError::InvalidAccountData)?;
+
+                let member_count = u32::from_le_bytes(member_count_bytes) as usize;
+
                 if member_count > MAX_MEMBERS_COUNT {
                     return Err(ProgramError::InvalidAccountData);
                 }
-                let members_start: usize = 39;
-                let members_len = member_count
-                    .checked_mul(MAX_MEMBER_SIZE)
-                    .ok_or(ProgramError::InvalidAccountData)?;
-                let members_end = members_start
-                    .checked_add(members_len)
-                    .ok_or(ProgramError::InvalidAccountData)?;
-                if members_end > data.len() {
-                    return Err(ProgramError::InvalidAccountData);
-                }
 
-                let members_data = &data[members_start..members_end];
-                let members_slice = unsafe {
-                    core::slice::from_raw_parts(
-                        members_data.as_ptr() as *const Member,
-                        member_count,
-                    )
-                };
-                members_slice
-            })
-        } else {
-            None
+                if member_count == 0 {
+                    Some(&[])
+                } else {
+                    let members_start = 39;
+
+                    let members_len = member_count
+                        .checked_mul(MAX_MEMBER_SIZE)
+                        .ok_or(ProgramError::InvalidAccountData)?;
+
+                    let members_end = members_start
+                        .checked_add(members_len)
+                        .ok_or(ProgramError::InvalidAccountData)?;
+
+                    if members_end > data.len() {
+                        return Err(ProgramError::InvalidAccountData);
+                    }
+
+                    let members_data = &data[members_start..members_end];
+
+                    let members_slice = unsafe {
+                        core::slice::from_raw_parts(
+                            members_data.as_ptr() as *const Member,
+                            member_count,
+                        )
+                    };
+
+                    Some(members_slice)
+                }
+            }
+            _ => return Err(ProgramError::InvalidAccountData),
         };
 
         Ok(Permission {
@@ -87,33 +99,40 @@ impl<'a> Permission<'a> {
     /// Serialize Permission to a mutable byte slice
     pub fn try_to_slice<'b>(&self, data: &'b mut [u8]) -> Result<&'b [u8], ProgramError> {
         let required_size = self.serialized_size();
+
         if data.len() < required_size {
             return Err(ProgramError::AccountDataTooSmall);
         }
 
-        // Write discriminator and bump
+        // base fields
         data[0] = self.discriminator;
         data[1] = self.bump;
-
-        // Write permissioned_account
         data[2..34].copy_from_slice(self.permissioned_account.as_ref());
 
-        // Write members
-        let member_count = self.members.map(|m| m.len()).unwrap_or(0);
-        data[34..38].copy_from_slice(&(member_count as u32).to_le_bytes());
+        let mut offset = 34;
 
-        let mut offset = 38;
-
-        // Serialize members if present
-        if let Some(members) = self.members {
-            for member in members {
-                // Flags (1 byte)
-                data[offset] = member.flags.as_u8();
+        match self.members {
+            None => {
+                data[offset] = 0;
+                offset += 1;
+            }
+            Some(members) => {
+                data[offset] = 1;
                 offset += 1;
 
-                // Address (32 bytes)
-                data[offset..offset + 32].copy_from_slice(member.pubkey.as_ref());
-                offset += 32;
+                let member_count = members.len();
+                data[offset..offset + 4]
+                    .copy_from_slice(&(member_count as u32).to_le_bytes());
+                offset += 4;
+
+                for member in members {
+                    data[offset] = member.flags.as_u8();
+                    offset += 1;
+
+                    data[offset..offset + 32]
+                        .copy_from_slice(member.pubkey.as_ref());
+                    offset += 32;
+                }
             }
         }
 
