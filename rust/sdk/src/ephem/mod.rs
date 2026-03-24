@@ -13,8 +13,8 @@ pub use crate::ephem::deprecated::v1::{
 use crate::solana_compat::solana::{
     invoke, AccountInfo, AccountMeta, Instruction, ProgramResult, Pubkey,
 };
-pub use cau_intent_builder::CommitAndUndelegateIntentBuilder;
-pub use commit_intent_builder::CommitIntentBuilder;
+pub use cau_intent_builder::{CommitAndUndelegateIntentBuilder, FoldableCauIntentBuilder};
+pub use commit_intent_builder::{CommitIntentBuilder, FoldableCommitIntentBuilder};
 use magicblock_magic_program_api::args::MagicIntentBundleArgs;
 use magicblock_magic_program_api::instruction::MagicBlockInstruction;
 pub use magicblock_magic_program_api::response::MagicResponse;
@@ -486,7 +486,6 @@ pub trait FoldableIntentBuilder<'info>: Sized {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ephem::cau_intent_builder::FoldableCauIntentBuilder;
     use crate::solana_compat::solana::{AccountInfo, Pubkey};
     use magicblock_magic_program_api::args::ActionArgs;
     use magicblock_magic_program_api::instruction::MagicBlockInstruction;
