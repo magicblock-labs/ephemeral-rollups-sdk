@@ -18,7 +18,6 @@ pub struct DelegateEphemeralAta<'a> {
     pub delegation_metadata: &'a AccountView,
     pub delegation_program: &'a AccountView,
     pub system_program: &'a AccountView,
-    pub eata_bump: u8,
     pub validator: Option<Address>,
 }
 
@@ -63,14 +62,13 @@ impl<'a> DelegateEphemeralAta<'a> {
         accounts[6].write(self.delegation_program);
         accounts[7].write(self.system_program);
 
-        let mut instruction_data = [0_u8; 34];
+        let mut instruction_data = [0_u8; 33];
         instruction_data[0] = EphemeralSplDiscriminator::DelegateEphemeralAta as u8;
-        instruction_data[1] = self.eata_bump;
         let instruction_data_len = if let Some(validator) = &self.validator {
-            instruction_data[2..34].copy_from_slice(validator.as_ref());
-            34
+            instruction_data[1..33].copy_from_slice(validator.as_ref());
+            33
         } else {
-            2
+            1
         };
 
         invoke_signed_with_bounds::<NUM_ACCOUNTS>(

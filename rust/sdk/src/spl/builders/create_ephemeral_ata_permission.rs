@@ -16,7 +16,7 @@ pub struct CreateEphemeralAtaPermissionBuilder {
 impl CreateEphemeralAtaPermissionBuilder {
     #[inline(always)]
     pub fn instruction(&self) -> Instruction {
-        let (eata, eata_bump) = EphemeralAta::find_pda(&self.user, &self.mint);
+        let (eata, _eata_bump) = EphemeralAta::find_pda(&self.user, &self.mint);
         let (permission, _permission_bump) = Permission::find_pda(&eata);
 
         Instruction {
@@ -30,7 +30,6 @@ impl CreateEphemeralAtaPermissionBuilder {
             ],
             data: vec![
                 EphemeralSplDiscriminator::CreateEphemeralAtaPermission as u8,
-                eata_bump,
                 self.flag_byte,
             ],
         }

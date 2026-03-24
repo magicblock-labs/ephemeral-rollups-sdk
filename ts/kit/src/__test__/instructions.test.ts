@@ -1,5 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { AccountRole } from "@solana/instructions";
+import bs58 from "bs58";
+import * as nacl from "tweetnacl";
 import {
   createDelegateInstruction,
   createTopUpEscrowInstruction,
@@ -12,15 +14,37 @@ import {
 } from "../instructions/magic-program";
 import { address, getAddressEncoder, type Address } from "@solana/kit";
 import {
+  delegateEataPermissionIx,
   depositAndQueueTransferIx,
   delegateSpl,
+  delegateSplWithPrivateTransfer,
   delegateTransferQueueIx,
   deriveEphemeralAta,
+  deriveRentPda,
   deriveVault,
   ensureTransferQueueCrankIx,
+  initEphemeralAtaIx,
   initVaultIx,
+  initRentPdaIx,
+  transferSpl,
+  withdrawSplIx,
+  withdrawSpl,
 } from "../instructions/ephemeral-spl-token-program";
-import { MAGIC_PROGRAM_ID, MAGIC_CONTEXT_ID } from "../constants";
+import {
+  MAGIC_PROGRAM_ID,
+  MAGIC_CONTEXT_ID,
+  EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
+} from "../constants";
+
+function readLengthPrefixedField(
+  data: Uint8Array,
+  offset: number,
+): [Buffer, number] {
+  const len = data[offset];
+  const start = offset + 1;
+  const end = start + len;
+  return [Buffer.from(data.subarray(start, end)), end];
+}
 
 describe("Exposed Instructions (@solana/kit)", () => {
   const mockAddress = "11111111111111111111111111111111" as Address;
@@ -263,6 +287,25 @@ describe("Exposed Instructions (@solana/kit)", () => {
       // Offset 12 should have seeds array length = 2
       const view = new DataView(instruction.data?.buffer as ArrayBuffer, 12, 4);
       expect(view.getUint32(0, true)).toBe(2);
+    });
+  });
+
+  describe("initRentPdaIx (Ephemeral SPL Token Program)", () => {
+    it("should derive and initialize the global rent PDA", async () => {
+      const [rentPda] = await deriveRentPda();
+      const instruction = initRentPdaIx(mockAddress, rentPda);
+
+      expect(instruction.programAddress).toBe(EPHEMERAL_SPL_TOKEN_PROGRAM_ID);
+      expect(instruction.accounts).toHaveLength(3);
+      expect(instruction.accounts?.[0]).toEqual({
+        address: mockAddress,
+        role: AccountRole.WRITABLE_SIGNER,
+      });
+      expect(instruction.accounts?.[1]).toEqual({
+        address: rentPda,
+        role: AccountRole.WRITABLE,
+      });
+      expect(instruction.data).toEqual(new Uint8Array([23]));
     });
   });
 
@@ -698,10 +741,7 @@ describe("Exposed Instructions (@solana/kit)", () => {
 
     it("should delegate the vault eata when initializing the vault in legacy flow", async () => {
       const [vault] = await deriveVault(mint);
-      const [vaultEphemeralAta, vaultEataBump] = await deriveEphemeralAta(
-        vault,
-        mint,
-      );
+      const [vaultEphemeralAta] = await deriveEphemeralAta(vault, mint);
 
       const instructions = await delegateSpl(owner, mint, 1n, {
         validator,
@@ -712,18 +752,14 @@ describe("Exposed Instructions (@solana/kit)", () => {
 
       expect(instructions[3].accounts?.[1].address).toBe(vaultEphemeralAta);
       expect(instructions[3].data?.[0]).toBe(4);
-      expect(instructions[3].data?.[1]).toBe(vaultEataBump);
-      expect(Array.from(instructions[3].data?.subarray(2) ?? [])).toEqual(
+      expect(Array.from(instructions[3].data?.subarray(1) ?? [])).toEqual(
         Array.from(addressEncoder.encode(validator)),
       );
     });
 
     it("should delegate the vault eata when initializing the vault in idempotent flow", async () => {
       const [vault] = await deriveVault(mint);
-      const [vaultEphemeralAta, vaultEataBump] = await deriveEphemeralAta(
-        vault,
-        mint,
-      );
+      const [vaultEphemeralAta] = await deriveEphemeralAta(vault, mint);
 
       const instructions = await delegateSpl(owner, mint, 1n, {
         validator,
@@ -733,32 +769,41 @@ describe("Exposed Instructions (@solana/kit)", () => {
 
       expect(instructions[2].accounts?.[1].address).toBe(vaultEphemeralAta);
       expect(instructions[2].data?.[0]).toBe(4);
-      expect(instructions[2].data?.[1]).toBe(vaultEataBump);
-      expect(Array.from(instructions[2].data?.subarray(2) ?? [])).toEqual(
+      expect(Array.from(instructions[2].data?.subarray(1) ?? [])).toEqual(
         Array.from(addressEncoder.encode(validator)),
       );
     });
 
-    it("should keep shuttleAta writable across the idempotent shuttle flow", async () => {
+    it("should use setup_and_delegate_shuttle_with_merge across the idempotent shuttle flow", async () => {
       const instructions = await delegateSpl(owner, mint, 1n, {
         validator,
         shuttleId: 7,
       });
 
-      const initShuttleInstruction = instructions.find(
-        (ix) => ix.data?.[0] === 11,
-      );
-      const delegateShuttleInstruction = instructions.find(
-        (ix) => ix.data?.[0] === 13,
+      const setupAndDelegateInstruction = instructions.find(
+        (ix) => ix.data?.[0] === 24,
       );
 
-      expect(initShuttleInstruction).toBeDefined();
-      expect(initShuttleInstruction?.accounts?.[2].role).toBe(
-        AccountRole.WRITABLE,
-      );
-      expect(delegateShuttleInstruction).toBeDefined();
-      expect(delegateShuttleInstruction?.accounts?.[2].role).toBe(
-        AccountRole.WRITABLE,
+      expect(setupAndDelegateInstruction).toBeDefined();
+      expect(setupAndDelegateInstruction?.accounts).toHaveLength(19);
+      expect(instructions.find((ix) => ix.data?.[0] === 11)).toBeUndefined();
+
+      const setupAndDelegateData = setupAndDelegateInstruction?.data;
+      expect(setupAndDelegateData).toBeDefined();
+
+      if (setupAndDelegateData === undefined) {
+        throw new Error("Expected setup-and-delegate instruction data");
+      }
+
+      expect(
+        new DataView(
+          setupAndDelegateData.buffer,
+          setupAndDelegateData.byteOffset,
+          setupAndDelegateData.byteLength,
+        ).getBigUint64(5, true),
+      ).toBe(1n);
+      expect(Array.from(setupAndDelegateData.subarray(13))).toEqual(
+        Array.from(addressEncoder.encode(validator)),
       );
     });
 
@@ -782,11 +827,346 @@ describe("Exposed Instructions (@solana/kit)", () => {
     });
   });
 
+  describe("delegateSplWithPrivateTransfer (Ephemeral SPL Token Program)", () => {
+    const owner = address("11111111111111111111111111111113");
+    const mint = address("11111111111111111111111111111114");
+    const validator = address(bs58.encode(nacl.sign.keyPair().publicKey));
+
+    it("should use the private transfer shuttle flow", async () => {
+      const instructions = await delegateSplWithPrivateTransfer(
+        owner,
+        mint,
+        1n,
+        {
+          validator,
+          shuttleId: 7,
+          initTransferQueueIfMissing: true,
+          minDelayMs: 100n,
+          maxDelayMs: 300n,
+          split: 4,
+        },
+      );
+
+      const privateTransferInstruction = instructions.find(
+        (ix) => ix.data?.[0] === 25,
+      );
+
+      expect(instructions.find((ix) => ix.data?.[0] === 12)).toBeDefined();
+      expect(privateTransferInstruction).toBeDefined();
+      expect(privateTransferInstruction?.accounts).toHaveLength(19);
+
+      const privateTransferData = privateTransferInstruction?.data;
+      expect(privateTransferData).toBeDefined();
+
+      if (privateTransferData === undefined) {
+        throw new Error("Expected private transfer instruction data");
+      }
+
+      const data = Buffer.from(privateTransferData);
+      expect(data.readUInt32LE(1)).toBe(7);
+      expect(data.readBigUInt64LE(5)).toBe(1n);
+
+      const [validatorField, nextOffset] = readLengthPrefixedField(data, 13);
+      const [destinationField, suffixOffset] = readLengthPrefixedField(
+        data,
+        nextOffset,
+      );
+      const [suffixField, endOffset] = readLengthPrefixedField(
+        data,
+        suffixOffset,
+      );
+
+      expect(
+        validatorField.equals(Buffer.from(addressEncoder.encode(validator))),
+      ).toBe(true);
+      expect(destinationField).toHaveLength(80);
+      expect(suffixField).toHaveLength(69);
+      expect(endOffset).toBe(data.length);
+    });
+  });
+
+  describe("withdrawSpl (Ephemeral SPL Token Program)", () => {
+    const owner = address("11111111111111111111111111111113");
+    const mint = address("11111111111111111111111111111114");
+    const validator = address("11111111111111111111111111111115");
+
+    it("should use the delegated shuttle withdrawal flow when idempotent", async () => {
+      const instructions = await withdrawSpl(owner, mint, 1n, {
+        validator,
+        shuttleId: 7,
+      });
+
+      const withdrawInstruction = instructions.find(
+        (ix) => ix.data?.[0] === 26,
+      );
+
+      expect(withdrawInstruction).toBeDefined();
+      expect(withdrawInstruction?.accounts).toHaveLength(16);
+      expect(instructions.find((ix) => ix.data?.[0] === 3)).toBeUndefined();
+    });
+
+    it("should fall back to the legacy withdraw instruction when idempotent is false", async () => {
+      const instructions = await withdrawSpl(owner, mint, 1n, {
+        idempotent: false,
+      });
+
+      expect(instructions).toHaveLength(1);
+      expect(instructions[0].data?.[0]).toBe(3);
+    });
+  });
+
+  describe("transferSpl (Ephemeral SPL Token Program)", () => {
+    const from = address("11111111111111111111111111111113");
+    const to = address("11111111111111111111111111111114");
+    const mint = address("11111111111111111111111111111115");
+    const validator = address(bs58.encode(nacl.sign.keyPair().publicKey));
+
+    it("should use the shuttle private transfer instruction for private base-to-base transfers", async () => {
+      const instructions = await transferSpl(from, to, mint, 25n, {
+        visibility: "private",
+        fromBalance: "base",
+        toBalance: "base",
+        validator,
+        shuttleId: 7,
+        privateTransfer: {
+          minDelayMs: 100n,
+          maxDelayMs: 300n,
+          split: 4,
+        },
+      });
+
+      expect(instructions).toHaveLength(1);
+      const data = Buffer.from(instructions[0].data ?? []);
+      expect(data[0]).toBe(25);
+      expect(instructions[0].accounts).toHaveLength(19);
+      expect(data.readUInt32LE(1)).toBe(7);
+      expect(data.readBigUInt64LE(5)).toBe(25n);
+
+      const [validatorField, nextOffset] = readLengthPrefixedField(data, 13);
+      const [destinationField, suffixOffset] = readLengthPrefixedField(
+        data,
+        nextOffset,
+      );
+      const [suffixField, endOffset] = readLengthPrefixedField(
+        data,
+        suffixOffset,
+      );
+
+      expect(
+        validatorField.equals(Buffer.from(addressEncoder.encode(validator))),
+      ).toBe(true);
+      expect(destinationField).toHaveLength(80);
+      expect(suffixField).toHaveLength(69);
+      expect(endOffset).toBe(data.length);
+    });
+
+    it("should initialize the destination ATA and vault when requested", async () => {
+      const [vault] = await deriveVault(mint);
+      const [vaultEphemeralAta] = await deriveEphemeralAta(vault, mint);
+
+      const instructions = await transferSpl(from, to, mint, 25n, {
+        visibility: "private",
+        fromBalance: "base",
+        toBalance: "base",
+        validator,
+        shuttleId: 7,
+        initIfMissing: true,
+        initVaultIfMissing: true,
+        privateTransfer: {
+          minDelayMs: 100n,
+          maxDelayMs: 300n,
+          split: 4,
+        },
+      });
+
+      expect(instructions).toHaveLength(4);
+      expect(instructions[2].accounts?.[1].address).toBe(vaultEphemeralAta);
+      expect(instructions[2].data?.[0]).toBe(4);
+      expect(instructions[3].data?.[0]).toBe(25);
+    });
+
+    it("should prepend source ATA creation when initAtasIfMissing is set on base-source transfers", async () => {
+      const instructions = await transferSpl(from, to, mint, 25n, {
+        visibility: "public",
+        fromBalance: "base",
+        toBalance: "base",
+        initAtasIfMissing: true,
+      });
+
+      expect(instructions).toHaveLength(2);
+      expect(instructions[0].data?.[0]).toBe(1);
+      expect(instructions[0].accounts?.[2].address).toBe(from);
+      expect(instructions[1].data?.[0]).toBe(3);
+    });
+
+    it("should use the shuttle merge instruction for private base-to-ephemeral transfers", async () => {
+      const instructions = await transferSpl(from, to, mint, 25n, {
+        visibility: "private",
+        fromBalance: "base",
+        toBalance: "ephemeral",
+        validator,
+        shuttleId: 7,
+      });
+
+      expect(instructions).toHaveLength(1);
+      expect(instructions[0].data?.[0]).toBe(24);
+      expect(instructions[0].accounts).toHaveLength(19);
+      expect(Buffer.from(instructions[0].data ?? []).readBigUInt64LE(5)).toBe(
+        25n,
+      );
+    });
+
+    it("should initialize and delegate the receiver eata for private base-to-ephemeral transfers when requested", async () => {
+      const [toEphemeralAta] = await deriveEphemeralAta(to, mint);
+
+      const instructions = await transferSpl(from, to, mint, 25n, {
+        visibility: "private",
+        fromBalance: "base",
+        toBalance: "ephemeral",
+        validator,
+        shuttleId: 7,
+        initIfMissing: true,
+      });
+
+      expect(instructions).toHaveLength(4);
+      expect(instructions[0].data?.[0]).toBe(1);
+      expect(instructions[0].accounts?.[2].address).toBe(to);
+      expect(instructions[1].data?.[0]).toBe(0);
+      expect(instructions[1].accounts?.[0].address).toBe(toEphemeralAta);
+      expect(instructions[2].data?.[0]).toBe(4);
+      expect(instructions[2].accounts?.[1].address).toBe(toEphemeralAta);
+      expect(instructions[3].data?.[0]).toBe(24);
+    });
+
+    it("should ignore initAtasIfMissing on ephemeral-source transfers", async () => {
+      const instructions = await transferSpl(from, to, mint, 25n, {
+        visibility: "private",
+        fromBalance: "ephemeral",
+        toBalance: "base",
+        initAtasIfMissing: true,
+        privateTransfer: {
+          minDelayMs: 100n,
+          maxDelayMs: 300n,
+          split: 4,
+        },
+      });
+
+      expect(instructions).toHaveLength(1);
+      expect(instructions[0].data?.[0]).toBe(16);
+    });
+
+    it("should use depositAndQueueTransferIx for private ephemeral-to-base transfers", async () => {
+      const instructions = await transferSpl(from, to, mint, 25n, {
+        visibility: "private",
+        fromBalance: "ephemeral",
+        toBalance: "base",
+        initIfMissing: true,
+        initVaultIfMissing: true,
+        privateTransfer: {
+          minDelayMs: 100n,
+          maxDelayMs: 300n,
+          split: 4,
+        },
+      });
+
+      expect(instructions).toHaveLength(1);
+      expect(instructions[0].data?.[0]).toBe(16);
+      expect(instructions[0].accounts).toHaveLength(8);
+      expect(Buffer.from(instructions[0].data ?? []).readBigUInt64LE(1)).toBe(
+        25n,
+      );
+      expect(Buffer.from(instructions[0].data ?? []).readBigUInt64LE(9)).toBe(
+        100n,
+      );
+      expect(Buffer.from(instructions[0].data ?? []).readBigUInt64LE(17)).toBe(
+        300n,
+      );
+      expect(Buffer.from(instructions[0].data ?? []).readUInt32LE(25)).toBe(4);
+    });
+
+    it("should reject private base-to-base transfers when maxDelayMs is less than minDelayMs", async () => {
+      await expect(
+        transferSpl(from, to, mint, 25n, {
+          visibility: "private",
+          fromBalance: "base",
+          toBalance: "base",
+          shuttleId: 7,
+          privateTransfer: {
+            minDelayMs: 300n,
+            maxDelayMs: 100n,
+            split: 4,
+          },
+        }),
+      ).rejects.toThrow(
+        "maxDelayMs must be greater than or equal to minDelayMs",
+      );
+    });
+
+    it("should use a normal transfer for public base-to-base transfers", async () => {
+      const instructions = await transferSpl(from, to, mint, 25n, {
+        visibility: "public",
+        fromBalance: "base",
+        toBalance: "base",
+      });
+
+      expect(instructions).toHaveLength(1);
+      expect(instructions[0].data?.[0]).toBe(3);
+      expect(instructions[0].accounts).toHaveLength(3);
+      expect(Buffer.from(instructions[0].data ?? []).readBigUInt64LE(1)).toBe(
+        25n,
+      );
+    });
+
+    it("should use a normal transfer for public ephemeral-to-ephemeral transfers", async () => {
+      const instructions = await transferSpl(from, to, mint, 25n, {
+        visibility: "public",
+        fromBalance: "ephemeral",
+        toBalance: "ephemeral",
+      });
+
+      expect(instructions).toHaveLength(1);
+      expect(instructions[0].data?.[0]).toBe(3);
+      expect(instructions[0].accounts).toHaveLength(3);
+      expect(Buffer.from(instructions[0].data ?? []).readBigUInt64LE(1)).toBe(
+        25n,
+      );
+    });
+
+    it("should use a normal transfer for private ephemeral-to-ephemeral transfers", async () => {
+      const instructions = await transferSpl(from, to, mint, 25n, {
+        visibility: "private",
+        fromBalance: "ephemeral",
+        toBalance: "ephemeral",
+        initIfMissing: true,
+        initVaultIfMissing: true,
+      });
+
+      expect(instructions).toHaveLength(1);
+      expect(instructions[0].data?.[0]).toBe(3);
+      expect(instructions[0].accounts).toHaveLength(3);
+      expect(Buffer.from(instructions[0].data ?? []).readBigUInt64LE(1)).toBe(
+        25n,
+      );
+    });
+
+    it("should reject unsupported routes", async () => {
+      await expect(
+        transferSpl(from, to, mint, 25n, {
+          visibility: "public",
+          fromBalance: "base",
+          toBalance: "ephemeral",
+        }),
+      ).rejects.toThrow(
+        "transferSpl route not implemented: visibility=public, fromBalance=base, toBalance=ephemeral",
+      );
+    });
+  });
+
   describe("initVaultIx (Ephemeral SPL Token Program)", () => {
     it("should use the provided vault ephemeral ATA synchronously", async () => {
       const mint = address("11111111111111111111111111111114");
       const payer = address("11111111111111111111111111111115");
-      const [vault, vaultBump] = await deriveVault(mint);
+      const [vault] = await deriveVault(mint);
       const [vaultEphemeralAta] = await deriveEphemeralAta(vault, mint);
       const vaultAta = address("11111111111111111111111111111116");
 
@@ -794,7 +1174,6 @@ describe("Exposed Instructions (@solana/kit)", () => {
         vault,
         mint,
         payer,
-        vaultBump,
         vaultEphemeralAta,
         vaultAta,
       );
@@ -802,7 +1181,7 @@ describe("Exposed Instructions (@solana/kit)", () => {
       expect(instruction.accounts?.[0].address).toBe(vault);
       expect(instruction.accounts?.[3].address).toBe(vaultEphemeralAta);
       expect(instruction.accounts?.[4].address).toBe(vaultAta);
-      expect(Array.from(instruction.data ?? [])).toEqual([1, vaultBump]);
+      expect(Array.from(instruction.data ?? [])).toEqual([1]);
     });
   });
 
@@ -877,6 +1256,57 @@ describe("Exposed Instructions (@solana/kit)", () => {
 
       expect(instruction.accounts).toHaveLength(9);
       expect(instruction.data).toEqual(new Uint8Array([19]));
+    });
+  });
+
+  describe("delegateEataPermissionIx (Ephemeral SPL Token Program)", () => {
+    it("should serialize only the discriminator", async () => {
+      const instruction = await delegateEataPermissionIx(
+        mockAddress,
+        differentAddress,
+        mockAddress,
+      );
+
+      expect(Array.from(instruction.data ?? [])).toEqual([7]);
+    });
+  });
+
+  describe("initEphemeralAtaIx (Ephemeral SPL Token Program)", () => {
+    it("should serialize only the discriminator", () => {
+      const instruction = initEphemeralAtaIx(
+        mockAddress,
+        differentAddress,
+        mockAddress,
+        differentAddress,
+      );
+
+      expect(Array.from(instruction.data ?? [])).toEqual([0]);
+    });
+  });
+
+  describe("withdrawSplIx (Ephemeral SPL Token Program)", () => {
+    it("should encode only discriminator plus amount", async () => {
+      const owner = address("11111111111111111111111111111113");
+      const mint = address("11111111111111111111111111111114");
+      const instruction = await withdrawSplIx(owner, mint, 1n);
+
+      expect(instruction.data).toHaveLength(9);
+      expect(instruction.data?.[0]).toBe(3);
+
+      const data = instruction.data;
+      expect(data).toBeDefined();
+
+      if (data === undefined) {
+        throw new Error("Expected withdraw instruction data");
+      }
+
+      expect(
+        new DataView(
+          data.buffer,
+          data.byteOffset,
+          data.byteLength,
+        ).getBigUint64(1, true),
+      ).toBe(1n);
     });
   });
 });

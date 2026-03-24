@@ -17,7 +17,7 @@ pinocchio-pubkey = { workspace = true, default-features = false, features = [
     "const",
 ] }
 pinocchio-system = { workspace = true, default-features = false }
-solana-address = { workspace = true, default-features = false, features = [
+solana-address = { version = ">=2, <3", default-features = false, features = [
     "curve25519",
 ] }
 solana-program = { workspace = true, default-features = false }

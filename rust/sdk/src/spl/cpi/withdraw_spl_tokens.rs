@@ -15,17 +15,16 @@ pub struct WithdrawSplTokens<'a> {
     pub vault_ata: AccountInfo<'a>,
     pub user_ata: AccountInfo<'a>,
     pub token_program: AccountInfo<'a>,
-    pub eata_bump: u8,
+    pub vault_bump: u8,
     pub amount: u64,
 }
 
 impl<'a> WithdrawSplTokens<'a> {
     #[inline(always)]
     pub fn instruction(&self) -> Instruction {
-        let mut data = Vec::with_capacity(10);
+        let mut data = Vec::with_capacity(9);
         data.push(EphemeralSplDiscriminator::WithdrawSplTokens as u8);
         data.extend_from_slice(self.amount.to_le_bytes().as_ref());
-        data.push(self.eata_bump);
         Instruction {
             program_id: ESPL_TOKEN_PROGRAM_ID,
             accounts: vec![

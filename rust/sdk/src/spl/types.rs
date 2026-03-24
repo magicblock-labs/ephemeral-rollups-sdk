@@ -2,6 +2,7 @@ use crate::{
     consts::ESPL_TOKEN_PROGRAM_ID,
     solana_compat::solana::{ProgramError, Pubkey},
 };
+use spl_associated_token_account_interface::address::get_associated_token_address;
 
 /// Internal representation of a token account data.
 #[repr(C)]
@@ -71,4 +72,34 @@ impl GlobalVault {
             ),
         })
     }
+}
+
+pub fn find_rent_pda() -> (Pubkey, u8) {
+    Pubkey::find_program_address(&[b"rent"], &ESPL_TOKEN_PROGRAM_ID)
+}
+
+pub fn find_vault_ata(mint: &Pubkey, vault: &Pubkey) -> Pubkey {
+    get_associated_token_address(vault, mint)
+}
+
+pub fn find_shuttle_ephemeral_ata(owner: &Pubkey, mint: &Pubkey, shuttle_id: u32) -> (Pubkey, u8) {
+    Pubkey::find_program_address(
+        &[owner.as_ref(), mint.as_ref(), &shuttle_id.to_le_bytes()],
+        &ESPL_TOKEN_PROGRAM_ID,
+    )
+}
+
+pub fn find_shuttle_ata(shuttle_ephemeral_ata: &Pubkey, mint: &Pubkey) -> (Pubkey, u8) {
+    Pubkey::find_program_address(
+        &[shuttle_ephemeral_ata.as_ref(), mint.as_ref()],
+        &ESPL_TOKEN_PROGRAM_ID,
+    )
+}
+
+pub fn find_shuttle_wallet_ata(mint: &Pubkey, shuttle_ephemeral_ata: &Pubkey) -> Pubkey {
+    get_associated_token_address(shuttle_ephemeral_ata, mint)
+}
+
+pub fn find_transfer_queue(mint: &Pubkey) -> (Pubkey, u8) {
+    Pubkey::find_program_address(&[b"queue", mint.as_ref()], &ESPL_TOKEN_PROGRAM_ID)
 }

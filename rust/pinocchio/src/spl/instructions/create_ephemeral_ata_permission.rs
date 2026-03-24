@@ -15,7 +15,6 @@ pub struct CreateEphemeralAtaPermission<'a> {
     pub payer: &'a AccountView,
     pub system_program: &'a AccountView,
     pub permission_program: &'a AccountView,
-    pub eata_bump: u8,
     pub flag_byte: u8,
 }
 
@@ -48,7 +47,6 @@ impl<'a> CreateEphemeralAtaPermission<'a> {
 
         let instruction_data = [
             EphemeralSplDiscriminator::CreateEphemeralAtaPermission as u8,
-            self.eata_bump,
             self.flag_byte,
         ];
 

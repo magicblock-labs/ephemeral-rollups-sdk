@@ -4,6 +4,9 @@ import {
   SystemProgram,
   AccountInfo,
 } from "@solana/web3.js";
+import { blake2b } from "@noble/hashes/blake2b";
+import { edwardsToMontgomeryPub } from "@noble/curves/ed25519";
+import * as nacl from "tweetnacl";
 
 import {
   DELEGATION_PROGRAM_ID,
@@ -18,6 +21,11 @@ import {
   delegationMetadataPdaFromDelegatedAccount,
   permissionPdaFromAccount,
 } from "../../pda.js";
+import {
+  depositAndQueueTransferIx,
+  deriveTransferQueue,
+  initTransferQueueIx,
+} from "./transferQueue.js";
 
 // Minimal SPL Token helpers (vendored) to avoid importing @solana/spl-token.
 // This prevents bundlers from pulling transitive deps like spl-token-group and
@@ -30,6 +38,7 @@ const TOKEN_PROGRAM_ID = new PublicKey(
 const ASSOCIATED_TOKEN_PROGRAM_ID = new PublicKey(
   "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL",
 );
+const QUEUED_TRANSFER_FLAG_CREATE_IDEMPOTENT_ATA = 1 << 0;
 
 // Derive the Associated Token Account for a given mint/owner pair. Mirrors the
 // behavior of @solana/spl-token's getAssociatedTokenAddressSync.
@@ -78,6 +87,99 @@ function createAssociatedTokenAccountIdempotentInstruction(
     ],
     data,
   });
+}
+
+function createTransferInstruction(
+  source: PublicKey,
+  destination: PublicKey,
+  owner: PublicKey,
+  amount: bigint,
+  multiSigners: PublicKey[] = [],
+  programId: PublicKey = TOKEN_PROGRAM_ID,
+): TransactionInstruction {
+  const data = Buffer.alloc(9);
+  data[0] = 3;
+  data.writeBigUInt64LE(amount, 1);
+
+  const keys = [
+    { pubkey: source, isSigner: false, isWritable: true },
+    { pubkey: destination, isSigner: false, isWritable: true },
+  ];
+
+  if (multiSigners.length === 0) {
+    keys.push({ pubkey: owner, isSigner: true, isWritable: false });
+  } else {
+    keys.push({ pubkey: owner, isSigner: false, isWritable: false });
+    for (const signer of multiSigners) {
+      keys.push({ pubkey: signer, isSigner: true, isWritable: false });
+    }
+  }
+
+  return new TransactionInstruction({
+    programId,
+    keys,
+    data,
+  });
+}
+
+function encryptEd25519Recipient(
+  plaintext: Uint8Array,
+  recipient: PublicKey,
+): Buffer {
+  const recipientX25519 = edwardsToMontgomeryPub(recipient.toBytes());
+  const ephemeral = nacl.box.keyPair();
+  const nonce = blake2b(
+    Buffer.concat([
+      Buffer.from(ephemeral.publicKey),
+      Buffer.from(recipientX25519),
+    ]),
+    { dkLen: nacl.box.nonceLength },
+  );
+  const ciphertext = nacl.box(
+    plaintext,
+    nonce,
+    recipientX25519,
+    ephemeral.secretKey,
+  );
+
+  return Buffer.concat([
+    Buffer.from(ephemeral.publicKey),
+    Buffer.from(ciphertext),
+  ]);
+}
+
+function encodeLengthPrefixedBytes(bytes: Uint8Array): Buffer {
+  if (bytes.length > 0xff) {
+    throw new Error("encrypted private transfer payload exceeds u8 length");
+  }
+
+  return Buffer.concat([Buffer.from([bytes.length]), Buffer.from(bytes)]);
+}
+
+function packPrivateTransferSuffix(
+  minDelayMs: bigint,
+  maxDelayMs: bigint,
+  split: number,
+  flags: number = 0,
+): Buffer {
+  const suffix = Buffer.alloc(8 + 8 + 4 + 1);
+  suffix.writeBigUInt64LE(minDelayMs, 0);
+  suffix.writeBigUInt64LE(maxDelayMs, 8);
+  suffix.writeUInt32LE(split, 16);
+  suffix.writeUInt8(flags, 20);
+  return suffix;
+}
+
+function u32leBuffer(value: number): Buffer {
+  const out = Buffer.alloc(4);
+  out.writeUInt32LE(value, 0);
+  return out;
+}
+
+function u64leBuffer(value: bigint): Buffer {
+  const out = Buffer.alloc(8);
+  out.writeBigUInt64LE(value, 0);
+  return out;
 }
 
 // ---------------------------------------------------------------------------
@@ -193,6 +295,17 @@ export function deriveVault(mint: PublicKey): [PublicKey, number] {
 }
 
 /**
+ * Derive global rent PDA
+ * @returns The rent PDA account and bump
+ */
+export function deriveRentPda(): [PublicKey, number] {
+  return PublicKey.findProgramAddressSync(
+    [Buffer.from("rent")],
+    EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
+  );
+}
+
+/**
  * Derive vault ATA
  * @param mint - The mint account
  * @param vault - The vault account
@@ -270,7 +383,6 @@ export function deriveShuttleWalletAta(
  * @param owner - The owner account
  * @param mint - The mint account
  * @param payer - The payer account
- * @param bump - The bump
  * @returns The init ephemeral ATA instruction
  */
 export function initEphemeralAtaIx(
@@ -278,7 +390,6 @@ export function initEphemeralAtaIx(
   owner: PublicKey,
   mint: PublicKey,
   payer: PublicKey,
-  bump: number,
 ): TransactionInstruction {
   return new TransactionInstruction({
     programId: EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
@@ -289,7 +400,7 @@ export function initEphemeralAtaIx(
       { pubkey: mint, isSigner: false, isWritable: false },
       { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
     ],
-    data: Buffer.from([0, bump]),
+    data: Buffer.from([0]),
   });
 }
 
@@ -320,14 +431,12 @@ export function initVaultAtaIx(
  * @param vault - The vault account
  * @param mint - The mint account
  * @param payer - The payer account
- * @param bump - The bump
  * @returns The init vault account instruction
  */
 export function initVaultIx(
   vault: PublicKey,
   mint: PublicKey,
   payer: PublicKey,
-  bump: number,
 ): TransactionInstruction {
   const [vaultEphemeralAta] = deriveEphemeralAta(vault, mint);
   const vaultAta = deriveVaultAta(mint, vault);
@@ -347,7 +456,28 @@ export function initVaultIx(
       },
       { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
     ],
-    data: Buffer.from([1, bump]),
+    data: Buffer.from([1]),
+  });
+}
+
+/**
+ * Init global rent PDA
+ * @param payer - The payer account
+ * @param rentPda - The rent PDA account
+ * @returns The init rent PDA instruction
+ */
+export function initRentPdaIx(
+  payer: PublicKey,
+  rentPda: PublicKey,
+): TransactionInstruction {
+  return new TransactionInstruction({
+    programId: EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
+    keys: [
+      { pubkey: payer, isSigner: true, isWritable: true },
+      { pubkey: rentPda, isSigner: false, isWritable: true },
+      { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+    ],
+    data: Buffer.from([23]),
   });
 }
 
@@ -421,12 +551,11 @@ export function depositSplTokensIx(
 export function delegateEphemeralAtaIx(
   payer: PublicKey,
   ephemeralAta: PublicKey,
-  bump: number,
   validator?: PublicKey,
 ): TransactionInstruction {
   const data = validator
-    ? Buffer.concat([Buffer.from([4, bump]), validator.toBuffer()])
-    : Buffer.from([4, bump]);
+    ? Buffer.concat([Buffer.from([4]), validator.toBuffer()])
+    : Buffer.from([4]);
   return new TransactionInstruction({
     programId: EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
     keys: [
@@ -482,7 +611,6 @@ export function initShuttleEphemeralAtaIx(
   owner: PublicKey,
   mint: PublicKey,
   shuttleId: number,
-  bump: number,
 ): TransactionInstruction {
   if (
     !Number.isInteger(shuttleId) ||
@@ -492,17 +620,16 @@ export function initShuttleEphemeralAtaIx(
     throw new Error("shuttleId must fit in u32");
   }
 
-  const data = Buffer.alloc(6);
+  const data = Buffer.alloc(5);
   data[0] = 11;
   data.writeUInt32LE(shuttleId, 1);
-  data[5] = bump;
 
   return new TransactionInstruction({
     programId: EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
     keys: [
       { pubkey: payer, isSigner: true, isWritable: true },
       { pubkey: shuttleEphemeralAta, isSigner: false, isWritable: true },
-      { pubkey: shuttleAta, isSigner: false, isWritable: false },
+      { pubkey: shuttleAta, isSigner: false, isWritable: true },
       { pubkey: shuttleWalletAta, isSigner: false, isWritable: true },
       { pubkey: owner, isSigner: false, isWritable: false },
       { pubkey: mint, isSigner: false, isWritable: false },
@@ -531,19 +658,18 @@ export function delegateShuttleEphemeralAtaIx(
   payer: PublicKey,
   shuttleEphemeralAta: PublicKey,
   shuttleAta: PublicKey,
-  bump: number,
   validator?: PublicKey,
 ): TransactionInstruction {
   const data = validator
-    ? Buffer.concat([Buffer.from([13, bump]), validator.toBuffer()])
-    : Buffer.from([13, bump]);
+    ? Buffer.concat([Buffer.from([13]), validator.toBuffer()])
+    : Buffer.from([13]);
 
   return new TransactionInstruction({
     programId: EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
     keys: [
       { pubkey: payer, isSigner: true, isWritable: true },
       { pubkey: shuttleEphemeralAta, isSigner: false, isWritable: false },
-      { pubkey: shuttleAta, isSigner: false, isWritable: false },
+      { pubkey: shuttleAta, isSigner: false, isWritable: true },
       {
         pubkey: EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
         isSigner: false,
@@ -569,6 +695,307 @@ export function delegateShuttleEphemeralAtaIx(
       },
       { pubkey: DELEGATION_PROGRAM_ID, isSigner: false, isWritable: false },
       { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+    ],
+    data,
+  });
+}
+
+/**
+ * Initialize shuttle metadata/EATA/wallet ATA, deposit into the shuttle EATA,
+ * then delegate it with implicit merge and cleanup.
+ * @param payer - The payer account
+ * @param shuttleEphemeralAta - The shuttle metadata account
+ * @param shuttleAta - The shuttle EATA account
+ * @param owner - The shuttle owner signer and deposit authority
+ * @param sourceAta - The owner source token account
+ * @param destinationAta - The destination token account for the merge
+ * @param shuttleWalletAta - The shuttle wallet ATA account
+ * @param mint - The mint account
+ * @param shuttleId - The shuttle id (u32)
+ * @param bump - The shuttle metadata bump
+ * @param amount - The amount to deposit before delegation
+ * @param validator - Optional validator pubkey
+ * @returns The setup+delegate shuttle-with-merge instruction
+ */
+export function setupAndDelegateShuttleEphemeralAtaWithMergeIx(
+  payer: PublicKey,
+  shuttleEphemeralAta: PublicKey,
+  shuttleAta: PublicKey,
+  owner: PublicKey,
+  sourceAta: PublicKey,
+  destinationAta: PublicKey,
+  shuttleWalletAta: PublicKey,
+  mint: PublicKey,
+  shuttleId: number,
+  amount: bigint,
+  validator?: PublicKey,
+): TransactionInstruction {
+  if (
+    !Number.isInteger(shuttleId) ||
+    shuttleId < 0 ||
+    shuttleId > 0xffff_ffff
+  ) {
+    throw new Error("shuttleId must fit in u32");
+  }
+
+  const [rentPda] = deriveRentPda();
+  const [vault] = deriveVault(mint);
+  const vaultAta = deriveVaultAta(mint, vault);
+
+  const data = validator ? Buffer.alloc(45) : Buffer.alloc(13);
+  data[0] = 24;
+  data.writeUInt32LE(shuttleId, 1);
+  data.writeBigUInt64LE(amount, 5);
+  if (validator) {
+    validator.toBuffer().copy(data, 13);
+  }
+
+  return new TransactionInstruction({
+    programId: EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
+    keys: [
+      { pubkey: payer, isSigner: true, isWritable: true },
+      { pubkey: rentPda, isSigner: false, isWritable: true },
+      { pubkey: shuttleEphemeralAta, isSigner: false, isWritable: true },
+      { pubkey: shuttleAta, isSigner: false, isWritable: true },
+      { pubkey: shuttleWalletAta, isSigner: false, isWritable: true },
+      { pubkey: owner, isSigner: true, isWritable: false },
+      {
+        pubkey: EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
+        isSigner: false,
+        isWritable: false,
+      },
+      {
+        pubkey: delegateBufferPdaFromDelegatedAccountAndOwnerProgram(
+          shuttleAta,
+          EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
+        ),
+        isSigner: false,
+        isWritable: true,
+      },
+      {
+        pubkey: delegationRecordPdaFromDelegatedAccount(shuttleAta),
+        isSigner: false,
+        isWritable: true,
+      },
+      {
+        pubkey: delegationMetadataPdaFromDelegatedAccount(shuttleAta),
+        isSigner: false,
+        isWritable: true,
+      },
+      { pubkey: DELEGATION_PROGRAM_ID, isSigner: false, isWritable: false },
+      {
+        pubkey: ASSOCIATED_TOKEN_PROGRAM_ID,
+        isSigner: false,
+        isWritable: false,
+      },
+      { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+      { pubkey: destinationAta, isSigner: false, isWritable: true },
+      { pubkey: mint, isSigner: false, isWritable: false },
+      { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
+      { pubkey: vault, isSigner: false, isWritable: false },
+      { pubkey: sourceAta, isSigner: false, isWritable: true },
+      { pubkey: vaultAta, isSigner: false, isWritable: true },
+    ],
+    data,
+  });
+}
+
+/**
+ * Initialize shuttle metadata/EATA/wallet ATA, deposit into the shuttle EATA,
+ * then delegate it with implicit merge, cleanup, and delayed private transfer.
+ * The destination owner is only carried inside the encrypted post-delegation action
+ * and is not passed as a cleartext account to this outer instruction.
+ */
+export function depositAndDelegateShuttleEphemeralAtaWithMergeAndPrivateTransferIx(
+  payer: PublicKey,
+  shuttleEphemeralAta: PublicKey,
+  shuttleAta: PublicKey,
+  owner: PublicKey,
+  sourceAta: PublicKey,
+  destinationOwner: PublicKey,
+  shuttleWalletAta: PublicKey,
+  mint: PublicKey,
+  shuttleId: number,
+  amount: bigint,
+  minDelayMs: bigint,
+  maxDelayMs: bigint,
+  split: number,
+  validator?: PublicKey,
+): TransactionInstruction {
+  if (
+    !Number.isInteger(shuttleId) ||
+    shuttleId < 0 ||
+    shuttleId > 0xffff_ffff
+  ) {
+    throw new Error("shuttleId must fit in u32");
+  }
+  if (!Number.isInteger(split) || split <= 0 || split > 0xffff_ffff) {
+    throw new Error("split must fit in u32");
+  }
+  if (amount < 0n || minDelayMs < 0n || maxDelayMs < 0n) {
+    throw new Error("amount and delays must be non-negative");
+  }
+  if (maxDelayMs < minDelayMs) {
+    throw new Error("maxDelayMs must be greater than or equal to minDelayMs");
+  }
+  if (validator == null) {
+    throw new Error("validator is required for encrypted private transfers");
+  }
+
+  const [rentPda] = deriveRentPda();
+  const [vault] = deriveVault(mint);
+  const vaultAta = deriveVaultAta(mint, vault);
+  const [queue] = deriveTransferQueue(mint);
+  const encryptedDestination = encryptEd25519Recipient(
+    destinationOwner.toBytes(),
+    validator,
+  );
+  const encryptedSuffix = encryptEd25519Recipient(
+    packPrivateTransferSuffix(
+      minDelayMs,
+      maxDelayMs,
+      split,
+      QUEUED_TRANSFER_FLAG_CREATE_IDEMPOTENT_ATA,
+    ),
+    validator,
+  );
+  const data = Buffer.concat([
+    Buffer.from([25]),
+    u32leBuffer(shuttleId),
+    u64leBuffer(amount),
+    encodeLengthPrefixedBytes(validator.toBytes()),
+    encodeLengthPrefixedBytes(encryptedDestination),
+    encodeLengthPrefixedBytes(encryptedSuffix),
+  ]);
+
+  return new TransactionInstruction({
+    programId: EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
+    keys: [
+      { pubkey: payer, isSigner: true, isWritable: true },
+      { pubkey: rentPda, isSigner: false, isWritable: true },
+      { pubkey: shuttleEphemeralAta, isSigner: false, isWritable: true },
+      { pubkey: shuttleAta, isSigner: false, isWritable: true },
+      { pubkey: shuttleWalletAta, isSigner: false, isWritable: true },
+      { pubkey: owner, isSigner: true, isWritable: false },
+      {
+        pubkey: EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
+        isSigner: false,
+        isWritable: false,
+      },
+      {
+        pubkey: delegateBufferPdaFromDelegatedAccountAndOwnerProgram(
+          shuttleAta,
+          EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
+        ),
+        isSigner: false,
+        isWritable: true,
+      },
+      {
+        pubkey: delegationRecordPdaFromDelegatedAccount(shuttleAta),
+        isSigner: false,
+        isWritable: true,
+      },
+      {
+        pubkey: delegationMetadataPdaFromDelegatedAccount(shuttleAta),
+        isSigner: false,
+        isWritable: true,
+      },
+      { pubkey: DELEGATION_PROGRAM_ID, isSigner: false, isWritable: false },
+      {
+        pubkey: ASSOCIATED_TOKEN_PROGRAM_ID,
+        isSigner: false,
+        isWritable: false,
+      },
+      { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+      { pubkey: mint, isSigner: false, isWritable: false },
+      { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
+      { pubkey: vault, isSigner: false, isWritable: false },
+      { pubkey: sourceAta, isSigner: false, isWritable: true },
+      { pubkey: vaultAta, isSigner: false, isWritable: true },
+      { pubkey: queue, isSigner: false, isWritable: true },
+    ],
+    data,
+  });
+}
+
+/**
+ * Initialize shuttle metadata/EATA/wallet ATA, delegate it, then route a
+ * withdraw round-trip through the delegated shuttle.
+ */
+export function withdrawThroughDelegatedShuttleWithMergeIx(
+  payer: PublicKey,
+  shuttleEphemeralAta: PublicKey,
+  shuttleAta: PublicKey,
+  owner: PublicKey,
+  ownerAta: PublicKey,
+  shuttleWalletAta: PublicKey,
+  mint: PublicKey,
+  shuttleId: number,
+  amount: bigint,
+  validator?: PublicKey,
+): TransactionInstruction {
+  if (
+    !Number.isInteger(shuttleId) ||
+    shuttleId < 0 ||
+    shuttleId > 0xffff_ffff
+  ) {
+    throw new Error("shuttleId must fit in u32");
+  }
+  if (amount < 0n) {
+    throw new Error("amount must be non-negative");
+  }
+
+  const [rentPda] = deriveRentPda();
+  const data = validator ? Buffer.alloc(45) : Buffer.alloc(13);
+  data[0] = 26;
+  data.writeUInt32LE(shuttleId, 1);
+  data.writeBigUInt64LE(amount, 5);
+  if (validator) {
+    validator.toBuffer().copy(data, 13);
+  }
+
+  return new TransactionInstruction({
+    programId: EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
+    keys: [
+      { pubkey: payer, isSigner: true, isWritable: true },
+      { pubkey: rentPda, isSigner: false, isWritable: true },
+      { pubkey: shuttleEphemeralAta, isSigner: false, isWritable: true },
+      { pubkey: shuttleAta, isSigner: false, isWritable: true },
+      { pubkey: shuttleWalletAta, isSigner: false, isWritable: true },
+      { pubkey: owner, isSigner: true, isWritable: false },
+      {
+        pubkey: EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
+        isSigner: false,
+        isWritable: false,
+      },
+      {
+        pubkey: delegateBufferPdaFromDelegatedAccountAndOwnerProgram(
+          shuttleAta,
+          EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
+        ),
+        isSigner: false,
+        isWritable: true,
+      },
+      {
+        pubkey: delegationRecordPdaFromDelegatedAccount(shuttleAta),
+        isSigner: false,
+        isWritable: true,
+      },
+      {
+        pubkey: delegationMetadataPdaFromDelegatedAccount(shuttleAta),
+        isSigner: false,
+        isWritable: true,
+      },
+      { pubkey: DELEGATION_PROGRAM_ID, isSigner: false, isWritable: false },
+      {
+        pubkey: ASSOCIATED_TOKEN_PROGRAM_ID,
+        isSigner: false,
+        isWritable: false,
+      },
+      { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+      { pubkey: ownerAta, isSigner: false, isWritable: true },
+      { pubkey: mint, isSigner: false, isWritable: false },
+      { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
     ],
     data,
   });
@@ -652,7 +1079,7 @@ export function withdrawSplIx(
   amount: bigint,
 ): TransactionInstruction {
   const [ephemeralAta] = deriveEphemeralAta(owner, mint);
-  const [vault, vaultBump] = deriveVault(mint);
+  const [vault] = deriveVault(mint);
   const vaultAta = deriveVaultAta(mint, vault);
   const userDestAta = getAssociatedTokenAddressSync(mint, owner);
 
@@ -667,8 +1094,8 @@ export function withdrawSplIx(
       { pubkey: userDestAta, isSigner: false, isWritable: true },
       { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
     ],
-    // [WITHDRAW_OPCODE, amount(le u64), vault_bump]
-    data: encodeAmountInstructionData(3, amount, vaultBump),
+    // [WITHDRAW_OPCODE, amount(le u64)]
+    data: encodeAmountInstructionData(3, amount),
   });
 }
 
@@ -729,7 +1156,6 @@ export function undelegateIx(
 export function createEataPermissionIx(
   ephemeralAta: PublicKey,
   payer: PublicKey,
-  bump: number,
   flags: number = 0,
 ): TransactionInstruction {
   const permission = permissionPdaFromAccount(ephemeralAta);
@@ -743,7 +1169,7 @@ export function createEataPermissionIx(
       { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
       { pubkey: PERMISSION_PROGRAM_ID, isSigner: false, isWritable: false },
     ],
-    data: Buffer.from([6, bump, flags]),
+    data: Buffer.from([6, flags]),
   });
 }
 
@@ -758,7 +1184,6 @@ export function createEataPermissionIx(
 export function resetEataPermissionIx(
   ephemeralAta: PublicKey,
   payer: PublicKey,
-  bump: number,
   flags: number = 0,
 ): TransactionInstruction {
   const permission = permissionPdaFromAccount(ephemeralAta);
@@ -771,7 +1196,7 @@ export function resetEataPermissionIx(
       { pubkey: payer, isSigner: true, isWritable: false },
       { pubkey: PERMISSION_PROGRAM_ID, isSigner: false, isWritable: false },
     ],
-    data: Buffer.from([9, bump, flags]),
+    data: Buffer.from([9, flags]),
   });
 }
 
@@ -779,14 +1204,12 @@ export function resetEataPermissionIx(
  * Delegate EATA permission
  * @param payer - The payer account
  * @param ephemeralAta - The ephemeral ATA account
- * @param bump - The bump
  * @param validator - The validator account
  * @returns The delegate EATA permission instruction
  */
 export function delegateEataPermissionIx(
   payer: PublicKey,
   ephemeralAta: PublicKey,
-  bump: number,
   validator: PublicKey,
 ): TransactionInstruction {
   const permission = permissionPdaFromAccount(ephemeralAta);
@@ -820,7 +1243,7 @@ export function delegateEataPermissionIx(
       { pubkey: DELEGATION_PROGRAM_ID, isSigner: false, isWritable: false },
       { pubkey: validator, isSigner: false, isWritable: false },
     ],
-    data: Buffer.from([7, bump]),
+    data: Buffer.from([7]),
   });
 }
 
@@ -866,6 +1289,50 @@ export interface DelegateSplOptions {
   private?: boolean;
 }
 
+export interface DelegateSplWithPrivateTransferOptions
+  extends Omit<DelegateSplOptions, "private"> {
+  minDelayMs?: bigint;
+  maxDelayMs?: bigint;
+  split?: number;
+  initTransferQueueIfMissing?: boolean;
+}
+
+export interface WithdrawSplOptions
+  extends Omit<DelegateSplOptions, "private" | "initVaultIfMissing"> {}
+
+export type TransferBalance = "base" | "ephemeral";
+
+export type TransferVisibility = "public" | "private";
+
+export interface TransferSplPrivateOptions {
+  minDelayMs?: bigint;
+  maxDelayMs?: bigint;
+  split?: number;
+}
+
+export interface TransferSplOptions {
+  visibility: TransferVisibility;
+  fromBalance: TransferBalance;
+  toBalance: TransferBalance;
+  payer?: PublicKey;
+  validator?: PublicKey;
+  initIfMissing?: boolean;
+  initAtasIfMissing?: boolean;
+  initVaultIfMissing?: boolean;
+  shuttleId?: number;
+  privateTransfer?: TransferSplPrivateOptions;
+}
+
+function randomShuttleId(): number {
+  const cryptoObj = (globalThis as any)?.crypto;
+  if (cryptoObj?.getRandomValues !== undefined) {
+    const buf = new Uint32Array(1);
+    cryptoObj.getRandomValues(buf);
+    return buf[0];
+  }
+  return Math.floor(Math.random() * 0x1_0000_0000);
+}
+
 async function buildDelegateSplInstructions(
   owner: PublicKey,
   mint: PublicKey,
@@ -880,28 +1347,21 @@ async function buildDelegateSplInstructions(
 
   const instructions: TransactionInstruction[] = [];
 
-  const [ephemeralAta, eataBump] = deriveEphemeralAta(owner, mint);
-  const [vault, vaultBump] = deriveVault(mint);
-  const [vaultEphemeralAta, vaultEataBump] = deriveEphemeralAta(vault, mint);
+  const [ephemeralAta] = deriveEphemeralAta(owner, mint);
+  const [vault] = deriveVault(mint);
+  const [vaultEphemeralAta] = deriveEphemeralAta(vault, mint);
   const vaultAta = deriveVaultAta(mint, vault);
   const ownerAta = getAssociatedTokenAddressSync(mint, owner);
 
   if (initIfMissing) {
-    instructions.push(
-      initEphemeralAtaIx(ephemeralAta, owner, mint, payer, eataBump),
-    );
+    instructions.push(initEphemeralAtaIx(ephemeralAta, owner, mint, payer));
   }
 
   if (initVaultIfMissing) {
     instructions.push(
-      initVaultIx(vault, mint, payer, vaultBump),
+      initVaultIx(vault, mint, payer),
       initVaultAtaIx(payer, vaultAta, vault, mint),
-      delegateEphemeralAtaIx(
-        payer,
-        vaultEphemeralAta,
-        vaultEataBump,
-        validator,
-      ),
+      delegateEphemeralAtaIx(payer, vaultEphemeralAta, validator),
     );
   }
 
@@ -918,12 +1378,10 @@ async function buildDelegateSplInstructions(
   );
 
   if (isPrivate) {
-    instructions.push(createEataPermissionIx(ephemeralAta, payer, eataBump));
+    instructions.push(createEataPermissionIx(ephemeralAta, payer));
   }
 
-  instructions.push(
-    delegateEphemeralAtaIx(payer, ephemeralAta, eataBump, validator),
-  );
+  instructions.push(delegateEphemeralAtaIx(payer, ephemeralAta, validator));
 
   return instructions;
 }
@@ -936,51 +1394,33 @@ async function buildIdempotentDelegateSplInstructions(
 ): Promise<TransactionInstruction[]> {
   const payer = opts?.payer ?? owner;
   const validator = opts?.validator;
+  const initIfMissing = opts?.initIfMissing ?? true;
   const initVaultIfMissing = opts?.initVaultIfMissing ?? false;
   const initAtasIfMissing = opts?.initAtasIfMissing ?? false;
   const isPrivate = opts?.private ?? false;
-
-  const randomShuttleId = (): number => {
-    const cryptoObj = (globalThis as any)?.crypto;
-    if (cryptoObj?.getRandomValues !== undefined) {
-      const buf = new Uint32Array(1);
-      cryptoObj.getRandomValues(buf);
-      return buf[0];
-    }
-    return Math.floor(Math.random() * 0x1_0000_0000);
-  };
-
   const shuttleId = opts?.shuttleId ?? randomShuttleId();
 
   const instructions: TransactionInstruction[] = [];
 
-  const [ephemeralAta, eataBump] = deriveEphemeralAta(owner, mint);
-  const [vault, vaultBump] = deriveVault(mint);
-  const [vaultEphemeralAta, vaultEataBump] = deriveEphemeralAta(vault, mint);
+  const [ephemeralAta] = deriveEphemeralAta(owner, mint);
+  const [vault] = deriveVault(mint);
+  const [vaultEphemeralAta] = deriveEphemeralAta(vault, mint);
   const vaultAta = deriveVaultAta(mint, vault);
   const ownerAta = getAssociatedTokenAddressSync(mint, owner);
 
-  const [shuttleEphemeralAta, shuttleBump] = deriveShuttleEphemeralAta(
+  const [shuttleEphemeralAta] = deriveShuttleEphemeralAta(
     owner,
     mint,
     shuttleId,
   );
-  const [shuttleAta, shuttleAtaBump] = deriveShuttleAta(
-    shuttleEphemeralAta,
-    mint,
-  );
+  const [shuttleAta] = deriveShuttleAta(shuttleEphemeralAta, mint);
   const shuttleWalletAta = deriveShuttleWalletAta(mint, shuttleEphemeralAta);
 
   if (initVaultIfMissing) {
     instructions.push(
-      initVaultIx(vault, mint, payer, vaultBump),
+      initVaultIx(vault, mint, payer),
       initVaultAtaIx(payer, vaultAta, vault, mint),
-      delegateEphemeralAtaIx(
-        payer,
-        vaultEphemeralAta,
-        vaultEataBump,
-        validator,
-      ),
+      delegateEphemeralAtaIx(payer, vaultEphemeralAta, validator),
     );
   }
 
@@ -992,60 +1432,54 @@ async function buildIdempotentDelegateSplInstructions(
         owner,
         mint,
       ),
-      createAssociatedTokenAccountIdempotentInstruction(
-        payer,
-        shuttleWalletAta,
-        shuttleEphemeralAta,
-        mint,
-      ),
     );
   }
 
-  instructions.push(
-    initEphemeralAtaIx(ephemeralAta, owner, mint, payer, eataBump),
-  );
-
-  if (isPrivate) {
-    instructions.push(createEataPermissionIx(ephemeralAta, payer, eataBump));
+  if (initIfMissing) {
+    instructions.push(initEphemeralAtaIx(ephemeralAta, owner, mint, payer));
   }
 
-  instructions.push(
-    delegateEphemeralAtaIx(payer, ephemeralAta, eataBump, validator),
-    initShuttleEphemeralAtaIx(
-      payer,
-      shuttleEphemeralAta,
-      shuttleAta,
-      shuttleWalletAta,
-      owner,
-      mint,
-      shuttleId,
-      shuttleBump,
-    ),
-  );
+  if (isPrivate) {
+    instructions.push(createEataPermissionIx(ephemeralAta, payer));
+  }
+
+  instructions.push(delegateEphemeralAtaIx(payer, ephemeralAta, validator));
 
   if (amount > 0n) {
     instructions.push(
-      depositSplTokensIx(
+      setupAndDelegateShuttleEphemeralAtaWithMergeIx(
+        payer,
+        shuttleEphemeralAta,
         shuttleAta,
-        vault,
-        mint,
-        ownerAta,
-        vaultAta,
         owner,
+        ownerAta,
+        ownerAta,
+        shuttleWalletAta,
+        mint,
+        shuttleId,
         amount,
+        validator,
+      ),
+    );
+  } else {
+    instructions.push(
+      initShuttleEphemeralAtaIx(
+        payer,
+        shuttleEphemeralAta,
+        shuttleAta,
+        shuttleWalletAta,
+        owner,
+        mint,
+        shuttleId,
+      ),
+      delegateShuttleEphemeralAtaIx(
+        payer,
+        shuttleEphemeralAta,
+        shuttleAta,
+        validator,
       ),
     );
   }
-
-  instructions.push(
-    delegateShuttleEphemeralAtaIx(
-      payer,
-      shuttleEphemeralAta,
-      shuttleAta,
-      shuttleAtaBump,
-      validator,
-    ),
-  );
 
   return instructions;
 }
@@ -1053,9 +1487,9 @@ async function buildIdempotentDelegateSplInstructions(
 /**
  * High-level method to delegate SPL tokens.
  *
- * By default this uses the idempotent shuttle flow. Set `idempotent: false`
- * to use the legacy direct delegation flow. Set `private: true` to add
- * `createEataPermissionIx`.
+ * By default this uses the setup+deposit+delegate idempotent shuttle flow.
+ * Set `idempotent: false` to use the legacy direct delegation flow.
+ * Set `private: true` to add `createEataPermissionIx`.
  */
 export async function delegateSpl(
   owner: PublicKey,
@@ -1068,6 +1502,359 @@ export async function delegateSpl(
   }
 
   return buildIdempotentDelegateSplInstructions(owner, mint, amount, opts);
+}
+
+export async function delegateSplWithPrivateTransfer(
+  owner: PublicKey,
+  mint: PublicKey,
+  amount: bigint,
+  opts?: DelegateSplWithPrivateTransferOptions,
+): Promise<TransactionInstruction[]> {
+  const payer = opts?.payer ?? owner;
+  const validator = opts?.validator;
+  const initIfMissing = opts?.initIfMissing ?? true;
+  const initVaultIfMissing = opts?.initVaultIfMissing ?? false;
+  const initAtasIfMissing = opts?.initAtasIfMissing ?? false;
+  const initTransferQueueIfMissing = opts?.initTransferQueueIfMissing ?? false;
+  const shuttleId = opts?.shuttleId ?? randomShuttleId();
+  const minDelayMs = opts?.minDelayMs ?? 0n;
+  const maxDelayMs = opts?.maxDelayMs ?? minDelayMs;
+  const split = opts?.split ?? 1;
+
+  const instructions: TransactionInstruction[] = [];
+
+  const [ephemeralAta] = deriveEphemeralAta(owner, mint);
+  const [vault] = deriveVault(mint);
+  const [vaultEphemeralAta] = deriveEphemeralAta(vault, mint);
+  const vaultAta = deriveVaultAta(mint, vault);
+  const [queue] = deriveTransferQueue(mint);
+  const ownerAta = getAssociatedTokenAddressSync(mint, owner);
+  const [shuttleEphemeralAta] = deriveShuttleEphemeralAta(
+    owner,
+    mint,
+    shuttleId,
+  );
+  const [shuttleAta] = deriveShuttleAta(shuttleEphemeralAta, mint);
+  const shuttleWalletAta = deriveShuttleWalletAta(mint, shuttleEphemeralAta);
+
+  if (initVaultIfMissing) {
+    instructions.push(
+      initVaultIx(vault, mint, payer),
+      initVaultAtaIx(payer, vaultAta, vault, mint),
+      delegateEphemeralAtaIx(payer, vaultEphemeralAta, validator),
+    );
+  }
+
+  if (initTransferQueueIfMissing) {
+    instructions.push(initTransferQueueIx(payer, queue, mint));
+  }
+
+  if (initAtasIfMissing) {
+    instructions.push(
+      createAssociatedTokenAccountIdempotentInstruction(
+        payer,
+        ownerAta,
+        owner,
+        mint,
+      ),
+    );
+  }
+
+  if (initIfMissing) {
+    instructions.push(initEphemeralAtaIx(ephemeralAta, owner, mint, payer));
+  }
+
+  instructions.push(
+    delegateEphemeralAtaIx(payer, ephemeralAta, validator),
+    depositAndDelegateShuttleEphemeralAtaWithMergeAndPrivateTransferIx(
+      payer,
+      shuttleEphemeralAta,
+      shuttleAta,
+      owner,
+      ownerAta,
+      owner,
+      shuttleWalletAta,
+      mint,
+      shuttleId,
+      amount,
+      minDelayMs,
+      maxDelayMs,
+      split,
+      validator,
+    ),
+  );
+
+  return instructions;
+}
+
+export async function transferSpl(
+  from: PublicKey,
+  to: PublicKey,
+  mint: PublicKey,
+  amount: bigint,
+  opts: TransferSplOptions,
+): Promise<TransactionInstruction[]> {
+  const payer = opts.payer ?? from;
+  const validator = opts.validator;
+  const initIfMissing = opts.initIfMissing ?? false;
+  const initAtasIfMissing = opts.initAtasIfMissing ?? false;
+  const initVaultIfMissing = opts.initVaultIfMissing ?? false;
+  const shuttleId = opts.shuttleId ?? randomShuttleId();
+  const minDelayMs = opts.privateTransfer?.minDelayMs ?? 0n;
+  const maxDelayMs = opts.privateTransfer?.maxDelayMs ?? minDelayMs;
+  const split = opts.privateTransfer?.split ?? 1;
+
+  const fromAta = getAssociatedTokenAddressSync(mint, from);
+  const toAta = getAssociatedTokenAddressSync(mint, to);
+
+  if (opts.fromBalance === "ephemeral") {
+    switch (opts.visibility) {
+      case "private":
+        if (opts.toBalance === "base") {
+          const [queue] = deriveTransferQueue(mint);
+          const [vault] = deriveVault(mint);
+          const vaultAta = deriveVaultAta(mint, vault);
+
+          return [
+            depositAndQueueTransferIx(
+              queue,
+              vault,
+              mint,
+              fromAta,
+              vaultAta,
+              toAta,
+              from,
+              amount,
+              minDelayMs,
+              maxDelayMs,
+              split,
+            ),
+          ];
+        }
+
+        if (opts.toBalance === "ephemeral") {
+          return [createTransferInstruction(fromAta, toAta, from, amount)];
+        }
+
+        break;
+
+      case "public":
+        if (opts.toBalance === "ephemeral") {
+          return [createTransferInstruction(fromAta, toAta, from, amount)];
+        }
+
+        break;
+    }
+  }
+
+  const instructions: TransactionInstruction[] = [];
+
+  if (initVaultIfMissing) {
+    const [vault] = deriveVault(mint);
+    const [vaultEphemeralAta] = deriveEphemeralAta(vault, mint);
+    const vaultAta = deriveVaultAta(mint, vault);
+
+    instructions.push(
+      initVaultIx(vault, mint, payer),
+      initVaultAtaIx(payer, vaultAta, vault, mint),
+      delegateEphemeralAtaIx(payer, vaultEphemeralAta, validator),
+    );
+  }
+
+  if (opts.fromBalance === "base" && initAtasIfMissing) {
+    instructions.push(
+      createAssociatedTokenAccountIdempotentInstruction(
+        payer,
+        fromAta,
+        from,
+        mint,
+      ),
+    );
+  }
+
+  switch (opts.visibility) {
+    case "private":
+      if (opts.fromBalance === "base" && opts.toBalance === "base") {
+        const [shuttleEphemeralAta] = deriveShuttleEphemeralAta(
+          from,
+          mint,
+          shuttleId,
+        );
+        const [shuttleAta] = deriveShuttleAta(shuttleEphemeralAta, mint);
+        const shuttleWalletAta = deriveShuttleWalletAta(
+          mint,
+          shuttleEphemeralAta,
+        );
+
+        return [
+          ...instructions,
+          depositAndDelegateShuttleEphemeralAtaWithMergeAndPrivateTransferIx(
+            payer,
+            shuttleEphemeralAta,
+            shuttleAta,
+            from,
+            fromAta,
+            to,
+            shuttleWalletAta,
+            mint,
+            shuttleId,
+            amount,
+            minDelayMs,
+            maxDelayMs,
+            split,
+            validator,
+          ),
+        ];
+      }
+
+      if (opts.fromBalance === "base" && opts.toBalance === "ephemeral") {
+        if (initIfMissing) {
+          const [toEphemeralAta] = deriveEphemeralAta(to, mint);
+
+          instructions.push(
+            createAssociatedTokenAccountIdempotentInstruction(
+              payer,
+              toAta,
+              to,
+              mint,
+            ),
+            initEphemeralAtaIx(toEphemeralAta, to, mint, payer),
+            delegateEphemeralAtaIx(payer, toEphemeralAta, validator),
+          );
+        }
+
+        const [shuttleEphemeralAta] = deriveShuttleEphemeralAta(
+          from,
+          mint,
+          shuttleId,
+        );
+        const [shuttleAta] = deriveShuttleAta(shuttleEphemeralAta, mint);
+        const shuttleWalletAta = deriveShuttleWalletAta(
+          mint,
+          shuttleEphemeralAta,
+        );
+
+        return [
+          ...instructions,
+          setupAndDelegateShuttleEphemeralAtaWithMergeIx(
+            payer,
+            shuttleEphemeralAta,
+            shuttleAta,
+            from,
+            fromAta,
+            toAta,
+            shuttleWalletAta,
+            mint,
+            shuttleId,
+            amount,
+            validator,
+          ),
+        ];
+      }
+
+      // TODO: support private transfers from base balance to ephemeral balance.
+      break;
+
+    case "public":
+      if (opts.fromBalance === "base" && opts.toBalance === "base") {
+        return [
+          ...instructions,
+          createTransferInstruction(fromAta, toAta, from, amount),
+        ];
+      }
+
+      // TODO: support public transfers across base/ephemeral balance boundaries.
+      break;
+  }
+
+  throw new Error(
+    `transferSpl route not implemented: visibility=${opts.visibility}, fromBalance=${opts.fromBalance}, toBalance=${opts.toBalance}`,
+  );
+}
+
+async function buildIdempotentWithdrawSplInstructions(
+  owner: PublicKey,
+  mint: PublicKey,
+  amount: bigint,
+  opts?: WithdrawSplOptions,
+): Promise<TransactionInstruction[]> {
+  const payer = opts?.payer ?? owner;
+  const validator = opts?.validator;
+  const initIfMissing = opts?.initIfMissing ?? true;
+  const initAtasIfMissing = opts?.initAtasIfMissing ?? false;
+  const shuttleId = opts?.shuttleId ?? randomShuttleId();
+
+  const instructions: TransactionInstruction[] = [];
+
+  const [ephemeralAta] = deriveEphemeralAta(owner, mint);
+  const ownerAta = getAssociatedTokenAddressSync(mint, owner);
+  const [shuttleEphemeralAta] = deriveShuttleEphemeralAta(
+    owner,
+    mint,
+    shuttleId,
+  );
+  const [shuttleAta] = deriveShuttleAta(shuttleEphemeralAta, mint);
+  const shuttleWalletAta = deriveShuttleWalletAta(mint, shuttleEphemeralAta);
+
+  if (initAtasIfMissing) {
+    instructions.push(
+      createAssociatedTokenAccountIdempotentInstruction(
+        payer,
+        ownerAta,
+        owner,
+        mint,
+      ),
+    );
+  }
+
+  if (initIfMissing) {
+    instructions.push(initEphemeralAtaIx(ephemeralAta, owner, mint, payer));
+  }
+
+  instructions.push(
+    delegateEphemeralAtaIx(payer, ephemeralAta, validator),
+    withdrawThroughDelegatedShuttleWithMergeIx(
+      payer,
+      shuttleEphemeralAta,
+      shuttleAta,
+      owner,
+      ownerAta,
+      shuttleWalletAta,
+      mint,
+      shuttleId,
+      amount,
+      validator,
+    ),
+  );
+
+  return instructions;
+}
+
+export async function withdrawSpl(
+  owner: PublicKey,
+  mint: PublicKey,
+  amount: bigint,
+  opts?: WithdrawSplOptions,
+): Promise<TransactionInstruction[]> {
+  if (opts?.idempotent === false) {
+    const instructions: TransactionInstruction[] = [];
+    if (opts?.initAtasIfMissing === true) {
+      const payer = opts.payer ?? owner;
+      const ownerAta = getAssociatedTokenAddressSync(mint, owner);
+      instructions.push(
+        createAssociatedTokenAccountIdempotentInstruction(
+          payer,
+          ownerAta,
+          owner,
+          mint,
+        ),
+      );
+    }
+    instructions.push(withdrawSplIx(owner, mint, amount));
+    return instructions;
+  }
+
+  return buildIdempotentWithdrawSplInstructions(owner, mint, amount, opts);
 }
 
 // ---------------------------------------------------------------------------

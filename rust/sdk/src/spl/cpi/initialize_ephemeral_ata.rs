@@ -13,7 +13,6 @@ pub struct InitializeEphemeralAta<'a> {
     pub user: AccountInfo<'a>,
     pub mint: AccountInfo<'a>,
     pub system_program: AccountInfo<'a>,
-    pub eata_bump: u8,
 }
 
 impl<'a> InitializeEphemeralAta<'a> {
@@ -28,10 +27,7 @@ impl<'a> InitializeEphemeralAta<'a> {
                 AccountMeta::new_readonly(*self.mint.key, false),
                 AccountMeta::new_readonly(*self.system_program.key, false),
             ],
-            data: vec![
-                EphemeralSplDiscriminator::InitializeEphemeralAta as u8,
-                self.eata_bump,
-            ],
+            data: vec![EphemeralSplDiscriminator::InitializeEphemeralAta as u8],
         }
     }
 

@@ -16,7 +16,6 @@ pub struct ResetEphemeralAtaPermission<'a> {
     pub permission: &'a AccountView,
     pub owner: &'a AccountView,
     pub permission_program: &'a AccountView,
-    pub bump: u8,
     pub flag_byte: u8,
 }
 
@@ -32,7 +31,7 @@ impl<'a> ResetEphemeralAtaPermission<'a> {
 
         let mut instruction_accounts =
             [const { MaybeUninit::<InstructionAccount>::uninit() }; NUM_ACCOUNTS];
-        instruction_accounts[0].write(InstructionAccount::writable(self.eata.address()));
+        instruction_accounts[0].write(InstructionAccount::readonly(self.eata.address()));
         instruction_accounts[1].write(InstructionAccount::writable(self.permission.address()));
         instruction_accounts[2].write(InstructionAccount::readonly_signer(self.owner.address()));
         instruction_accounts[3].write(InstructionAccount::readonly(
@@ -47,7 +46,6 @@ impl<'a> ResetEphemeralAtaPermission<'a> {
 
         let instruction_data = [
             EphemeralSplDiscriminator::ResetEphemeralAtaPermission as u8,
-            self.bump,
             self.flag_byte,
         ];
 
