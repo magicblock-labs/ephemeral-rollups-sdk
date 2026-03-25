@@ -16,9 +16,12 @@ pub mod types;
 
 use crate::intent_bundle::commit::CommitIntentBuilder;
 use crate::intent_bundle::commit_and_undelegate::CommitAndUndelegateIntentBuilder;
+use args::AddActionCallbackArgs;
 pub use args::{ActionArgs, ShortAccountMeta};
 use types::MagicIntentBundle;
-pub use types::{CallHandler, CommitAndUndelegateIntent, CommitIntent, MagicIntent};
+pub use types::{
+    ActionCallback, CallHandler, CommitAndUndelegateIntent, CommitIntent, MagicIntent,
+};
 
 const MAX_ACTIONS_NUM: usize = 10;
 const _: () = assert!(MAX_ACTIONS_NUM <= u8::MAX as usize);
@@ -26,6 +29,9 @@ const _: () = assert!(MAX_ACTIONS_NUM <= u8::MAX as usize);
 /// Bincode 1.x u32 LE discriminant for `MagicBlockInstruction::ScheduleIntentBundle` (variant index 11).
 const SCHEDULE_INTENT_BUNDLE_DISCRIMINANT: [u8; 4] = 11u32.to_le_bytes();
 const OFFSET: usize = SCHEDULE_INTENT_BUNDLE_DISCRIMINANT.len();
+
+/// Bincode 1.x u32 LE discriminant for `MagicBlockInstruction::AddActionCallback` (variant index 23).
+const ADD_ACTION_CALLBACK_DISCRIMINANT: [u8; 4] = 23u32.to_le_bytes();
 
 /// Builds a single `MagicBlockInstruction::ScheduleIntentBundle` instruction by aggregating
 /// multiple independent intents (base actions, commits, commit+undelegate), normalizing them,
@@ -147,38 +153,21 @@ impl<'acc, 'args> MagicIntentBundleBuilder<'acc, 'args> {
     /// `data_buf` must be large enough to hold the serialized `MagicIntentBundleArgs`.
     #[inline(never)]
     pub fn build_and_invoke(self, data_buf: &mut [u8]) -> ProgramResult {
-        // Guard: buffer must be large enough for at least the discriminant plus
-        // one byte of payload; otherwise the slice indexing below would panic.
-        if data_buf.len() <= OFFSET {
-            return Err(ProgramError::InvalidInstructionData);
-        }
-
-        // Validate: ensure intents have at least one committed account, no overlap
-        self.intent_bundle.validate()?;
-
-        // Collect all unique accounts (payer + context first, then from intents)
-        let mut all_accounts = NoVec::<AccountView, MAX_STATIC_CPI_ACCOUNTS>::new();
-        all_accounts.try_append([self.payer, self.magic_context])?;
-        if let Some(vault) = self.magic_fee_vault {
-            all_accounts.try_push(vault)?;
-        }
-        self.intent_bundle
-            .collect_unique_accounts(&mut all_accounts)?;
-
-        let data_len =
-            Self::encode_into_slice(all_accounts.as_slice(), self.intent_bundle, data_buf)?;
-
-        Self::invoke_cpi(
-            all_accounts.as_slice(),
-            self.magic_program.address(),
-            &data_buf[..data_len],
-        )
+        self.build_and_invoke_impl(data_buf, &[])
     }
 
     /// Equivalent to [`Self::build_and_invoke`], but signs the CPI with the
     /// provided PDA seeds.
     #[inline(never)]
     pub fn build_and_invoke_signed(
+        self,
+        data_buf: &mut [u8],
+        signers_seeds: &[Signer<'_, '_>],
+    ) -> ProgramResult {
+        self.build_and_invoke_impl(data_buf, signers_seeds)
+    }
+
+    pub fn build_and_invoke_impl(
         self,
         data_buf: &mut [u8],
         signers_seeds: &[Signer<'_, '_>],
@@ -206,32 +195,6 @@ impl<'acc, 'args> MagicIntentBundleBuilder<'acc, 'args> {
             &data_buf[..data_len],
             signers_seeds,
         )
-    }
-
-    /// Builds `instruction_accounts` + `ix`, then delegates to [`Self::do_invoke`].
-    ///
-    /// Split from [`Self::build_and_invoke`] so these `NoVec` allocations live in
-    /// their own stack frame.
-    #[inline(never)]
-    fn invoke_cpi(
-        all_accounts: &[AccountView],
-        program_id: &Address,
-        data: &[u8],
-    ) -> ProgramResult {
-        let instruction_accounts = Self::instruction_accounts(all_accounts)?;
-
-        let mut account_refs = NoVec::<&AccountView, MAX_STATIC_CPI_ACCOUNTS>::new();
-        for account in all_accounts.iter() {
-            account_refs.try_push(account)?;
-        }
-
-        let ix = InstructionView {
-            program_id,
-            data,
-            accounts: instruction_accounts.as_slice(),
-        };
-
-        Self::do_invoke(&ix, account_refs.as_slice())
     }
 
     /// Builds `instruction_accounts` + `ix`, then delegates to
@@ -264,6 +227,7 @@ impl<'acc, 'args> MagicIntentBundleBuilder<'acc, 'args> {
     /// The first account is always the magic payer, so it must be marked as a
     /// signer in the CPI instruction even when the backing `AccountView` is a
     /// PDA that will sign via `invoke_signed`.
+    #[inline(never)]
     fn instruction_accounts(
         all_accounts: &[AccountView],
     ) -> Result<NoVec<InstructionAccount<'_>, MAX_STATIC_CPI_ACCOUNTS>, ProgramError> {
@@ -288,12 +252,6 @@ impl<'acc, 'args> MagicIntentBundleBuilder<'acc, 'args> {
     /// Thin `#[inline(never)]` wrapper around [`invoke_with_bounds`] so its internal
     /// locals (large fixed-size arrays) live in their own stack frame, separate from
     /// [`Self::invoke_cpi`].
-    #[inline(never)]
-    fn do_invoke(ix: &InstructionView, account_refs: &[&AccountView]) -> ProgramResult {
-        invoke_with_bounds::<MAX_STATIC_CPI_ACCOUNTS>(ix, account_refs)
-    }
-
-    /// Signed variant of [`Self::do_invoke`].
     #[inline(never)]
     fn do_invoke_signed(
         ix: &InstructionView,
@@ -500,6 +458,7 @@ mod tests {
             args: ActionArgs::new(&action_data),
             compute_units: 200_000,
             accounts: &[],
+            callback: None,
         };
         let commit_accs = [p_acc1.as_account_view()];
         let mut buf = [0u8; CPI_DATA_BUF_SIZE];
@@ -577,6 +536,7 @@ mod tests {
             args: ActionArgs::new(&commit_data),
             compute_units: 100_000,
             accounts: &[],
+            callback: None,
         };
         let post_undelegate = CallHandler {
             destination_program: Address::new_from_array(dest2_addr),
@@ -584,6 +544,7 @@ mod tests {
             args: ActionArgs::new(&undelegate_data),
             compute_units: 50_000,
             accounts: &[],
+            callback: None,
         };
         let cau_accs = [p_acc1.as_account_view()];
         let mut buf = [0u8; CPI_DATA_BUF_SIZE];
@@ -676,6 +637,7 @@ mod tests {
             args: ActionArgs::new(&commit_data),
             compute_units: 100_000,
             accounts: &[],
+            callback: None,
         };
         let undelegate_handler = CallHandler {
             destination_program: Address::new_from_array(dest2_addr),
@@ -683,6 +645,7 @@ mod tests {
             args: ActionArgs::new(&undelegate_data),
             compute_units: 50_000,
             accounts: &[],
+            callback: None,
         };
         let commit_accs = [p_commit.as_account_view()];
         let cau_accs = [p_cau.as_account_view()];
@@ -779,6 +742,7 @@ mod tests {
             args: ActionArgs::new(&commit_data),
             compute_units: 100_000,
             accounts: &[],
+            callback: None,
         };
         let post_undelegate_handler = CallHandler {
             destination_program: Address::new_from_array(dest2_addr),
@@ -786,6 +750,7 @@ mod tests {
             args: ActionArgs::new(&undelegate_data),
             compute_units: 50_000,
             accounts: &[],
+            callback: None,
         };
 
         let commit_accs = [p_commit.as_account_view()];

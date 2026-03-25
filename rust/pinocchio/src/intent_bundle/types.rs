@@ -108,6 +108,20 @@ impl<'args> MagicIntentBundle<'_, 'args> {
 }
 
 // ---------------------------------------------------------------------------
+// Callback type
+// ---------------------------------------------------------------------------
+
+/// Callback to invoke after a specific action is executed on the base layer.
+#[derive(Copy, Clone)]
+pub struct ActionCallback<'args> {
+    pub destination_program: Address,
+    pub discriminator: &'args [u8],
+    pub payload: &'args [u8],
+    pub compute_units: u32,
+    pub accounts: &'args [ShortAccountMeta],
+}
+
+// ---------------------------------------------------------------------------
 // Intent Types
 // ---------------------------------------------------------------------------
 
@@ -118,6 +132,7 @@ pub struct CallHandler<'args> {
     pub args: ActionArgs<'args>,
     pub compute_units: u32,
     pub accounts: &'args [ShortAccountMeta],
+    pub callback: Option<ActionCallback<'args>>,
 }
 
 impl<'args> CallHandler<'args> {

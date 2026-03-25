@@ -9,6 +9,28 @@ use solana_address::Address;
 // Args types for serialization
 // ---------------------------------------------------------
 
+/// Arguments for the `AddActionCallback` instruction (variant 23 of `MagicBlockInstruction`).
+pub(super) struct AddActionCallbackArgs<'args> {
+    pub action_index: u8,
+    pub destination_program: Address,
+    pub discriminator: &'args [u8],
+    pub payload: &'args [u8],
+    pub compute_units: u32,
+    pub accounts: &'args [ShortAccountMeta],
+}
+
+impl bincode::Encode for AddActionCallbackArgs<'_> {
+    #[inline]
+    fn encode<E: Encoder>(&self, encoder: &mut E) -> Result<(), EncodeError> {
+        self.action_index.encode(encoder)?;
+        self.destination_program.to_bytes().encode(encoder)?;
+        self.discriminator.encode(encoder)?;
+        self.payload.encode(encoder)?;
+        self.compute_units.encode(encoder)?;
+        self.accounts.encode(encoder)
+    }
+}
+
 /// Action arguments containing escrow index and instruction data.
 #[derive(Debug, Clone, PartialEq, Eq, bincode::Encode)]
 pub struct ActionArgs<'a> {
