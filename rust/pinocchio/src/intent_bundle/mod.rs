@@ -155,7 +155,7 @@ impl<'acc, 'args> MagicIntentBundleBuilder<'acc, 'args> {
         self.build_and_invoke_impl(data_buf, signers_seeds)
     }
 
-    pub fn build_and_invoke_impl(
+    fn build_and_invoke_impl(
         self,
         data_buf: &mut [u8],
         signers_seeds: &[Signer<'_, '_>],
