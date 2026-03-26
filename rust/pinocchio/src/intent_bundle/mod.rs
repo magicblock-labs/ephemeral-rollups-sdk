@@ -1,7 +1,5 @@
 use crate::intent_bundle::no_vec::{CapacityError, NoVec};
-use pinocchio::cpi::{
-    invoke_signed_with_bounds, invoke_with_bounds, Signer, MAX_STATIC_CPI_ACCOUNTS,
-};
+use pinocchio::cpi::{invoke_signed_with_bounds, Signer, MAX_STATIC_CPI_ACCOUNTS};
 use pinocchio::error::ProgramError;
 use pinocchio::instruction::{InstructionAccount, InstructionView};
 use pinocchio::{AccountView, ProgramResult};
@@ -16,7 +14,7 @@ pub mod types;
 
 use crate::intent_bundle::commit::CommitIntentBuilder;
 use crate::intent_bundle::commit_and_undelegate::CommitAndUndelegateIntentBuilder;
-use args::AddActionCallbackArgs;
+use crate::intent_bundle::serialize::{MagicIntentBundleSerialize, DISCRIMINANT_SIZE};
 pub use args::{ActionArgs, ShortAccountMeta};
 use types::MagicIntentBundle;
 pub use types::{
@@ -25,13 +23,6 @@ pub use types::{
 
 const MAX_ACTIONS_NUM: usize = 10;
 const _: () = assert!(MAX_ACTIONS_NUM <= u8::MAX as usize);
-
-/// Bincode 1.x u32 LE discriminant for `MagicBlockInstruction::ScheduleIntentBundle` (variant index 11).
-const SCHEDULE_INTENT_BUNDLE_DISCRIMINANT: [u8; 4] = 11u32.to_le_bytes();
-const OFFSET: usize = SCHEDULE_INTENT_BUNDLE_DISCRIMINANT.len();
-
-/// Bincode 1.x u32 LE discriminant for `MagicBlockInstruction::AddActionCallback` (variant index 23).
-const ADD_ACTION_CALLBACK_DISCRIMINANT: [u8; 4] = 23u32.to_le_bytes();
 
 /// Builds a single `MagicBlockInstruction::ScheduleIntentBundle` instruction by aggregating
 /// multiple independent intents (base actions, commits, commit+undelegate), normalizing them,
@@ -126,27 +117,6 @@ impl<'acc, 'args> MagicIntentBundleBuilder<'acc, 'args> {
         }
     }
 
-    #[inline(never)]
-    pub(in crate::intent_bundle) fn encode_into_slice(
-        all_accounts: &[AccountView],
-        intent_bundle: MagicIntentBundle<'_, 'args>,
-        data_buf: &mut [u8],
-    ) -> Result<usize, ProgramError> {
-        let mut indices_map = NoVec::<&Address, MAX_STATIC_CPI_ACCOUNTS>::new();
-        for account in all_accounts {
-            indices_map.try_push(account.address())?;
-        }
-
-        let bundle =
-            serialize::MagicIntentBundleSerialize::new(indices_map.as_slice(), intent_bundle);
-        data_buf[..OFFSET].copy_from_slice(&SCHEDULE_INTENT_BUNDLE_DISCRIMINANT);
-        let args_len =
-            bincode::encode_into_slice(&bundle, &mut data_buf[OFFSET..], bincode::config::legacy())
-                .map_err(|_| ProgramError::InvalidInstructionData)?;
-
-        Ok(OFFSET + args_len)
-    }
-
     /// Normalizes the bundle, serializes it with bincode into `data_buf`, builds the
     /// CPI instruction, and invokes the magic program.
     ///
@@ -172,29 +142,61 @@ impl<'acc, 'args> MagicIntentBundleBuilder<'acc, 'args> {
         data_buf: &mut [u8],
         signers_seeds: &[Signer<'_, '_>],
     ) -> ProgramResult {
-        if data_buf.len() <= OFFSET {
+        if data_buf.len() <= DISCRIMINANT_SIZE {
             return Err(ProgramError::InvalidInstructionData);
         }
 
         self.intent_bundle.validate()?;
 
         let mut all_accounts = NoVec::<AccountView, MAX_STATIC_CPI_ACCOUNTS>::new();
-        all_accounts.try_append([self.payer, self.magic_context])?;
-        if let Some(vault) = self.magic_fee_vault {
-            all_accounts.try_push(vault)?;
+        all_accounts.try_append([self.payer.clone(), self.magic_context.clone()])?;
+        if let Some(ref vault) = self.magic_fee_vault {
+            all_accounts.try_push(vault.clone())?;
         }
         self.intent_bundle
             .collect_unique_accounts(&mut all_accounts)?;
 
-        let data_len =
-            Self::encode_into_slice(all_accounts.as_slice(), self.intent_bundle, data_buf)?;
+        self.invoke_all(&all_accounts, signers_seeds, data_buf)
+    }
 
+    #[inline(never)]
+    fn invoke_all(
+        self,
+        all_accounts: &[AccountView],
+        signers_seeds: &[Signer<'_, '_>],
+        data_buf: &mut [u8],
+    ) -> ProgramResult {
+        let mut indices_map = NoVec::<&Address, MAX_STATIC_CPI_ACCOUNTS>::new();
+        for account in all_accounts {
+            indices_map.try_push(account.address())?;
+        }
+
+        let serializable_intent = MagicIntentBundleSerialize::new(&indices_map, self.intent_bundle);
+        let len = serializable_intent.encode_intent_into_slice(data_buf)?;
         Self::invoke_cpi_signed(
-            all_accounts.as_slice(),
+            all_accounts,
             self.magic_program.address(),
-            &data_buf[..data_len],
+            &data_buf[..len],
             signers_seeds,
-        )
+        )?;
+
+        // Callback CPIs only need payer + magic_context (+ optional vault), not all bundle accounts.
+        let mut cb_accounts = NoVec::<AccountView, 3>::new();
+        cb_accounts.append([self.payer, self.magic_context]);
+        if let Some(vault) = self.magic_fee_vault {
+            cb_accounts.push(vault);
+        }
+
+        for (i, callback) in serializable_intent.action_callback_iter() {
+            let len = callback.args(i as u8)?.encode_into_slice(data_buf)?;
+            Self::invoke_cpi_signed(
+                cb_accounts.as_slice(),
+                self.magic_program.address(),
+                &data_buf[..len],
+                signers_seeds,
+            )?;
+        }
+        Ok(())
     }
 
     /// Builds `instruction_accounts` + `ix`, then delegates to
@@ -314,10 +316,6 @@ impl<'acc, 'args>
         self.fold().build_serialized(buf)
     }
 }
-
-// ---------------------------------------------------------------------------
-// Tests: builder compatibility between pinocchio and SDK
-// ---------------------------------------------------------------------------
 
 #[cfg(test)]
 mod tests {

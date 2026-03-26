@@ -9,15 +9,23 @@
 //! All types produce output identical to the corresponding `*Args` types in
 //! [`crate::intent_bundle::args`] when encoded with `bincode::config::legacy()`.
 
-use bincode::enc::Encoder;
-use bincode::error::EncodeError;
-use bincode::Encode;
-use solana_address::Address;
-
-use crate::intent_bundle::args::BaseActionArgs;
+use crate::intent_bundle::args::{AddActionCallbackArgs, BaseActionArgs};
 use crate::intent_bundle::types::{
     get_index, CallHandler, CommitAndUndelegateIntent, CommitIntent, MagicIntentBundle,
 };
+use crate::intent_bundle::ActionCallback;
+use bincode::enc::Encoder;
+use bincode::error::EncodeError;
+use bincode::Encode;
+use core::ops::Deref;
+use pinocchio::error::ProgramError;
+use solana_address::Address;
+
+/// Bincode 1.x u32 LE discriminant for `MagicBlockInstruction::ScheduleIntentBundle` (variant index 11).
+const SCHEDULE_INTENT_BUNDLE_DISCRIMINANT: [u8; 4] = 11u32.to_le_bytes();
+/// Bincode 1.x u32 LE discriminant for `MagicBlockInstruction::AddActionCallback` (variant index 23).
+const ADD_ACTION_CALLBACK_DISCRIMINANT: [u8; 4] = 23u32.to_le_bytes();
+pub(crate) const DISCRIMINANT_SIZE: usize = SCHEDULE_INTENT_BUNDLE_DISCRIMINANT.len();
 
 // ---------------------------------------------------------------------------
 // Wrapper types
@@ -35,6 +43,13 @@ pub(super) struct CommitSerialize<'i, 'acc, 'args> {
 impl<'i, 'acc, 'args> CommitSerialize<'i, 'acc, 'args> {
     pub(super) fn new(inner: CommitIntent<'acc, 'args>, indices_map: &'i [&'i Address]) -> Self {
         Self { inner, indices_map }
+    }
+}
+
+impl<'acc, 'args> Deref for CommitSerialize<'_, 'acc, 'args> {
+    type Target = CommitIntent<'acc, 'args>;
+    fn deref(&self) -> &Self::Target {
+        &self.inner
     }
 }
 
@@ -63,6 +78,13 @@ impl<'i, 'acc, 'args> CommitAndUndelegateSerialize<'i, 'acc, 'args> {
         indices_map: &'i [&'i Address],
     ) -> Self {
         Self { inner, indices_map }
+    }
+}
+
+impl<'acc, 'args> Deref for CommitAndUndelegateSerialize<'_, 'acc, 'args> {
+    type Target = CommitAndUndelegateIntent<'acc, 'args>;
+    fn deref(&self) -> &Self::Target {
+        &self.inner
     }
 }
 
@@ -110,6 +132,114 @@ impl<'i, 'acc, 'args> MagicIntentBundleSerialize<'i, 'acc, 'args> {
             indices_map,
         }
     }
+
+    pub(super) fn encode_intent_into_slice(
+        &self,
+        data_buf: &mut [u8],
+    ) -> Result<usize, ProgramError> {
+        const OFFSET: usize = SCHEDULE_INTENT_BUNDLE_DISCRIMINANT.len();
+
+        data_buf[..OFFSET].copy_from_slice(&SCHEDULE_INTENT_BUNDLE_DISCRIMINANT);
+        let len =
+            bincode::encode_into_slice(self, &mut data_buf[OFFSET..], bincode::config::legacy())
+                .map_err(|_| ProgramError::InvalidInstructionData)?;
+
+        Ok(OFFSET + len)
+    }
+
+    pub(super) fn action_callback_iter(&self) -> ActionCallbackIter<'_, '_, '_, '_> {
+        ActionCallbackIter::new(self)
+    }
+
+    pub(super) fn get_action_callback(
+        &self,
+        mut action_index: usize,
+    ) -> Option<&ActionCallback<'args>> {
+        if let Some(ref commit) = self.commit {
+            let commit_action_len = commit.get_actions_len();
+            if action_index < commit_action_len {
+                return commit.get_action_callback(action_index);
+            }
+            action_index -= commit_action_len;
+        }
+
+        if let Some(ref commit_and_undelegate) = self.commit_and_undelegate {
+            let cau_action_len = commit_and_undelegate.get_actions_len();
+            if action_index < cau_action_len {
+                return commit_and_undelegate.get_action_callback(action_index);
+            }
+            action_index -= cau_action_len;
+        }
+
+        if let Some(ref _commit_finalize) = self.commit_finalize {
+            // TODO: implement once supported
+        }
+
+        if let Some(ref _commit_finalize_and_undelegate) = self.commit_finalize_and_undelegate {
+            // TODO: implement once supported
+        }
+
+        let standalone_action_len = self.standalone_actions.len();
+        if action_index < standalone_action_len {
+            self.get_standalone_action_callback(action_index)
+        } else {
+            None
+        }
+    }
+
+    #[allow(clippy::identity_op)]
+    pub(super) fn get_actions_len(&self) -> usize {
+        self.standalone_actions.len()
+            + self
+                .commit
+                .as_ref()
+                .map(|el| el.get_actions_len())
+                .unwrap_or(0)
+            + self
+                .commit_and_undelegate
+                .as_ref()
+                .map(|el| el.get_actions_len())
+                .unwrap_or(0)
+            + 0 // TODO: support commit_finalize & commit_finalize_and_undelegate
+            + 0 // TODO: support commit_finalize_and_undelegate
+    }
+
+    pub(super) fn get_standalone_action_callback(
+        &self,
+        index: usize,
+    ) -> Option<&ActionCallback<'args>> {
+        self.standalone_actions
+            .get(index)
+            .and_then(|el| el.callback.as_ref())
+    }
+}
+
+pub(super) struct ActionCallbackIter<'a, 'i, 'acc, 'args> {
+    intent: &'a MagicIntentBundleSerialize<'i, 'acc, 'args>,
+    intent_actions_num: usize,
+    cur_action_index: usize,
+}
+
+impl<'a, 'i, 'acc, 'args> ActionCallbackIter<'a, 'i, 'acc, 'args> {
+    pub(super) fn new(intent: &'a MagicIntentBundleSerialize<'i, 'acc, 'args>) -> Self {
+        Self {
+            intent,
+            intent_actions_num: intent.get_actions_len(),
+            cur_action_index: 0,
+        }
+    }
+}
+
+impl<'a, 'i, 'acc, 'args> Iterator for ActionCallbackIter<'a, 'i, 'acc, 'args> {
+    type Item = (usize, &'a ActionCallback<'args>);
+    fn next(&mut self) -> Option<Self::Item> {
+        (self.cur_action_index..self.intent_actions_num).find_map(move |i| {
+            self.cur_action_index = i + 1;
+            self.intent
+                .get_action_callback(i)
+                .map(|el: &'a ActionCallback<'args>| (i, el))
+        })
+    }
 }
 
 impl bincode::Encode for MagicIntentBundleSerialize<'_, '_, '_> {
@@ -120,6 +250,30 @@ impl bincode::Encode for MagicIntentBundleSerialize<'_, '_, '_> {
         self.commit_finalize.encode(encoder)?;
         self.commit_finalize_and_undelegate.encode(encoder)?;
         encode_handler_slice(self.standalone_actions, self.indices_map, encoder)
+    }
+}
+
+/// Encodes `AddActionCallbackArgs`
+impl bincode::Encode for AddActionCallbackArgs<'_> {
+    #[inline]
+    fn encode<E: Encoder>(&self, encoder: &mut E) -> Result<(), EncodeError> {
+        self.action_index.encode(encoder)?;
+        self.destination_program.to_bytes().encode(encoder)?;
+        self.discriminator.encode(encoder)?;
+        self.payload.encode(encoder)?;
+        self.compute_units.encode(encoder)?;
+        self.accounts.encode(encoder)
+    }
+}
+
+impl AddActionCallbackArgs<'_> {
+    pub(super) fn encode_into_slice(&self, data_buf: &mut [u8]) -> Result<usize, ProgramError> {
+        const OFFSET: usize = ADD_ACTION_CALLBACK_DISCRIMINANT.len();
+        data_buf[..OFFSET].copy_from_slice(&ADD_ACTION_CALLBACK_DISCRIMINANT);
+        let len =
+            bincode::encode_into_slice(self, &mut data_buf[OFFSET..], bincode::config::legacy())
+                .map_err(|_| ProgramError::InvalidInstructionData)?;
+        Ok(OFFSET + len)
     }
 }
 
@@ -150,7 +304,6 @@ fn encode_handler_slice<E: Encoder>(
 /// derived [`bincode::Encode`] impl, so field order cannot silently diverge
 /// from the canonical serialization type.
 #[inline(never)]
-#[allow(clippy::clone_on_copy)]
 fn encode_handler<E: Encoder>(
     handler: &CallHandler<'_>,
     indices_map: &[&Address],

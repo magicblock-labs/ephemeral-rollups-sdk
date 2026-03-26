@@ -19,18 +19,6 @@ pub(super) struct AddActionCallbackArgs<'args> {
     pub accounts: &'args [ShortAccountMeta],
 }
 
-impl bincode::Encode for AddActionCallbackArgs<'_> {
-    #[inline]
-    fn encode<E: Encoder>(&self, encoder: &mut E) -> Result<(), EncodeError> {
-        self.action_index.encode(encoder)?;
-        self.destination_program.to_bytes().encode(encoder)?;
-        self.discriminator.encode(encoder)?;
-        self.payload.encode(encoder)?;
-        self.compute_units.encode(encoder)?;
-        self.accounts.encode(encoder)
-    }
-}
-
 /// Action arguments containing escrow index and instruction data.
 #[derive(Debug, Clone, PartialEq, Eq, bincode::Encode)]
 pub struct ActionArgs<'a> {
