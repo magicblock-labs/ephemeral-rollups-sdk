@@ -130,32 +130,6 @@ impl<'info> MagicIntentBundleBuilder<'info> {
         }
     }
 
-    /// Adds an intent to the bundle.
-    ///
-    /// If an intent of the same category already exists in the bundle:
-    /// - base actions are appended
-    /// - commit intents are merged (accounts/actions appended; variant upgraded to handler if needed)
-    /// - commit+undelegate intents are merged (accounts/actions appended)
-    ///
-    /// See `MagicIntentBundle::add_intent` for merge semantics.
-    pub fn add_intent(mut self, intent: MagicIntent<'info>) -> Self {
-        self.intent_bundle.add_intent(intent);
-        self
-    }
-
-    /// Adds (or merges) a `Commit` intent into the bundle.
-    pub fn add_commit(mut self, commit: CommitType<'info>) -> Self {
-        self.intent_bundle.add_intent(MagicIntent::Commit(commit));
-        self
-    }
-
-    /// Adds (or merges) a `CommitAndUndelegate` intent into the bundle.
-    pub fn add_commit_and_undelegate(mut self, value: CommitAndUndelegate<'info>) -> Self {
-        self.intent_bundle
-            .add_intent(MagicIntent::CommitAndUndelegate(value));
-        self
-    }
-
     /// Adds standalone base-layer actions to be executed without any commit/undelegate semantics.
     pub fn add_standalone_actions(
         mut self,
@@ -168,15 +142,25 @@ impl<'info> MagicIntentBundleBuilder<'info> {
         self
     }
 
-    /// Adds a single standalone action with a callback. Chainable.
-    pub fn add_standalone_action_with_callback(
-        mut self,
+    /// Adds a single standalone action. Returns an [`ActionBuilder`] that lets you
+    /// optionally attach a callback via `.then()` before continuing the chain.
+    pub fn add_standalone_action(
+        self,
         action: CallHandler<'info>,
-        callback: ActionCallback,
-    ) -> Self {
-        self.intent_bundle.standalone_actions.push(action);
-        self.intent_bundle.standalone_callbacks.push(Some(callback));
-        self
+    ) -> action_builder::ActionBuilder<
+        'info,
+        MagicIntentBundleBuilder<'info>,
+        impl FnOnce(
+            MagicIntentBundleBuilder<'info>,
+            CallHandler<'info>,
+            Option<ActionCallback>,
+        ) -> MagicIntentBundleBuilder<'info>,
+    > {
+        action_builder::ActionBuilder::new(self, action, |mut parent, action, callback| {
+            parent.intent_bundle.standalone_actions.push(action);
+            parent.intent_bundle.standalone_callbacks.push(callback);
+            parent
+        })
     }
 
     fn build_callback_ixs(&mut self) -> Vec<(Vec<AccountInfo<'info>>, Instruction)> {
@@ -465,13 +449,19 @@ pub trait FoldableIntentBuilder<'info>: Sized {
         self.fold_builder().add_standalone_actions(actions)
     }
 
-    fn add_standalone_action_with_callback(
+    fn add_standalone_action(
         self,
         action: CallHandler<'info>,
-        callback: ActionCallback,
-    ) -> MagicIntentBundleBuilder<'info> {
-        self.fold_builder()
-            .add_standalone_action_with_callback(action, callback)
+    ) -> action_builder::ActionBuilder<
+        'info,
+        MagicIntentBundleBuilder<'info>,
+        impl FnOnce(
+            MagicIntentBundleBuilder<'info>,
+            CallHandler<'info>,
+            Option<ActionCallback>,
+        ) -> MagicIntentBundleBuilder<'info>,
+    > {
+        self.fold_builder().add_standalone_action(action)
     }
 
     fn build(self) -> IntentInstructions<'info> {
@@ -1199,10 +1189,8 @@ mod tests {
             true,
         );
 
-        let commit = CommitType::Standalone(vec![acc1_info]);
-
         let (accounts, ix) = MagicIntentBundleBuilder::new(payer_info, ctx_info, prog_info)
-            .add_commit(commit)
+            .commit(&[acc1_info])
             .build()
             .schedule_intent_ix;
 
@@ -1269,10 +1257,8 @@ mod tests {
             true,
         );
 
-        let commit = CommitType::Standalone(vec![acc1_info, acc2_info]);
-
         let (accounts, _ix) = MagicIntentBundleBuilder::new(payer_info, ctx_info, prog_info)
-            .add_commit(commit)
+            .commit(&[acc1_info, acc2_info])
             .build()
             .schedule_intent_ix;
 
@@ -1339,16 +1325,11 @@ mod tests {
             false,
         );
 
-        let commit = CommitType::Standalone(vec![commit_info]);
-        let cau = CommitAndUndelegate {
-            commit_type: CommitType::Standalone(vec![cau_info]),
-            undelegate_type: UndelegateType::Standalone,
-        };
         let handler = create_test_call_handler(escrow_info);
 
         let (accounts, ix) = MagicIntentBundleBuilder::new(payer_info, ctx_info, prog_info)
-            .add_commit(commit)
-            .add_commit_and_undelegate(cau)
+            .commit(&[commit_info])
+            .commit_and_undelegate(&[cau_info])
             .add_standalone_actions([handler])
             .build()
             .schedule_intent_ix;
@@ -1508,10 +1489,8 @@ mod tests {
                 &mut escrow_cau_undelegate,
             )))
             .then(make_callback())
-            .add_standalone_action_with_callback(
-                create_test_call_handler(make_info(&mut escrow_standalone)),
-                make_callback(),
-            )
+            .add_standalone_action(create_test_call_handler(make_info(&mut escrow_standalone)))
+            .then(make_callback())
             .build();
 
         assert_eq!(add_callback_ixs.len(), 4);

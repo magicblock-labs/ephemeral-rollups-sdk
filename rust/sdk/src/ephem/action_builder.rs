@@ -84,3 +84,17 @@ where
         (self.f)(self.parent, self.action, self.callback).fold_builder()
     }
 }
+
+impl<'info, F> FoldableIntentBuilder<'info>
+    for ActionBuilder<'info, MagicIntentBundleBuilder<'info>, F>
+where
+    F: FnOnce(
+        MagicIntentBundleBuilder<'info>,
+        CallHandler<'info>,
+        Option<ActionCallback>,
+    ) -> MagicIntentBundleBuilder<'info>,
+{
+    fn fold_builder(self) -> MagicIntentBundleBuilder<'info> {
+        (self.f)(self.parent, self.action, self.callback)
+    }
+}
