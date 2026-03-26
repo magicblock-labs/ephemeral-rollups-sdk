@@ -137,6 +137,7 @@ mod tests {
 
     use super::*;
     use magicblock_magic_program_api::args as sdk;
+    use magicblock_magic_program_api::instruction::MagicBlockInstruction;
     use magicblock_magic_program_api::Pubkey;
 
     /// Helper to create a deterministic pubkey/address from a seed byte
@@ -464,6 +465,53 @@ mod tests {
             &pino_buf[..pino_len],
             &sdk_bytes[..],
             "Empty MagicIntentBundleArgs mismatch"
+        );
+    }
+
+    /// Wire-format compatibility for `AddActionCallback` instruction.
+    ///
+    /// Verifies that pinocchio's `encode_into_slice` (discriminant + bincode2-legacy payload)
+    /// matches bincode1 serialization of `MagicBlockInstruction::AddActionCallback`.
+    #[test]
+    fn test_add_action_callback_args_serialization() {
+        let discriminator: &[u8] = &[0xDE, 0xAD];
+        let payload: &[u8] = &[0x01, 0x02, 0x03];
+
+        // SDK type – serialized as MagicBlockInstruction::AddActionCallback(args)
+        let sdk_args = sdk::AddActionCallbackArgs {
+            action_index: 7,
+            destination_program: make_pubkey(0xCB),
+            discriminator: discriminator.to_vec(),
+            payload: payload.to_vec(),
+            compute_units: 75_000,
+            accounts: vec![sdk::ShortAccountMeta {
+                pubkey: make_pubkey(0xAC),
+                is_writable: true,
+            }],
+        };
+        let sdk_bytes =
+            bincode1::serialize(&MagicBlockInstruction::AddActionCallback(sdk_args)).unwrap();
+
+        // Pinocchio type – encode_into_slice prepends ADD_ACTION_CALLBACK_DISCRIMINANT
+        let pino_account = ShortAccountMeta {
+            pubkey: make_address(0xAC),
+            is_writable: true,
+        };
+        let pino_args = AddActionCallbackArgs {
+            action_index: 7,
+            destination_program: make_address(0xCB),
+            discriminator,
+            payload,
+            compute_units: 75_000,
+            accounts: core::slice::from_ref(&pino_account),
+        };
+        let mut pino_buf = [0u8; 512];
+        let pino_len = pino_args.encode_into_slice(&mut pino_buf).unwrap();
+
+        assert_eq!(
+            &pino_buf[..pino_len],
+            &sdk_bytes[..],
+            "AddActionCallback wire format mismatch"
         );
     }
 }
