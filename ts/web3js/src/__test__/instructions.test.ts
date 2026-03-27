@@ -1106,7 +1106,7 @@ describe("Exposed Instructions (web3.js)", () => {
 
       expect(instructions).toHaveLength(1);
       expect(instructions[0].data[0]).toBe(16);
-      expect(instructions[0].keys).toHaveLength(8);
+      expect(instructions[0].keys).toHaveLength(9);
       expect(Buffer.from(instructions[0].data).readBigUInt64LE(1)).toBe(25n);
       expect(Buffer.from(instructions[0].data).readBigUInt64LE(9)).toBe(100n);
       expect(Buffer.from(instructions[0].data).readBigUInt64LE(17)).toBe(300n);
@@ -1209,7 +1209,7 @@ describe("Exposed Instructions (web3.js)", () => {
         4,
       );
 
-      expect(instruction.keys).toHaveLength(8);
+      expect(instruction.keys).toHaveLength(9);
       expect(Array.from(instruction.data)).toEqual([
         16,
         ...Array.from(
