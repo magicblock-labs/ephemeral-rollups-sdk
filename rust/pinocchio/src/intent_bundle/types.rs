@@ -1,6 +1,6 @@
 use crate::intent_bundle::args::{
-    ActionArgs, BaseActionArgs, CommitAndUndelegateArgs, CommitTypeArgs, MagicIntentBundleArgs,
-    ShortAccountMeta, UndelegateTypeArgs,
+    ActionArgs, AddActionCallbackArgs, BaseActionArgs, CommitAndUndelegateArgs, CommitTypeArgs,
+    MagicIntentBundleArgs, ShortAccountMeta, UndelegateTypeArgs,
 };
 use crate::intent_bundle::no_vec::NoVec;
 use pinocchio::cpi::MAX_STATIC_CPI_ACCOUNTS;
@@ -111,44 +111,6 @@ impl<'args> MagicIntentBundle<'_, 'args> {
 // Intent Types
 // ---------------------------------------------------------------------------
 
-#[derive(Clone)]
-pub struct CallHandler<'args> {
-    pub destination_program: Address,
-    pub escrow_authority: AccountView,
-    pub args: ActionArgs<'args>,
-    pub compute_units: u32,
-    pub accounts: &'args [ShortAccountMeta],
-}
-
-impl<'args> CallHandler<'args> {
-    #[inline(never)]
-    pub(super) fn collect_unique_accounts(
-        &self,
-        container: &mut NoVec<AccountView, MAX_STATIC_CPI_ACCOUNTS>,
-    ) -> ProgramResult {
-        if !container.contains(&self.escrow_authority) {
-            container.try_push(self.escrow_authority.clone())?;
-        }
-        Ok(())
-    }
-
-    #[allow(clippy::clone_on_copy)]
-    pub(crate) fn args(
-        &self,
-        indices_map: &[&Address],
-    ) -> Result<BaseActionArgs<'args>, ProgramError> {
-        let escrow_authority_index = get_index(indices_map, self.escrow_authority.address())
-            .ok_or(ProgramError::InvalidArgument)?;
-        Ok(BaseActionArgs {
-            args: self.args.clone(),
-            compute_units: self.compute_units,
-            destination_program: self.destination_program.clone(),
-            escrow_authority: escrow_authority_index,
-            accounts: self.accounts,
-        })
-    }
-}
-
 #[derive(Copy, Clone)]
 pub struct CommitIntent<'acc, 'args> {
     pub(super) accounts: &'acc [AccountView],
@@ -223,6 +185,14 @@ impl<'args> CommitIntent<'_, 'args> {
                 base_actions,
             })
         }
+    }
+
+    pub(crate) fn get_actions_len(&self) -> usize {
+        self.actions.len()
+    }
+
+    pub(crate) fn get_action_callback(&self, ind: usize) -> Option<&ActionCallback<'args>> {
+        self.actions.get(ind).and_then(|el| el.callback.as_ref())
     }
 }
 
@@ -321,6 +291,106 @@ impl<'args> CommitAndUndelegateIntent<'_, 'args> {
         Ok(CommitAndUndelegateArgs {
             commit_type,
             undelegate_type,
+        })
+    }
+
+    pub(crate) fn get_actions_len(&self) -> usize {
+        self.post_commit_actions.len() + self.post_undelegate_actions.len()
+    }
+
+    pub(crate) fn get_action_callback(
+        &self,
+        mut action_index: usize,
+    ) -> Option<&ActionCallback<'args>> {
+        let post_commit_len = self.post_commit_actions.len();
+        if action_index < post_commit_len {
+            return self
+                .post_commit_actions
+                .get(action_index)
+                .and_then(|el| el.callback.as_ref());
+        }
+        action_index -= post_commit_len;
+
+        if action_index < self.post_undelegate_actions.len() {
+            self.post_undelegate_actions
+                .get(action_index)
+                .and_then(|el| el.callback.as_ref())
+        } else {
+            None
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// BaseAction type
+// ---------------------------------------------------------------------------
+
+#[derive(Clone)]
+pub struct CallHandler<'args> {
+    pub destination_program: Address,
+    pub escrow_authority: AccountView,
+    pub args: ActionArgs<'args>,
+    pub compute_units: u32,
+    pub accounts: &'args [ShortAccountMeta],
+    pub callback: Option<ActionCallback<'args>>,
+}
+
+impl<'args> CallHandler<'args> {
+    #[inline(never)]
+    pub(super) fn collect_unique_accounts(
+        &self,
+        container: &mut NoVec<AccountView, MAX_STATIC_CPI_ACCOUNTS>,
+    ) -> ProgramResult {
+        if !container.contains(&self.escrow_authority) {
+            container.try_push(self.escrow_authority.clone())?;
+        }
+        Ok(())
+    }
+
+    #[allow(clippy::clone_on_copy)]
+    pub(crate) fn args(
+        &self,
+        indices_map: &[&Address],
+    ) -> Result<BaseActionArgs<'args>, ProgramError> {
+        let escrow_authority_index = get_index(indices_map, self.escrow_authority.address())
+            .ok_or(ProgramError::InvalidArgument)?;
+        Ok(BaseActionArgs {
+            args: self.args.clone(),
+            compute_units: self.compute_units,
+            destination_program: self.destination_program.clone(),
+            escrow_authority: escrow_authority_index,
+            accounts: self.accounts,
+        })
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Callback type
+// ---------------------------------------------------------------------------
+
+/// Callback to invoke after a specific action is executed on the base layer.
+#[derive(Clone)]
+pub struct ActionCallback<'args> {
+    pub destination_program: Address,
+    pub discriminator: &'args [u8],
+    pub payload: &'args [u8],
+    pub compute_units: u32,
+    pub accounts: &'args [ShortAccountMeta],
+}
+
+impl<'args> ActionCallback<'args> {
+    #[allow(clippy::clone_on_copy)]
+    pub(super) fn args(
+        &self,
+        action_index: u8,
+    ) -> Result<AddActionCallbackArgs<'args>, ProgramError> {
+        Ok(AddActionCallbackArgs {
+            action_index,
+            destination_program: self.destination_program.clone(),
+            discriminator: self.discriminator,
+            payload: self.payload,
+            compute_units: self.compute_units,
+            accounts: self.accounts,
         })
     }
 }
