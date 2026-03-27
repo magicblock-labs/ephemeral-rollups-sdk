@@ -845,7 +845,7 @@ export function depositAndDelegateShuttleEphemeralAtaWithMergeAndPrivateTransfer
   const [rentPda] = deriveRentPda();
   const [vault] = deriveVault(mint);
   const vaultAta = deriveVaultAta(mint, vault);
-  const [queue] = deriveTransferQueue(mint);
+  const [queue] = deriveTransferQueue(mint, validator);
   const encryptedDestination = encryptEd25519Recipient(
     destinationOwner.toBytes(),
     validator,
@@ -1521,13 +1521,17 @@ export async function delegateSplWithPrivateTransfer(
   const maxDelayMs = opts?.maxDelayMs ?? minDelayMs;
   const split = opts?.split ?? 1;
 
+  if (validator == null) {
+    throw new Error("validator is required for encrypted private transfers");
+  }
+
   const instructions: TransactionInstruction[] = [];
 
   const [ephemeralAta] = deriveEphemeralAta(owner, mint);
   const [vault] = deriveVault(mint);
   const [vaultEphemeralAta] = deriveEphemeralAta(vault, mint);
   const vaultAta = deriveVaultAta(mint, vault);
-  const [queue] = deriveTransferQueue(mint);
+  const [queue] = deriveTransferQueue(mint, validator);
   const ownerAta = getAssociatedTokenAddressSync(mint, owner);
   const [shuttleEphemeralAta] = deriveShuttleEphemeralAta(
     owner,
@@ -1546,7 +1550,7 @@ export async function delegateSplWithPrivateTransfer(
   }
 
   if (initTransferQueueIfMissing) {
-    instructions.push(initTransferQueueIx(payer, queue, mint));
+    instructions.push(initTransferQueueIx(payer, queue, mint, validator));
   }
 
   if (initAtasIfMissing) {
@@ -1611,7 +1615,13 @@ export async function transferSpl(
     switch (opts.visibility) {
       case "private":
         if (opts.toBalance === "base") {
-          const [queue] = deriveTransferQueue(mint);
+          if (validator == null) {
+            throw new Error(
+              "validator is required for private ephemeral-to-base transfers",
+            );
+          }
+
+          const [queue] = deriveTransferQueue(mint, validator);
           const [vault] = deriveVault(mint);
           const vaultAta = deriveVaultAta(mint, vault);
 

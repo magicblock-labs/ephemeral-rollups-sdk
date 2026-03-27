@@ -134,6 +134,20 @@ export async function validatorFeesVaultPdaFromValidator(validator: Address) {
 }
 
 /**
+ * Derives the magic fee vault PDA for a given validator
+ * @param validator - The validator address
+ * @returns The magic fee vault PDA
+ */
+export async function magicFeeVaultPdaFromValidator(validator: Address) {
+  const addressEncoder = getAddressEncoder();
+  const [magicFeeVault] = await getProgramDerivedAddress({
+    programAddress: DELEGATION_PROGRAM_ID,
+    seeds: [Buffer.from("magic-fee-vault"), addressEncoder.encode(validator)],
+  });
+  return magicFeeVault;
+}
+
+/**
  * Derives the commit state PDA for a given delegated account
  * @param delegatedAccount - The delegated account address
  * @returns The commit state PDA

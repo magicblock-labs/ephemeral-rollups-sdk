@@ -844,7 +844,7 @@ export async function depositAndDelegateShuttleEphemeralAtaWithMergeAndPrivateTr
   const [rentPda] = await deriveRentPda();
   const [vault] = await deriveVault(mint);
   const vaultAta = await deriveVaultAta(mint, vault);
-  const [queue] = await deriveTransferQueue(mint);
+  const [queue] = await deriveTransferQueue(mint, validator);
   const delegateBuffer =
     await delegateBufferPdaFromDelegatedAccountAndOwnerProgram(
       shuttleAta,
@@ -1497,13 +1497,17 @@ export async function delegateSplWithPrivateTransfer(
   const maxDelayMs = opts?.maxDelayMs ?? minDelayMs;
   const split = opts?.split ?? 1;
 
+  if (validator == null) {
+    throw new Error("validator is required for encrypted private transfers");
+  }
+
   const instructions: Instruction[] = [];
 
   const [ephemeralAta] = await deriveEphemeralAta(owner, mint);
   const [vault] = await deriveVault(mint);
   const [vaultEphemeralAta] = await deriveEphemeralAta(vault, mint);
   const vaultAta = await deriveVaultAta(mint, vault);
-  const [queue] = await deriveTransferQueue(mint);
+  const [queue] = await deriveTransferQueue(mint, validator);
   const ownerAta = await getAssociatedTokenAddressSync(mint, owner);
   const [shuttleEphemeralAta] = await deriveShuttleEphemeralAta(
     owner,
@@ -1525,7 +1529,7 @@ export async function delegateSplWithPrivateTransfer(
   }
 
   if (initTransferQueueIfMissing) {
-    instructions.push(initTransferQueueIx(payer, queue, mint));
+    instructions.push(initTransferQueueIx(payer, queue, mint, validator));
   }
 
   if (initAtasIfMissing) {
@@ -1583,7 +1587,13 @@ export async function transferSpl(
     switch (opts.visibility) {
       case "private":
         if (opts.toBalance === "base") {
-          const [queue] = await deriveTransferQueue(mint);
+          if (validator == null) {
+            throw new Error(
+              "validator is required for private ephemeral-to-base transfers",
+            );
+          }
+
+          const [queue] = await deriveTransferQueue(mint, validator);
           const [vault] = await deriveVault(mint);
           const vaultAta = await deriveVaultAta(mint, vault);
 
