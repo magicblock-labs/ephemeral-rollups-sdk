@@ -11,18 +11,21 @@ import {
   createCommitAndUndelegateInstruction,
 } from "../instructions/magic-program";
 import {
+  allocateTransferQueueIx,
   delegateEataPermissionIx,
   depositAndQueueTransferIx,
   delegateSpl,
   delegateSplWithPrivateTransfer,
   delegateTransferQueueIx,
   deriveEphemeralAta,
+  deriveTransferQueue,
   deriveRentPda,
   deriveShuttleAta,
   deriveShuttleEphemeralAta,
   deriveVault,
   ensureTransferQueueCrankIx,
   initEphemeralAtaIx,
+  initTransferQueueIx,
   initVaultIx,
   initRentPdaIx,
   transferSpl,
@@ -1078,6 +1081,7 @@ describe("Exposed Instructions (web3.js)", () => {
         visibility: "private",
         fromBalance: "ephemeral",
         toBalance: "base",
+        validator,
         initAtasIfMissing: true,
         privateTransfer: {
           minDelayMs: 100n,
@@ -1095,6 +1099,7 @@ describe("Exposed Instructions (web3.js)", () => {
         visibility: "private",
         fromBalance: "ephemeral",
         toBalance: "base",
+        validator,
         initIfMissing: true,
         initVaultIfMissing: true,
         privateTransfer: {
@@ -1111,6 +1116,18 @@ describe("Exposed Instructions (web3.js)", () => {
       expect(Buffer.from(instructions[0].data).readBigUInt64LE(9)).toBe(100n);
       expect(Buffer.from(instructions[0].data).readBigUInt64LE(17)).toBe(300n);
       expect(Buffer.from(instructions[0].data).readUInt32LE(25)).toBe(4);
+    });
+
+    it("should require validator for private ephemeral-to-base transfers", async () => {
+      await expect(
+        transferSpl(from, to, mint, 25n, {
+          visibility: "private",
+          fromBalance: "ephemeral",
+          toBalance: "base",
+        }),
+      ).rejects.toThrow(
+        "validator is required for private ephemeral-to-base transfers",
+      );
     });
 
     it("should use a normal transfer for public base-to-base transfers", async () => {
@@ -1170,17 +1187,25 @@ describe("Exposed Instructions (web3.js)", () => {
   describe("ensureTransferQueueCrankIx (Ephemeral SPL Token Program)", () => {
     const payer = mockPublicKey;
     const queue = differentKey;
+    const magicFeeVault = new PublicKey("11111111111111111111111111111113");
 
-    it("should include queue, magic context, and magic program in order", () => {
-      const instruction = ensureTransferQueueCrankIx(payer, queue);
+    it("should include queue, magic fee vault, magic context, and magic program in order", () => {
+      const instruction = ensureTransferQueueCrankIx(
+        payer,
+        queue,
+        magicFeeVault,
+      );
 
-      expect(instruction.keys).toHaveLength(4);
+      expect(instruction.keys).toHaveLength(5);
       expect(instruction.keys[0].pubkey.toBase58()).toBe(payer.toBase58());
       expect(instruction.keys[1].pubkey.toBase58()).toBe(queue.toBase58());
       expect(instruction.keys[2].pubkey.toBase58()).toBe(
-        MAGIC_CONTEXT_ID.toBase58(),
+        magicFeeVault.toBase58(),
       );
       expect(instruction.keys[3].pubkey.toBase58()).toBe(
+        MAGIC_CONTEXT_ID.toBase58(),
+      );
+      expect(instruction.keys[4].pubkey.toBase58()).toBe(
         MAGIC_PROGRAM_ID.toBase58(),
       );
     });
@@ -1238,6 +1263,41 @@ describe("Exposed Instructions (web3.js)", () => {
 
       expect(instruction.keys).toHaveLength(9);
       expect(Array.from(instruction.data)).toEqual([19]);
+    });
+  });
+
+  describe("transfer queue helpers (Ephemeral SPL Token Program)", () => {
+    const mint = new PublicKey("11111111111111111111111111111113");
+    const validator = new PublicKey("11111111111111111111111111111114");
+
+    it("should derive validator-scoped transfer queue PDAs", () => {
+      const [queueA] = deriveTransferQueue(mint, validator);
+      const [queueB] = deriveTransferQueue(mint, mockPublicKey);
+
+      expect(queueA.toBase58()).not.toBe(queueB.toBase58());
+    });
+
+    it("should include validator and requested item count in initTransferQueueIx", () => {
+      const [queue] = deriveTransferQueue(mint, validator);
+      const instruction = initTransferQueueIx(
+        mockPublicKey,
+        queue,
+        mint,
+        validator,
+        92,
+      );
+
+      expect(instruction.keys).toHaveLength(5);
+      expect(instruction.keys[3].pubkey.toBase58()).toBe(validator.toBase58());
+      expect(Array.from(instruction.data)).toEqual([12, 92, 0, 0, 0]);
+    });
+
+    it("should serialize discriminator 27 for allocateTransferQueueIx", () => {
+      const [queue] = deriveTransferQueue(mint, validator);
+      const instruction = allocateTransferQueueIx(queue);
+
+      expect(instruction.keys).toHaveLength(2);
+      expect(Array.from(instruction.data)).toEqual([27]);
     });
   });
 

@@ -689,7 +689,7 @@ mod tests {
         let shuttle_wallet_ata = find_shuttle_wallet_ata(&mint, &shuttle_ephemeral_ata);
         let (vault, _) = GlobalVault::find_pda(&mint);
         let vault_ata = find_vault_ata(&mint, &vault);
-        let (queue, _) = find_transfer_queue(&mint);
+        let (queue, _) = find_transfer_queue(&mint, &validator);
 
         assert_eq!(instruction.program_id, ESPL_TOKEN_PROGRAM_ID);
         assert_eq!(instruction.accounts.len(), 19);

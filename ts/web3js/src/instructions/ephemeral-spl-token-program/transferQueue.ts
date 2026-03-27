@@ -24,32 +24,39 @@ const INITIALIZE_TRANSFER_QUEUE_DISCRIMINATOR = 12;
 const DEPOSIT_AND_QUEUE_TRANSFER_DISCRIMINATOR = 16;
 const ENSURE_TRANSFER_QUEUE_CRANK_DISCRIMINATOR = 17;
 const DELEGATE_TRANSFER_QUEUE_DISCRIMINATOR = 19;
+const ALLOCATE_TRANSFER_QUEUE_DISCRIMINATOR = 27;
 
 /**
- * Derive the transfer queue PDA for a mint.
+ * Derive the transfer queue PDA for a mint/validator pair.
  * @param mint - The mint account
+ * @param validator - The validator account
  * @returns The transfer queue PDA and bump
  */
-export function deriveTransferQueue(mint: PublicKey): [PublicKey, number] {
+export function deriveTransferQueue(
+  mint: PublicKey,
+  validator: PublicKey,
+): [PublicKey, number] {
   return PublicKey.findProgramAddressSync(
-    [TRANSFER_QUEUE_SEED, mint.toBuffer()],
+    [TRANSFER_QUEUE_SEED, mint.toBuffer(), validator.toBuffer()],
     EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
   );
 }
 
 /**
- * Initialize the per-mint transfer queue.
+ * Initialize the per-validator transfer queue for a mint.
  * @param payer - The payer account
  * @param queue - The transfer queue PDA
  * @param mint - The mint account
- * @param sizeBytes - Optional queue size in bytes. Omit to use the program default.
+ * @param validator - The validator account
+ * @param requestedItems - Optional queue item count. Omit to use the program default.
  * @returns The initialize transfer queue instruction
  */
 export function initTransferQueueIx(
   payer: PublicKey,
   queue: PublicKey,
   mint: PublicKey,
-  sizeBytes?: number,
+  validator: PublicKey,
+  requestedItems?: number,
 ): TransactionInstruction {
   return new TransactionInstruction({
     programId: EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
@@ -57,15 +64,34 @@ export function initTransferQueueIx(
       { pubkey: payer, isSigner: true, isWritable: true },
       { pubkey: queue, isSigner: false, isWritable: true },
       { pubkey: mint, isSigner: false, isWritable: false },
+      { pubkey: validator, isSigner: false, isWritable: false },
       { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
     ],
     data:
-      sizeBytes === undefined
+      requestedItems === undefined
         ? Buffer.from([INITIALIZE_TRANSFER_QUEUE_DISCRIMINATOR])
         : Buffer.from([
             INITIALIZE_TRANSFER_QUEUE_DISCRIMINATOR,
-            ...u32le(sizeBytes),
+            ...u32le(requestedItems),
           ]),
+  });
+}
+
+/**
+ * Allocate additional space for a prefunded transfer queue.
+ * @param queue - The transfer queue PDA
+ * @returns The allocate transfer queue instruction
+ */
+export function allocateTransferQueueIx(
+  queue: PublicKey,
+): TransactionInstruction {
+  return new TransactionInstruction({
+    programId: EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
+    keys: [
+      { pubkey: queue, isSigner: false, isWritable: true },
+      { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+    ],
+    data: Buffer.from([ALLOCATE_TRANSFER_QUEUE_DISCRIMINATOR]),
   });
 }
 
@@ -133,6 +159,7 @@ export function depositAndQueueTransferIx(
  * Ensure the recurring transfer queue crank is scheduled.
  * @param payer - The payer account
  * @param queue - The transfer queue PDA
+ * @param magicFeeVault - The validator magic fee vault PDA from the delegation program
  * @param magicContext - The Magic context account
  * @param magicProgram - The Magic program account
  * @returns The ensure transfer queue crank instruction
@@ -140,6 +167,7 @@ export function depositAndQueueTransferIx(
 export function ensureTransferQueueCrankIx(
   payer: PublicKey,
   queue: PublicKey,
+  magicFeeVault: PublicKey,
   magicContext: PublicKey = MAGIC_CONTEXT_ID,
   magicProgram: PublicKey = MAGIC_PROGRAM_ID,
 ): TransactionInstruction {
@@ -148,6 +176,7 @@ export function ensureTransferQueueCrankIx(
     keys: [
       { pubkey: payer, isSigner: true, isWritable: true },
       { pubkey: queue, isSigner: false, isWritable: true },
+      { pubkey: magicFeeVault, isSigner: false, isWritable: true },
       { pubkey: magicContext, isSigner: false, isWritable: true },
       { pubkey: magicProgram, isSigner: false, isWritable: false },
     ],
@@ -205,7 +234,7 @@ export function delegateTransferQueueIx(
 
 function u32le(n: number): number[] {
   if (!Number.isInteger(n) || n < 0 || n > 0xffff_ffff) {
-    throw new Error("sizeBytes out of range for u32");
+    throw new Error("value out of range for u32");
   }
 
   return [n & 0xff, (n >>> 8) & 0xff, (n >>> 16) & 0xff, (n >>> 24) & 0xff];

@@ -14,16 +14,19 @@ import {
 } from "../instructions/magic-program";
 import { address, getAddressEncoder, type Address } from "@solana/kit";
 import {
+  allocateTransferQueueIx,
   delegateEataPermissionIx,
   depositAndQueueTransferIx,
   delegateSpl,
   delegateSplWithPrivateTransfer,
   delegateTransferQueueIx,
   deriveEphemeralAta,
+  deriveTransferQueue,
   deriveRentPda,
   deriveVault,
   ensureTransferQueueCrankIx,
   initEphemeralAtaIx,
+  initTransferQueueIx,
   initVaultIx,
   initRentPdaIx,
   transferSpl,
@@ -1043,6 +1046,7 @@ describe("Exposed Instructions (@solana/kit)", () => {
         visibility: "private",
         fromBalance: "ephemeral",
         toBalance: "base",
+        validator,
         initAtasIfMissing: true,
         privateTransfer: {
           minDelayMs: 100n,
@@ -1060,6 +1064,7 @@ describe("Exposed Instructions (@solana/kit)", () => {
         visibility: "private",
         fromBalance: "ephemeral",
         toBalance: "base",
+        validator,
         initIfMissing: true,
         initVaultIfMissing: true,
         privateTransfer: {
@@ -1082,6 +1087,18 @@ describe("Exposed Instructions (@solana/kit)", () => {
         300n,
       );
       expect(Buffer.from(instructions[0].data ?? []).readUInt32LE(25)).toBe(4);
+    });
+
+    it("should require validator for private ephemeral-to-base transfers", async () => {
+      await expect(
+        transferSpl(from, to, mint, 25n, {
+          visibility: "private",
+          fromBalance: "ephemeral",
+          toBalance: "base",
+        }),
+      ).rejects.toThrow(
+        "validator is required for private ephemeral-to-base transfers",
+      );
     });
 
     it("should reject private base-to-base transfers when maxDelayMs is less than minDelayMs", async () => {
@@ -1188,15 +1205,21 @@ describe("Exposed Instructions (@solana/kit)", () => {
   describe("ensureTransferQueueCrankIx (Ephemeral SPL Token Program)", () => {
     const payer = mockAddress;
     const queue = differentAddress;
+    const magicFeeVault = address("11111111111111111111111111111113");
 
-    it("should include queue, magic context, and magic program in order", () => {
-      const instruction = ensureTransferQueueCrankIx(payer, queue);
+    it("should include queue, magic fee vault, magic context, and magic program in order", () => {
+      const instruction = ensureTransferQueueCrankIx(
+        payer,
+        queue,
+        magicFeeVault,
+      );
 
-      expect(instruction.accounts).toHaveLength(4);
+      expect(instruction.accounts).toHaveLength(5);
       expect(instruction.accounts?.[0].address).toBe(payer);
       expect(instruction.accounts?.[1].address).toBe(queue);
-      expect(instruction.accounts?.[2].address).toBe(MAGIC_CONTEXT_ID);
-      expect(instruction.accounts?.[3].address).toBe(MAGIC_PROGRAM_ID);
+      expect(instruction.accounts?.[2].address).toBe(magicFeeVault);
+      expect(instruction.accounts?.[3].address).toBe(MAGIC_CONTEXT_ID);
+      expect(instruction.accounts?.[4].address).toBe(MAGIC_PROGRAM_ID);
     });
   });
 
@@ -1256,6 +1279,41 @@ describe("Exposed Instructions (@solana/kit)", () => {
 
       expect(instruction.accounts).toHaveLength(9);
       expect(instruction.data).toEqual(new Uint8Array([19]));
+    });
+  });
+
+  describe("transfer queue helpers (Ephemeral SPL Token Program)", () => {
+    const mint = address("11111111111111111111111111111113");
+    const validator = address("11111111111111111111111111111114");
+
+    it("should derive validator-scoped transfer queue PDAs", async () => {
+      const [queueA] = await deriveTransferQueue(mint, validator);
+      const [queueB] = await deriveTransferQueue(mint, mockAddress);
+
+      expect(queueA).not.toBe(queueB);
+    });
+
+    it("should include validator and requested item count in initTransferQueueIx", async () => {
+      const [queue] = await deriveTransferQueue(mint, validator);
+      const instruction = initTransferQueueIx(
+        mockAddress,
+        queue,
+        mint,
+        validator,
+        92,
+      );
+
+      expect(instruction.accounts).toHaveLength(5);
+      expect(instruction.accounts?.[3].address).toBe(validator);
+      expect(Array.from(instruction.data ?? [])).toEqual([12, 92, 0, 0, 0]);
+    });
+
+    it("should serialize discriminator 27 for allocateTransferQueueIx", async () => {
+      const [queue] = await deriveTransferQueue(mint, validator);
+      const instruction = allocateTransferQueueIx(queue);
+
+      expect(instruction.accounts).toHaveLength(2);
+      expect(Array.from(instruction.data ?? [])).toEqual([27]);
     });
   });
 

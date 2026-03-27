@@ -85,8 +85,8 @@ impl DepositAndDelegateShuttleEphemeralAtaWithMergeAndPrivateTransferBuilder {
         let delegation_metadata = delegation_metadata_pda_from_delegated_account(&shuttle_ata);
         let (vault, _vault_bump) = GlobalVault::find_pda(&self.mint);
         let vault_ata = find_vault_ata(&self.mint, &vault);
-        let (queue, _queue_bump) = find_transfer_queue(&self.mint);
         let validator = self.require_validator()?;
+        let (queue, _queue_bump) = find_transfer_queue(&self.mint, validator);
         let encrypted_destination =
             encrypt_private_transfer_field(self.destination_owner.as_ref(), validator)?;
         let encrypted_suffix = encrypt_private_transfer_field(
