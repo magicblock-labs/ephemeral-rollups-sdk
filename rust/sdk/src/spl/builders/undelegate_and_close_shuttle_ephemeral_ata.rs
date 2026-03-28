@@ -9,8 +9,10 @@ use crate::{
 
 pub struct UndelegateAndCloseShuttleEphemeralAtaBuilder {
     pub payer: Pubkey,
+    pub rent_reimbursement: Pubkey,
     pub owner: Pubkey,
     pub mint: Pubkey,
+    pub destination_ata: Pubkey,
     pub shuttle_id: u32,
     pub escrow_index: Option<u8>,
 }
@@ -33,9 +35,11 @@ impl UndelegateAndCloseShuttleEphemeralAtaBuilder {
             program_id: ESPL_TOKEN_PROGRAM_ID,
             accounts: vec![
                 AccountMeta::new(self.payer, true),
+                AccountMeta::new(self.rent_reimbursement, false),
                 AccountMeta::new_readonly(shuttle_ephemeral_ata, false),
                 AccountMeta::new_readonly(shuttle_ata, false),
                 AccountMeta::new(shuttle_wallet_ata, false),
+                AccountMeta::new(self.destination_ata, false),
                 AccountMeta::new_readonly(TOKEN_PROGRAM_ID, false),
                 AccountMeta::new(MAGIC_CONTEXT_ID, false),
                 AccountMeta::new_readonly(MAGIC_PROGRAM_ID, false),

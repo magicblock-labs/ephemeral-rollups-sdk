@@ -13,11 +13,13 @@ import {
   EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
   MAGIC_CONTEXT_ID,
   MAGIC_PROGRAM_ID,
+  PERMISSION_PROGRAM_ID,
 } from "../../constants";
 import {
   delegateBufferPdaFromDelegatedAccountAndOwnerProgram,
   delegationMetadataPdaFromDelegatedAccount,
   delegationRecordPdaFromDelegatedAccount,
+  permissionPdaFromAccount,
 } from "../../pda";
 
 const INITIALIZE_TRANSFER_QUEUE_DISCRIMINATOR = 12;
@@ -61,20 +63,25 @@ export async function deriveTransferQueue(
  * @param requestedItems - Optional queue item count. Omit to use the program default.
  * @returns The initialize transfer queue instruction
  */
-export function initTransferQueueIx(
+export async function initTransferQueueIx(
   payer: Address,
   queue: Address,
   mint: Address,
   validator: Address,
   requestedItems?: number,
-): Instruction {
+): Promise<Instruction> {
   return {
     accounts: [
       { address: payer, role: AccountRole.WRITABLE_SIGNER },
       { address: queue, role: AccountRole.WRITABLE },
+      {
+        address: await permissionPdaFromAccount(queue),
+        role: AccountRole.WRITABLE,
+      },
       { address: mint, role: AccountRole.READONLY },
       { address: validator, role: AccountRole.READONLY },
       { address: SYSTEM_PROGRAM_ADDRESS, role: AccountRole.READONLY },
+      { address: PERMISSION_PROGRAM_ID, role: AccountRole.READONLY },
     ],
     data:
       requestedItems === undefined
@@ -116,6 +123,7 @@ export function allocateTransferQueueIx(queue: Address): Instruction {
  * @param minDelayMs - The minimum delay in milliseconds
  * @param maxDelayMs - The maximum delay in milliseconds
  * @param split - The number of queue entries to create
+ * @param reimbursementTokenInfo - Reimbursement token account used by the queue-full fallback path
  * @returns The deposit-and-queue-transfer instruction
  */
 export function depositAndQueueTransferIx(
@@ -130,6 +138,7 @@ export function depositAndQueueTransferIx(
   minDelayMs: bigint = 0n,
   maxDelayMs: bigint = minDelayMs,
   split: number = 1,
+  reimbursementTokenInfo: Address = source,
 ): Instruction {
   if (!Number.isInteger(split) || split <= 0 || split > 0xffff_ffff) {
     throw new Error("split must fit in u32");
@@ -151,6 +160,7 @@ export function depositAndQueueTransferIx(
       { address: destination, role: AccountRole.READONLY },
       { address: owner, role: AccountRole.READONLY_SIGNER },
       { address: TOKEN_PROGRAM_ADDRESS, role: AccountRole.READONLY },
+      { address: reimbursementTokenInfo, role: AccountRole.WRITABLE },
     ],
     data: new Uint8Array([
       DEPOSIT_AND_QUEUE_TRANSFER_DISCRIMINATOR,
