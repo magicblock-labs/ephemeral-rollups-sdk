@@ -36,8 +36,12 @@ export interface StructuredInstruction {
 }
 
 export function toTransactionInstruction(
-  instruction: StructuredInstruction,
+  instruction: StructuredInstruction | TransactionInstruction,
 ): TransactionInstruction {
+  if ("keys" in instruction) {
+    return instruction;
+  }
+
   return new TransactionInstruction({
     programId: instruction.programAddress,
     keys: instruction.accounts,
@@ -76,8 +80,8 @@ export function initTransferQueueIx(
   mint: PublicKey,
   validator: PublicKey,
   requestedItems?: number,
-): StructuredInstruction {
-  return {
+): TransactionInstruction {
+  return toTransactionInstruction({
     accounts: [
       { pubkey: payer, isSigner: true, isWritable: true },
       { pubkey: queue, isSigner: false, isWritable: true },
@@ -99,7 +103,7 @@ export function initTransferQueueIx(
             ...u32le(requestedItems),
           ]),
     programAddress: EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
-  };
+  });
 }
 
 /**
@@ -109,15 +113,15 @@ export function initTransferQueueIx(
  */
 export function allocateTransferQueueIx(
   queue: PublicKey,
-): StructuredInstruction {
-  return {
+): TransactionInstruction {
+  return toTransactionInstruction({
     accounts: [
       { pubkey: queue, isSigner: false, isWritable: true },
       { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
     ],
     data: new Uint8Array([ALLOCATE_TRANSFER_QUEUE_DISCRIMINATOR]),
     programAddress: EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
-  };
+  });
 }
 
 /**
@@ -149,7 +153,7 @@ export function depositAndQueueTransferIx(
   maxDelayMs: bigint = minDelayMs,
   split: number = 1,
   reimbursementTokenInfo: PublicKey = source,
-): StructuredInstruction {
+): TransactionInstruction {
   if (!Number.isInteger(split) || split <= 0 || split > 0xffff_ffff) {
     throw new Error("split must fit in u32");
   }
@@ -160,7 +164,7 @@ export function depositAndQueueTransferIx(
     throw new Error("maxDelayMs must be greater than or equal to minDelayMs");
   }
 
-  return {
+  return toTransactionInstruction({
     accounts: [
       { pubkey: queue, isSigner: false, isWritable: true },
       { pubkey: vault, isSigner: false, isWritable: false },
@@ -180,7 +184,7 @@ export function depositAndQueueTransferIx(
       ...u32le(split),
     ]),
     programAddress: EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
-  };
+  });
 }
 
 /**
@@ -198,8 +202,8 @@ export function ensureTransferQueueCrankIx(
   magicFeeVault: PublicKey,
   magicContext: PublicKey = MAGIC_CONTEXT_ID,
   magicProgram: PublicKey = MAGIC_PROGRAM_ID,
-): StructuredInstruction {
-  return {
+): TransactionInstruction {
+  return toTransactionInstruction({
     accounts: [
       { pubkey: payer, isSigner: true, isWritable: true },
       { pubkey: queue, isSigner: false, isWritable: true },
@@ -209,7 +213,7 @@ export function ensureTransferQueueCrankIx(
     ],
     data: new Uint8Array([ENSURE_TRANSFER_QUEUE_CRANK_DISCRIMINATOR]),
     programAddress: EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
-  };
+  });
 }
 
 /**
@@ -223,8 +227,8 @@ export function delegateTransferQueueIx(
   queue: PublicKey,
   payer: PublicKey,
   mint: PublicKey,
-): StructuredInstruction {
-  return {
+): TransactionInstruction {
+  return toTransactionInstruction({
     accounts: [
       { pubkey: payer, isSigner: true, isWritable: true },
       { pubkey: queue, isSigner: false, isWritable: true },
@@ -257,7 +261,7 @@ export function delegateTransferQueueIx(
     ],
     data: new Uint8Array([DELEGATE_TRANSFER_QUEUE_DISCRIMINATOR]),
     programAddress: EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
-  };
+  });
 }
 
 function u32le(n: number): number[] {
