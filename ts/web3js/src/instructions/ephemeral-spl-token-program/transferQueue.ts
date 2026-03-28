@@ -1,4 +1,5 @@
 import {
+  AccountMeta,
   PublicKey,
   SystemProgram,
   TransactionInstruction,
@@ -9,11 +10,13 @@ import {
   EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
   MAGIC_CONTEXT_ID,
   MAGIC_PROGRAM_ID,
+  PERMISSION_PROGRAM_ID,
 } from "../../constants.js";
 import {
   delegateBufferPdaFromDelegatedAccountAndOwnerProgram,
   delegationMetadataPdaFromDelegatedAccount,
   delegationRecordPdaFromDelegatedAccount,
+  permissionPdaFromAccount,
 } from "../../pda.js";
 
 const TRANSFER_QUEUE_SEED = Buffer.from("queue");
@@ -25,6 +28,22 @@ const DEPOSIT_AND_QUEUE_TRANSFER_DISCRIMINATOR = 16;
 const ENSURE_TRANSFER_QUEUE_CRANK_DISCRIMINATOR = 17;
 const DELEGATE_TRANSFER_QUEUE_DISCRIMINATOR = 19;
 const ALLOCATE_TRANSFER_QUEUE_DISCRIMINATOR = 27;
+
+export interface StructuredInstruction {
+  accounts: AccountMeta[];
+  data: Uint8Array;
+  programAddress: PublicKey;
+}
+
+export function toTransactionInstruction(
+  instruction: StructuredInstruction,
+): TransactionInstruction {
+  return new TransactionInstruction({
+    programId: instruction.programAddress,
+    keys: instruction.accounts,
+    data: Buffer.from(instruction.data),
+  });
+}
 
 /**
  * Derive the transfer queue PDA for a mint/validator pair.
@@ -57,24 +76,30 @@ export function initTransferQueueIx(
   mint: PublicKey,
   validator: PublicKey,
   requestedItems?: number,
-): TransactionInstruction {
-  return new TransactionInstruction({
-    programId: EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
-    keys: [
+): StructuredInstruction {
+  return {
+    accounts: [
       { pubkey: payer, isSigner: true, isWritable: true },
       { pubkey: queue, isSigner: false, isWritable: true },
+      {
+        pubkey: permissionPdaFromAccount(queue),
+        isSigner: false,
+        isWritable: true,
+      },
       { pubkey: mint, isSigner: false, isWritable: false },
       { pubkey: validator, isSigner: false, isWritable: false },
       { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+      { pubkey: PERMISSION_PROGRAM_ID, isSigner: false, isWritable: false },
     ],
     data:
       requestedItems === undefined
-        ? Buffer.from([INITIALIZE_TRANSFER_QUEUE_DISCRIMINATOR])
-        : Buffer.from([
+        ? new Uint8Array([INITIALIZE_TRANSFER_QUEUE_DISCRIMINATOR])
+        : new Uint8Array([
             INITIALIZE_TRANSFER_QUEUE_DISCRIMINATOR,
             ...u32le(requestedItems),
           ]),
-  });
+    programAddress: EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
+  };
 }
 
 /**
@@ -84,15 +109,15 @@ export function initTransferQueueIx(
  */
 export function allocateTransferQueueIx(
   queue: PublicKey,
-): TransactionInstruction {
-  return new TransactionInstruction({
-    programId: EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
-    keys: [
+): StructuredInstruction {
+  return {
+    accounts: [
       { pubkey: queue, isSigner: false, isWritable: true },
       { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
     ],
-    data: Buffer.from([ALLOCATE_TRANSFER_QUEUE_DISCRIMINATOR]),
-  });
+    data: new Uint8Array([ALLOCATE_TRANSFER_QUEUE_DISCRIMINATOR]),
+    programAddress: EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
+  };
 }
 
 /**
@@ -122,7 +147,7 @@ export function depositAndQueueTransferIx(
   minDelayMs: bigint = 0n,
   maxDelayMs: bigint = minDelayMs,
   split: number = 1,
-): TransactionInstruction {
+): StructuredInstruction {
   if (!Number.isInteger(split) || split <= 0 || split > 0xffff_ffff) {
     throw new Error("split must fit in u32");
   }
@@ -133,9 +158,8 @@ export function depositAndQueueTransferIx(
     throw new Error("maxDelayMs must be greater than or equal to minDelayMs");
   }
 
-  return new TransactionInstruction({
-    programId: EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
-    keys: [
+  return {
+    accounts: [
       { pubkey: queue, isSigner: false, isWritable: true },
       { pubkey: vault, isSigner: false, isWritable: false },
       { pubkey: mint, isSigner: false, isWritable: false },
@@ -145,14 +169,15 @@ export function depositAndQueueTransferIx(
       { pubkey: owner, isSigner: true, isWritable: false },
       { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
     ],
-    data: Buffer.from([
+    data: new Uint8Array([
       DEPOSIT_AND_QUEUE_TRANSFER_DISCRIMINATOR,
       ...u64le(amount),
       ...u64le(minDelayMs),
       ...u64le(maxDelayMs),
       ...u32le(split),
     ]),
-  });
+    programAddress: EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
+  };
 }
 
 /**
@@ -170,18 +195,18 @@ export function ensureTransferQueueCrankIx(
   magicFeeVault: PublicKey,
   magicContext: PublicKey = MAGIC_CONTEXT_ID,
   magicProgram: PublicKey = MAGIC_PROGRAM_ID,
-): TransactionInstruction {
-  return new TransactionInstruction({
-    programId: EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
-    keys: [
+): StructuredInstruction {
+  return {
+    accounts: [
       { pubkey: payer, isSigner: true, isWritable: true },
       { pubkey: queue, isSigner: false, isWritable: true },
       { pubkey: magicFeeVault, isSigner: false, isWritable: true },
       { pubkey: magicContext, isSigner: false, isWritable: true },
       { pubkey: magicProgram, isSigner: false, isWritable: false },
     ],
-    data: Buffer.from([ENSURE_TRANSFER_QUEUE_CRANK_DISCRIMINATOR]),
-  });
+    data: new Uint8Array([ENSURE_TRANSFER_QUEUE_CRANK_DISCRIMINATOR]),
+    programAddress: EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
+  };
 }
 
 /**
@@ -195,10 +220,9 @@ export function delegateTransferQueueIx(
   queue: PublicKey,
   payer: PublicKey,
   mint: PublicKey,
-): TransactionInstruction {
-  return new TransactionInstruction({
-    programId: EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
-    keys: [
+): StructuredInstruction {
+  return {
+    accounts: [
       { pubkey: payer, isSigner: true, isWritable: true },
       { pubkey: queue, isSigner: false, isWritable: true },
       { pubkey: mint, isSigner: false, isWritable: false },
@@ -228,8 +252,9 @@ export function delegateTransferQueueIx(
       { pubkey: DELEGATION_PROGRAM_ID, isSigner: false, isWritable: false },
       { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
     ],
-    data: Buffer.from([DELEGATE_TRANSFER_QUEUE_DISCRIMINATOR]),
-  });
+    data: new Uint8Array([DELEGATE_TRANSFER_QUEUE_DISCRIMINATOR]),
+    programAddress: EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
+  };
 }
 
 function u32le(n: number): number[] {

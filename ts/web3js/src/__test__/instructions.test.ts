@@ -37,7 +37,9 @@ import {
   EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
   MAGIC_PROGRAM_ID,
   MAGIC_CONTEXT_ID,
+  PERMISSION_PROGRAM_ID,
 } from "../constants";
+import { permissionPdaFromAccount } from "../pda";
 
 function readLengthPrefixedField(
   data: Uint8Array,
@@ -1196,16 +1198,16 @@ describe("Exposed Instructions (web3.js)", () => {
         magicFeeVault,
       );
 
-      expect(instruction.keys).toHaveLength(5);
-      expect(instruction.keys[0].pubkey.toBase58()).toBe(payer.toBase58());
-      expect(instruction.keys[1].pubkey.toBase58()).toBe(queue.toBase58());
-      expect(instruction.keys[2].pubkey.toBase58()).toBe(
+      expect(instruction.accounts).toHaveLength(5);
+      expect(instruction.accounts[0].pubkey.toBase58()).toBe(payer.toBase58());
+      expect(instruction.accounts[1].pubkey.toBase58()).toBe(queue.toBase58());
+      expect(instruction.accounts[2].pubkey.toBase58()).toBe(
         magicFeeVault.toBase58(),
       );
-      expect(instruction.keys[3].pubkey.toBase58()).toBe(
+      expect(instruction.accounts[3].pubkey.toBase58()).toBe(
         MAGIC_CONTEXT_ID.toBase58(),
       );
-      expect(instruction.keys[4].pubkey.toBase58()).toBe(
+      expect(instruction.accounts[4].pubkey.toBase58()).toBe(
         MAGIC_PROGRAM_ID.toBase58(),
       );
     });
@@ -1234,7 +1236,7 @@ describe("Exposed Instructions (web3.js)", () => {
         4,
       );
 
-      expect(instruction.keys).toHaveLength(8);
+      expect(instruction.accounts).toHaveLength(8);
       expect(Array.from(instruction.data)).toEqual([
         16,
         ...Array.from(
@@ -1261,7 +1263,7 @@ describe("Exposed Instructions (web3.js)", () => {
     it("should serialize discriminator 19 for the delegated transfer queue opcode", () => {
       const instruction = delegateTransferQueueIx(queue, payer, mockPublicKey);
 
-      expect(instruction.keys).toHaveLength(9);
+      expect(instruction.accounts).toHaveLength(9);
       expect(Array.from(instruction.data)).toEqual([19]);
     });
   });
@@ -1287,8 +1289,16 @@ describe("Exposed Instructions (web3.js)", () => {
         92,
       );
 
-      expect(instruction.keys).toHaveLength(5);
-      expect(instruction.keys[3].pubkey.toBase58()).toBe(validator.toBase58());
+      expect(instruction.accounts).toHaveLength(7);
+      expect(instruction.accounts[2].pubkey.toBase58()).toBe(
+        permissionPdaFromAccount(queue).toBase58(),
+      );
+      expect(instruction.accounts[4].pubkey.toBase58()).toBe(
+        validator.toBase58(),
+      );
+      expect(instruction.accounts[6].pubkey.toBase58()).toBe(
+        PERMISSION_PROGRAM_ID.toBase58(),
+      );
       expect(Array.from(instruction.data)).toEqual([12, 92, 0, 0, 0]);
     });
 
@@ -1296,7 +1306,7 @@ describe("Exposed Instructions (web3.js)", () => {
       const [queue] = deriveTransferQueue(mint, validator);
       const instruction = allocateTransferQueueIx(queue);
 
-      expect(instruction.keys).toHaveLength(2);
+      expect(instruction.accounts).toHaveLength(2);
       expect(Array.from(instruction.data)).toEqual([27]);
     });
   });

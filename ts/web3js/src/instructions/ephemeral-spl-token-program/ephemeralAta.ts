@@ -25,6 +25,7 @@ import {
   depositAndQueueTransferIx,
   deriveTransferQueue,
   initTransferQueueIx,
+  toTransactionInstruction,
 } from "./transferQueue.js";
 
 // Minimal SPL Token helpers (vendored) to avoid importing @solana/spl-token.
@@ -600,7 +601,6 @@ export function delegateEphemeralAtaIx(
  * @param owner - The owner account
  * @param mint - The mint account
  * @param shuttleId - The shuttle id (u32)
- * @param bump - The shuttle metadata bump
  * @returns The initialize shuttle instruction
  */
 export function initShuttleEphemeralAtaIx(
@@ -1550,7 +1550,11 @@ export async function delegateSplWithPrivateTransfer(
   }
 
   if (initTransferQueueIfMissing) {
-    instructions.push(initTransferQueueIx(payer, queue, mint, validator));
+    instructions.push(
+      toTransactionInstruction(
+        initTransferQueueIx(payer, queue, mint, validator),
+      ),
+    );
   }
 
   if (initAtasIfMissing) {
@@ -1626,18 +1630,20 @@ export async function transferSpl(
           const vaultAta = deriveVaultAta(mint, vault);
 
           return [
-            depositAndQueueTransferIx(
-              queue,
-              vault,
-              mint,
-              fromAta,
-              vaultAta,
-              toAta,
-              from,
-              amount,
-              minDelayMs,
-              maxDelayMs,
-              split,
+            toTransactionInstruction(
+              depositAndQueueTransferIx(
+                queue,
+                vault,
+                mint,
+                fromAta,
+                vaultAta,
+                toAta,
+                from,
+                amount,
+                minDelayMs,
+                maxDelayMs,
+                split,
+              ),
             ),
           ];
         }

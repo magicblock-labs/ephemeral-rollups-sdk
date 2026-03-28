@@ -1529,7 +1529,7 @@ export async function delegateSplWithPrivateTransfer(
   }
 
   if (initTransferQueueIfMissing) {
-    instructions.push(initTransferQueueIx(payer, queue, mint, validator));
+    instructions.push(await initTransferQueueIx(payer, queue, mint, validator));
   }
 
   if (initAtasIfMissing) {

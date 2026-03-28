@@ -37,7 +37,9 @@ import {
   MAGIC_PROGRAM_ID,
   MAGIC_CONTEXT_ID,
   EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
+  PERMISSION_PROGRAM_ID,
 } from "../constants";
+import { permissionPdaFromAccount } from "../pda";
 
 function readLengthPrefixedField(
   data: Uint8Array,
@@ -1295,7 +1297,7 @@ describe("Exposed Instructions (@solana/kit)", () => {
 
     it("should include validator and requested item count in initTransferQueueIx", async () => {
       const [queue] = await deriveTransferQueue(mint, validator);
-      const instruction = initTransferQueueIx(
+      const instruction = await initTransferQueueIx(
         mockAddress,
         queue,
         mint,
@@ -1303,8 +1305,12 @@ describe("Exposed Instructions (@solana/kit)", () => {
         92,
       );
 
-      expect(instruction.accounts).toHaveLength(5);
-      expect(instruction.accounts?.[3].address).toBe(validator);
+      expect(instruction.accounts).toHaveLength(7);
+      expect(instruction.accounts?.[2].address).toBe(
+        await permissionPdaFromAccount(queue),
+      );
+      expect(instruction.accounts?.[4].address).toBe(validator);
+      expect(instruction.accounts?.[6].address).toBe(PERMISSION_PROGRAM_ID);
       expect(Array.from(instruction.data ?? [])).toEqual([12, 92, 0, 0, 0]);
     });
 
