@@ -1116,7 +1116,7 @@ describe("Exposed Instructions (web3.js)", () => {
       expect(instructions[0].data[0]).toBe(16);
       expect(instructions[0].keys).toHaveLength(9);
       expect(instructions[0].keys[8].pubkey.toBase58()).toBe(
-        EPHEMERAL_SPL_TOKEN_PROGRAM_ID.toBase58(),
+        instructions[0].keys[3].pubkey.toBase58(),
       );
       expect(Buffer.from(instructions[0].data).readBigUInt64LE(1)).toBe(25n);
       expect(Buffer.from(instructions[0].data).readBigUInt64LE(9)).toBe(100n);
@@ -1241,9 +1241,7 @@ describe("Exposed Instructions (web3.js)", () => {
       );
 
       expect(instruction.accounts).toHaveLength(9);
-      expect(instruction.accounts[8].pubkey.toBase58()).toBe(
-        EPHEMERAL_SPL_TOKEN_PROGRAM_ID.toBase58(),
-      );
+      expect(instruction.accounts[8].pubkey.toBase58()).toBe(source.toBase58());
       expect(instruction.accounts[8].isWritable).toBe(true);
       expect(Array.from(instruction.data)).toEqual([
         16,
@@ -1263,8 +1261,8 @@ describe("Exposed Instructions (web3.js)", () => {
       ]);
     });
 
-    it("should allow overriding the shuttle wallet fallback account", () => {
-      const shuttleWalletAta = new PublicKey(
+    it("should allow overriding the reimbursement token account", () => {
+      const reimbursementTokenInfo = new PublicKey(
         "11111111111111111111111111111118",
       );
       const instruction = depositAndQueueTransferIx(
@@ -1279,11 +1277,11 @@ describe("Exposed Instructions (web3.js)", () => {
         100n,
         300n,
         4,
-        shuttleWalletAta,
+        reimbursementTokenInfo,
       );
 
       expect(instruction.accounts[8].pubkey.toBase58()).toBe(
-        shuttleWalletAta.toBase58(),
+        reimbursementTokenInfo.toBase58(),
       );
     });
   });

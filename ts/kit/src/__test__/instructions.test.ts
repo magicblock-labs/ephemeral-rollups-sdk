@@ -1081,7 +1081,7 @@ describe("Exposed Instructions (@solana/kit)", () => {
       expect(instructions[0].data?.[0]).toBe(16);
       expect(instructions[0].accounts).toHaveLength(9);
       expect(instructions[0].accounts?.[8].address).toBe(
-        EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
+        instructions[0].accounts?.[3].address,
       );
       expect(Buffer.from(instructions[0].data ?? []).readBigUInt64LE(1)).toBe(
         25n,
@@ -1253,9 +1253,7 @@ describe("Exposed Instructions (@solana/kit)", () => {
       );
 
       expect(instruction.accounts).toHaveLength(9);
-      expect(instruction.accounts?.[8].address).toBe(
-        EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
-      );
+      expect(instruction.accounts?.[8].address).toBe(source);
       expect(instruction.accounts?.[8].role).toBe(AccountRole.WRITABLE);
       expect(Array.from(instruction.data ?? [])).toEqual([
         16,
@@ -1275,8 +1273,10 @@ describe("Exposed Instructions (@solana/kit)", () => {
       ]);
     });
 
-    it("should allow overriding the shuttle wallet fallback account", () => {
-      const shuttleWalletAta = address("11111111111111111111111111111118");
+    it("should allow overriding the reimbursement token account", () => {
+      const reimbursementTokenInfo = address(
+        "11111111111111111111111111111118",
+      );
       const instruction = depositAndQueueTransferIx(
         queue,
         vault,
@@ -1289,10 +1289,10 @@ describe("Exposed Instructions (@solana/kit)", () => {
         100n,
         300n,
         4,
-        shuttleWalletAta,
+        reimbursementTokenInfo,
       );
 
-      expect(instruction.accounts?.[8].address).toBe(shuttleWalletAta);
+      expect(instruction.accounts?.[8].address).toBe(reimbursementTokenInfo);
     });
   });
 

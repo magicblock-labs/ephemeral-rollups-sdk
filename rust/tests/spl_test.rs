@@ -199,7 +199,7 @@ mod tests {
             vault_ata,
             destination,
             owner,
-            shuttle_wallet_ata: None,
+            reimbursement_token_info: None,
             amount: 25,
             min_delay_ms: 100,
             max_delay_ms: 300,
@@ -218,7 +218,7 @@ mod tests {
         assert_eq!(instruction.accounts[5].pubkey, destination);
         assert_eq!(instruction.accounts[6].pubkey, owner);
         assert_eq!(instruction.accounts[7].pubkey, TOKEN_PROGRAM_ID);
-        assert_eq!(instruction.accounts[8].pubkey, ESPL_TOKEN_PROGRAM_ID);
+        assert_eq!(instruction.accounts[8].pubkey, source);
         assert_eq!(
             instruction.data[0],
             EphemeralSplDiscriminator::DepositAndQueueTransfer as u8
@@ -242,8 +242,8 @@ mod tests {
     }
 
     #[test]
-    fn test_deposit_and_queue_transfer_with_shuttle_wallet_override() {
-        let shuttle_wallet_ata = Pubkey::new_unique();
+    fn test_deposit_and_queue_transfer_with_reimbursement_token_override() {
+        let reimbursement_token_info = Pubkey::new_unique();
 
         let instruction = DepositAndQueueTransferBuilder {
             queue: Pubkey::new_unique(),
@@ -253,7 +253,7 @@ mod tests {
             vault_ata: Pubkey::new_unique(),
             destination: Pubkey::new_unique(),
             owner: Pubkey::new_unique(),
-            shuttle_wallet_ata: Some(shuttle_wallet_ata),
+            reimbursement_token_info: Some(reimbursement_token_info),
             amount: 25,
             min_delay_ms: 100,
             max_delay_ms: 300,
@@ -262,7 +262,7 @@ mod tests {
         .instruction()
         .unwrap();
 
-        assert_eq!(instruction.accounts[8].pubkey, shuttle_wallet_ata);
+        assert_eq!(instruction.accounts[8].pubkey, reimbursement_token_info);
     }
 
     #[test]

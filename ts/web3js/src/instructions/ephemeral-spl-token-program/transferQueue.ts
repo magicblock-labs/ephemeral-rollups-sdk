@@ -133,7 +133,7 @@ export function allocateTransferQueueIx(
  * @param minDelayMs - The minimum delay in milliseconds
  * @param maxDelayMs - The maximum delay in milliseconds
  * @param split - The number of queue entries to create
- * @param shuttleWalletAta - Optional shuttle wallet ATA used by the queue-full fallback path
+ * @param reimbursementTokenInfo - Reimbursement token account used by the queue-full fallback path
  * @returns The deposit-and-queue-transfer instruction
  */
 export function depositAndQueueTransferIx(
@@ -148,7 +148,7 @@ export function depositAndQueueTransferIx(
   minDelayMs: bigint = 0n,
   maxDelayMs: bigint = minDelayMs,
   split: number = 1,
-  shuttleWalletAta: PublicKey = EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
+  reimbursementTokenInfo: PublicKey = source,
 ): StructuredInstruction {
   if (!Number.isInteger(split) || split <= 0 || split > 0xffff_ffff) {
     throw new Error("split must fit in u32");
@@ -170,7 +170,7 @@ export function depositAndQueueTransferIx(
       { pubkey: destination, isSigner: false, isWritable: false },
       { pubkey: owner, isSigner: true, isWritable: false },
       { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
-      { pubkey: shuttleWalletAta, isSigner: false, isWritable: true },
+      { pubkey: reimbursementTokenInfo, isSigner: false, isWritable: true },
     ],
     data: new Uint8Array([
       DEPOSIT_AND_QUEUE_TRANSFER_DISCRIMINATOR,
