@@ -27,8 +27,9 @@ mod tests {
                 DepositAndQueueTransferBuilder, DepositSplTokensBuilder,
                 EnsureTransferQueueCrankBuilder, InitializeEphemeralAtaBuilder,
                 InitializeGlobalVaultBuilder, InitializeTransferQueueBuilder,
-                ResetEphemeralAtaPermissionBuilder, UndelegateEphemeralAtaBuilder,
-                UndelegateEphemeralAtaPermissionBuilder, WithdrawSplTokensBuilder,
+                ResetEphemeralAtaPermissionBuilder, UndelegateAndCloseShuttleEphemeralAtaBuilder,
+                UndelegateEphemeralAtaBuilder, UndelegateEphemeralAtaPermissionBuilder,
+                WithdrawSplTokensBuilder,
             },
             find_rent_pda, find_shuttle_ata, find_shuttle_ephemeral_ata, find_shuttle_wallet_ata,
             find_transfer_queue, find_vault_ata, EphemeralAta, EphemeralSplDiscriminator,
@@ -198,6 +199,7 @@ mod tests {
             vault_ata,
             destination,
             owner,
+            shuttle_wallet_ata: None,
             amount: 25,
             min_delay_ms: 100,
             max_delay_ms: 300,
@@ -207,7 +209,7 @@ mod tests {
         .unwrap();
 
         assert_eq!(instruction.program_id, ESPL_TOKEN_PROGRAM_ID);
-        assert_eq!(instruction.accounts.len(), 8);
+        assert_eq!(instruction.accounts.len(), 9);
         assert_eq!(instruction.accounts[0].pubkey, queue);
         assert_eq!(instruction.accounts[1].pubkey, vault);
         assert_eq!(instruction.accounts[2].pubkey, mint);
@@ -216,6 +218,7 @@ mod tests {
         assert_eq!(instruction.accounts[5].pubkey, destination);
         assert_eq!(instruction.accounts[6].pubkey, owner);
         assert_eq!(instruction.accounts[7].pubkey, TOKEN_PROGRAM_ID);
+        assert_eq!(instruction.accounts[8].pubkey, ESPL_TOKEN_PROGRAM_ID);
         assert_eq!(
             instruction.data[0],
             EphemeralSplDiscriminator::DepositAndQueueTransfer as u8
@@ -236,6 +239,30 @@ mod tests {
             u32::from_le_bytes(instruction.data[25..29].try_into().unwrap()),
             4
         );
+    }
+
+    #[test]
+    fn test_deposit_and_queue_transfer_with_shuttle_wallet_override() {
+        let shuttle_wallet_ata = Pubkey::new_unique();
+
+        let instruction = DepositAndQueueTransferBuilder {
+            queue: Pubkey::new_unique(),
+            vault: Pubkey::new_unique(),
+            mint: Pubkey::new_unique(),
+            source: Pubkey::new_unique(),
+            vault_ata: Pubkey::new_unique(),
+            destination: Pubkey::new_unique(),
+            owner: Pubkey::new_unique(),
+            shuttle_wallet_ata: Some(shuttle_wallet_ata),
+            amount: 25,
+            min_delay_ms: 100,
+            max_delay_ms: 300,
+            split: 4,
+        }
+        .instruction()
+        .unwrap();
+
+        assert_eq!(instruction.accounts[8].pubkey, shuttle_wallet_ata);
     }
 
     #[test]
@@ -745,6 +772,50 @@ mod tests {
         assert_eq!(
             instruction.data[0],
             EphemeralSplDiscriminator::UndelegateEphemeralAtaPermission as u8
+        );
+    }
+
+    #[test]
+    fn test_undelegate_and_close_shuttle_ephemeral_ata() {
+        let payer = Pubkey::new_unique();
+        let rent_reimbursement = Pubkey::new_unique();
+        let owner = Pubkey::new_unique();
+        let mint = Pubkey::new_unique();
+        let destination_ata = Pubkey::new_unique();
+        let shuttle_id = 7;
+        let (shuttle_ephemeral_ata, _shuttle_bump) =
+            find_shuttle_ephemeral_ata(&owner, &mint, shuttle_id);
+        let (shuttle_ata, _shuttle_ata_bump) = find_shuttle_ata(&shuttle_ephemeral_ata, &mint);
+        let shuttle_wallet_ata = find_shuttle_wallet_ata(&mint, &shuttle_ephemeral_ata);
+
+        let instruction = UndelegateAndCloseShuttleEphemeralAtaBuilder {
+            payer,
+            rent_reimbursement,
+            owner,
+            mint,
+            destination_ata,
+            shuttle_id,
+            escrow_index: Some(3),
+        }
+        .instruction();
+
+        assert_eq!(instruction.program_id, ESPL_TOKEN_PROGRAM_ID);
+        assert_eq!(instruction.accounts.len(), 9);
+        assert_eq!(instruction.accounts[0].pubkey, payer);
+        assert_eq!(instruction.accounts[1].pubkey, rent_reimbursement);
+        assert_eq!(instruction.accounts[2].pubkey, shuttle_ephemeral_ata);
+        assert_eq!(instruction.accounts[3].pubkey, shuttle_ata);
+        assert_eq!(instruction.accounts[4].pubkey, shuttle_wallet_ata);
+        assert_eq!(instruction.accounts[5].pubkey, destination_ata);
+        assert_eq!(instruction.accounts[6].pubkey, TOKEN_PROGRAM_ID);
+        assert_eq!(instruction.accounts[7].pubkey, MAGIC_CONTEXT_ID);
+        assert_eq!(instruction.accounts[8].pubkey, MAGIC_PROGRAM_ID);
+        assert_eq!(
+            instruction.data,
+            vec![
+                EphemeralSplDiscriminator::UndelegateAndCloseShuttleEphemeralAta as u8,
+                3,
+            ]
         );
     }
 

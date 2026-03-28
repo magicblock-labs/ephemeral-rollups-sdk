@@ -38,6 +38,7 @@ pub struct DepositAndQueueTransferBuilder {
     pub vault_ata: Pubkey,
     pub destination: Pubkey,
     pub owner: Pubkey,
+    pub shuttle_wallet_ata: Option<Pubkey>,
     pub amount: u64,
     pub min_delay_ms: u64,
     pub max_delay_ms: u64,
@@ -65,6 +66,7 @@ impl DepositAndQueueTransferBuilder {
         data.extend_from_slice(&self.min_delay_ms.to_le_bytes());
         data.extend_from_slice(&self.max_delay_ms.to_le_bytes());
         data.extend_from_slice(&self.split.to_le_bytes());
+        let shuttle_wallet_ata = self.shuttle_wallet_ata.unwrap_or(ESPL_TOKEN_PROGRAM_ID);
 
         Ok(Instruction {
             program_id: ESPL_TOKEN_PROGRAM_ID,
@@ -77,6 +79,7 @@ impl DepositAndQueueTransferBuilder {
                 AccountMeta::new_readonly(self.destination, false),
                 AccountMeta::new_readonly(self.owner, true),
                 AccountMeta::new_readonly(TOKEN_PROGRAM_ID, false),
+                AccountMeta::new(shuttle_wallet_ata, false),
             ],
             data,
         })

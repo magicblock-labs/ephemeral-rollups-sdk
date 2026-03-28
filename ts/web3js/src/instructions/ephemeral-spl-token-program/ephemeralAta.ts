@@ -1034,16 +1034,20 @@ export function mergeShuttleIntoAtaIx(
 /**
  * Undelegate shuttle wallet ATA and close it when empty.
  * @param payer - The payer account
+ * @param rentReimbursement - The rent reimbursement account
  * @param shuttleEphemeralAta - The shuttle metadata account
  * @param shuttleAta - The shuttle EATA account
  * @param shuttleWalletAta - The shuttle wallet ATA account
+ * @param destinationAta - The destination token account used by the close handler
  * @returns The undelegate shuttle instruction
  */
 export function undelegateAndCloseShuttleEphemeralAtaIx(
   payer: PublicKey,
+  rentReimbursement: PublicKey,
   shuttleEphemeralAta: PublicKey,
   shuttleAta: PublicKey,
   shuttleWalletAta: PublicKey,
+  destinationAta: PublicKey,
   escrowIndex?: number,
 ): TransactionInstruction {
   const data =
@@ -1055,9 +1059,11 @@ export function undelegateAndCloseShuttleEphemeralAtaIx(
     programId: EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
     keys: [
       { pubkey: payer, isSigner: true, isWritable: true },
+      { pubkey: rentReimbursement, isSigner: false, isWritable: true },
       { pubkey: shuttleEphemeralAta, isSigner: false, isWritable: false },
       { pubkey: shuttleAta, isSigner: false, isWritable: false },
       { pubkey: shuttleWalletAta, isSigner: false, isWritable: true },
+      { pubkey: destinationAta, isSigner: false, isWritable: true },
       { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
       { pubkey: MAGIC_CONTEXT_ID, isSigner: false, isWritable: true },
       { pubkey: MAGIC_PROGRAM_ID, isSigner: false, isWritable: false },
