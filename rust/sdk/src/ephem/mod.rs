@@ -7,16 +7,22 @@ pub use crate::ephem::deprecated::v0::{
 };
 use crate::ephem::deprecated::v1::utils;
 pub use crate::ephem::deprecated::v1::{
-    CallHandler, CommitAndUndelegate, CommitType, MagicAction, MagicInstructionBuilder,
-    UndelegateType,
+    ActionCallback, CallHandler, CommitAndUndelegate, CommitType, MagicAction,
+    MagicInstructionBuilder, UndelegateType,
 };
 use crate::solana_compat::solana::{
     invoke, AccountInfo, AccountMeta, Instruction, ProgramResult, Pubkey,
 };
+pub use cau_intent_builder::{CommitAndUndelegateIntentBuilder, FoldableCauIntentBuilder};
+pub use commit_intent_builder::{CommitIntentBuilder, FoldableCommitIntentBuilder};
 use magicblock_magic_program_api::args::MagicIntentBundleArgs;
 use magicblock_magic_program_api::instruction::MagicBlockInstruction;
+pub use magicblock_magic_program_api::response::MagicResponse;
 use std::collections::HashMap;
 
+pub mod action_builder;
+pub mod cau_intent_builder;
+pub mod commit_intent_builder;
 pub mod deprecated;
 
 /// Intent to be scheduled for execution on the base layer.
@@ -34,6 +40,28 @@ pub enum MagicIntent<'info> {
     CommitFinalize(CommitType<'info>),
     /// CommitFinalize accounts and undelegate them, optionally with post-commit and post-undelegate actions.
     CommitFinalizeAndUndelegate(CommitAndUndelegate<'info>),
+}
+
+/// The result of [`MagicIntentBundleBuilder::build`].
+///
+/// Holds the `ScheduleIntentBundle` instruction and any `AddActionCallback` instructions
+/// that must be invoked after it. Call [`invoke`](IntentInstructions::invoke) to execute
+/// all of them in order, or inspect the fields to drive the CPIs yourself.
+pub struct IntentInstructions<'info> {
+    pub schedule_intent_ix: (Vec<AccountInfo<'info>>, Instruction),
+    pub add_callback_ixs: Vec<(Vec<AccountInfo<'info>>, Instruction)>,
+}
+
+impl<'info> IntentInstructions<'info> {
+    /// Invokes `ScheduleIntentBundle` followed by each `AddActionCallback` in order.
+    pub fn invoke(self) -> ProgramResult {
+        let (accounts, ix) = self.schedule_intent_ix;
+        invoke(&ix, &accounts)?;
+
+        self.add_callback_ixs
+            .into_iter()
+            .try_for_each(|(accounts, ix)| invoke(&ix, &accounts))
+    }
 }
 
 /// Builds a single `MagicBlockInstruction::ScheduleIntentBundle` instruction by aggregating
@@ -78,6 +106,7 @@ impl<'info> MagicIntentBundleBuilder<'info> {
             parent: self,
             accounts: accounts.to_vec(),
             actions: vec![],
+            callbacks: vec![],
         }
     }
 
@@ -95,34 +124,10 @@ impl<'info> MagicIntentBundleBuilder<'info> {
             parent: self,
             accounts: accounts.to_vec(),
             post_commit_actions: vec![],
+            post_commit_callbacks: vec![],
             post_undelegate_actions: vec![],
+            post_undelegate_callbacks: vec![],
         }
-    }
-
-    /// Adds an intent to the bundle.
-    ///
-    /// If an intent of the same category already exists in the bundle:
-    /// - base actions are appended
-    /// - commit intents are merged (accounts/actions appended; variant upgraded to handler if needed)
-    /// - commit+undelegate intents are merged (accounts/actions appended)
-    ///
-    /// See `MagicIntentBundle::add_intent` for merge semantics.
-    pub fn add_intent(mut self, intent: MagicIntent<'info>) -> Self {
-        self.intent_bundle.add_intent(intent);
-        self
-    }
-
-    /// Adds (or merges) a `Commit` intent into the bundle.
-    pub fn add_commit(mut self, commit: CommitType<'info>) -> Self {
-        self.intent_bundle.add_intent(MagicIntent::Commit(commit));
-        self
-    }
-
-    /// Adds (or merges) a `CommitAndUndelegate` intent into the bundle.
-    pub fn add_commit_and_undelegate(mut self, value: CommitAndUndelegate<'info>) -> Self {
-        self.intent_bundle
-            .add_intent(MagicIntent::CommitAndUndelegate(value));
-        self
     }
 
     /// Adds standalone base-layer actions to be executed without any commit/undelegate semantics.
@@ -137,24 +142,78 @@ impl<'info> MagicIntentBundleBuilder<'info> {
         self
     }
 
-    /// Builds the deduplicated account list and the CPI `Instruction` that schedules this bundle.
-    ///
-    /// # Returns
-    /// - `Vec<AccountInfo>`: the full, deduplicated account list to pass to CPI (payer/context first).
-    /// - `Instruction`: the instruction to invoke against the magic program.
-    pub fn build(mut self) -> (Vec<AccountInfo<'info>>, Instruction) {
-        // Dedup Intent Bundle
+    /// Adds a single standalone action. Returns an [`ActionBuilder`] that lets you
+    /// optionally attach a callback via `.then()` before continuing the chain.
+    pub fn add_standalone_action(
+        self,
+        action: CallHandler<'info>,
+    ) -> action_builder::ActionBuilder<
+        'info,
+        MagicIntentBundleBuilder<'info>,
+        impl FnOnce(
+            MagicIntentBundleBuilder<'info>,
+            CallHandler<'info>,
+            Option<ActionCallback>,
+        ) -> MagicIntentBundleBuilder<'info>,
+    > {
+        action_builder::ActionBuilder::new(self, action, |mut parent, action, callback| {
+            parent.intent_bundle.standalone_actions.push(action);
+            parent.intent_bundle.standalone_callbacks.push(callback);
+            parent
+        })
+    }
+
+    fn build_callback_ixs(&mut self) -> Vec<(Vec<AccountInfo<'info>>, Instruction)> {
+        let callbacks = self.intent_bundle.extract_callbacks();
+        if callbacks.is_empty() {
+            return vec![];
+        }
+
+        callbacks
+            .into_iter()
+            .map(|(action_index, callback)| {
+                let args = callback.into_args(action_index);
+                let payer_meta = AccountMeta {
+                    pubkey: *self.payer.key,
+                    is_signer: true,
+                    is_writable: true,
+                };
+                let ctx_meta = AccountMeta {
+                    pubkey: *self.magic_context.key,
+                    is_signer: false,
+                    is_writable: true,
+                };
+                let mut accounts = vec![payer_meta, ctx_meta];
+                let mut account_infos = vec![self.payer.clone(), self.magic_context.clone()];
+                if let Some(ref magic_fee_vault) = self.magic_fee_vault {
+                    account_infos.push(magic_fee_vault.clone());
+                    accounts.push(AccountMeta::new(*magic_fee_vault.key, false));
+                };
+
+                let ix = Instruction::new_with_bincode(
+                    *self.magic_program.key,
+                    &MagicBlockInstruction::AddActionCallback(args),
+                    accounts,
+                );
+                (account_infos, ix)
+            })
+            .collect()
+    }
+
+    /// Builds [`IntentInstructions`] that schedules IntentBundle in magic program
+    pub fn build(mut self) -> IntentInstructions<'info> {
         self.intent_bundle.normalize();
 
-        // Collect all accounts used by the bundle, then dedup them + create index map.
+        // Build AddActionCallback instructions
+        let add_callback_ixs = self.build_callback_ixs();
+
+        // Build ScheduleIntentBundle instruction
         let mut all_accounts = vec![self.payer, self.magic_context];
         if let Some(vault) = self.magic_fee_vault {
             all_accounts.push(vault);
         }
         self.intent_bundle.collect_accounts(&mut all_accounts);
         let indices_map = utils::filter_duplicates_with_map(&mut all_accounts);
-
-        // Create data for instruction
         let args = self.intent_bundle.into_args(&indices_map);
         let metas = all_accounts
             .iter()
@@ -164,25 +223,21 @@ impl<'info> MagicIntentBundleBuilder<'info> {
                 is_writable: ai.is_writable,
             })
             .collect();
-        let ix = Instruction::new_with_bincode(
+        let schedule_ix = Instruction::new_with_bincode(
             *self.magic_program.key,
             &MagicBlockInstruction::ScheduleIntentBundle(args),
             metas,
         );
 
-        (all_accounts, ix)
+        IntentInstructions {
+            schedule_intent_ix: (all_accounts, schedule_ix),
+            add_callback_ixs,
+        }
     }
 
-    /// Convenience wrapper that builds the instruction and immediately invokes it.
-    ///
-    /// Equivalent to:
-    /// ```ignore
-    /// let (accounts, ix) = builder.build();
-    /// invoke(&ix, &accounts)
-    /// ```
+    /// Convenience wrapper: builds all instructions and invokes them in order.
     pub fn build_and_invoke(self) -> ProgramResult {
-        let (accounts, ix) = self.build();
-        invoke(&ix, &accounts)
+        self.build().invoke()
     }
 }
 
@@ -196,6 +251,7 @@ impl<'info> MagicIntentBundleBuilder<'info> {
 #[derive(Default)]
 struct MagicIntentBundle<'info> {
     standalone_actions: Vec<CallHandler<'info>>,
+    standalone_callbacks: Vec<Option<ActionCallback>>, // parallel to standalone_actions
     commit_intent: Option<CommitType<'info>>,
     commit_and_undelegate_intent: Option<CommitAndUndelegate<'info>>,
     commit_finalize_intent: Option<CommitType<'info>>,
@@ -206,7 +262,11 @@ impl<'info> MagicIntentBundle<'info> {
     /// Inserts an intent into the bundle, merging with any existing intent of the same category.
     fn add_intent(&mut self, intent: MagicIntent<'info>) {
         match intent {
-            MagicIntent::StandaloneActions(value) => self.standalone_actions.extend(value),
+            MagicIntent::StandaloneActions(value) => {
+                self.standalone_callbacks
+                    .extend((0..value.len()).map(|_| None));
+                self.standalone_actions.extend(value);
+            }
             MagicIntent::Commit(value) => {
                 if let Some(ref mut commit_accounts) = self.commit_intent {
                     commit_accounts.merge(value);
@@ -238,6 +298,34 @@ impl<'info> MagicIntentBundle<'info> {
                 }
             }
         }
+    }
+
+    /// Extracts callbacks with correct Action indices
+    fn extract_callbacks(&mut self) -> Vec<(u8, ActionCallback)> {
+        let mut out = Vec::new();
+        let mut idx: u8 = 0;
+        self.commit_intent
+            .iter_mut()
+            .for_each(|c| c.extract_callbacks(&mut idx, &mut out));
+        self.commit_and_undelegate_intent
+            .iter_mut()
+            .for_each(|cau| cau.extract_callbacks(&mut idx, &mut out));
+        self.commit_finalize_intent
+            .iter_mut()
+            .for_each(|c| c.extract_callbacks(&mut idx, &mut out));
+        self.commit_finalize_and_undelegate_intent
+            .iter_mut()
+            .for_each(|cau| cau.extract_callbacks(&mut idx, &mut out));
+        self.standalone_callbacks
+            .iter_mut()
+            .take(self.standalone_actions.len())
+            .for_each(|cb_opt| {
+                if let Some(cb) = cb_opt.take() {
+                    out.push((idx, cb));
+                }
+                idx += 1;
+            });
+        out
     }
 
     /// Consumes the bundle and encodes it into `MagicIntentBundleArgs` using a `Pubkey -> u8` indices map.
@@ -275,6 +363,12 @@ impl<'info> MagicIntentBundle<'info> {
         }
         if let Some(cau) = &self.commit_and_undelegate_intent {
             cau.collect_accounts(all_accounts);
+        }
+        if let Some(commit_finalize) = &self.commit_finalize_intent {
+            commit_finalize.collect_accounts(all_accounts);
+        }
+        if let Some(cau_finalize) = &self.commit_finalize_and_undelegate_intent {
+            cau_finalize.collect_accounts(all_accounts);
         }
     }
 
@@ -329,155 +423,53 @@ impl<'info> MagicIntentBundle<'info> {
     }
 }
 
-/// Builder of Commit Intent.
+/// Shared transition and terminal methods for intent sub-builders.
 ///
-/// Created via [`MagicIntentBundleBuilder::commit()`]. Owns the parent builder
-/// and returns it (or a sibling sub-builder) on every transition/terminal call.
-pub struct CommitIntentBuilder<'info> {
-    parent: MagicIntentBundleBuilder<'info>,
-    accounts: Vec<AccountInfo<'info>>,
-    actions: Vec<CallHandler<'info>>,
-}
+/// Implementors provide only `fold`, which collapses the sub-builder back into
+/// the parent [`MagicIntentBundleBuilder`]. All transition/terminal methods are
+/// then available as defaults.
+pub trait FoldableIntentBuilder<'info>: Sized {
+    fn fold_builder(self) -> MagicIntentBundleBuilder<'info>;
 
-impl<'info> CommitIntentBuilder<'info> {
-    /// Adds post-commit actions. Chainable.
-    pub fn add_post_commit_actions(
-        mut self,
-        actions: impl IntoIterator<Item = CallHandler<'info>>,
-    ) -> Self {
-        self.actions.extend(actions);
-        self
+    fn commit(self, accounts: &[AccountInfo<'info>]) -> CommitIntentBuilder<'info> {
+        self.fold_builder().commit(accounts)
     }
 
-    /// Transition: finalizes this commit intent and starts a commit-and-undelegate intent.
-    pub fn commit_and_undelegate(
+    fn commit_and_undelegate(
         self,
         accounts: &[AccountInfo<'info>],
     ) -> CommitAndUndelegateIntentBuilder<'info> {
-        self.fold().commit_and_undelegate(accounts)
+        self.fold_builder().commit_and_undelegate(accounts)
     }
 
-    /// Transition: finalizes this commit intent and adds standalone base-layer actions.
-    pub fn add_standalone_actions(
+    fn add_standalone_actions(
         self,
         actions: impl IntoIterator<Item = CallHandler<'info>>,
     ) -> MagicIntentBundleBuilder<'info> {
-        self.fold().add_standalone_actions(actions)
+        self.fold_builder().add_standalone_actions(actions)
     }
 
-    /// Terminal: finalizes this commit intent and builds the full instruction.
-    pub fn build(self) -> (Vec<AccountInfo<'info>>, Instruction) {
-        self.fold().build()
-    }
-
-    /// Terminal: finalizes this commit intent, builds the instruction and invokes it.
-    pub fn build_and_invoke(self) -> ProgramResult {
-        self.fold().build_and_invoke()
-    }
-
-    /// Finalizes this commit intent and folds it into the parent bundle.
-    pub fn fold(self) -> MagicIntentBundleBuilder<'info> {
-        let Self {
-            mut parent,
-            accounts,
-            actions,
-        } = self;
-        let commit = if actions.is_empty() {
-            CommitType::Standalone(accounts)
-        } else {
-            CommitType::WithHandler {
-                commited_accounts: accounts,
-                call_handlers: actions,
-            }
-        };
-        parent.intent_bundle.add_intent(MagicIntent::Commit(commit));
-        parent
-    }
-}
-
-/// Builder of CommitAndUndelegate Intent.
-///
-/// Created via [`MagicIntentBundleBuilder::commit_and_undelegate()`] or
-/// [`CommitIntentBuilder::commit_and_undelegate()`]. Owns the parent builder
-/// and returns it (or a sibling sub-builder) on every transition/terminal call.
-pub struct CommitAndUndelegateIntentBuilder<'info> {
-    parent: MagicIntentBundleBuilder<'info>,
-    accounts: Vec<AccountInfo<'info>>,
-    post_commit_actions: Vec<CallHandler<'info>>,
-    post_undelegate_actions: Vec<CallHandler<'info>>,
-}
-
-impl<'info> CommitAndUndelegateIntentBuilder<'info> {
-    /// Adds post-commit actions. Chainable.
-    pub fn add_post_commit_actions(
-        mut self,
-        actions: impl IntoIterator<Item = CallHandler<'info>>,
-    ) -> Self {
-        self.post_commit_actions.extend(actions);
-        self
-    }
-
-    /// Adds post-undelegate actions. Chainable.
-    pub fn add_post_undelegate_actions(
-        mut self,
-        actions: impl IntoIterator<Item = CallHandler<'info>>,
-    ) -> Self {
-        self.post_undelegate_actions.extend(actions);
-        self
-    }
-
-    /// Transition: finalizes this commit-and-undelegate intent and starts a new commit intent.
-    pub fn commit(self, accounts: &[AccountInfo<'info>]) -> CommitIntentBuilder<'info> {
-        self.fold().commit(accounts)
-    }
-
-    /// Transition: finalizes this commit-and-undelegate intent and adds standalone base-layer actions.
-    pub fn add_standalone_actions(
+    fn add_standalone_action(
         self,
-        actions: impl IntoIterator<Item = CallHandler<'info>>,
-    ) -> MagicIntentBundleBuilder<'info> {
-        self.fold().add_standalone_actions(actions)
+        action: CallHandler<'info>,
+    ) -> action_builder::ActionBuilder<
+        'info,
+        MagicIntentBundleBuilder<'info>,
+        impl FnOnce(
+            MagicIntentBundleBuilder<'info>,
+            CallHandler<'info>,
+            Option<ActionCallback>,
+        ) -> MagicIntentBundleBuilder<'info>,
+    > {
+        self.fold_builder().add_standalone_action(action)
     }
 
-    /// Terminal: finalizes this intent and builds the full instruction.
-    pub fn build(self) -> (Vec<AccountInfo<'info>>, Instruction) {
-        self.fold().build()
+    fn build(self) -> IntentInstructions<'info> {
+        self.fold_builder().build()
     }
 
-    /// Terminal: finalizes this intent, builds the instruction and invokes it.
-    pub fn build_and_invoke(self) -> ProgramResult {
-        self.fold().build_and_invoke()
-    }
-
-    /// Finalizes this commit-and-undelegate intent and folds it into the parent bundle.
-    pub fn fold(self) -> MagicIntentBundleBuilder<'info> {
-        let Self {
-            mut parent,
-            accounts,
-            post_commit_actions,
-            post_undelegate_actions,
-        } = self;
-        let commit_type = if post_commit_actions.is_empty() {
-            CommitType::Standalone(accounts)
-        } else {
-            CommitType::WithHandler {
-                commited_accounts: accounts,
-                call_handlers: post_commit_actions,
-            }
-        };
-        let undelegate_type = if post_undelegate_actions.is_empty() {
-            UndelegateType::Standalone
-        } else {
-            UndelegateType::WithHandler(post_undelegate_actions)
-        };
-        let cau = CommitAndUndelegate {
-            commit_type,
-            undelegate_type,
-        };
-        parent
-            .intent_bundle
-            .add_intent(MagicIntent::CommitAndUndelegate(cau));
-        parent
+    fn build_and_invoke(self) -> ProgramResult {
+        self.fold_builder().build_and_invoke()
     }
 }
 
@@ -486,6 +478,7 @@ mod tests {
     use super::*;
     use crate::solana_compat::solana::{AccountInfo, Pubkey};
     use magicblock_magic_program_api::args::ActionArgs;
+    use magicblock_magic_program_api::instruction::MagicBlockInstruction;
     use std::cell::RefCell;
     use std::rc::Rc;
 
@@ -508,6 +501,17 @@ mod tests {
             executable: false,
             rent_epoch: 0,
         }
+    }
+
+    fn make_info(acc: &mut TestAccount) -> AccountInfo<'_> {
+        create_mock_account_info(
+            &acc.key,
+            &mut acc.lamports,
+            &mut acc.data,
+            &acc.owner,
+            true,
+            false,
+        )
     }
 
     /// Helper struct to hold account data for tests
@@ -618,7 +622,7 @@ mod tests {
             true,
         );
 
-        let (accounts, ix) = builder.commit(&[info1, info2]).build();
+        let (accounts, ix) = builder.commit(&[info1, info2]).build().schedule_intent_ix;
 
         // payer + magic_ctx + 2 committed accounts
         assert_eq!(accounts.len(), 4);
@@ -655,13 +659,17 @@ mod tests {
         );
         let handler = create_test_call_handler(escrow_info);
 
-        let (accounts, _ix) = builder
+        let IntentInstructions {
+            schedule_intent_ix: (accounts, _ix),
+            add_callback_ixs,
+        } = builder
             .commit(&[info1])
             .add_post_commit_actions([handler])
             .build();
 
         // payer + magic_ctx + committed acc + escrow
         assert_eq!(accounts.len(), 4);
+        assert_eq!(add_callback_ixs.len(), 0);
     }
 
     // ----- Fluent CommitAndUndelegateIntentBuilder Tests -----
@@ -684,7 +692,10 @@ mod tests {
             true,
         );
 
-        let (accounts, _ix) = builder.commit_and_undelegate(&[info1]).build();
+        let (accounts, _ix) = builder
+            .commit_and_undelegate(&[info1])
+            .build()
+            .schedule_intent_ix;
 
         // payer + magic_ctx + committed acc
         assert_eq!(accounts.len(), 3);
@@ -730,9 +741,10 @@ mod tests {
 
         let (accounts, _ix) = builder
             .commit_and_undelegate(&[info1])
-            .add_post_commit_actions([post_commit_handler])
+            .add_post_commit_action(post_commit_handler)
             .add_post_undelegate_actions([post_undelegate_handler])
-            .build();
+            .build()
+            .schedule_intent_ix;
 
         // payer + magic_ctx + committed acc + 2 escrows
         assert_eq!(accounts.len(), 5);
@@ -771,7 +783,8 @@ mod tests {
         let (accounts, _ix) = builder
             .commit(&[info1])
             .commit_and_undelegate(&[info2])
-            .build();
+            .build()
+            .schedule_intent_ix;
 
         // payer + magic_ctx + commit_acc + cau_acc
         assert_eq!(accounts.len(), 4);
@@ -808,7 +821,8 @@ mod tests {
         let (accounts, _ix) = builder
             .commit_and_undelegate(&[info1])
             .commit(&[info2])
-            .build();
+            .build()
+            .schedule_intent_ix;
 
         // payer + magic_ctx + cau_acc + commit_acc
         assert_eq!(accounts.len(), 4);
@@ -867,7 +881,8 @@ mod tests {
             .add_post_commit_actions([handler1])
             .commit_and_undelegate(&[info2])
             .add_post_commit_actions([handler2])
-            .build();
+            .build()
+            .schedule_intent_ix;
 
         // payer + magic_ctx + commit_acc + escrow1 + cau_acc + escrow2
         assert_eq!(accounts.len(), 6);
@@ -1027,6 +1042,7 @@ mod tests {
         bundle.add_intent(MagicIntent::Commit(CommitType::WithHandler {
             commited_accounts: vec![shared_info1],
             call_handlers: vec![handler],
+            callbacks: vec![None],
         }));
 
         // Add same account to CommitAndUndelegate
@@ -1173,11 +1189,10 @@ mod tests {
             true,
         );
 
-        let commit = CommitType::Standalone(vec![acc1_info]);
-
         let (accounts, ix) = MagicIntentBundleBuilder::new(payer_info, ctx_info, prog_info)
-            .add_commit(commit)
-            .build();
+            .commit(&[acc1_info])
+            .build()
+            .schedule_intent_ix;
 
         // Verify accounts: payer, context, acc1
         assert_eq!(accounts.len(), 3);
@@ -1242,11 +1257,10 @@ mod tests {
             true,
         );
 
-        let commit = CommitType::Standalone(vec![acc1_info, acc2_info]);
-
         let (accounts, _ix) = MagicIntentBundleBuilder::new(payer_info, ctx_info, prog_info)
-            .add_commit(commit)
-            .build();
+            .commit(&[acc1_info, acc2_info])
+            .build()
+            .schedule_intent_ix;
 
         // Should be: payer, context, shared_account (deduplicated)
         assert_eq!(accounts.len(), 3, "Duplicate accounts should be removed");
@@ -1311,18 +1325,14 @@ mod tests {
             false,
         );
 
-        let commit = CommitType::Standalone(vec![commit_info]);
-        let cau = CommitAndUndelegate {
-            commit_type: CommitType::Standalone(vec![cau_info]),
-            undelegate_type: UndelegateType::Standalone,
-        };
         let handler = create_test_call_handler(escrow_info);
 
         let (accounts, ix) = MagicIntentBundleBuilder::new(payer_info, ctx_info, prog_info)
-            .add_commit(commit)
-            .add_commit_and_undelegate(cau)
+            .commit(&[commit_info])
+            .commit_and_undelegate(&[cau_info])
             .add_standalone_actions([handler])
-            .build();
+            .build()
+            .schedule_intent_ix;
 
         // Should have: payer, context, commit_acc, cau_acc, escrow_acc
         assert_eq!(accounts.len(), 5);
@@ -1375,7 +1385,8 @@ mod tests {
         // Test that fluent builder methods chain properly
         let (accounts, _ix) = MagicIntentBundleBuilder::new(payer_info, ctx_info, prog_info)
             .commit(&[acc1_info])
-            .build();
+            .build()
+            .schedule_intent_ix;
 
         assert_eq!(accounts.len(), 3);
     }
@@ -1431,6 +1442,7 @@ mod tests {
         let commit = CommitType::WithHandler {
             commited_accounts: vec![acc1_info],
             call_handlers: vec![handler],
+            callbacks: vec![None],
         };
 
         let mut container = Vec::new();
@@ -1438,5 +1450,65 @@ mod tests {
 
         // Should have both the committed account and escrow from handler
         assert_eq!(container.len(), 2);
+    }
+
+    // Verifies flat action index ordering:
+    #[test]
+    fn test_callback_action_index_ordering() {
+        let owner = Pubkey::new_unique();
+        let mut payer = TestAccount::new();
+        let mut magic_ctx = TestAccount::new();
+        let mut magic_prog = TestAccount::new();
+        let mut commit_acc = TestAccount::new();
+        let mut cau_acc = TestAccount::new();
+        let mut escrow_commit = TestAccount::new();
+        let mut escrow_cau_commit = TestAccount::new();
+        let mut escrow_cau_undelegate = TestAccount::new();
+        let mut escrow_standalone = TestAccount::new();
+
+        let (builder, _) = create_test_builder(&mut payer, &mut magic_ctx, &mut magic_prog, &owner);
+
+        let make_callback = || ActionCallback {
+            destination_program: Pubkey::new_unique(),
+            discriminator: vec![0u8; 8],
+            payload: vec![],
+            compute_units: 10_000,
+            accounts: vec![],
+        };
+
+        let IntentInstructions {
+            add_callback_ixs, ..
+        } = builder
+            .commit(&[make_info(&mut commit_acc)])
+            .add_post_commit_action(create_test_call_handler(make_info(&mut escrow_commit)))
+            .then(make_callback())
+            .commit_and_undelegate(&[make_info(&mut cau_acc)])
+            .add_post_commit_action(create_test_call_handler(make_info(&mut escrow_cau_commit)))
+            .then(make_callback())
+            .add_post_undelegate_action(create_test_call_handler(make_info(
+                &mut escrow_cau_undelegate,
+            )))
+            .then(make_callback())
+            .add_standalone_action(create_test_call_handler(make_info(&mut escrow_standalone)))
+            .then(make_callback())
+            .build();
+
+        assert_eq!(add_callback_ixs.len(), 4);
+
+        let action_index = |ix: &Instruction| -> u8 {
+            match bincode::deserialize::<MagicBlockInstruction>(&ix.data).unwrap() {
+                MagicBlockInstruction::AddActionCallback(args) => args.action_index,
+                _ => panic!("expected AddActionCallback"),
+            }
+        };
+
+        assert_eq!(action_index(&add_callback_ixs[0].1), 0, "commit action");
+        assert_eq!(action_index(&add_callback_ixs[1].1), 1, "cau commit action");
+        assert_eq!(
+            action_index(&add_callback_ixs[2].1),
+            2,
+            "cau undelegate action"
+        );
+        assert_eq!(action_index(&add_callback_ixs[3].1), 3, "standalone action");
     }
 }
