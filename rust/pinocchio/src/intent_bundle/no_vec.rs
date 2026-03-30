@@ -1,7 +1,7 @@
 use bincode::enc::Encoder;
 use bincode::error::EncodeError;
 use core::mem::{ManuallyDrop, MaybeUninit};
-use core::ops::Index;
+use core::ops::{Deref, Index};
 use core::{mem, ptr, slice};
 
 const CAPACITY_OVERFLOW_MSG: &str = "capacity overflow";
@@ -342,6 +342,13 @@ impl<T: core::fmt::Debug, const N: usize> core::fmt::Debug for NoVec<T, N> {
 impl<T: bincode::Encode, const N: usize> bincode::Encode for NoVec<T, N> {
     fn encode<E: Encoder>(&self, encoder: &mut E) -> Result<(), EncodeError> {
         bincode::Encode::encode(self.as_slice(), encoder)
+    }
+}
+
+impl<T, const N: usize> Deref for NoVec<T, N> {
+    type Target = [T];
+    fn deref(&self) -> &Self::Target {
+        self.as_slice()
     }
 }
 
