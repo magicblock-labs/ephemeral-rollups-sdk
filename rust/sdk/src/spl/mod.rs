@@ -27,6 +27,7 @@ pub enum EphemeralSplDiscriminator {
     DepositAndQueueTransfer = 16,
     EnsureTransferQueueCrank = 17,
     DelegateTransferQueue = 19,
+    LamportsDelegatedTransfer = 20,
     InitializeRentPda = 23,
     SetupAndDelegateShuttleEphemeralAtaWithMerge = 24,
     DepositAndDelegateShuttleEphemeralAtaWithMergeAndPrivateTransfer = 25,

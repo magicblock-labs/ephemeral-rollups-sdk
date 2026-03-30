@@ -27,13 +27,13 @@ mod tests {
                 DepositAndQueueTransferBuilder, DepositSplTokensBuilder,
                 EnsureTransferQueueCrankBuilder, InitializeEphemeralAtaBuilder,
                 InitializeGlobalVaultBuilder, InitializeTransferQueueBuilder,
-                ResetEphemeralAtaPermissionBuilder, UndelegateAndCloseShuttleEphemeralAtaBuilder,
-                UndelegateEphemeralAtaBuilder, UndelegateEphemeralAtaPermissionBuilder,
-                WithdrawSplTokensBuilder,
+                LamportsDelegatedTransferBuilder, ResetEphemeralAtaPermissionBuilder,
+                UndelegateAndCloseShuttleEphemeralAtaBuilder, UndelegateEphemeralAtaBuilder,
+                UndelegateEphemeralAtaPermissionBuilder, WithdrawSplTokensBuilder,
             },
-            find_rent_pda, find_shuttle_ata, find_shuttle_ephemeral_ata, find_shuttle_wallet_ata,
-            find_transfer_queue, find_vault_ata, EphemeralAta, EphemeralSplDiscriminator,
-            GlobalVault,
+            find_lamports_pda, find_rent_pda, find_shuttle_ata, find_shuttle_ephemeral_ata,
+            find_shuttle_wallet_ata, find_transfer_queue, find_vault_ata, EphemeralAta,
+            EphemeralSplDiscriminator, GlobalVault,
         },
     };
     use magicblock_magic_program_api::Pubkey;
@@ -291,6 +291,49 @@ mod tests {
             instruction.data,
             vec![EphemeralSplDiscriminator::EnsureTransferQueueCrank as u8]
         );
+    }
+
+    #[test]
+    fn test_lamports_delegated_transfer() {
+        let payer = Pubkey::new_unique();
+        let destination = Pubkey::new_unique();
+        let salt = core::array::from_fn(|i| i as u8);
+        let (rent_pda, _rent_bump) = find_rent_pda();
+        let (lamports_pda, _lamports_bump) = find_lamports_pda(&payer, &destination, &salt);
+        let destination_delegation_record =
+            delegation_record_pda_from_delegated_account(&destination);
+
+        let instruction = LamportsDelegatedTransferBuilder {
+            payer,
+            destination,
+            amount: 25,
+            salt,
+        }
+        .instruction();
+
+        assert_eq!(instruction.program_id, ESPL_TOKEN_PROGRAM_ID);
+        assert_eq!(instruction.accounts.len(), 11);
+        assert_eq!(instruction.accounts[0].pubkey, payer);
+        assert!(instruction.accounts[0].is_writable);
+        assert!(instruction.accounts[0].is_signer);
+        assert_eq!(instruction.accounts[1].pubkey, rent_pda);
+        assert_eq!(instruction.accounts[2].pubkey, lamports_pda);
+        assert_eq!(instruction.accounts[9].pubkey, destination);
+        assert!(instruction.accounts[9].is_writable);
+        assert_eq!(
+            instruction.accounts[10].pubkey,
+            destination_delegation_record
+        );
+        assert!(!instruction.accounts[10].is_writable);
+        assert_eq!(
+            instruction.data[0],
+            EphemeralSplDiscriminator::LamportsDelegatedTransfer as u8
+        );
+        assert_eq!(
+            u64::from_le_bytes(instruction.data[1..9].try_into().unwrap()),
+            25
+        );
+        assert_eq!(&instruction.data[9..41], &salt);
     }
 
     #[test]
