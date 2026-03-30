@@ -60,7 +60,7 @@ const QUEUED_TRANSFER_FLAG_CREATE_IDEMPOTENT_ATA = 1 << 0;
 async function getAssociatedTokenAddressSync(
   mint: Address,
   owner: Address,
-  allowOwnerOffCurve: boolean = false,
+  allowOwnerOffCurve: boolean = true,
 ): Promise<Address> {
   const addressEncoder = getAddressEncoder();
   const [ata] = await getProgramDerivedAddress({
@@ -298,6 +298,35 @@ export async function deriveRentPda(): Promise<[Address, number]> {
     seeds: [new Uint8Array([114, 101, 110, 116])],
   });
   return [rentPda, bump];
+}
+
+/**
+ * Derive delegated lamports PDA
+ * @param payer - The payer account
+ * @param destination - The destination delegated account
+ * @param salt - User-provided 32-byte salt
+ * @returns The delegated lamports PDA and bump
+ */
+export async function deriveLamportsPda(
+  payer: Address,
+  destination: Address,
+  salt: Uint8Array,
+): Promise<[Address, number]> {
+  if (salt.length !== 32) {
+    throw new Error("salt must be exactly 32 bytes");
+  }
+
+  const addressEncoder = getAddressEncoder();
+  const [lamportsPda, bump] = await getProgramDerivedAddress({
+    programAddress: EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
+    seeds: [
+      Buffer.from("lamports"),
+      addressEncoder.encode(payer),
+      addressEncoder.encode(destination),
+      Buffer.from(salt),
+    ],
+  });
+  return [lamportsPda, bump];
 }
 
 /**
@@ -977,6 +1006,75 @@ export async function withdrawThroughDelegatedShuttleWithMergeIx(
       { address: ownerAta, role: AccountRole.WRITABLE },
       { address: mint, role: AccountRole.READONLY },
       { address: TOKEN_PROGRAM_ADDRESS as Address, role: AccountRole.READONLY },
+    ],
+    data,
+    programAddress: EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
+  };
+}
+
+/**
+ * Create and delegate a sponsored lamports PDA, then schedule post-delegation
+ * transfer and cleanup to move lamports to a base-layer destination.
+ * @param payer - The payer and action signer
+ * @param destination - The delegated destination base-layer account
+ * @param amount - The lamports amount to transfer
+ * @param salt - User-provided 32-byte salt
+ * @returns The sponsored delegated lamports transfer instruction
+ */
+export async function lamportsDelegatedTransferIx(
+  payer: Address,
+  destination: Address,
+  amount: bigint,
+  salt: Uint8Array,
+): Promise<Instruction> {
+  if (amount < 0n) {
+    throw new Error("amount must be non-negative");
+  }
+  if (salt.length !== 32) {
+    throw new Error("salt must be exactly 32 bytes");
+  }
+
+  const [rentPda] = await deriveRentPda();
+  const [lamportsPda] = await deriveLamportsPda(payer, destination, salt);
+  const destinationDelegationRecord =
+    await delegationRecordPdaFromDelegatedAccount(destination);
+
+  const data = Buffer.alloc(41);
+  data[0] = 20;
+  data.writeBigUInt64LE(amount, 1);
+  Buffer.from(salt).copy(data, 9);
+
+  return {
+    accounts: [
+      { address: payer, role: AccountRole.WRITABLE_SIGNER },
+      { address: rentPda, role: AccountRole.WRITABLE },
+      { address: lamportsPda, role: AccountRole.WRITABLE },
+      {
+        address: EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
+        role: AccountRole.READONLY,
+      },
+      {
+        address: await delegateBufferPdaFromDelegatedAccountAndOwnerProgram(
+          lamportsPda,
+          EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
+        ),
+        role: AccountRole.WRITABLE,
+      },
+      {
+        address: await delegationRecordPdaFromDelegatedAccount(lamportsPda),
+        role: AccountRole.WRITABLE,
+      },
+      {
+        address: await delegationMetadataPdaFromDelegatedAccount(lamportsPda),
+        role: AccountRole.WRITABLE,
+      },
+      { address: DELEGATION_PROGRAM_ID, role: AccountRole.READONLY },
+      { address: SYSTEM_PROGRAM_ADDRESS, role: AccountRole.READONLY },
+      { address: destination, role: AccountRole.WRITABLE },
+      {
+        address: destinationDelegationRecord,
+        role: AccountRole.READONLY,
+      },
     ],
     data,
     programAddress: EPHEMERAL_SPL_TOKEN_PROGRAM_ID,

@@ -21,6 +21,7 @@ import {
   delegateSplWithPrivateTransfer,
   delegateTransferQueueIx,
   deriveEphemeralAta,
+  deriveLamportsPda,
   deriveTransferQueue,
   deriveRentPda,
   deriveVault,
@@ -29,6 +30,7 @@ import {
   initTransferQueueIx,
   initVaultIx,
   initRentPdaIx,
+  lamportsDelegatedTransferIx,
   transferSpl,
   undelegateAndCloseShuttleEphemeralAtaIx,
   withdrawSplIx,
@@ -40,7 +42,10 @@ import {
   EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
   PERMISSION_PROGRAM_ID,
 } from "../constants";
-import { permissionPdaFromAccount } from "../pda";
+import {
+  delegationRecordPdaFromDelegatedAccount,
+  permissionPdaFromAccount,
+} from "../pda";
 
 function readLengthPrefixedField(
   data: Uint8Array,
@@ -918,6 +923,57 @@ describe("Exposed Instructions (@solana/kit)", () => {
 
       expect(instructions).toHaveLength(1);
       expect(instructions[0].data?.[0]).toBe(3);
+    });
+  });
+
+  describe("lamportsDelegatedTransferIx (Ephemeral SPL Token Program)", () => {
+    const payer = address(bs58.encode(nacl.sign.keyPair().publicKey));
+    const destination = address(bs58.encode(nacl.sign.keyPair().publicKey));
+    const salt = new Uint8Array(Array.from({ length: 32 }, (_, i) => i));
+
+    it("should derive the lamports PDA and encode the sponsored delegated transfer instruction", async () => {
+      const [rentPda] = await deriveRentPda();
+      const [lamportsPda] = await deriveLamportsPda(payer, destination, salt);
+      const destinationDelegationRecord =
+        await delegationRecordPdaFromDelegatedAccount(destination);
+
+      const instruction = await lamportsDelegatedTransferIx(
+        payer,
+        destination,
+        25n,
+        salt,
+      );
+
+      expect(instruction.programAddress).toBe(EPHEMERAL_SPL_TOKEN_PROGRAM_ID);
+      expect(instruction.accounts).toHaveLength(11);
+      expect(instruction.accounts?.[0]).toEqual({
+        address: payer,
+        role: AccountRole.WRITABLE_SIGNER,
+      });
+      expect(instruction.accounts?.[1]).toEqual({
+        address: rentPda,
+        role: AccountRole.WRITABLE,
+      });
+      expect(instruction.accounts?.[2]).toEqual({
+        address: lamportsPda,
+        role: AccountRole.WRITABLE,
+      });
+      expect(instruction.accounts?.[9]).toEqual({
+        address: destination,
+        role: AccountRole.WRITABLE,
+      });
+      expect(instruction.accounts?.[10]).toEqual({
+        address: destinationDelegationRecord,
+        role: AccountRole.READONLY,
+      });
+
+      const data = Buffer.from(instruction.data ?? []);
+      expect(data[0]).toBe(20);
+      expect(data.readBigUInt64LE(1)).toBe(25n);
+      expect(Buffer.from(data.subarray(9, 41)).equals(Buffer.from(salt))).toBe(
+        true,
+      );
+      expect(data).toHaveLength(41);
     });
   });
 

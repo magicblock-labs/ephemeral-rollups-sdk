@@ -18,6 +18,7 @@ import {
   delegateSplWithPrivateTransfer,
   delegateTransferQueueIx,
   deriveEphemeralAta,
+  deriveLamportsPda,
   deriveTransferQueue,
   deriveRentPda,
   deriveShuttleAta,
@@ -28,6 +29,7 @@ import {
   initTransferQueueIx,
   initVaultIx,
   initRentPdaIx,
+  lamportsDelegatedTransferIx,
   transferSpl,
   undelegateAndCloseShuttleEphemeralAtaIx,
   withdrawSplIx,
@@ -40,7 +42,10 @@ import {
   MAGIC_CONTEXT_ID,
   PERMISSION_PROGRAM_ID,
 } from "../constants";
-import { permissionPdaFromAccount } from "../pda";
+import {
+  delegationRecordPdaFromDelegatedAccount,
+  permissionPdaFromAccount,
+} from "../pda";
 
 function readLengthPrefixedField(
   data: Uint8Array,
@@ -951,6 +956,58 @@ describe("Exposed Instructions (web3.js)", () => {
 
       expect(instructions).toHaveLength(1);
       expect(instructions[0].data[0]).toBe(3);
+    });
+  });
+
+  describe("lamportsDelegatedTransferIx (Ephemeral SPL Token Program)", () => {
+    const payer = Keypair.generate().publicKey;
+    const destination = Keypair.generate().publicKey;
+    const salt = new Uint8Array(Array.from({ length: 32 }, (_, i) => i));
+
+    it("should derive the lamports PDA and encode the sponsored delegated transfer instruction", () => {
+      const [rentPda] = deriveRentPda();
+      const [lamportsPda] = deriveLamportsPda(payer, destination, salt);
+      const destinationDelegationRecord =
+        delegationRecordPdaFromDelegatedAccount(destination);
+
+      const instruction = lamportsDelegatedTransferIx(
+        payer,
+        destination,
+        25n,
+        salt,
+      );
+
+      expect(instruction.programId.toBase58()).toBe(
+        EPHEMERAL_SPL_TOKEN_PROGRAM_ID.toBase58(),
+      );
+      expect(instruction.keys).toHaveLength(11);
+      expect(instruction.keys[0]).toMatchObject({
+        pubkey: payer,
+        isSigner: true,
+        isWritable: true,
+      });
+      expect(instruction.keys[1].pubkey.toBase58()).toBe(rentPda.toBase58());
+      expect(instruction.keys[2].pubkey.toBase58()).toBe(
+        lamportsPda.toBase58(),
+      );
+      expect(instruction.keys[9]).toMatchObject({
+        pubkey: destination,
+        isSigner: false,
+        isWritable: true,
+      });
+      expect(instruction.keys[10]).toMatchObject({
+        pubkey: destinationDelegationRecord,
+        isSigner: false,
+        isWritable: false,
+      });
+
+      const data = Buffer.from(instruction.data);
+      expect(data[0]).toBe(20);
+      expect(data.readBigUInt64LE(1)).toBe(25n);
+      expect(Buffer.from(data.subarray(9, 41)).equals(Buffer.from(salt))).toBe(
+        true,
+      );
+      expect(data).toHaveLength(41);
     });
   });
 

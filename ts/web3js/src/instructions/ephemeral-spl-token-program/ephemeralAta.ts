@@ -46,7 +46,7 @@ const QUEUED_TRANSFER_FLAG_CREATE_IDEMPOTENT_ATA = 1 << 0;
 function getAssociatedTokenAddressSync(
   mint: PublicKey,
   owner: PublicKey,
-  allowOwnerOffCurve: boolean = false,
+  allowOwnerOffCurve: boolean = true,
   programId: PublicKey = TOKEN_PROGRAM_ID,
   associatedTokenProgramId: PublicKey = ASSOCIATED_TOKEN_PROGRAM_ID,
 ): PublicKey {
@@ -302,6 +302,33 @@ export function deriveVault(mint: PublicKey): [PublicKey, number] {
 export function deriveRentPda(): [PublicKey, number] {
   return PublicKey.findProgramAddressSync(
     [Buffer.from("rent")],
+    EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
+  );
+}
+
+/**
+ * Derive delegated lamports PDA
+ * @param payer - The payer account
+ * @param destination - The destination delegated account
+ * @param salt - User-provided 32-byte salt
+ * @returns The delegated lamports PDA and bump
+ */
+export function deriveLamportsPda(
+  payer: PublicKey,
+  destination: PublicKey,
+  salt: Uint8Array,
+): [PublicKey, number] {
+  if (salt.length !== 32) {
+    throw new Error("salt must be exactly 32 bytes");
+  }
+
+  return PublicKey.findProgramAddressSync(
+    [
+      Buffer.from("lamports"),
+      payer.toBuffer(),
+      destination.toBuffer(),
+      Buffer.from(salt),
+    ],
     EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
   );
 }
@@ -996,6 +1023,80 @@ export function withdrawThroughDelegatedShuttleWithMergeIx(
       { pubkey: ownerAta, isSigner: false, isWritable: true },
       { pubkey: mint, isSigner: false, isWritable: false },
       { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
+    ],
+    data,
+  });
+}
+
+/**
+ * Create and delegate a sponsored lamports PDA, then schedule post-delegation
+ * transfer and cleanup to move lamports to a base-layer destination.
+ * @param payer - The payer and action signer
+ * @param destination - The delegated destination base-layer account
+ * @param amount - The lamports amount to transfer
+ * @param salt - User-provided 32-byte salt
+ * @returns The sponsored delegated lamports transfer instruction
+ */
+export function lamportsDelegatedTransferIx(
+  payer: PublicKey,
+  destination: PublicKey,
+  amount: bigint,
+  salt: Uint8Array,
+): TransactionInstruction {
+  if (amount < 0n) {
+    throw new Error("amount must be non-negative");
+  }
+  if (salt.length !== 32) {
+    throw new Error("salt must be exactly 32 bytes");
+  }
+
+  const [rentPda] = deriveRentPda();
+  const [lamportsPda] = deriveLamportsPda(payer, destination, salt);
+  const destinationDelegationRecord =
+    delegationRecordPdaFromDelegatedAccount(destination);
+
+  const data = Buffer.alloc(41);
+  data[0] = 20;
+  data.writeBigUInt64LE(amount, 1);
+  Buffer.from(salt).copy(data, 9);
+
+  return new TransactionInstruction({
+    programId: EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
+    keys: [
+      { pubkey: payer, isSigner: true, isWritable: true },
+      { pubkey: rentPda, isSigner: false, isWritable: true },
+      { pubkey: lamportsPda, isSigner: false, isWritable: true },
+      {
+        pubkey: EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
+        isSigner: false,
+        isWritable: false,
+      },
+      {
+        pubkey: delegateBufferPdaFromDelegatedAccountAndOwnerProgram(
+          lamportsPda,
+          EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
+        ),
+        isSigner: false,
+        isWritable: true,
+      },
+      {
+        pubkey: delegationRecordPdaFromDelegatedAccount(lamportsPda),
+        isSigner: false,
+        isWritable: true,
+      },
+      {
+        pubkey: delegationMetadataPdaFromDelegatedAccount(lamportsPda),
+        isSigner: false,
+        isWritable: true,
+      },
+      { pubkey: DELEGATION_PROGRAM_ID, isSigner: false, isWritable: false },
+      { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+      { pubkey: destination, isSigner: false, isWritable: true },
+      {
+        pubkey: destinationDelegationRecord,
+        isSigner: false,
+        isWritable: false,
+      },
     ],
     data,
   });
