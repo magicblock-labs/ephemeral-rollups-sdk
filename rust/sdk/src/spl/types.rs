@@ -100,6 +100,9 @@ pub fn find_shuttle_wallet_ata(mint: &Pubkey, shuttle_ephemeral_ata: &Pubkey) ->
     get_associated_token_address(shuttle_ephemeral_ata, mint)
 }
 
-pub fn find_transfer_queue(mint: &Pubkey) -> (Pubkey, u8) {
-    Pubkey::find_program_address(&[b"queue", mint.as_ref()], &ESPL_TOKEN_PROGRAM_ID)
+pub fn find_transfer_queue(mint: &Pubkey, validator: &Pubkey) -> (Pubkey, u8) {
+    Pubkey::find_program_address(
+        &[b"queue", mint.as_ref(), validator.as_ref()],
+        &ESPL_TOKEN_PROGRAM_ID,
+    )
 }

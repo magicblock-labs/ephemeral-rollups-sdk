@@ -19,12 +19,15 @@ mod tests {
         },
         spl::{
             builders::{
-                CreateEphemeralAtaPermissionBuilder, DelegateEphemeralAtaBuilder,
-                DelegateEphemeralAtaPermissionBuilder,
+                AllocateTransferQueueBuilder, CreateEphemeralAtaPermissionBuilder,
+                DelegateEphemeralAtaBuilder, DelegateEphemeralAtaPermissionBuilder,
+                DelegateTransferQueueBuilder,
                 DepositAndDelegateShuttleEphemeralAtaWithMergeAndPrivateTransferBuilder,
                 DepositAndDelegateShuttleEphemeralAtaWithMergeAndPrivateTransferBuilderError,
-                DepositSplTokensBuilder, InitializeEphemeralAtaBuilder,
-                InitializeGlobalVaultBuilder, ResetEphemeralAtaPermissionBuilder,
+                DepositAndQueueTransferBuilder, DepositSplTokensBuilder,
+                EnsureTransferQueueCrankBuilder, InitializeEphemeralAtaBuilder,
+                InitializeGlobalVaultBuilder, InitializeTransferQueueBuilder,
+                ResetEphemeralAtaPermissionBuilder, UndelegateAndCloseShuttleEphemeralAtaBuilder,
                 UndelegateEphemeralAtaBuilder, UndelegateEphemeralAtaPermissionBuilder,
                 WithdrawSplTokensBuilder,
             },
@@ -129,6 +132,196 @@ mod tests {
             EphemeralSplDiscriminator::InitializeEphemeralAta as u8
         );
         assert_eq!(instruction.data.len(), 1);
+    }
+
+    #[test]
+    fn test_initialize_transfer_queue() {
+        let payer = Pubkey::new_unique();
+        let mint = Pubkey::new_unique();
+        let validator = Pubkey::new_unique();
+        let (queue, _queue_bump) = find_transfer_queue(&mint, &validator);
+        let (queue_permission, _permission_bump) = Permission::find_pda(&queue);
+
+        let instruction = InitializeTransferQueueBuilder {
+            payer,
+            mint,
+            validator,
+            requested_items: Some(92),
+        }
+        .instruction();
+
+        assert_eq!(instruction.program_id, ESPL_TOKEN_PROGRAM_ID);
+        assert_eq!(instruction.accounts.len(), 7);
+        assert_eq!(instruction.accounts[0].pubkey, payer);
+        assert_eq!(instruction.accounts[1].pubkey, queue);
+        assert_eq!(instruction.accounts[2].pubkey, queue_permission);
+        assert_eq!(instruction.accounts[3].pubkey, mint);
+        assert_eq!(instruction.accounts[4].pubkey, validator);
+        assert_eq!(instruction.accounts[5].pubkey, system_program::id());
+        assert_eq!(instruction.accounts[6].pubkey, PERMISSION_PROGRAM_ID);
+        assert_eq!(
+            instruction.data[0],
+            EphemeralSplDiscriminator::InitializeTransferQueue as u8
+        );
+        assert_eq!(&instruction.data[1..], &92_u32.to_le_bytes());
+    }
+
+    #[test]
+    fn test_allocate_transfer_queue() {
+        let queue = Pubkey::new_unique();
+        let instruction = AllocateTransferQueueBuilder { queue }.instruction();
+
+        assert_eq!(instruction.program_id, ESPL_TOKEN_PROGRAM_ID);
+        assert_eq!(instruction.accounts.len(), 2);
+        assert_eq!(instruction.accounts[0].pubkey, queue);
+        assert_eq!(instruction.accounts[1].pubkey, system_program::id());
+        assert_eq!(
+            instruction.data,
+            vec![EphemeralSplDiscriminator::AllocateTransferQueue as u8]
+        );
+    }
+
+    #[test]
+    fn test_deposit_and_queue_transfer() {
+        let queue = Pubkey::new_unique();
+        let vault = Pubkey::new_unique();
+        let mint = Pubkey::new_unique();
+        let source = Pubkey::new_unique();
+        let vault_ata = Pubkey::new_unique();
+        let destination = Pubkey::new_unique();
+        let owner = Pubkey::new_unique();
+
+        let instruction = DepositAndQueueTransferBuilder {
+            queue,
+            vault,
+            mint,
+            source,
+            vault_ata,
+            destination,
+            owner,
+            reimbursement_token_info: None,
+            amount: 25,
+            min_delay_ms: 100,
+            max_delay_ms: 300,
+            split: 4,
+        }
+        .instruction()
+        .unwrap();
+
+        assert_eq!(instruction.program_id, ESPL_TOKEN_PROGRAM_ID);
+        assert_eq!(instruction.accounts.len(), 9);
+        assert_eq!(instruction.accounts[0].pubkey, queue);
+        assert_eq!(instruction.accounts[1].pubkey, vault);
+        assert_eq!(instruction.accounts[2].pubkey, mint);
+        assert_eq!(instruction.accounts[3].pubkey, source);
+        assert_eq!(instruction.accounts[4].pubkey, vault_ata);
+        assert_eq!(instruction.accounts[5].pubkey, destination);
+        assert_eq!(instruction.accounts[6].pubkey, owner);
+        assert_eq!(instruction.accounts[7].pubkey, TOKEN_PROGRAM_ID);
+        assert_eq!(instruction.accounts[8].pubkey, source);
+        assert_eq!(
+            instruction.data[0],
+            EphemeralSplDiscriminator::DepositAndQueueTransfer as u8
+        );
+        assert_eq!(
+            u64::from_le_bytes(instruction.data[1..9].try_into().unwrap()),
+            25
+        );
+        assert_eq!(
+            u64::from_le_bytes(instruction.data[9..17].try_into().unwrap()),
+            100
+        );
+        assert_eq!(
+            u64::from_le_bytes(instruction.data[17..25].try_into().unwrap()),
+            300
+        );
+        assert_eq!(
+            u32::from_le_bytes(instruction.data[25..29].try_into().unwrap()),
+            4
+        );
+    }
+
+    #[test]
+    fn test_deposit_and_queue_transfer_with_reimbursement_token_override() {
+        let reimbursement_token_info = Pubkey::new_unique();
+
+        let instruction = DepositAndQueueTransferBuilder {
+            queue: Pubkey::new_unique(),
+            vault: Pubkey::new_unique(),
+            mint: Pubkey::new_unique(),
+            source: Pubkey::new_unique(),
+            vault_ata: Pubkey::new_unique(),
+            destination: Pubkey::new_unique(),
+            owner: Pubkey::new_unique(),
+            reimbursement_token_info: Some(reimbursement_token_info),
+            amount: 25,
+            min_delay_ms: 100,
+            max_delay_ms: 300,
+            split: 4,
+        }
+        .instruction()
+        .unwrap();
+
+        assert_eq!(instruction.accounts[8].pubkey, reimbursement_token_info);
+    }
+
+    #[test]
+    fn test_ensure_transfer_queue_crank() {
+        let payer = Pubkey::new_unique();
+        let queue = Pubkey::new_unique();
+        let magic_fee_vault = Pubkey::new_unique();
+
+        let instruction = EnsureTransferQueueCrankBuilder {
+            payer,
+            queue,
+            magic_fee_vault,
+            magic_context: MAGIC_CONTEXT_ID,
+            magic_program: MAGIC_PROGRAM_ID,
+        }
+        .instruction();
+
+        assert_eq!(instruction.program_id, ESPL_TOKEN_PROGRAM_ID);
+        assert_eq!(instruction.accounts.len(), 5);
+        assert_eq!(instruction.accounts[0].pubkey, payer);
+        assert_eq!(instruction.accounts[1].pubkey, queue);
+        assert_eq!(instruction.accounts[2].pubkey, magic_fee_vault);
+        assert_eq!(instruction.accounts[3].pubkey, MAGIC_CONTEXT_ID);
+        assert_eq!(instruction.accounts[4].pubkey, MAGIC_PROGRAM_ID);
+        assert_eq!(
+            instruction.data,
+            vec![EphemeralSplDiscriminator::EnsureTransferQueueCrank as u8]
+        );
+    }
+
+    #[test]
+    fn test_delegate_transfer_queue() {
+        let payer = Pubkey::new_unique();
+        let queue = Pubkey::new_unique();
+        let mint = Pubkey::new_unique();
+        let delegation_buffer = delegate_buffer_pda_from_delegated_account_and_owner_program(
+            &queue,
+            &ESPL_TOKEN_PROGRAM_ID,
+        );
+        let delegation_record = delegation_record_pda_from_delegated_account(&queue);
+        let delegation_metadata = delegation_metadata_pda_from_delegated_account(&queue);
+
+        let instruction = DelegateTransferQueueBuilder { payer, queue, mint }.instruction();
+
+        assert_eq!(instruction.program_id, ESPL_TOKEN_PROGRAM_ID);
+        assert_eq!(instruction.accounts.len(), 9);
+        assert_eq!(instruction.accounts[0].pubkey, payer);
+        assert_eq!(instruction.accounts[1].pubkey, queue);
+        assert_eq!(instruction.accounts[2].pubkey, mint);
+        assert_eq!(instruction.accounts[3].pubkey, ESPL_TOKEN_PROGRAM_ID);
+        assert_eq!(instruction.accounts[4].pubkey, delegation_buffer);
+        assert_eq!(instruction.accounts[5].pubkey, delegation_record);
+        assert_eq!(instruction.accounts[6].pubkey, delegation_metadata);
+        assert_eq!(instruction.accounts[7].pubkey, DELEGATION_PROGRAM_ID);
+        assert_eq!(instruction.accounts[8].pubkey, system_program::id());
+        assert_eq!(
+            instruction.data,
+            vec![EphemeralSplDiscriminator::DelegateTransferQueue as u8]
+        );
     }
 
     #[test]
@@ -583,6 +776,50 @@ mod tests {
     }
 
     #[test]
+    fn test_undelegate_and_close_shuttle_ephemeral_ata() {
+        let payer = Pubkey::new_unique();
+        let rent_reimbursement = Pubkey::new_unique();
+        let owner = Pubkey::new_unique();
+        let mint = Pubkey::new_unique();
+        let destination_ata = Pubkey::new_unique();
+        let shuttle_id = 7;
+        let (shuttle_ephemeral_ata, _shuttle_bump) =
+            find_shuttle_ephemeral_ata(&owner, &mint, shuttle_id);
+        let (shuttle_ata, _shuttle_ata_bump) = find_shuttle_ata(&shuttle_ephemeral_ata, &mint);
+        let shuttle_wallet_ata = find_shuttle_wallet_ata(&mint, &shuttle_ephemeral_ata);
+
+        let instruction = UndelegateAndCloseShuttleEphemeralAtaBuilder {
+            payer,
+            rent_reimbursement,
+            owner,
+            mint,
+            destination_ata,
+            shuttle_id,
+            escrow_index: Some(3),
+        }
+        .instruction();
+
+        assert_eq!(instruction.program_id, ESPL_TOKEN_PROGRAM_ID);
+        assert_eq!(instruction.accounts.len(), 9);
+        assert_eq!(instruction.accounts[0].pubkey, payer);
+        assert_eq!(instruction.accounts[1].pubkey, rent_reimbursement);
+        assert_eq!(instruction.accounts[2].pubkey, shuttle_ephemeral_ata);
+        assert_eq!(instruction.accounts[3].pubkey, shuttle_ata);
+        assert_eq!(instruction.accounts[4].pubkey, shuttle_wallet_ata);
+        assert_eq!(instruction.accounts[5].pubkey, destination_ata);
+        assert_eq!(instruction.accounts[6].pubkey, TOKEN_PROGRAM_ID);
+        assert_eq!(instruction.accounts[7].pubkey, MAGIC_CONTEXT_ID);
+        assert_eq!(instruction.accounts[8].pubkey, MAGIC_PROGRAM_ID);
+        assert_eq!(
+            instruction.data,
+            vec![
+                EphemeralSplDiscriminator::UndelegateAndCloseShuttleEphemeralAta as u8,
+                3,
+            ]
+        );
+    }
+
+    #[test]
     fn test_reset_ephemeral_ata_permission() {
         let user = Pubkey::new_unique();
         let mint = Pubkey::new_unique();
@@ -689,7 +926,7 @@ mod tests {
         let shuttle_wallet_ata = find_shuttle_wallet_ata(&mint, &shuttle_ephemeral_ata);
         let (vault, _) = GlobalVault::find_pda(&mint);
         let vault_ata = find_vault_ata(&mint, &vault);
-        let (queue, _) = find_transfer_queue(&mint);
+        let (queue, _) = find_transfer_queue(&mint, &validator);
 
         assert_eq!(instruction.program_id, ESPL_TOKEN_PROGRAM_ID);
         assert_eq!(instruction.accounts.len(), 19);
