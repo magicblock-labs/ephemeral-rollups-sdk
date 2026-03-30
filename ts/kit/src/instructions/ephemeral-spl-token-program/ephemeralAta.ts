@@ -844,7 +844,7 @@ export async function depositAndDelegateShuttleEphemeralAtaWithMergeAndPrivateTr
   const [rentPda] = await deriveRentPda();
   const [vault] = await deriveVault(mint);
   const vaultAta = await deriveVaultAta(mint, vault);
-  const [queue] = await deriveTransferQueue(mint);
+  const [queue] = await deriveTransferQueue(mint, validator);
   const delegateBuffer =
     await delegateBufferPdaFromDelegatedAccountAndOwnerProgram(
       shuttleAta,
@@ -1016,16 +1016,20 @@ export function mergeShuttleIntoAtaIx(
 /**
  * Undelegate shuttle wallet ATA and close it when empty.
  * @param payer - The payer account
+ * @param rentReimbursement - The rent reimbursement account
  * @param shuttleEphemeralAta - The shuttle metadata account
  * @param shuttleAta - The shuttle EATA account
  * @param shuttleWalletAta - The shuttle wallet ATA account
+ * @param destinationAta - The destination token account used by the close handler
  * @returns The undelegate shuttle instruction
  */
 export function undelegateAndCloseShuttleEphemeralAtaIx(
   payer: Address,
+  rentReimbursement: Address,
   shuttleEphemeralAta: Address,
   shuttleAta: Address,
   shuttleWalletAta: Address,
+  destinationAta: Address,
   escrowIndex?: number,
 ): Instruction {
   if (
@@ -1043,9 +1047,11 @@ export function undelegateAndCloseShuttleEphemeralAtaIx(
   return {
     accounts: [
       { address: payer, role: AccountRole.WRITABLE_SIGNER },
+      { address: rentReimbursement, role: AccountRole.WRITABLE },
       { address: shuttleEphemeralAta, role: AccountRole.READONLY },
       { address: shuttleAta, role: AccountRole.READONLY },
       { address: shuttleWalletAta, role: AccountRole.WRITABLE },
+      { address: destinationAta, role: AccountRole.WRITABLE },
       { address: TOKEN_PROGRAM_ADDRESS as Address, role: AccountRole.READONLY },
       { address: MAGIC_CONTEXT_ID, role: AccountRole.WRITABLE },
       { address: MAGIC_PROGRAM_ID, role: AccountRole.READONLY },
@@ -1497,13 +1503,17 @@ export async function delegateSplWithPrivateTransfer(
   const maxDelayMs = opts?.maxDelayMs ?? minDelayMs;
   const split = opts?.split ?? 1;
 
+  if (validator == null) {
+    throw new Error("validator is required for encrypted private transfers");
+  }
+
   const instructions: Instruction[] = [];
 
   const [ephemeralAta] = await deriveEphemeralAta(owner, mint);
   const [vault] = await deriveVault(mint);
   const [vaultEphemeralAta] = await deriveEphemeralAta(vault, mint);
   const vaultAta = await deriveVaultAta(mint, vault);
-  const [queue] = await deriveTransferQueue(mint);
+  const [queue] = await deriveTransferQueue(mint, validator);
   const ownerAta = await getAssociatedTokenAddressSync(mint, owner);
   const [shuttleEphemeralAta] = await deriveShuttleEphemeralAta(
     owner,
@@ -1525,7 +1535,7 @@ export async function delegateSplWithPrivateTransfer(
   }
 
   if (initTransferQueueIfMissing) {
-    instructions.push(initTransferQueueIx(payer, queue, mint));
+    instructions.push(await initTransferQueueIx(payer, queue, mint, validator));
   }
 
   if (initAtasIfMissing) {
@@ -1583,7 +1593,13 @@ export async function transferSpl(
     switch (opts.visibility) {
       case "private":
         if (opts.toBalance === "base") {
-          const [queue] = await deriveTransferQueue(mint);
+          if (validator == null) {
+            throw new Error(
+              "validator is required for private ephemeral-to-base transfers",
+            );
+          }
+
+          const [queue] = await deriveTransferQueue(mint, validator);
           const [vault] = await deriveVault(mint);
           const vaultAta = await deriveVaultAta(mint, vault);
 

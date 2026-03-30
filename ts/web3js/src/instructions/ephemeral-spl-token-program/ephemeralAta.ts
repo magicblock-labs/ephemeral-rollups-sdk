@@ -25,6 +25,7 @@ import {
   depositAndQueueTransferIx,
   deriveTransferQueue,
   initTransferQueueIx,
+  toTransactionInstruction,
 } from "./transferQueue.js";
 
 // Minimal SPL Token helpers (vendored) to avoid importing @solana/spl-token.
@@ -600,7 +601,6 @@ export function delegateEphemeralAtaIx(
  * @param owner - The owner account
  * @param mint - The mint account
  * @param shuttleId - The shuttle id (u32)
- * @param bump - The shuttle metadata bump
  * @returns The initialize shuttle instruction
  */
 export function initShuttleEphemeralAtaIx(
@@ -845,7 +845,7 @@ export function depositAndDelegateShuttleEphemeralAtaWithMergeAndPrivateTransfer
   const [rentPda] = deriveRentPda();
   const [vault] = deriveVault(mint);
   const vaultAta = deriveVaultAta(mint, vault);
-  const [queue] = deriveTransferQueue(mint);
+  const [queue] = deriveTransferQueue(mint, validator);
   const encryptedDestination = encryptEd25519Recipient(
     destinationOwner.toBytes(),
     validator,
@@ -1034,16 +1034,20 @@ export function mergeShuttleIntoAtaIx(
 /**
  * Undelegate shuttle wallet ATA and close it when empty.
  * @param payer - The payer account
+ * @param rentReimbursement - The rent reimbursement account
  * @param shuttleEphemeralAta - The shuttle metadata account
  * @param shuttleAta - The shuttle EATA account
  * @param shuttleWalletAta - The shuttle wallet ATA account
+ * @param destinationAta - The destination token account used by the close handler
  * @returns The undelegate shuttle instruction
  */
 export function undelegateAndCloseShuttleEphemeralAtaIx(
   payer: PublicKey,
+  rentReimbursement: PublicKey,
   shuttleEphemeralAta: PublicKey,
   shuttleAta: PublicKey,
   shuttleWalletAta: PublicKey,
+  destinationAta: PublicKey,
   escrowIndex?: number,
 ): TransactionInstruction {
   const data =
@@ -1055,9 +1059,11 @@ export function undelegateAndCloseShuttleEphemeralAtaIx(
     programId: EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
     keys: [
       { pubkey: payer, isSigner: true, isWritable: true },
+      { pubkey: rentReimbursement, isSigner: false, isWritable: true },
       { pubkey: shuttleEphemeralAta, isSigner: false, isWritable: false },
       { pubkey: shuttleAta, isSigner: false, isWritable: false },
       { pubkey: shuttleWalletAta, isSigner: false, isWritable: true },
+      { pubkey: destinationAta, isSigner: false, isWritable: true },
       { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
       { pubkey: MAGIC_CONTEXT_ID, isSigner: false, isWritable: true },
       { pubkey: MAGIC_PROGRAM_ID, isSigner: false, isWritable: false },
@@ -1521,13 +1527,17 @@ export async function delegateSplWithPrivateTransfer(
   const maxDelayMs = opts?.maxDelayMs ?? minDelayMs;
   const split = opts?.split ?? 1;
 
+  if (validator == null) {
+    throw new Error("validator is required for encrypted private transfers");
+  }
+
   const instructions: TransactionInstruction[] = [];
 
   const [ephemeralAta] = deriveEphemeralAta(owner, mint);
   const [vault] = deriveVault(mint);
   const [vaultEphemeralAta] = deriveEphemeralAta(vault, mint);
   const vaultAta = deriveVaultAta(mint, vault);
-  const [queue] = deriveTransferQueue(mint);
+  const [queue] = deriveTransferQueue(mint, validator);
   const ownerAta = getAssociatedTokenAddressSync(mint, owner);
   const [shuttleEphemeralAta] = deriveShuttleEphemeralAta(
     owner,
@@ -1546,7 +1556,11 @@ export async function delegateSplWithPrivateTransfer(
   }
 
   if (initTransferQueueIfMissing) {
-    instructions.push(initTransferQueueIx(payer, queue, mint));
+    instructions.push(
+      toTransactionInstruction(
+        initTransferQueueIx(payer, queue, mint, validator),
+      ),
+    );
   }
 
   if (initAtasIfMissing) {
@@ -1611,23 +1625,31 @@ export async function transferSpl(
     switch (opts.visibility) {
       case "private":
         if (opts.toBalance === "base") {
-          const [queue] = deriveTransferQueue(mint);
+          if (validator == null) {
+            throw new Error(
+              "validator is required for private ephemeral-to-base transfers",
+            );
+          }
+
+          const [queue] = deriveTransferQueue(mint, validator);
           const [vault] = deriveVault(mint);
           const vaultAta = deriveVaultAta(mint, vault);
 
           return [
-            depositAndQueueTransferIx(
-              queue,
-              vault,
-              mint,
-              fromAta,
-              vaultAta,
-              toAta,
-              from,
-              amount,
-              minDelayMs,
-              maxDelayMs,
-              split,
+            toTransactionInstruction(
+              depositAndQueueTransferIx(
+                queue,
+                vault,
+                mint,
+                fromAta,
+                vaultAta,
+                toAta,
+                from,
+                amount,
+                minDelayMs,
+                maxDelayMs,
+                split,
+              ),
             ),
           ];
         }

@@ -9,6 +9,7 @@ pub enum Seed<'a> {
     CommitRecord(&'a Address),
     UndelegateBuffer(&'a Address),
     ValidatorFeesVault(&'a Address),
+    MagicFeeVault(&'a Address),
     EphemeralBalance { payer: &'a Address, index: u8 },
     ProgramConfig(&'a Address),
     FeesVault,
@@ -56,6 +57,11 @@ impl<'a> Seed<'a> {
             }
             Seed::ValidatorFeesVault(pubkey) => {
                 out[0] = b"v-fees-vault";
+                out[1] = pubkey.as_ref();
+                &out[..2]
+            }
+            Seed::MagicFeeVault(pubkey) => {
+                out[0] = b"magic-fee-vault";
                 out[1] = pubkey.as_ref();
                 &out[..2]
             }

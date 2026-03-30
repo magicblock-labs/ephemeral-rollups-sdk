@@ -13,66 +13,99 @@ import {
   EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
   MAGIC_CONTEXT_ID,
   MAGIC_PROGRAM_ID,
+  PERMISSION_PROGRAM_ID,
 } from "../../constants";
 import {
   delegateBufferPdaFromDelegatedAccountAndOwnerProgram,
   delegationMetadataPdaFromDelegatedAccount,
   delegationRecordPdaFromDelegatedAccount,
+  permissionPdaFromAccount,
 } from "../../pda";
 
 const INITIALIZE_TRANSFER_QUEUE_DISCRIMINATOR = 12;
 const DEPOSIT_AND_QUEUE_TRANSFER_DISCRIMINATOR = 16;
 const ENSURE_TRANSFER_QUEUE_CRANK_DISCRIMINATOR = 17;
 const DELEGATE_TRANSFER_QUEUE_DISCRIMINATOR = 19;
+const ALLOCATE_TRANSFER_QUEUE_DISCRIMINATOR = 27;
 const QUEUE_SEED = new TextEncoder().encode("queue");
 const TOKEN_PROGRAM_ADDRESS = address(
   "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
 );
 
 /**
- * Derive the transfer queue PDA for a mint.
+ * Derive the transfer queue PDA for a mint/validator pair.
  * @param mint - The mint account address
+ * @param validator - The validator account address
  * @returns The transfer queue PDA and bump
  */
 export async function deriveTransferQueue(
   mint: Address,
+  validator: Address,
 ): Promise<[Address, number]> {
   const addressEncoder = getAddressEncoder();
   const [queue, bump] = await getProgramDerivedAddress({
     programAddress: EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
-    seeds: [QUEUE_SEED, addressEncoder.encode(mint)],
+    seeds: [
+      QUEUE_SEED,
+      addressEncoder.encode(mint),
+      addressEncoder.encode(validator),
+    ],
   });
   return [queue, bump];
 }
 
 /**
- * Initialize the per-mint transfer queue.
+ * Initialize the per-validator transfer queue for a mint.
  * @param payer - The payer account
  * @param queue - The transfer queue PDA
  * @param mint - The mint account
- * @param sizeBytes - Optional queue size in bytes. Omit to use the program default.
+ * @param validator - The validator account
+ * @param requestedItems - Optional queue item count. Omit to use the program default.
  * @returns The initialize transfer queue instruction
  */
-export function initTransferQueueIx(
+export async function initTransferQueueIx(
   payer: Address,
   queue: Address,
   mint: Address,
-  sizeBytes?: number,
-): Instruction {
+  validator: Address,
+  requestedItems?: number,
+): Promise<Instruction> {
   return {
     accounts: [
       { address: payer, role: AccountRole.WRITABLE_SIGNER },
       { address: queue, role: AccountRole.WRITABLE },
+      {
+        address: await permissionPdaFromAccount(queue),
+        role: AccountRole.WRITABLE,
+      },
       { address: mint, role: AccountRole.READONLY },
+      { address: validator, role: AccountRole.READONLY },
       { address: SYSTEM_PROGRAM_ADDRESS, role: AccountRole.READONLY },
+      { address: PERMISSION_PROGRAM_ID, role: AccountRole.READONLY },
     ],
     data:
-      sizeBytes === undefined
+      requestedItems === undefined
         ? new Uint8Array([INITIALIZE_TRANSFER_QUEUE_DISCRIMINATOR])
         : new Uint8Array([
             INITIALIZE_TRANSFER_QUEUE_DISCRIMINATOR,
-            ...u32le(sizeBytes),
+            ...u32le(requestedItems),
           ]),
+    programAddress: EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
+  };
+}
+
+/**
+ * Allocate additional space for a prefunded transfer queue.
+ * @param queue - The transfer queue PDA
+ * @returns The allocate transfer queue instruction
+ */
+export function allocateTransferQueueIx(queue: Address): Instruction {
+  return {
+    accounts: [
+      { address: queue, role: AccountRole.WRITABLE },
+      { address: SYSTEM_PROGRAM_ADDRESS, role: AccountRole.READONLY },
+    ],
+    data: new Uint8Array([ALLOCATE_TRANSFER_QUEUE_DISCRIMINATOR]),
     programAddress: EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
   };
 }
@@ -90,6 +123,7 @@ export function initTransferQueueIx(
  * @param minDelayMs - The minimum delay in milliseconds
  * @param maxDelayMs - The maximum delay in milliseconds
  * @param split - The number of queue entries to create
+ * @param reimbursementTokenInfo - Reimbursement token account used by the queue-full fallback path
  * @returns The deposit-and-queue-transfer instruction
  */
 export function depositAndQueueTransferIx(
@@ -104,6 +138,7 @@ export function depositAndQueueTransferIx(
   minDelayMs: bigint = 0n,
   maxDelayMs: bigint = minDelayMs,
   split: number = 1,
+  reimbursementTokenInfo: Address = source,
 ): Instruction {
   if (!Number.isInteger(split) || split <= 0 || split > 0xffff_ffff) {
     throw new Error("split must fit in u32");
@@ -125,6 +160,7 @@ export function depositAndQueueTransferIx(
       { address: destination, role: AccountRole.READONLY },
       { address: owner, role: AccountRole.READONLY_SIGNER },
       { address: TOKEN_PROGRAM_ADDRESS, role: AccountRole.READONLY },
+      { address: reimbursementTokenInfo, role: AccountRole.WRITABLE },
     ],
     data: new Uint8Array([
       DEPOSIT_AND_QUEUE_TRANSFER_DISCRIMINATOR,
@@ -141,6 +177,7 @@ export function depositAndQueueTransferIx(
  * Ensure the recurring transfer queue crank is scheduled.
  * @param payer - The payer account
  * @param queue - The transfer queue PDA
+ * @param magicFeeVault - The validator magic fee vault PDA from the delegation program
  * @param magicContext - The Magic context account
  * @param magicProgram - The Magic program account
  * @returns The ensure transfer queue crank instruction
@@ -148,6 +185,7 @@ export function depositAndQueueTransferIx(
 export function ensureTransferQueueCrankIx(
   payer: Address,
   queue: Address,
+  magicFeeVault: Address,
   magicContext: Address = MAGIC_CONTEXT_ID,
   magicProgram: Address = MAGIC_PROGRAM_ID,
 ): Instruction {
@@ -155,6 +193,7 @@ export function ensureTransferQueueCrankIx(
     accounts: [
       { address: payer, role: AccountRole.WRITABLE_SIGNER },
       { address: queue, role: AccountRole.WRITABLE },
+      { address: magicFeeVault, role: AccountRole.WRITABLE },
       { address: magicContext, role: AccountRole.WRITABLE },
       { address: magicProgram, role: AccountRole.READONLY },
     ],
@@ -206,7 +245,7 @@ export async function delegateTransferQueueIx(
 
 function u32le(n: number): number[] {
   if (!Number.isInteger(n) || n < 0 || n > 0xffff_ffff) {
-    throw new Error("sizeBytes out of range for u32");
+    throw new Error("value out of range for u32");
   }
 
   return [n & 0xff, (n >>> 8) & 0xff, (n >>> 16) & 0xff, (n >>> 24) & 0xff];

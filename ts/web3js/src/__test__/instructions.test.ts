@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { Keypair, PublicKey } from "@solana/web3.js";
+import { Keypair, PublicKey, TransactionInstruction } from "@solana/web3.js";
 import {
   createDelegateInstruction,
   createTopUpEscrowInstruction,
@@ -11,21 +11,25 @@ import {
   createCommitAndUndelegateInstruction,
 } from "../instructions/magic-program";
 import {
+  allocateTransferQueueIx,
   delegateEataPermissionIx,
   depositAndQueueTransferIx,
   delegateSpl,
   delegateSplWithPrivateTransfer,
   delegateTransferQueueIx,
   deriveEphemeralAta,
+  deriveTransferQueue,
   deriveRentPda,
   deriveShuttleAta,
   deriveShuttleEphemeralAta,
   deriveVault,
   ensureTransferQueueCrankIx,
   initEphemeralAtaIx,
+  initTransferQueueIx,
   initVaultIx,
   initRentPdaIx,
   transferSpl,
+  undelegateAndCloseShuttleEphemeralAtaIx,
   withdrawSplIx,
   withdrawSpl,
 } from "../instructions/ephemeral-spl-token-program";
@@ -34,7 +38,9 @@ import {
   EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
   MAGIC_PROGRAM_ID,
   MAGIC_CONTEXT_ID,
+  PERMISSION_PROGRAM_ID,
 } from "../constants";
+import { permissionPdaFromAccount } from "../pda";
 
 function readLengthPrefixedField(
   data: Uint8Array,
@@ -1078,6 +1084,7 @@ describe("Exposed Instructions (web3.js)", () => {
         visibility: "private",
         fromBalance: "ephemeral",
         toBalance: "base",
+        validator,
         initAtasIfMissing: true,
         privateTransfer: {
           minDelayMs: 100n,
@@ -1095,6 +1102,7 @@ describe("Exposed Instructions (web3.js)", () => {
         visibility: "private",
         fromBalance: "ephemeral",
         toBalance: "base",
+        validator,
         initIfMissing: true,
         initVaultIfMissing: true,
         privateTransfer: {
@@ -1106,11 +1114,26 @@ describe("Exposed Instructions (web3.js)", () => {
 
       expect(instructions).toHaveLength(1);
       expect(instructions[0].data[0]).toBe(16);
-      expect(instructions[0].keys).toHaveLength(8);
+      expect(instructions[0].keys).toHaveLength(9);
+      expect(instructions[0].keys[8].pubkey.toBase58()).toBe(
+        instructions[0].keys[3].pubkey.toBase58(),
+      );
       expect(Buffer.from(instructions[0].data).readBigUInt64LE(1)).toBe(25n);
       expect(Buffer.from(instructions[0].data).readBigUInt64LE(9)).toBe(100n);
       expect(Buffer.from(instructions[0].data).readBigUInt64LE(17)).toBe(300n);
       expect(Buffer.from(instructions[0].data).readUInt32LE(25)).toBe(4);
+    });
+
+    it("should require validator for private ephemeral-to-base transfers", async () => {
+      await expect(
+        transferSpl(from, to, mint, 25n, {
+          visibility: "private",
+          fromBalance: "ephemeral",
+          toBalance: "base",
+        }),
+      ).rejects.toThrow(
+        "validator is required for private ephemeral-to-base transfers",
+      );
     });
 
     it("should use a normal transfer for public base-to-base transfers", async () => {
@@ -1170,17 +1193,26 @@ describe("Exposed Instructions (web3.js)", () => {
   describe("ensureTransferQueueCrankIx (Ephemeral SPL Token Program)", () => {
     const payer = mockPublicKey;
     const queue = differentKey;
+    const magicFeeVault = new PublicKey("11111111111111111111111111111113");
 
-    it("should include queue, magic context, and magic program in order", () => {
-      const instruction = ensureTransferQueueCrankIx(payer, queue);
+    it("should include queue, magic fee vault, magic context, and magic program in order", () => {
+      const instruction = ensureTransferQueueCrankIx(
+        payer,
+        queue,
+        magicFeeVault,
+      );
 
-      expect(instruction.keys).toHaveLength(4);
+      expect(instruction).toBeInstanceOf(TransactionInstruction);
+      expect(instruction.keys).toHaveLength(5);
       expect(instruction.keys[0].pubkey.toBase58()).toBe(payer.toBase58());
       expect(instruction.keys[1].pubkey.toBase58()).toBe(queue.toBase58());
       expect(instruction.keys[2].pubkey.toBase58()).toBe(
-        MAGIC_CONTEXT_ID.toBase58(),
+        magicFeeVault.toBase58(),
       );
       expect(instruction.keys[3].pubkey.toBase58()).toBe(
+        MAGIC_CONTEXT_ID.toBase58(),
+      );
+      expect(instruction.keys[4].pubkey.toBase58()).toBe(
         MAGIC_PROGRAM_ID.toBase58(),
       );
     });
@@ -1209,7 +1241,10 @@ describe("Exposed Instructions (web3.js)", () => {
         4,
       );
 
-      expect(instruction.keys).toHaveLength(8);
+      expect(instruction).toBeInstanceOf(TransactionInstruction);
+      expect(instruction.keys).toHaveLength(9);
+      expect(instruction.keys[8].pubkey.toBase58()).toBe(source.toBase58());
+      expect(instruction.keys[8].isWritable).toBe(true);
       expect(Array.from(instruction.data)).toEqual([
         16,
         ...Array.from(
@@ -1227,6 +1262,66 @@ describe("Exposed Instructions (web3.js)", () => {
         0,
       ]);
     });
+
+    it("should allow overriding the reimbursement token account", () => {
+      const reimbursementTokenInfo = new PublicKey(
+        "11111111111111111111111111111118",
+      );
+      const instruction = depositAndQueueTransferIx(
+        queue,
+        vault,
+        mint,
+        source,
+        vaultAta,
+        destination,
+        mockPublicKey,
+        25n,
+        100n,
+        300n,
+        4,
+        reimbursementTokenInfo,
+      );
+
+      expect(instruction.keys[8].pubkey.toBase58()).toBe(
+        reimbursementTokenInfo.toBase58(),
+      );
+    });
+  });
+
+  describe("undelegateAndCloseShuttleEphemeralAtaIx (Ephemeral SPL Token Program)", () => {
+    it("should include rent reimbursement and destination ATA accounts", () => {
+      const rentReimbursement = new PublicKey(
+        "11111111111111111111111111111113",
+      );
+      const shuttleEphemeralAta = new PublicKey(
+        "11111111111111111111111111111114",
+      );
+      const shuttleAta = new PublicKey("11111111111111111111111111111115");
+      const shuttleWalletAta = new PublicKey(
+        "11111111111111111111111111111116",
+      );
+      const destinationAta = new PublicKey("11111111111111111111111111111117");
+      const instruction = undelegateAndCloseShuttleEphemeralAtaIx(
+        mockPublicKey,
+        rentReimbursement,
+        shuttleEphemeralAta,
+        shuttleAta,
+        shuttleWalletAta,
+        destinationAta,
+        3,
+      );
+
+      expect(instruction.keys).toHaveLength(9);
+      expect(instruction.keys[1].pubkey.toBase58()).toBe(
+        rentReimbursement.toBase58(),
+      );
+      expect(instruction.keys[1].isWritable).toBe(true);
+      expect(instruction.keys[5].pubkey.toBase58()).toBe(
+        destinationAta.toBase58(),
+      );
+      expect(instruction.keys[5].isWritable).toBe(true);
+      expect(Array.from(instruction.data)).toEqual([14, 3]);
+    });
   });
 
   describe("delegateTransferQueueIx (Ephemeral SPL Token Program)", () => {
@@ -1236,8 +1331,52 @@ describe("Exposed Instructions (web3.js)", () => {
     it("should serialize discriminator 19 for the delegated transfer queue opcode", () => {
       const instruction = delegateTransferQueueIx(queue, payer, mockPublicKey);
 
+      expect(instruction).toBeInstanceOf(TransactionInstruction);
       expect(instruction.keys).toHaveLength(9);
       expect(Array.from(instruction.data)).toEqual([19]);
+    });
+  });
+
+  describe("transfer queue helpers (Ephemeral SPL Token Program)", () => {
+    const mint = new PublicKey("11111111111111111111111111111113");
+    const validator = new PublicKey("11111111111111111111111111111114");
+
+    it("should derive validator-scoped transfer queue PDAs", () => {
+      const [queueA] = deriveTransferQueue(mint, validator);
+      const [queueB] = deriveTransferQueue(mint, mockPublicKey);
+
+      expect(queueA.toBase58()).not.toBe(queueB.toBase58());
+    });
+
+    it("should include validator and requested item count in initTransferQueueIx", () => {
+      const [queue] = deriveTransferQueue(mint, validator);
+      const instruction = initTransferQueueIx(
+        mockPublicKey,
+        queue,
+        mint,
+        validator,
+        92,
+      );
+
+      expect(instruction).toBeInstanceOf(TransactionInstruction);
+      expect(instruction.keys).toHaveLength(7);
+      expect(instruction.keys[2].pubkey.toBase58()).toBe(
+        permissionPdaFromAccount(queue).toBase58(),
+      );
+      expect(instruction.keys[4].pubkey.toBase58()).toBe(validator.toBase58());
+      expect(instruction.keys[6].pubkey.toBase58()).toBe(
+        PERMISSION_PROGRAM_ID.toBase58(),
+      );
+      expect(Array.from(instruction.data)).toEqual([12, 92, 0, 0, 0]);
+    });
+
+    it("should serialize discriminator 27 for allocateTransferQueueIx", () => {
+      const [queue] = deriveTransferQueue(mint, validator);
+      const instruction = allocateTransferQueueIx(queue);
+
+      expect(instruction).toBeInstanceOf(TransactionInstruction);
+      expect(instruction.keys).toHaveLength(2);
+      expect(Array.from(instruction.data)).toEqual([27]);
     });
   });
 

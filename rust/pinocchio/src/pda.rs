@@ -50,6 +50,10 @@ pub fn validator_fees_vault_pda_from_validator(validator: &Address) -> Address {
     find_seed_pda(&Seed::ValidatorFeesVault(validator), crate::id())
 }
 
+pub fn magic_fee_vault_pda_from_validator(validator: &Address) -> Address {
+    find_seed_pda(&Seed::MagicFeeVault(validator), crate::id())
+}
+
 pub fn program_config_from_program_id(program_id: &Address) -> Address {
     find_seed_pda(&Seed::ProgramConfig(program_id), crate::id())
 }

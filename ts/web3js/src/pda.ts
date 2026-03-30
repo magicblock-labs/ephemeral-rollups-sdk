@@ -107,6 +107,18 @@ export function validatorFeesVaultPdaFromValidator(validator: PublicKey) {
 }
 
 /**
+ * Derives the magic fee vault PDA for a given validator
+ * @param validator - The validator address
+ * @returns The magic fee vault PDA
+ */
+export function magicFeeVaultPdaFromValidator(validator: PublicKey) {
+  return PublicKey.findProgramAddressSync(
+    [Buffer.from("magic-fee-vault"), validator.toBytes()],
+    DELEGATION_PROGRAM_ID,
+  )[0];
+}
+
+/**
  * Derives the commit state PDA for a given delegated account
  * @param delegatedAccount - The delegated account address
  * @returns The commit state PDA
