@@ -51,7 +51,6 @@ export async function verifyTeeRpcIntegrity(rpcUrl: string): Promise<boolean> {
 /**
  * Verify the integrity of the RPC
  * @param rpcUrl - The URL of the RPC server
- * @param validatorIdentity - The expected identity of the validator
  * @returns True if the quote is valid, false otherwise
  */
 export async function verifyTeeIntegrity(rpcUrl: string): Promise<boolean> {
