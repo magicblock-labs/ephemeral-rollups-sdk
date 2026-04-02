@@ -891,7 +891,7 @@ describe("Exposed Instructions (@solana/kit)", () => {
         validatorField.equals(Buffer.from(addressEncoder.encode(validator))),
       ).toBe(true);
       expect(destinationField).toHaveLength(80);
-      expect(suffixField).toHaveLength(69);
+      expect(suffixField).toHaveLength(68);
       expect(endOffset).toBe(data.length);
     });
   });
@@ -1018,8 +1018,31 @@ describe("Exposed Instructions (@solana/kit)", () => {
         validatorField.equals(Buffer.from(addressEncoder.encode(validator))),
       ).toBe(true);
       expect(destinationField).toHaveLength(80);
-      expect(suffixField).toHaveLength(69);
+      expect(suffixField).toHaveLength(68);
       expect(endOffset).toBe(data.length);
+    });
+
+    it("should append clientRefId to the encrypted private transfer suffix when provided", async () => {
+      const instructions = await transferSpl(from, to, mint, 25n, {
+        visibility: "private",
+        fromBalance: "base",
+        toBalance: "base",
+        validator,
+        shuttleId: 7,
+        privateTransfer: {
+          minDelayMs: 100n,
+          maxDelayMs: 300n,
+          split: 4,
+          clientRefId: 42n,
+        },
+      });
+
+      const data = Buffer.from(instructions[0].data ?? []);
+      const [, nextOffset] = readLengthPrefixedField(data, 13);
+      const [, suffixOffset] = readLengthPrefixedField(data, nextOffset);
+      const [suffixField] = readLengthPrefixedField(data, suffixOffset);
+
+      expect(suffixField).toHaveLength(76);
     });
 
     it("should initialize the destination ATA and vault when requested", async () => {
@@ -1136,6 +1159,7 @@ describe("Exposed Instructions (@solana/kit)", () => {
       expect(instructions).toHaveLength(1);
       expect(instructions[0].data?.[0]).toBe(16);
       expect(instructions[0].accounts).toHaveLength(9);
+      expect(instructions[0].accounts?.[5].address).toBe(to);
       expect(instructions[0].accounts?.[8].address).toBe(
         instructions[0].accounts?.[3].address,
       );
@@ -1349,6 +1373,48 @@ describe("Exposed Instructions (@solana/kit)", () => {
       );
 
       expect(instruction.accounts?.[8].address).toBe(reimbursementTokenInfo);
+    });
+
+    it("should append clientRefId when provided", () => {
+      const instruction = depositAndQueueTransferIx(
+        queue,
+        vault,
+        mint,
+        source,
+        vaultAta,
+        destination,
+        mockAddress,
+        25n,
+        100n,
+        300n,
+        4,
+        source,
+        42n,
+      );
+
+      expect(Array.from(instruction.data ?? [])).toEqual([
+        16,
+        ...Array.from(
+          Buffer.from(
+            [25n, 100n, 300n].flatMap((value) => {
+              const out = Buffer.alloc(8);
+              out.writeBigUInt64LE(value);
+              return Array.from(out);
+            }),
+          ),
+        ),
+        4,
+        0,
+        0,
+        0,
+        ...Array.from(
+          (() => {
+            const out = Buffer.alloc(8);
+            out.writeBigUInt64LE(42n);
+            return out;
+          })(),
+        ),
+      ]);
     });
   });
 

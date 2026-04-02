@@ -204,6 +204,7 @@ mod tests {
             min_delay_ms: 100,
             max_delay_ms: 300,
             split: 4,
+            client_ref_id: None,
         }
         .instruction()
         .unwrap();
@@ -258,11 +259,41 @@ mod tests {
             min_delay_ms: 100,
             max_delay_ms: 300,
             split: 4,
+            client_ref_id: None,
         }
         .instruction()
         .unwrap();
 
         assert_eq!(instruction.accounts[8].pubkey, reimbursement_token_info);
+    }
+
+    #[test]
+    fn test_deposit_and_queue_transfer_with_client_ref_id() {
+        let client_ref_id = 42u64;
+
+        let instruction = DepositAndQueueTransferBuilder {
+            queue: Pubkey::new_unique(),
+            vault: Pubkey::new_unique(),
+            mint: Pubkey::new_unique(),
+            source: Pubkey::new_unique(),
+            vault_ata: Pubkey::new_unique(),
+            destination: Pubkey::new_unique(),
+            owner: Pubkey::new_unique(),
+            reimbursement_token_info: None,
+            amount: 25,
+            min_delay_ms: 100,
+            max_delay_ms: 300,
+            split: 4,
+            client_ref_id: Some(client_ref_id),
+        }
+        .instruction()
+        .unwrap();
+
+        assert_eq!(instruction.data.len(), 37);
+        assert_eq!(
+            u64::from_le_bytes(instruction.data[29..37].try_into().unwrap()),
+            client_ref_id
+        );
     }
 
     #[test]
@@ -920,6 +951,7 @@ mod tests {
             min_delay_ms: 100_u64,
             max_delay_ms: 300_u64,
             split: 4_u32,
+            client_ref_id: None,
             validator: None,
         }
         .instruction();
@@ -958,6 +990,7 @@ mod tests {
             min_delay_ms,
             max_delay_ms,
             split,
+            client_ref_id: None,
             validator: Some(validator),
         }
         .instruction()
@@ -1007,7 +1040,34 @@ mod tests {
 
         let suffix_offset = 47 + destination_len;
         let suffix_len = instruction.data[suffix_offset] as usize;
-        assert_eq!(suffix_len, 69);
+        assert_eq!(suffix_len, 68);
+        assert_eq!(suffix_offset + 1 + suffix_len, instruction.data.len());
+    }
+
+    #[cfg(feature = "encryption")]
+    #[test]
+    fn test_deposit_and_delegate_shuttle_private_transfer_instruction_layout_with_client_ref_id() {
+        let instruction = DepositAndDelegateShuttleEphemeralAtaWithMergeAndPrivateTransferBuilder {
+            payer: Pubkey::new_unique(),
+            owner: Pubkey::new_unique(),
+            mint: Pubkey::new_unique(),
+            source_ata: Pubkey::new_unique(),
+            destination_owner: Pubkey::new_unique(),
+            shuttle_id: 7,
+            amount: 25_u64,
+            min_delay_ms: 100_u64,
+            max_delay_ms: 300_u64,
+            split: 4_u32,
+            client_ref_id: Some(42),
+            validator: Some(Keypair::new().pubkey()),
+        }
+        .instruction()
+        .unwrap();
+
+        let destination_len = instruction.data[46] as usize;
+        let suffix_offset = 47 + destination_len;
+        let suffix_len = instruction.data[suffix_offset] as usize;
+        assert_eq!(suffix_len, 76);
         assert_eq!(suffix_offset + 1 + suffix_len, instruction.data.len());
     }
 }
