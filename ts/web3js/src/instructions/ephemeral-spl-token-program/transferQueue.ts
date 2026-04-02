@@ -131,13 +131,14 @@ export function allocateTransferQueueIx(
  * @param mint - The mint account
  * @param source - The sender token account
  * @param vaultAta - The vault token account
- * @param destination - The queued destination token account
+ * @param destination - The queued destination owner
  * @param owner - The sender authority
  * @param amount - The total amount to queue
  * @param minDelayMs - The minimum delay in milliseconds
  * @param maxDelayMs - The maximum delay in milliseconds
  * @param split - The number of queue entries to create
  * @param reimbursementTokenInfo - Reimbursement token account used by the queue-full fallback path
+ * @param clientRefId - Optional client-provided reference ID attached to each queued split
  * @returns The deposit-and-queue-transfer instruction
  */
 export function depositAndQueueTransferIx(
@@ -153,15 +154,32 @@ export function depositAndQueueTransferIx(
   maxDelayMs: bigint = minDelayMs,
   split: number = 1,
   reimbursementTokenInfo: PublicKey = source,
+  clientRefId?: bigint,
 ): TransactionInstruction {
   if (!Number.isInteger(split) || split <= 0 || split > 0xffff_ffff) {
     throw new Error("split must fit in u32");
   }
-  if (amount < 0n || minDelayMs < 0n || maxDelayMs < 0n) {
-    throw new Error("amount and delays must be non-negative");
+  if (
+    amount < 0n ||
+    minDelayMs < 0n ||
+    maxDelayMs < 0n ||
+    (clientRefId !== undefined && clientRefId < 0n)
+  ) {
+    throw new Error("amount, delays, and clientRefId must be non-negative");
   }
   if (maxDelayMs < minDelayMs) {
     throw new Error("maxDelayMs must be greater than or equal to minDelayMs");
+  }
+
+  const data = [
+    DEPOSIT_AND_QUEUE_TRANSFER_DISCRIMINATOR,
+    ...u64le(amount),
+    ...u64le(minDelayMs),
+    ...u64le(maxDelayMs),
+    ...u32le(split),
+  ];
+  if (clientRefId !== undefined) {
+    data.push(...u64le(clientRefId));
   }
 
   return toTransactionInstruction({
@@ -176,13 +194,7 @@ export function depositAndQueueTransferIx(
       { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
       { pubkey: reimbursementTokenInfo, isSigner: false, isWritable: true },
     ],
-    data: new Uint8Array([
-      DEPOSIT_AND_QUEUE_TRANSFER_DISCRIMINATOR,
-      ...u64le(amount),
-      ...u64le(minDelayMs),
-      ...u64le(maxDelayMs),
-      ...u32le(split),
-    ]),
+    data: new Uint8Array(data),
     programAddress: EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
   });
 }

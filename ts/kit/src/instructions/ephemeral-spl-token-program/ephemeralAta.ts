@@ -47,8 +47,6 @@ const TOKEN_PROGRAM_ADDRESS =
   "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA" as const;
 const ASSOCIATED_TOKEN_PROGRAM_ADDRESS =
   "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL" as const;
-const QUEUED_TRANSFER_FLAG_CREATE_IDEMPOTENT_ATA = 1 << 0;
-
 /**
  * Derive the Associated Token Account for a given mint/owner pair.
  * Mirrors the behavior of @solana/spl-token's getAssociatedTokenAddressSync.
@@ -132,13 +130,17 @@ function packPrivateTransferSuffix(
   minDelayMs: bigint,
   maxDelayMs: bigint,
   split: number,
-  flags: number = 0,
+  clientRefId?: bigint,
 ): Buffer {
-  const suffix = Buffer.alloc(8 + 8 + 4 + 1);
+  const suffix = Buffer.alloc(
+    clientRefId === undefined ? 8 + 8 + 4 : 8 + 8 + 4 + 8,
+  );
   suffix.writeBigUInt64LE(minDelayMs, 0);
   suffix.writeBigUInt64LE(maxDelayMs, 8);
   suffix.writeUInt32LE(split, 16);
-  suffix.writeUInt8(flags, 20);
+  if (clientRefId !== undefined) {
+    suffix.writeBigUInt64LE(clientRefId, 20);
+  }
   return suffix;
 }
 
@@ -846,6 +848,7 @@ export async function depositAndDelegateShuttleEphemeralAtaWithMergeAndPrivateTr
   maxDelayMs: bigint,
   split: number,
   validator?: Address,
+  clientRefId?: bigint,
 ): Promise<Instruction> {
   if (
     !Number.isInteger(shuttleId) ||
@@ -854,11 +857,13 @@ export async function depositAndDelegateShuttleEphemeralAtaWithMergeAndPrivateTr
   ) {
     throw new Error("shuttleId must fit in u32");
   }
-  if (amount < 0n) {
-    throw new Error("amount must be non-negative");
-  }
-  if (minDelayMs < 0n || maxDelayMs < 0n) {
-    throw new Error("delay values must be non-negative");
+  if (
+    amount < 0n ||
+    minDelayMs < 0n ||
+    maxDelayMs < 0n ||
+    (clientRefId !== undefined && clientRefId < 0n)
+  ) {
+    throw new Error("amount, delays, and clientRefId must be non-negative");
   }
   if (maxDelayMs < minDelayMs) {
     throw new Error("maxDelayMs must be greater than or equal to minDelayMs");
@@ -890,12 +895,7 @@ export async function depositAndDelegateShuttleEphemeralAtaWithMergeAndPrivateTr
     validator,
   );
   const encryptedSuffix = encryptEd25519Recipient(
-    packPrivateTransferSuffix(
-      minDelayMs,
-      maxDelayMs,
-      split,
-      QUEUED_TRANSFER_FLAG_CREATE_IDEMPOTENT_ATA,
-    ),
+    packPrivateTransferSuffix(minDelayMs, maxDelayMs, split, clientRefId),
     validator,
   );
   const data = Buffer.concat([
@@ -1377,6 +1377,7 @@ export interface DelegateSplWithPrivateTransferOptions
   minDelayMs?: bigint;
   maxDelayMs?: bigint;
   split?: number;
+  clientRefId?: bigint;
   initTransferQueueIfMissing?: boolean;
 }
 
@@ -1391,6 +1392,7 @@ export interface TransferSplPrivateOptions {
   minDelayMs?: bigint;
   maxDelayMs?: bigint;
   split?: number;
+  clientRefId?: bigint;
 }
 
 export interface TransferSplOptions {
@@ -1600,6 +1602,7 @@ export async function delegateSplWithPrivateTransfer(
   const minDelayMs = opts?.minDelayMs ?? 0n;
   const maxDelayMs = opts?.maxDelayMs ?? minDelayMs;
   const split = opts?.split ?? 1;
+  const clientRefId = opts?.clientRefId;
 
   if (validator == null) {
     throw new Error("validator is required for encrypted private transfers");
@@ -1661,6 +1664,7 @@ export async function delegateSplWithPrivateTransfer(
       maxDelayMs,
       split,
       validator,
+      clientRefId,
     ),
   );
 
@@ -1683,6 +1687,7 @@ export async function transferSpl(
   const minDelayMs = opts.privateTransfer?.minDelayMs ?? 0n;
   const maxDelayMs = opts.privateTransfer?.maxDelayMs ?? minDelayMs;
   const split = opts.privateTransfer?.split ?? 1;
+  const clientRefId = opts.privateTransfer?.clientRefId;
 
   const fromAta = await getAssociatedTokenAddressSync(mint, from);
   const toAta = await getAssociatedTokenAddressSync(mint, to);
@@ -1708,12 +1713,14 @@ export async function transferSpl(
               mint,
               fromAta,
               vaultAta,
-              toAta,
+              to,
               from,
               amount,
               minDelayMs,
               maxDelayMs,
               split,
+              undefined,
+              clientRefId,
             ),
           ];
         }
@@ -1782,6 +1789,7 @@ export async function transferSpl(
             maxDelayMs,
             split,
             validator,
+            clientRefId,
           ),
         ];
       }
