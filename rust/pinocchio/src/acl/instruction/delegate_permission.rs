@@ -45,7 +45,7 @@ pub fn delegate_permission(
 
     // SAFETY: The slice has length `num_accounts` (10 or 11). This block writes
     // exactly indices 0..=9 via `account_metas.get_unchecked_mut(...).write(...)`
-    // using `InstructionAccount::writable_signer`, `readonly`, and `writable`,
+    // using `InstructionAccount::writable_signer`, `readonly_signer`, `readonly`, and `writable`,
     // and conditionally writes index 10 when `validator` is `Some`. There are
     // no reads of uninitialized memory, no out-of-bounds access, and no aliasing
     // violations because each index is written once within this unsafe block.
@@ -58,7 +58,7 @@ pub fn delegate_permission(
         if authority_is_signer {
             account_metas
                 .get_unchecked_mut(1)
-                .write(InstructionAccount::writable_signer(authority.address()));
+                .write(InstructionAccount::readonly_signer(authority.address()));
         } else {
             account_metas
                 .get_unchecked_mut(1)
@@ -69,7 +69,7 @@ pub fn delegate_permission(
         if permissioned_account_is_signer {
             account_metas
                 .get_unchecked_mut(2)
-                .write(InstructionAccount::writable_signer(
+                .write(InstructionAccount::readonly_signer(
                     permissioned_account.address(),
                 ));
         } else {
