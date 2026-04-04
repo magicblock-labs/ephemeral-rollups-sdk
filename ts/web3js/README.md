@@ -15,7 +15,7 @@ yarn add @magicblock-labs/ephemeral-rollups-sdk
 ```
 ## Usage (basic)
 ```ts
-import { MagicRouter } from "@magicblock-labs/ephemeral-rollups-sdk";
+import { ConnectionMagicRouter } from "@magicblock-labs/ephemeral-rollups-sdk";
 
 // See full examples and docs in the Quickstart link above.
 ```
