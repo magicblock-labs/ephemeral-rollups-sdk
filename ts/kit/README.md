@@ -14,7 +14,7 @@ npm install @magicblock-labs/ephemeral-rollups-kit
 yarn add @magicblock-labs/ephemeral-rollups-kit
 ```
 ## Usage (basic)
-
+```ts
 import { Connection } from "@magicblock-labs/ephemeral-rollups-kit";
 
 // See full examples and docs in the Quickstart link above.
