@@ -6,14 +6,19 @@ Quickstart and integration guide:
 https://docs.magicblock.gg
 
 ## Install
+
 ```bash
 npm install @magicblock-labs/ephemeral-rollups-kit
 ```
+
 # or
+
 ```bash
 yarn add @magicblock-labs/ephemeral-rollups-kit
 ```
+
 ## Usage (basic)
+
 ```ts
 import { Connection } from "@magicblock-labs/ephemeral-rollups-kit";
 
