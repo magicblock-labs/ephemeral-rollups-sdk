@@ -31,7 +31,7 @@ pub fn commit_permission(
         if authority_is_signer {
             account_metas
                 .get_unchecked_mut(0)
-                .write(InstructionAccount::writable_signer(authority.address()));
+                .write(InstructionAccount::readonly_signer(authority.address()));
         } else {
             account_metas
                 .get_unchecked_mut(0)
@@ -42,7 +42,7 @@ pub fn commit_permission(
         if permissioned_account_is_signer {
             account_metas
                 .get_unchecked_mut(1)
-                .write(InstructionAccount::writable_signer(
+                .write(InstructionAccount::readonly_signer(
                     permissioned_account.address(),
                 ));
         } else {
