@@ -38,7 +38,7 @@ pub fn commit_and_undelegate_permission(
                 .write(InstructionAccount::readonly(authority.address()));
         }
 
-        // permissioned_account can be signer or not
+        // permissioned_account: always writable (matches rust/sdk AccountMeta::new)
         if permissioned_account_is_signer {
             account_metas
                 .get_unchecked_mut(1)
