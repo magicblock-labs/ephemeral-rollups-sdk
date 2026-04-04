@@ -33,7 +33,7 @@ export async function createCommitAndUndelegatePermissionInstruction(accounts: {
     {
       address: accounts.authority[0],
       role: accounts.authority[1]
-        ? AccountRole.WRITABLE_SIGNER
+        ? AccountRole.READONLY_SIGNER
         : AccountRole.READONLY,
     },
     {
