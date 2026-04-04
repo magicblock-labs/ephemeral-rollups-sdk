@@ -6,14 +6,19 @@ Quickstart and integration guide:
 https://docs.magicblock.gg
 
 ## Install
+
 ```bash
 npm install @magicblock-labs/ephemeral-rollups-sdk
 ```
+
 # or
+
 ```bash
 yarn add @magicblock-labs/ephemeral-rollups-sdk
 ```
+
 ## Usage (basic)
+
 ```ts
 import { ConnectionMagicRouter } from "@magicblock-labs/ephemeral-rollups-sdk";
 
