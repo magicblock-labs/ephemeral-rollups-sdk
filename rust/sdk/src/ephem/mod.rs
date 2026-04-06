@@ -479,8 +479,6 @@ mod tests {
     use crate::solana_compat::solana::{AccountInfo, Pubkey};
     use magicblock_magic_program_api::args::ActionArgs;
     use magicblock_magic_program_api::instruction::MagicBlockInstruction;
-    use std::cell::RefCell;
-    use std::rc::Rc;
 
     /// Helper to create a mock AccountInfo for testing
     fn create_mock_account_info<'a>(
@@ -491,16 +489,7 @@ mod tests {
         is_signer: bool,
         is_writable: bool,
     ) -> AccountInfo<'a> {
-        AccountInfo {
-            key,
-            is_signer,
-            is_writable,
-            lamports: Rc::new(RefCell::new(lamports)),
-            data: Rc::new(RefCell::new(data)),
-            owner,
-            executable: false,
-            rent_epoch: 0,
-        }
+        AccountInfo::new(key, is_signer, is_writable, lamports, data, owner, false)
     }
 
     fn make_info(acc: &mut TestAccount) -> AccountInfo<'_> {

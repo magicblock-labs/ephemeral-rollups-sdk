@@ -202,7 +202,9 @@ pub fn delegate_account_with_actions<'a, 'info>(
     let delegate_args = DelegateArgs {
         commit_frequency_ms: config.commit_frequency_ms,
         seeds: seeds_vec,
-        validator: config.validator,
+        validator: config
+            .validator
+            .map(|validator| validator.to_bytes().into()),
     };
     let args = DelegateWithActionsArgs {
         delegate: delegate_args,
