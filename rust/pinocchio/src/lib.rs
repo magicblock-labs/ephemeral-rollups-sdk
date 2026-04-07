@@ -16,6 +16,7 @@ pub mod utils;
 use pinocchio::Address;
 
 pub use consts::DELEGATION_PROGRAM_ID as ID;
+pub use intent_bundle::no_vec;
 
 /// Returns a reference to the delegation program ID.
 pub fn id() -> &'static Address {

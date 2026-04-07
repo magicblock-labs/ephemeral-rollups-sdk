@@ -10,7 +10,7 @@ use solana_address::Address;
 mod args;
 mod commit;
 mod commit_and_undelegate;
-mod no_vec;
+pub mod no_vec;
 mod serialize;
 pub mod types;
 
