@@ -91,7 +91,7 @@ impl<'a> CancelCrankCpi<'a> {
 mod tests {
     use super::*;
     use magicblock_magic_program_api::args::ScheduleTaskArgs;
-    use solana_program::{account_info::AccountInfo, clock::Epoch, pubkey::Pubkey};
+    use solana_program::{account_info::AccountInfo, pubkey::Pubkey};
 
     fn new_account_info<'a>(
         key: &'a Pubkey,
@@ -101,16 +101,7 @@ mod tests {
         data: &'a mut [u8],
         owner: &'a Pubkey,
     ) -> AccountInfo<'a> {
-        AccountInfo::new(
-            key,
-            is_signer,
-            is_writable,
-            lamports,
-            data,
-            owner,
-            false,
-            Epoch::default(),
-        )
+        AccountInfo::new(key, is_signer, is_writable, lamports, data, owner, false)
     }
 
     #[test]

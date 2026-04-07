@@ -15,7 +15,8 @@ use error::Error;
 use http::{fetch_account_state, fetch_domain_records, update_account_state};
 use rpc::nonblocking::rpc_client::RpcClient;
 use scc::{hash_cache::Entry, HashCache};
-use sdk::{commitment_config::CommitmentConfig, pubkey::Pubkey, transaction::Transaction};
+use sdk::{pubkey::Pubkey, transaction::Transaction};
+use solana_commitment_config::CommitmentConfig;
 use tokio::sync::mpsc::{unbounded_channel, UnboundedSender};
 use websocket::{
     connection::{delegations::WsDelegationsConnection, routes::WsRoutesConnection},

@@ -365,8 +365,6 @@ impl<'acc, 'args>
 mod tests {
     extern crate std;
 
-    use std::cell::RefCell;
-    use std::rc::Rc;
     use std::vec;
     use std::vec::Vec;
 
@@ -445,29 +443,27 @@ mod tests {
         }
 
         fn as_account_info(&mut self) -> AccountInfo<'_> {
-            AccountInfo {
-                key: &self.key,
-                is_signer: false,
-                is_writable: true,
-                lamports: Rc::new(RefCell::new(&mut self.lamports)),
-                data: Rc::new(RefCell::new(&mut self.data)),
-                owner: &self.owner,
-                executable: false,
-                rent_epoch: 0,
-            }
+            AccountInfo::new(
+                &self.key,
+                false,
+                true,
+                &mut self.lamports,
+                &mut self.data,
+                &self.owner,
+                false,
+            )
         }
 
         fn as_signer_info(&mut self) -> AccountInfo<'_> {
-            AccountInfo {
-                key: &self.key,
-                is_signer: true,
-                is_writable: false,
-                lamports: Rc::new(RefCell::new(&mut self.lamports)),
-                data: Rc::new(RefCell::new(&mut self.data)),
-                owner: &self.owner,
-                executable: false,
-                rent_epoch: 0,
-            }
+            AccountInfo::new(
+                &self.key,
+                true,
+                false,
+                &mut self.lamports,
+                &mut self.data,
+                &self.owner,
+                false,
+            )
         }
     }
 
