@@ -33,4 +33,5 @@ pub enum EphemeralSplDiscriminator {
     DepositAndDelegateShuttleEphemeralAtaWithMergeAndPrivateTransfer = 25,
     WithdrawThroughDelegatedShuttleWithMerge = 26,
     AllocateTransferQueue = 27,
+    ProcessPendingTransferQueueRefill = 28,
 }

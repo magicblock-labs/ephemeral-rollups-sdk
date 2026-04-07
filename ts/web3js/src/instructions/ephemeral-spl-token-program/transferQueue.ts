@@ -20,6 +20,9 @@ import {
 } from "../../pda.js";
 
 const TRANSFER_QUEUE_SEED = Buffer.from("queue");
+const QUEUE_REFILL_STATE_SEED = Buffer.from("queue-refill");
+const RENT_PDA_SEED = Buffer.from("rent");
+const LAMPORTS_PDA_SEED = Buffer.from("lamports");
 const TOKEN_PROGRAM_ID = new PublicKey(
   "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
 );
@@ -28,6 +31,7 @@ const DEPOSIT_AND_QUEUE_TRANSFER_DISCRIMINATOR = 16;
 const ENSURE_TRANSFER_QUEUE_CRANK_DISCRIMINATOR = 17;
 const DELEGATE_TRANSFER_QUEUE_DISCRIMINATOR = 19;
 const ALLOCATE_TRANSFER_QUEUE_DISCRIMINATOR = 27;
+const PROCESS_PENDING_TRANSFER_QUEUE_REFILL_DISCRIMINATOR = 28;
 
 export interface StructuredInstruction {
   accounts: AccountMeta[];
@@ -272,6 +276,69 @@ export function delegateTransferQueueIx(
       { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
     ],
     data: new Uint8Array([DELEGATE_TRANSFER_QUEUE_DISCRIMINATOR]),
+    programAddress: EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
+  });
+}
+
+/**
+ * Execute a pending transfer-queue refill through the sponsored lamports flow.
+ * @param queue - The delegated transfer queue PDA
+ * @returns The pending transfer queue refill instruction
+ */
+export function processPendingTransferQueueRefillIx(
+  queue: PublicKey,
+): TransactionInstruction {
+  const [rentPda] = PublicKey.findProgramAddressSync(
+    [RENT_PDA_SEED],
+    EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
+  );
+  const [refillState] = PublicKey.findProgramAddressSync(
+    [QUEUE_REFILL_STATE_SEED, queue.toBuffer()],
+    EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
+  );
+  const [lamportsPda] = PublicKey.findProgramAddressSync(
+    [LAMPORTS_PDA_SEED, rentPda.toBuffer(), queue.toBuffer(), queue.toBuffer()],
+    EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
+  );
+
+  return toTransactionInstruction({
+    accounts: [
+      { pubkey: refillState, isSigner: false, isWritable: true },
+      { pubkey: queue, isSigner: false, isWritable: true },
+      { pubkey: rentPda, isSigner: false, isWritable: true },
+      { pubkey: lamportsPda, isSigner: false, isWritable: true },
+      {
+        pubkey: EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
+        isSigner: false,
+        isWritable: false,
+      },
+      {
+        pubkey: delegateBufferPdaFromDelegatedAccountAndOwnerProgram(
+          lamportsPda,
+          EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
+        ),
+        isSigner: false,
+        isWritable: true,
+      },
+      {
+        pubkey: delegationRecordPdaFromDelegatedAccount(lamportsPda),
+        isSigner: false,
+        isWritable: true,
+      },
+      {
+        pubkey: delegationMetadataPdaFromDelegatedAccount(lamportsPda),
+        isSigner: false,
+        isWritable: true,
+      },
+      { pubkey: DELEGATION_PROGRAM_ID, isSigner: false, isWritable: false },
+      { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+      {
+        pubkey: delegationRecordPdaFromDelegatedAccount(queue),
+        isSigner: false,
+        isWritable: false,
+      },
+    ],
+    data: new Uint8Array([PROCESS_PENDING_TRANSFER_QUEUE_REFILL_DISCRIMINATOR]),
     programAddress: EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
   });
 }

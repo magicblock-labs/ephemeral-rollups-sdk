@@ -25,6 +25,7 @@ import {
   depositAndQueueTransferIx,
   deriveTransferQueue,
   initTransferQueueIx,
+  processPendingTransferQueueRefillIx,
   toTransactionInstruction,
 } from "./transferQueue.js";
 
@@ -1805,6 +1806,15 @@ export async function transferSpl(
     );
   }
 
+  const maybeRefillInstructions = (): TransactionInstruction[] => {
+    if (opts.fromBalance !== "base" || validator == null) {
+      return [];
+    }
+
+    const [queue] = deriveTransferQueue(mint, validator);
+    return [processPendingTransferQueueRefillIx(queue)];
+  };
+
   switch (opts.visibility) {
     case "private":
       if (opts.fromBalance === "base" && opts.toBalance === "base") {
@@ -1821,6 +1831,7 @@ export async function transferSpl(
 
         return [
           ...instructions,
+          ...maybeRefillInstructions(),
           depositAndDelegateShuttleEphemeralAtaWithMergeAndPrivateTransferIx(
             payer,
             shuttleEphemeralAta,
@@ -1893,6 +1904,7 @@ export async function transferSpl(
       if (opts.fromBalance === "base" && opts.toBalance === "base") {
         return [
           ...instructions,
+          ...maybeRefillInstructions(),
           createTransferInstruction(fromAta, toAta, from, amount),
         ];
       }

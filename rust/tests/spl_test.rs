@@ -27,13 +27,14 @@ mod tests {
                 DepositAndQueueTransferBuilder, DepositSplTokensBuilder,
                 EnsureTransferQueueCrankBuilder, InitializeEphemeralAtaBuilder,
                 InitializeGlobalVaultBuilder, InitializeTransferQueueBuilder,
-                LamportsDelegatedTransferBuilder, ResetEphemeralAtaPermissionBuilder,
-                UndelegateAndCloseShuttleEphemeralAtaBuilder, UndelegateEphemeralAtaBuilder,
-                UndelegateEphemeralAtaPermissionBuilder, WithdrawSplTokensBuilder,
+                LamportsDelegatedTransferBuilder, ProcessPendingTransferQueueRefillBuilder,
+                ResetEphemeralAtaPermissionBuilder, UndelegateAndCloseShuttleEphemeralAtaBuilder,
+                UndelegateEphemeralAtaBuilder, UndelegateEphemeralAtaPermissionBuilder,
+                WithdrawSplTokensBuilder,
             },
             find_lamports_pda, find_rent_pda, find_shuttle_ata, find_shuttle_ephemeral_ata,
-            find_shuttle_wallet_ata, find_transfer_queue, find_vault_ata, EphemeralAta,
-            EphemeralSplDiscriminator, GlobalVault,
+            find_shuttle_wallet_ata, find_transfer_queue, find_transfer_queue_refill_state,
+            find_vault_ata, EphemeralAta, EphemeralSplDiscriminator, GlobalVault,
         },
     };
     use magicblock_magic_program_api::Pubkey;
@@ -395,6 +396,42 @@ mod tests {
         assert_eq!(
             instruction.data,
             vec![EphemeralSplDiscriminator::DelegateTransferQueue as u8]
+        );
+    }
+
+    #[test]
+    fn test_process_pending_transfer_queue_refill() {
+        let queue = Pubkey::new_unique();
+        let (rent_pda, _rent_bump) = find_rent_pda();
+        let (refill_state, _refill_state_bump) = find_transfer_queue_refill_state(&queue);
+        let queue_bytes = queue.to_bytes();
+        let (lamports_pda, _lamports_bump) = find_lamports_pda(&rent_pda, &queue, &queue_bytes);
+        let delegation_buffer = delegate_buffer_pda_from_delegated_account_and_owner_program(
+            &lamports_pda,
+            &ESPL_TOKEN_PROGRAM_ID,
+        );
+        let delegation_record = delegation_record_pda_from_delegated_account(&lamports_pda);
+        let delegation_metadata = delegation_metadata_pda_from_delegated_account(&lamports_pda);
+        let queue_delegation_record = delegation_record_pda_from_delegated_account(&queue);
+
+        let instruction = ProcessPendingTransferQueueRefillBuilder { queue }.instruction();
+
+        assert_eq!(instruction.program_id, ESPL_TOKEN_PROGRAM_ID);
+        assert_eq!(instruction.accounts.len(), 11);
+        assert_eq!(instruction.accounts[0].pubkey, refill_state);
+        assert_eq!(instruction.accounts[1].pubkey, queue);
+        assert_eq!(instruction.accounts[2].pubkey, rent_pda);
+        assert_eq!(instruction.accounts[3].pubkey, lamports_pda);
+        assert_eq!(instruction.accounts[4].pubkey, ESPL_TOKEN_PROGRAM_ID);
+        assert_eq!(instruction.accounts[5].pubkey, delegation_buffer);
+        assert_eq!(instruction.accounts[6].pubkey, delegation_record);
+        assert_eq!(instruction.accounts[7].pubkey, delegation_metadata);
+        assert_eq!(instruction.accounts[8].pubkey, DELEGATION_PROGRAM_ID);
+        assert_eq!(instruction.accounts[9].pubkey, system_program::id());
+        assert_eq!(instruction.accounts[10].pubkey, queue_delegation_record);
+        assert_eq!(
+            instruction.data,
+            vec![EphemeralSplDiscriminator::ProcessPendingTransferQueueRefill as u8]
         );
     }
 
