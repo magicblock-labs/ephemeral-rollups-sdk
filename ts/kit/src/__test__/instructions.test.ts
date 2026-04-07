@@ -1234,6 +1234,19 @@ describe("Exposed Instructions (@solana/kit)", () => {
       );
     });
 
+    it("should not prepend refill for public base-to-base transfers even when validator is provided", async () => {
+      const instructions = await transferSpl(from, to, mint, 25n, {
+        visibility: "public",
+        fromBalance: "base",
+        toBalance: "base",
+        validator,
+      });
+
+      expect(instructions).toHaveLength(1);
+      expect(instructions[0].data?.[0]).toBe(3);
+      expect(instructions[0].accounts).toHaveLength(3);
+    });
+
     it("should use a normal transfer for public ephemeral-to-ephemeral transfers", async () => {
       const instructions = await transferSpl(from, to, mint, 25n, {
         visibility: "public",

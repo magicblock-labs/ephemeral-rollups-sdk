@@ -1902,11 +1902,7 @@ export async function transferSpl(
 
     case "public":
       if (opts.fromBalance === "base" && opts.toBalance === "base") {
-        return [
-          ...instructions,
-          ...maybeRefillInstructions(),
-          createTransferInstruction(fromAta, toAta, from, amount),
-        ];
+        return [...instructions, createTransferInstruction(fromAta, toAta, from, amount)];
       }
 
       // TODO: support public transfers across base/ephemeral balance boundaries.
