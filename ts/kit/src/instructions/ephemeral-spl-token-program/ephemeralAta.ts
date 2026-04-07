@@ -38,6 +38,7 @@ import {
   depositAndQueueTransferIx,
   deriveTransferQueue,
   initTransferQueueIx,
+  processPendingTransferQueueRefillIx,
 } from "./transferQueue";
 
 // SPL Token program IDs
@@ -1758,6 +1759,15 @@ export async function transferSpl(
     instructions.push(initVaultAtaIx(payer, fromAta, from, mint));
   }
 
+  const maybeRefillInstructions = async (): Promise<Instruction[]> => {
+    if (opts.fromBalance !== "base" || validator == null) {
+      return [];
+    }
+
+    const [queue] = await deriveTransferQueue(mint, validator);
+    return [await processPendingTransferQueueRefillIx(queue)];
+  };
+
   switch (opts.visibility) {
     case "private":
       if (opts.fromBalance === "base" && opts.toBalance === "base") {
@@ -1774,6 +1784,7 @@ export async function transferSpl(
 
         return [
           ...instructions,
+          ...(await maybeRefillInstructions()),
           await depositAndDelegateShuttleEphemeralAtaWithMergeAndPrivateTransferIx(
             payer,
             shuttleEphemeralAta,
@@ -1838,10 +1849,7 @@ export async function transferSpl(
 
     case "public":
       if (opts.fromBalance === "base" && opts.toBalance === "base") {
-        return [
-          ...instructions,
-          createTransferInstruction(fromAta, toAta, from, amount),
-        ];
+        return [...instructions, createTransferInstruction(fromAta, toAta, from, amount)];
       }
 
       break;

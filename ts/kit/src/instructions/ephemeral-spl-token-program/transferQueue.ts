@@ -27,7 +27,11 @@ const DEPOSIT_AND_QUEUE_TRANSFER_DISCRIMINATOR = 16;
 const ENSURE_TRANSFER_QUEUE_CRANK_DISCRIMINATOR = 17;
 const DELEGATE_TRANSFER_QUEUE_DISCRIMINATOR = 19;
 const ALLOCATE_TRANSFER_QUEUE_DISCRIMINATOR = 27;
+const PROCESS_PENDING_TRANSFER_QUEUE_REFILL_DISCRIMINATOR = 28;
 const QUEUE_SEED = new TextEncoder().encode("queue");
+const QUEUE_REFILL_STATE_SEED = new TextEncoder().encode("queue-refill");
+const RENT_PDA_SEED = new TextEncoder().encode("rent");
+const LAMPORTS_PDA_SEED = new TextEncoder().encode("lamports");
 const TOKEN_PROGRAM_ADDRESS = address(
   "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
 );
@@ -251,6 +255,68 @@ export async function delegateTransferQueueIx(
       { address: SYSTEM_PROGRAM_ADDRESS, role: AccountRole.READONLY },
     ],
     data: new Uint8Array([DELEGATE_TRANSFER_QUEUE_DISCRIMINATOR]),
+    programAddress: EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
+  };
+}
+
+/**
+ * Execute a pending transfer-queue refill through the sponsored lamports flow.
+ * @param queue - The delegated transfer queue PDA
+ * @returns The pending transfer queue refill instruction
+ */
+export async function processPendingTransferQueueRefillIx(
+  queue: Address,
+): Promise<Instruction> {
+  const addressEncoder = getAddressEncoder();
+  const [rentPda] = await getProgramDerivedAddress({
+    programAddress: EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
+    seeds: [RENT_PDA_SEED],
+  });
+  const [refillState] = await getProgramDerivedAddress({
+    programAddress: EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
+    seeds: [QUEUE_REFILL_STATE_SEED, addressEncoder.encode(queue)],
+  });
+  const queueBytes = addressEncoder.encode(queue);
+  const [lamportsPda] = await getProgramDerivedAddress({
+    programAddress: EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
+    seeds: [
+      LAMPORTS_PDA_SEED,
+      addressEncoder.encode(rentPda),
+      queueBytes,
+      queueBytes,
+    ],
+  });
+
+  return {
+    accounts: [
+      { address: refillState, role: AccountRole.WRITABLE },
+      { address: queue, role: AccountRole.WRITABLE },
+      { address: rentPda, role: AccountRole.WRITABLE },
+      { address: lamportsPda, role: AccountRole.WRITABLE },
+      { address: EPHEMERAL_SPL_TOKEN_PROGRAM_ID, role: AccountRole.READONLY },
+      {
+        address: await delegateBufferPdaFromDelegatedAccountAndOwnerProgram(
+          lamportsPda,
+          EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
+        ),
+        role: AccountRole.WRITABLE,
+      },
+      {
+        address: await delegationRecordPdaFromDelegatedAccount(lamportsPda),
+        role: AccountRole.WRITABLE,
+      },
+      {
+        address: await delegationMetadataPdaFromDelegatedAccount(lamportsPda),
+        role: AccountRole.WRITABLE,
+      },
+      { address: DELEGATION_PROGRAM_ID, role: AccountRole.READONLY },
+      { address: SYSTEM_PROGRAM_ADDRESS, role: AccountRole.READONLY },
+      {
+        address: await delegationRecordPdaFromDelegatedAccount(queue),
+        role: AccountRole.READONLY,
+      },
+    ],
+    data: new Uint8Array([PROCESS_PENDING_TRANSFER_QUEUE_REFILL_DISCRIMINATOR]),
     programAddress: EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
   };
 }

@@ -113,3 +113,7 @@ pub fn find_transfer_queue(mint: &Pubkey, validator: &Pubkey) -> (Pubkey, u8) {
         &ESPL_TOKEN_PROGRAM_ID,
     )
 }
+
+pub fn find_transfer_queue_refill_state(queue: &Pubkey) -> (Pubkey, u8) {
+    Pubkey::find_program_address(&[b"queue-refill", queue.as_ref()], &ESPL_TOKEN_PROGRAM_ID)
+}
