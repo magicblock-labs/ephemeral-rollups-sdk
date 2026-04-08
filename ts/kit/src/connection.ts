@@ -273,8 +273,8 @@ export class Connection {
    * const tx = await connection.prepareTransactionWithLatestBlockhash(transaction);
    * const partiallySigned = await connection.partiallySignTransaction([signer1, signer2], tx);
    *
-   * // Later, another party can add their signature:
-   * const fullySigned = await connection.fullySignTransaction([signer3], partiallySigned);
+   * // Another signer can add a signature by calling this method again:
+   * const signedAgain = await connection.partiallySignTransaction([signer3], partiallySigned);
    * ```
    */
   public async partiallySignTransaction(
