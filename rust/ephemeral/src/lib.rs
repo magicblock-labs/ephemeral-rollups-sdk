@@ -80,10 +80,20 @@ pub fn ephemeral(_args: TokenStream, input: TokenStream) -> TokenStream {
 
 /// Modifies the component module and adds the necessary functions and structs.
 fn modify_component_module(mut module: ItemMod) -> ItemMod {
+    // Add common imports for MagicIntentBundleBuilder for user
+    let builder_imports = quote! {
+        #[allow(unused_imports)]
+        use ephemeral_rollups_sdk::ephem::{
+            FoldableIntentBuilder,
+            FoldableCommitIntentBuilder,
+            FoldableCauIntentBuilder,
+        };
+    };
+
     let (imports, undelegate_fn, undelegate_struct) = generate_undelegate();
     module.content = module.content.map(|(brace, mut items)| {
         items.extend(
-            vec![imports, undelegate_fn, undelegate_struct]
+            vec![builder_imports, imports, undelegate_fn, undelegate_struct]
                 .into_iter()
                 .map(|item| {
                     syn::parse2(item).unwrap_or_else(|e| panic!("Failed to parse item: {e}"))
