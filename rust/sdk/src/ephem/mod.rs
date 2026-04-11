@@ -11,7 +11,7 @@ pub use crate::ephem::deprecated::v1::{
     UndelegateType,
 };
 use crate::solana_compat::solana::{
-    invoke, AccountInfo, AccountMeta, Instruction, ProgramResult, Pubkey,
+    invoke, invoke_signed, AccountInfo, AccountMeta, Instruction, ProgramResult, Pubkey,
 };
 use magicblock_magic_program_api::args::MagicIntentBundleArgs;
 use magicblock_magic_program_api::instruction::MagicBlockInstruction;
@@ -43,6 +43,7 @@ pub struct MagicIntentBundleBuilder<'info> {
     payer: AccountInfo<'info>,
     magic_context: AccountInfo<'info>,
     magic_program: AccountInfo<'info>,
+    magic_fee_vault: Option<AccountInfo<'info>>,
     intent_bundle: MagicIntentBundle<'info>,
 }
 
@@ -56,8 +57,16 @@ impl<'info> MagicIntentBundleBuilder<'info> {
             payer,
             magic_context,
             magic_program,
+            magic_fee_vault: None,
             intent_bundle: MagicIntentBundle::default(),
         }
+    }
+
+    /// Sets an optional fee vault account inserted at index 2 (after payer and magic_context).
+    /// Required when the payer is delegated.
+    pub fn magic_fee_vault(mut self, vault: AccountInfo<'info>) -> Self {
+        self.magic_fee_vault = Some(vault);
+        self
     }
 
     /// Starts building a Commit intent. Returns a [`CommitIntentBuilder`] that owns this parent.
@@ -116,6 +125,15 @@ impl<'info> MagicIntentBundleBuilder<'info> {
         self
     }
 
+    /// Replaces all standalone base-layer actions with the provided set.
+    pub fn set_standalone_actions(
+        mut self,
+        actions: impl IntoIterator<Item = CallHandler<'info>>,
+    ) -> Self {
+        self.intent_bundle.standalone_actions = actions.into_iter().collect();
+        self
+    }
+
     /// Adds standalone base-layer actions to be executed without any commit/undelegate semantics.
     pub fn add_standalone_actions(
         mut self,
@@ -139,6 +157,9 @@ impl<'info> MagicIntentBundleBuilder<'info> {
 
         // Collect all accounts used by the bundle, then dedup them + create index map.
         let mut all_accounts = vec![self.payer, self.magic_context];
+        if let Some(vault) = self.magic_fee_vault {
+            all_accounts.push(vault);
+        }
         self.intent_bundle.collect_accounts(&mut all_accounts);
         let indices_map = utils::filter_duplicates_with_map(&mut all_accounts);
 
@@ -146,9 +167,14 @@ impl<'info> MagicIntentBundleBuilder<'info> {
         let args = self.intent_bundle.into_args(&indices_map);
         let metas = all_accounts
             .iter()
-            .map(|ai| AccountMeta {
+            .enumerate()
+            .map(|(i, ai)| AccountMeta {
                 pubkey: *ai.key,
-                is_signer: ai.is_signer,
+                // The payer (index 0) must always be marked as a signer in the
+                // ScheduleCommit instruction. For keypair payers this is already
+                // true; for PDA payers we force it here — the runtime validates
+                // the seeds provided to `invoke_signed`.
+                is_signer: if i == 0 { true } else { ai.is_signer },
                 is_writable: ai.is_writable,
             })
             .collect();
@@ -171,6 +197,71 @@ impl<'info> MagicIntentBundleBuilder<'info> {
     pub fn build_and_invoke(self) -> ProgramResult {
         let (accounts, ix) = self.build();
         invoke(&ix, &accounts)
+    }
+
+    /// Convenience wrapper that builds the instruction and invokes it with PDA signer seeds.
+    ///
+    /// Equivalent to:
+    /// ```ignore
+    /// let (accounts, ix) = builder.build();
+    /// invoke_signed(&ix, &accounts, signers_seeds)
+    /// ```
+    pub fn build_and_invoke_signed(self, signers_seeds: &[&[&[u8]]]) -> ProgramResult {
+        let (accounts, ix) = self.build();
+        invoke_signed(&ix, &accounts, signers_seeds)
+    }
+}
+
+/// Shared transition and terminal methods for intent sub-builders.
+///
+/// Implementors provide only `fold_builder`, which collapses the sub-builder back into
+/// the parent [`MagicIntentBundleBuilder`]. All transition/terminal methods are
+/// then available as defaults.
+///
+/// This trait is automatically imported by the `#[ephemeral]` macro.
+pub trait FoldableIntentBuilder<'info>: Sized {
+    fn fold_builder(self) -> MagicIntentBundleBuilder<'info>;
+
+    fn commit(self, accounts: &[AccountInfo<'info>]) -> CommitIntentBuilder<'info> {
+        self.fold_builder().commit(accounts)
+    }
+
+    fn commit_and_undelegate(
+        self,
+        accounts: &[AccountInfo<'info>],
+    ) -> CommitAndUndelegateIntentBuilder<'info> {
+        self.fold_builder().commit_and_undelegate(accounts)
+    }
+
+    fn add_standalone_actions(
+        self,
+        actions: impl IntoIterator<Item = CallHandler<'info>>,
+    ) -> MagicIntentBundleBuilder<'info> {
+        self.fold_builder().add_standalone_actions(actions)
+    }
+
+    fn build(self) -> (Vec<AccountInfo<'info>>, Instruction) {
+        self.fold_builder().build()
+    }
+
+    fn build_and_invoke(self) -> ProgramResult {
+        self.fold_builder().build_and_invoke()
+    }
+
+    fn build_and_invoke_signed(self, signers_seeds: &[&[&[u8]]]) -> ProgramResult {
+        self.fold_builder().build_and_invoke_signed(signers_seeds)
+    }
+}
+
+impl<'info> FoldableIntentBuilder<'info> for CommitIntentBuilder<'info> {
+    fn fold_builder(self) -> MagicIntentBundleBuilder<'info> {
+        self.fold()
+    }
+}
+
+impl<'info> FoldableIntentBuilder<'info> for CommitAndUndelegateIntentBuilder<'info> {
+    fn fold_builder(self) -> MagicIntentBundleBuilder<'info> {
+        self.fold()
     }
 }
 
