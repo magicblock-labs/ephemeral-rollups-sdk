@@ -83,11 +83,7 @@ fn modify_component_module(mut module: ItemMod) -> ItemMod {
     // Add common imports for MagicIntentBundleBuilder for user
     let builder_imports = quote! {
         #[allow(unused_imports)]
-        use ephemeral_rollups_sdk::ephem::{
-            FoldableIntentBuilder,
-            FoldableCommitIntentBuilder,
-            FoldableCauIntentBuilder,
-        };
+        use ephemeral_rollups_sdk::ephem::FoldableIntentBuilder;
     };
 
     let (imports, undelegate_fn, undelegate_struct) = generate_undelegate();
