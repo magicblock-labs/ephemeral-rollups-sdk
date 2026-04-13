@@ -39,9 +39,9 @@ mod tests {
     };
     use magicblock_magic_program_api::Pubkey;
     #[cfg(feature = "encryption")]
-    use sdk::signature::Keypair;
+    use solana_keypair::Keypair;
     #[cfg(feature = "encryption")]
-    use sdk::signer::Signer;
+    use solana_signer::Signer;
     use solana_system_interface::program as system_program;
     use spl_associated_token_account_interface::address::get_associated_token_address;
 

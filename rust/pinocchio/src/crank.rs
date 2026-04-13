@@ -543,7 +543,7 @@ mod tests {
         let acc1 = Address::new_from_array(core::array::from_fn(|i| if i == 0 { 2 } else { 0 }));
         let instruction_accounts = [InstructionAccount::new(&acc1, true, false)];
         let crank_instructions = [CrankInstruction::new(
-            program_id.clone(),
+            program_id,
             &instruction_accounts,
             &[1, 2, 3],
         )];
@@ -617,8 +617,8 @@ mod tests {
             InstructionAccount::new(&acc2, true, false),
         ];
         let crank_instructions = [
-            CrankInstruction::new(program_id.clone(), &first_accounts, &[1, 2, 3]),
-            CrankInstruction::new(program_id.clone(), &second_accounts, &[1, 2, 3]),
+            CrankInstruction::new(program_id, &first_accounts, &[1, 2, 3]),
+            CrankInstruction::new(program_id, &second_accounts, &[1, 2, 3]),
         ];
         let this_args = ScheduleCrankArgs::new(123, &crank_instructions)
             .execution_interval_millis(123456)

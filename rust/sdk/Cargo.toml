@@ -1,68 +1,68 @@
 [package]
-name = "ephemeral-rollups-sdk"
-description = "Ephemeral Rollups Integration SDK"
-version = { workspace = true }
 authors = { workspace = true }
-repository = { workspace = true }
+description = "Ephemeral Rollups Integration SDK"
 documentation = { workspace = true }
+edition = { workspace = true }
 homepage = { workspace = true }
 keywords = { workspace = true }
 license = { workspace = true }
-edition = { workspace = true }
+name = "ephemeral-rollups-sdk"
 readme = "README.md"
+repository = { workspace = true }
+version = { workspace = true }
 
 [features]
-default = ["solana-program", "solana-system-interface"]
-anchor = ["anchor-lang"]
 access-control = ["num-derive", "num-traits", "thiserror"]
-spl = ["spl-associated-token-account-interface", "encryption"]
-encryption = [
-    "magicblock-delegation-program-api/encryption",
-    "magicblock-delegation-program-api/instruction",
-]
+anchor = ["anchor-lang"]
+anchor-debug = []
 crank = []
-disable-realloc = []
-modular-sdk = [
-    "solana-account",
-    "solana-account-info",
-    "solana-cpi",
-    "solana-instruction",
-    "solana-pubkey",
-    "solana-program-error",
-    "solana-program-memory",
-    "solana-sysvar",
-    "solana-system-interface",
-]
 custom-heap = []
 custom-panic = []
-anchor-debug = []
+default = ["solana-program", "solana-system-interface"]
+disable-realloc = []
+encryption = [
+  "magicblock-delegation-program-api/encryption",
+  "magicblock-delegation-program-api/instruction",
+]
+modular-sdk = [
+  "solana-account",
+  "solana-account-info",
+  "solana-cpi",
+  "solana-instruction",
+  "solana-program-error",
+  "solana-program-memory",
+  "solana-pubkey",
+  "solana-system-interface",
+  "solana-sysvar",
+]
 serde = []
+spl = ["encryption", "spl-associated-token-account-interface"]
 
 
 [dependencies]
 anchor-lang = { workspace = true, optional = true }
-borsh = { workspace = true }
 bincode = { workspace = true }
+borsh = { workspace = true }
+ephemeral-rollups-sdk-attribute-action = { workspace = true }
+ephemeral-rollups-sdk-attribute-commit = { workspace = true }
 ephemeral-rollups-sdk-attribute-delegate = { workspace = true }
 ephemeral-rollups-sdk-attribute-ephemeral = { workspace = true }
 ephemeral-rollups-sdk-attribute-ephemeral-accounts = { workspace = true }
-ephemeral-rollups-sdk-attribute-commit = { workspace = true }
-ephemeral-rollups-sdk-attribute-action = { workspace = true }
-solana-program = { workspace = true, optional = true }
+magicblock-delegation-program-api = { workspace = true, default-features = false }
+magicblock-magic-program-api = { workspace = true }
+num-derive = { workspace = true, optional = true }
+num-traits = { workspace = true, optional = true }
 solana-account = { workspace = true, optional = true }
 solana-account-info = { workspace = true, optional = true }
 solana-cpi = { workspace = true, optional = true }
 solana-instruction = { workspace = true, optional = true }
-solana-pubkey = { workspace = true, optional = true }
+solana-program = { workspace = true, optional = true }
 solana-program-error = { workspace = true, optional = true }
 solana-program-memory = { workspace = true, optional = true }
+solana-pubkey = { workspace = true, optional = true }
 solana-system-interface = { workspace = true, optional = true }
 solana-sysvar = { workspace = true, optional = true }
 spl-associated-token-account-interface = { workspace = true, optional = true }
-magicblock-magic-program-api = { workspace = true }
-magicblock-delegation-program-api = { workspace = true, default-features = false }
-num-derive = { workspace = true, optional = true }
-num-traits = { workspace = true, optional = true }
 thiserror = { workspace = true, optional = true }
 
 # Fix for older toolchain
@@ -101,8 +101,9 @@ path = "../tests/macros_test.rs"
 [[test]]
 name = "spl_test"
 path = "../tests/spl_test.rs"
-required-features = ["spl", "access-control", "modular-sdk"]
+required-features = ["access-control", "modular-sdk", "spl"]
 
 [dev-dependencies]
 bincode = { workspace = true }
-sdk = { workspace = true }
+solana-keypair = { workspace = true }
+solana-signer = { workspace = true }
