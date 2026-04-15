@@ -1,12 +1,12 @@
 [package]
-name = "ephemeral-rollups-sdk-attribute-delegate"
-description = "ephemeral-rollups-sdk-attribute-delegate"
-version = { workspace = true }
 authors = { workspace = true }
-repository = { workspace = true }
+description = "ephemeral-rollups-sdk-attribute-delegate"
+edition = { workspace = true }
 homepage = { workspace = true }
 license = { workspace = true }
-edition = { workspace = true }
+name = "ephemeral-rollups-sdk-attribute-delegate"
+repository = { workspace = true }
+version = { workspace = true }
 
 [features]
 default = []
@@ -16,5 +16,5 @@ proc-macro = true
 
 [dependencies]
 proc-macro2 = { workspace = true }
-syn = { workspace = true, features = ["full"] }
 quote = { workspace = true }
+syn = { workspace = true, features = ["full"] }

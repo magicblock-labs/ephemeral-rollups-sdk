@@ -5,7 +5,8 @@ use std::sync::Arc;
 use borsh::BorshDeserialize;
 use mdp::state::record::ErRecord;
 use rpc::nonblocking::rpc_client::RpcClient;
-use sdk::{account::ReadableAccount, pubkey::Pubkey};
+use solana_account::ReadableAccount;
+use solana_address::Address as Pubkey;
 
 use crate::{
     account, DelegationStatus, DelegationsDB, ResolverResult, DELEGATION_PROGRAM_ID,
@@ -65,8 +66,9 @@ pub async fn fetch_account_state(
 /// Fetches all domain registration records from base layer chain
 /// Returns list of all available ER node records
 pub async fn fetch_domain_records(chain: &RpcClient) -> ResolverResult<Vec<ErRecord>> {
+    let program = account::pubkey_from_bytes(mdp::id().as_ref());
     let accounts = chain
-        .get_program_accounts(&mdp::id())
+        .get_program_accounts(&program)
         .await
         .map_err(Box::new)?;
     let mut records = Vec::with_capacity(accounts.len());

@@ -7,7 +7,7 @@ use mdp::state::record::ErRecord;
 use rpc::nonblocking::rpc_client::RpcClient;
 
 use crate::{
-    account::ProgramAccountValue,
+    account::{pubkey_from_bytes, ProgramAccountValue},
     config::WebsocketConf,
     http::fetch_domain_records,
     websocket::{
@@ -132,10 +132,10 @@ impl WsRoutesConnection {
     }
 
     fn update_routing_table(routes: &RoutingTable, record: ErRecord) {
-        let identity = record.identity();
+        let identity = pubkey_from_bytes(record.identity().as_ref());
         let address_is_the_same = routes
             .read()
-            .get(identity)
+            .get(&identity)
             .map(|client| client.url() == record.addr())
             .unwrap_or_default();
         if address_is_the_same {
@@ -143,7 +143,7 @@ impl WsRoutesConnection {
         }
 
         let client = Arc::new(RpcClient::new(record.addr().to_owned()));
-        routes.write().insert(*identity, client);
+        routes.write().insert(identity, client);
     }
 
     fn generate_subscription() -> String {

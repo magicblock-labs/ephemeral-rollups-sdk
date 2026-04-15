@@ -15,7 +15,9 @@ use error::Error;
 use http::{fetch_account_state, fetch_domain_records, update_account_state};
 use rpc::nonblocking::rpc_client::RpcClient;
 use scc::{hash_cache::Entry, HashCache};
-use sdk::{commitment_config::CommitmentConfig, pubkey::Pubkey, transaction::Transaction};
+use solana_address::Address as Pubkey;
+use solana_commitment_config::CommitmentConfig;
+use solana_transaction::Transaction;
 use tokio::sync::mpsc::{unbounded_channel, UnboundedSender};
 use websocket::{
     connection::{delegations::WsDelegationsConnection, routes::WsRoutesConnection},
@@ -33,7 +35,8 @@ type DelegationsDB = Arc<HashCache<Pubkey, DelegationRecord>>;
 /// Conveniece wrapper for results with possible resolver errors
 type ResolverResult<T> = Result<T, Error>;
 
-const DELEGATION_PROGRAM_ID: Pubkey = ephemeral_rollups_sdk::id();
+const DELEGATION_PROGRAM_ID: Pubkey =
+    Pubkey::new_from_array(ephemeral_rollups_sdk::id().to_bytes());
 /// The fixed size of delegation record account's data,
 /// NOTE: this value should be updated if the ABI of delegation
 /// program changes in the future, that will affect the size
@@ -93,7 +96,7 @@ impl Resolver {
                 .into_iter()
                 .map(|record| {
                     (
-                        *record.identity(),
+                        Pubkey::new_from_array(record.identity().to_bytes()),
                         RpcClient::new_with_commitment(record.addr().to_string(), commitment)
                             .into(),
                     )

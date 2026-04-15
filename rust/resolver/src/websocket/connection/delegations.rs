@@ -6,7 +6,7 @@ use std::{
 };
 
 use rpc::nonblocking::rpc_client::RpcClient;
-use sdk::pubkey::Pubkey;
+use solana_address::Address as Pubkey;
 use tokio::sync::mpsc::UnboundedReceiver;
 
 use crate::{

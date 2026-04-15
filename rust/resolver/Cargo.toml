@@ -1,15 +1,15 @@
 [package]
-name = "magic-resolver"
-description = "Connection resolver for ephemeral rollups"
-version = { workspace = true }
 authors = { workspace = true }
-repository = { workspace = true }
+description = "Connection resolver for ephemeral rollups"
 documentation = { workspace = true }
+edition = { workspace = true }
 homepage = { workspace = true }
 keywords = { workspace = true }
-readme = "README.md"
 license = { workspace = true }
-edition = { workspace = true }
+name = "magic-resolver"
+readme = "README.md"
+repository = { workspace = true }
+version = { workspace = true }
 
 [dependencies]
 ephemeral-rollups-sdk = { workspace = true }
@@ -18,33 +18,36 @@ magic-domain-program = { workspace = true }
 ## External crates
 
 # runtime
-tokio = { workspace = true }
 futures = { workspace = true }
+tokio = { workspace = true }
 
 # sync
 parking_lot = { workspace = true }
 
 # network
+reqwest = { workspace = true }
 url = { workspace = true }
 websocket = { workspace = true }
-reqwest = { workspace = true }
 
 # solana
-sdk = { workspace = true }
 rpc = { workspace = true }
 rpc-api = { workspace = true }
+solana-account = { workspace = true }
+solana-address = { workspace = true }
+solana-commitment-config = { workspace = true }
 solana-program = { workspace = true }
+solana-transaction = { workspace = true }
 
 # serialization/parsing
-serde = { workspace = true, default-features = true }
-json = { workspace = true }
+borsh = { workspace = true }
 humantime = { workspace = true }
-borsh = { workspace = true } 
+json = { workspace = true }
+serde = { workspace = true, default-features = true }
 
 # codec
 base64 = { workspace = true }
-bs58 = { workspace = true }
 bincode = { workspace = true }
+bs58 = { workspace = true }
 zstd = { workspace = true }
 
 # containers
