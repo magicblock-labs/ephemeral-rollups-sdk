@@ -78,6 +78,13 @@ pub fn find_rent_pda() -> (Pubkey, u8) {
     Pubkey::find_program_address(&[b"rent"], &ESPL_TOKEN_PROGRAM_ID)
 }
 
+pub fn find_lamports_pda(payer: &Pubkey, destination: &Pubkey, salt: &[u8; 32]) -> (Pubkey, u8) {
+    Pubkey::find_program_address(
+        &[b"lamports", payer.as_ref(), destination.as_ref(), salt],
+        &ESPL_TOKEN_PROGRAM_ID,
+    )
+}
+
 pub fn find_vault_ata(mint: &Pubkey, vault: &Pubkey) -> Pubkey {
     get_associated_token_address(vault, mint)
 }
@@ -105,4 +112,8 @@ pub fn find_transfer_queue(mint: &Pubkey, validator: &Pubkey) -> (Pubkey, u8) {
         &[b"queue", mint.as_ref(), validator.as_ref()],
         &ESPL_TOKEN_PROGRAM_ID,
     )
+}
+
+pub fn find_transfer_queue_refill_state(queue: &Pubkey) -> (Pubkey, u8) {
+    Pubkey::find_program_address(&[b"queue-refill", queue.as_ref()], &ESPL_TOKEN_PROGRAM_ID)
 }

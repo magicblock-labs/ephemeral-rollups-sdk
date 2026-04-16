@@ -15,8 +15,6 @@ use crate::{
     },
 };
 
-const QUEUED_TRANSFER_FLAG_CREATE_IDEMPOTENT_ATA: u8 = 1 << 0;
-
 #[derive(Debug)]
 pub enum DepositAndDelegateShuttleEphemeralAtaWithMergeAndPrivateTransferBuilderError {
     MissingValidator,
@@ -61,6 +59,7 @@ pub struct DepositAndDelegateShuttleEphemeralAtaWithMergeAndPrivateTransferBuild
     pub min_delay_ms: u64,
     pub max_delay_ms: u64,
     pub split: u32,
+    pub client_ref_id: Option<u64>,
     pub validator: Option<Pubkey>,
 }
 
@@ -94,7 +93,7 @@ impl DepositAndDelegateShuttleEphemeralAtaWithMergeAndPrivateTransferBuilder {
                 self.min_delay_ms,
                 self.max_delay_ms,
                 self.split,
-                QUEUED_TRANSFER_FLAG_CREATE_IDEMPOTENT_ATA,
+                self.client_ref_id,
             ),
             validator,
         )?;
@@ -155,13 +154,15 @@ fn pack_private_transfer_suffix(
     min_delay_ms: u64,
     max_delay_ms: u64,
     split: u32,
-    flags: u8,
-) -> [u8; 21] {
-    let mut suffix = [0u8; 21];
-    suffix[..8].copy_from_slice(&min_delay_ms.to_le_bytes());
-    suffix[8..16].copy_from_slice(&max_delay_ms.to_le_bytes());
-    suffix[16..20].copy_from_slice(&split.to_le_bytes());
-    suffix[20] = flags;
+    client_ref_id: Option<u64>,
+) -> Vec<u8> {
+    let mut suffix = Vec::with_capacity(if client_ref_id.is_some() { 28 } else { 20 });
+    suffix.extend_from_slice(&min_delay_ms.to_le_bytes());
+    suffix.extend_from_slice(&max_delay_ms.to_le_bytes());
+    suffix.extend_from_slice(&split.to_le_bytes());
+    if let Some(client_ref_id) = client_ref_id {
+        suffix.extend_from_slice(&client_ref_id.to_le_bytes());
+    }
     suffix
 }
 

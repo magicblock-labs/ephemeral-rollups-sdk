@@ -43,6 +43,7 @@ pub struct DepositAndQueueTransferBuilder {
     pub min_delay_ms: u64,
     pub max_delay_ms: u64,
     pub split: u32,
+    pub client_ref_id: Option<u64>,
 }
 
 impl DepositAndQueueTransferBuilder {
@@ -60,12 +61,15 @@ impl DepositAndQueueTransferBuilder {
             });
         }
 
-        let mut data = Vec::with_capacity(29);
+        let mut data = Vec::with_capacity(if self.client_ref_id.is_some() { 37 } else { 29 });
         data.push(EphemeralSplDiscriminator::DepositAndQueueTransfer as u8);
         data.extend_from_slice(&self.amount.to_le_bytes());
         data.extend_from_slice(&self.min_delay_ms.to_le_bytes());
         data.extend_from_slice(&self.max_delay_ms.to_le_bytes());
         data.extend_from_slice(&self.split.to_le_bytes());
+        if let Some(client_ref_id) = self.client_ref_id {
+            data.extend_from_slice(&client_ref_id.to_le_bytes());
+        }
         let reimbursement_token_info = self.reimbursement_token_info.unwrap_or(self.source);
 
         Ok(Instruction {
