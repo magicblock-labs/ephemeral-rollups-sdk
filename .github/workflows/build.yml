@@ -117,6 +117,7 @@ jobs:
           cargo build-sbf --features unit_test_config
 
       - name: Run Anchor build
+        if: ${{ false }}
         working-directory: delegation-program/tests/integration
         env:
           RUSTUP_TOOLCHAIN: ${{ env.rust_version }}

@@ -38,6 +38,7 @@ import {
   depositAndQueueTransferIx,
   deriveTransferQueue,
   initTransferQueueIx,
+  processPendingTransferQueueRefillIx,
 } from "./transferQueue";
 
 // SPL Token program IDs
@@ -47,8 +48,6 @@ const TOKEN_PROGRAM_ADDRESS =
   "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA" as const;
 const ASSOCIATED_TOKEN_PROGRAM_ADDRESS =
   "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL" as const;
-const QUEUED_TRANSFER_FLAG_CREATE_IDEMPOTENT_ATA = 1 << 0;
-
 /**
  * Derive the Associated Token Account for a given mint/owner pair.
  * Mirrors the behavior of @solana/spl-token's getAssociatedTokenAddressSync.
@@ -60,7 +59,7 @@ const QUEUED_TRANSFER_FLAG_CREATE_IDEMPOTENT_ATA = 1 << 0;
 async function getAssociatedTokenAddressSync(
   mint: Address,
   owner: Address,
-  allowOwnerOffCurve: boolean = false,
+  allowOwnerOffCurve: boolean = true,
 ): Promise<Address> {
   const addressEncoder = getAddressEncoder();
   const [ata] = await getProgramDerivedAddress({
@@ -132,13 +131,17 @@ function packPrivateTransferSuffix(
   minDelayMs: bigint,
   maxDelayMs: bigint,
   split: number,
-  flags: number = 0,
+  clientRefId?: bigint,
 ): Buffer {
-  const suffix = Buffer.alloc(8 + 8 + 4 + 1);
+  const suffix = Buffer.alloc(
+    clientRefId === undefined ? 8 + 8 + 4 : 8 + 8 + 4 + 8,
+  );
   suffix.writeBigUInt64LE(minDelayMs, 0);
   suffix.writeBigUInt64LE(maxDelayMs, 8);
   suffix.writeUInt32LE(split, 16);
-  suffix.writeUInt8(flags, 20);
+  if (clientRefId !== undefined) {
+    suffix.writeBigUInt64LE(clientRefId, 20);
+  }
   return suffix;
 }
 
@@ -298,6 +301,35 @@ export async function deriveRentPda(): Promise<[Address, number]> {
     seeds: [new Uint8Array([114, 101, 110, 116])],
   });
   return [rentPda, bump];
+}
+
+/**
+ * Derive delegated lamports PDA
+ * @param payer - The payer account
+ * @param destination - The destination delegated account
+ * @param salt - User-provided 32-byte salt
+ * @returns The delegated lamports PDA and bump
+ */
+export async function deriveLamportsPda(
+  payer: Address,
+  destination: Address,
+  salt: Uint8Array,
+): Promise<[Address, number]> {
+  if (salt.length !== 32) {
+    throw new Error("salt must be exactly 32 bytes");
+  }
+
+  const addressEncoder = getAddressEncoder();
+  const [lamportsPda, bump] = await getProgramDerivedAddress({
+    programAddress: EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
+    seeds: [
+      Buffer.from("lamports"),
+      addressEncoder.encode(payer),
+      addressEncoder.encode(destination),
+      Buffer.from(salt),
+    ],
+  });
+  return [lamportsPda, bump];
 }
 
 /**
@@ -817,6 +849,7 @@ export async function depositAndDelegateShuttleEphemeralAtaWithMergeAndPrivateTr
   maxDelayMs: bigint,
   split: number,
   validator?: Address,
+  clientRefId?: bigint,
 ): Promise<Instruction> {
   if (
     !Number.isInteger(shuttleId) ||
@@ -825,11 +858,13 @@ export async function depositAndDelegateShuttleEphemeralAtaWithMergeAndPrivateTr
   ) {
     throw new Error("shuttleId must fit in u32");
   }
-  if (amount < 0n) {
-    throw new Error("amount must be non-negative");
-  }
-  if (minDelayMs < 0n || maxDelayMs < 0n) {
-    throw new Error("delay values must be non-negative");
+  if (
+    amount < 0n ||
+    minDelayMs < 0n ||
+    maxDelayMs < 0n ||
+    (clientRefId !== undefined && clientRefId < 0n)
+  ) {
+    throw new Error("amount, delays, and clientRefId must be non-negative");
   }
   if (maxDelayMs < minDelayMs) {
     throw new Error("maxDelayMs must be greater than or equal to minDelayMs");
@@ -861,12 +896,7 @@ export async function depositAndDelegateShuttleEphemeralAtaWithMergeAndPrivateTr
     validator,
   );
   const encryptedSuffix = encryptEd25519Recipient(
-    packPrivateTransferSuffix(
-      minDelayMs,
-      maxDelayMs,
-      split,
-      QUEUED_TRANSFER_FLAG_CREATE_IDEMPOTENT_ATA,
-    ),
+    packPrivateTransferSuffix(minDelayMs, maxDelayMs, split, clientRefId),
     validator,
   );
   const data = Buffer.concat([
@@ -977,6 +1007,75 @@ export async function withdrawThroughDelegatedShuttleWithMergeIx(
       { address: ownerAta, role: AccountRole.WRITABLE },
       { address: mint, role: AccountRole.READONLY },
       { address: TOKEN_PROGRAM_ADDRESS as Address, role: AccountRole.READONLY },
+    ],
+    data,
+    programAddress: EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
+  };
+}
+
+/**
+ * Create and delegate a sponsored lamports PDA, then schedule post-delegation
+ * transfer and cleanup to move lamports to a base-layer destination.
+ * @param payer - The payer and action signer
+ * @param destination - The delegated destination base-layer account
+ * @param amount - The lamports amount to transfer
+ * @param salt - User-provided 32-byte salt
+ * @returns The sponsored delegated lamports transfer instruction
+ */
+export async function lamportsDelegatedTransferIx(
+  payer: Address,
+  destination: Address,
+  amount: bigint,
+  salt: Uint8Array,
+): Promise<Instruction> {
+  if (amount < 0n) {
+    throw new Error("amount must be non-negative");
+  }
+  if (salt.length !== 32) {
+    throw new Error("salt must be exactly 32 bytes");
+  }
+
+  const [rentPda] = await deriveRentPda();
+  const [lamportsPda] = await deriveLamportsPda(payer, destination, salt);
+  const destinationDelegationRecord =
+    await delegationRecordPdaFromDelegatedAccount(destination);
+
+  const data = Buffer.alloc(41);
+  data[0] = 20;
+  data.writeBigUInt64LE(amount, 1);
+  Buffer.from(salt).copy(data, 9);
+
+  return {
+    accounts: [
+      { address: payer, role: AccountRole.WRITABLE_SIGNER },
+      { address: rentPda, role: AccountRole.WRITABLE },
+      { address: lamportsPda, role: AccountRole.WRITABLE },
+      {
+        address: EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
+        role: AccountRole.READONLY,
+      },
+      {
+        address: await delegateBufferPdaFromDelegatedAccountAndOwnerProgram(
+          lamportsPda,
+          EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
+        ),
+        role: AccountRole.WRITABLE,
+      },
+      {
+        address: await delegationRecordPdaFromDelegatedAccount(lamportsPda),
+        role: AccountRole.WRITABLE,
+      },
+      {
+        address: await delegationMetadataPdaFromDelegatedAccount(lamportsPda),
+        role: AccountRole.WRITABLE,
+      },
+      { address: DELEGATION_PROGRAM_ID, role: AccountRole.READONLY },
+      { address: SYSTEM_PROGRAM_ADDRESS, role: AccountRole.READONLY },
+      { address: destination, role: AccountRole.WRITABLE },
+      {
+        address: destinationDelegationRecord,
+        role: AccountRole.READONLY,
+      },
     ],
     data,
     programAddress: EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
@@ -1279,6 +1378,7 @@ export interface DelegateSplWithPrivateTransferOptions
   minDelayMs?: bigint;
   maxDelayMs?: bigint;
   split?: number;
+  clientRefId?: bigint;
   initTransferQueueIfMissing?: boolean;
 }
 
@@ -1293,6 +1393,7 @@ export interface TransferSplPrivateOptions {
   minDelayMs?: bigint;
   maxDelayMs?: bigint;
   split?: number;
+  clientRefId?: bigint;
 }
 
 export interface TransferSplOptions {
@@ -1502,6 +1603,7 @@ export async function delegateSplWithPrivateTransfer(
   const minDelayMs = opts?.minDelayMs ?? 0n;
   const maxDelayMs = opts?.maxDelayMs ?? minDelayMs;
   const split = opts?.split ?? 1;
+  const clientRefId = opts?.clientRefId;
 
   if (validator == null) {
     throw new Error("validator is required for encrypted private transfers");
@@ -1563,6 +1665,7 @@ export async function delegateSplWithPrivateTransfer(
       maxDelayMs,
       split,
       validator,
+      clientRefId,
     ),
   );
 
@@ -1585,6 +1688,7 @@ export async function transferSpl(
   const minDelayMs = opts.privateTransfer?.minDelayMs ?? 0n;
   const maxDelayMs = opts.privateTransfer?.maxDelayMs ?? minDelayMs;
   const split = opts.privateTransfer?.split ?? 1;
+  const clientRefId = opts.privateTransfer?.clientRefId;
 
   const fromAta = await getAssociatedTokenAddressSync(mint, from);
   const toAta = await getAssociatedTokenAddressSync(mint, to);
@@ -1610,12 +1714,14 @@ export async function transferSpl(
               mint,
               fromAta,
               vaultAta,
-              toAta,
+              to,
               from,
               amount,
               minDelayMs,
               maxDelayMs,
               split,
+              undefined,
+              clientRefId,
             ),
           ];
         }
@@ -1653,6 +1759,15 @@ export async function transferSpl(
     instructions.push(initVaultAtaIx(payer, fromAta, from, mint));
   }
 
+  const maybeRefillInstructions = async (): Promise<Instruction[]> => {
+    if (opts.fromBalance !== "base" || validator == null) {
+      return [];
+    }
+
+    const [queue] = await deriveTransferQueue(mint, validator);
+    return [await processPendingTransferQueueRefillIx(queue)];
+  };
+
   switch (opts.visibility) {
     case "private":
       if (opts.fromBalance === "base" && opts.toBalance === "base") {
@@ -1669,6 +1784,7 @@ export async function transferSpl(
 
         return [
           ...instructions,
+          ...(await maybeRefillInstructions()),
           await depositAndDelegateShuttleEphemeralAtaWithMergeAndPrivateTransferIx(
             payer,
             shuttleEphemeralAta,
@@ -1684,6 +1800,7 @@ export async function transferSpl(
             maxDelayMs,
             split,
             validator,
+            clientRefId,
           ),
         ];
       }
@@ -1732,10 +1849,7 @@ export async function transferSpl(
 
     case "public":
       if (opts.fromBalance === "base" && opts.toBalance === "base") {
-        return [
-          ...instructions,
-          createTransferInstruction(fromAta, toAta, from, amount),
-        ];
+        return [...instructions, createTransferInstruction(fromAta, toAta, from, amount)];
       }
 
       break;

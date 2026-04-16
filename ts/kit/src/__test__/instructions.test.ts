@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { AccountRole } from "@solana/instructions";
+import { SYSTEM_PROGRAM_ADDRESS } from "@solana-program/system";
 import bs58 from "bs58";
 import * as nacl from "tweetnacl";
 import {
@@ -12,7 +13,12 @@ import {
   createCommitInstruction,
   createCommitAndUndelegateInstruction,
 } from "../instructions/magic-program";
-import { address, getAddressEncoder, type Address } from "@solana/kit";
+import {
+  address,
+  getAddressEncoder,
+  getProgramDerivedAddress,
+  type Address,
+} from "@solana/kit";
 import {
   allocateTransferQueueIx,
   delegateEataPermissionIx,
@@ -21,6 +27,7 @@ import {
   delegateSplWithPrivateTransfer,
   delegateTransferQueueIx,
   deriveEphemeralAta,
+  deriveLamportsPda,
   deriveTransferQueue,
   deriveRentPda,
   deriveVault,
@@ -29,18 +36,26 @@ import {
   initTransferQueueIx,
   initVaultIx,
   initRentPdaIx,
+  lamportsDelegatedTransferIx,
+  processPendingTransferQueueRefillIx,
   transferSpl,
   undelegateAndCloseShuttleEphemeralAtaIx,
   withdrawSplIx,
   withdrawSpl,
 } from "../instructions/ephemeral-spl-token-program";
 import {
+  DELEGATION_PROGRAM_ID,
   MAGIC_PROGRAM_ID,
   MAGIC_CONTEXT_ID,
   EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
   PERMISSION_PROGRAM_ID,
 } from "../constants";
-import { permissionPdaFromAccount } from "../pda";
+import {
+  delegateBufferPdaFromDelegatedAccountAndOwnerProgram,
+  delegationMetadataPdaFromDelegatedAccount,
+  delegationRecordPdaFromDelegatedAccount,
+  permissionPdaFromAccount,
+} from "../pda";
 
 function readLengthPrefixedField(
   data: Uint8Array,
@@ -886,7 +901,7 @@ describe("Exposed Instructions (@solana/kit)", () => {
         validatorField.equals(Buffer.from(addressEncoder.encode(validator))),
       ).toBe(true);
       expect(destinationField).toHaveLength(80);
-      expect(suffixField).toHaveLength(69);
+      expect(suffixField).toHaveLength(68);
       expect(endOffset).toBe(data.length);
     });
   });
@@ -921,6 +936,57 @@ describe("Exposed Instructions (@solana/kit)", () => {
     });
   });
 
+  describe("lamportsDelegatedTransferIx (Ephemeral SPL Token Program)", () => {
+    const payer = address(bs58.encode(nacl.sign.keyPair().publicKey));
+    const destination = address(bs58.encode(nacl.sign.keyPair().publicKey));
+    const salt = new Uint8Array(Array.from({ length: 32 }, (_, i) => i));
+
+    it("should derive the lamports PDA and encode the sponsored delegated transfer instruction", async () => {
+      const [rentPda] = await deriveRentPda();
+      const [lamportsPda] = await deriveLamportsPda(payer, destination, salt);
+      const destinationDelegationRecord =
+        await delegationRecordPdaFromDelegatedAccount(destination);
+
+      const instruction = await lamportsDelegatedTransferIx(
+        payer,
+        destination,
+        25n,
+        salt,
+      );
+
+      expect(instruction.programAddress).toBe(EPHEMERAL_SPL_TOKEN_PROGRAM_ID);
+      expect(instruction.accounts).toHaveLength(11);
+      expect(instruction.accounts?.[0]).toEqual({
+        address: payer,
+        role: AccountRole.WRITABLE_SIGNER,
+      });
+      expect(instruction.accounts?.[1]).toEqual({
+        address: rentPda,
+        role: AccountRole.WRITABLE,
+      });
+      expect(instruction.accounts?.[2]).toEqual({
+        address: lamportsPda,
+        role: AccountRole.WRITABLE,
+      });
+      expect(instruction.accounts?.[9]).toEqual({
+        address: destination,
+        role: AccountRole.WRITABLE,
+      });
+      expect(instruction.accounts?.[10]).toEqual({
+        address: destinationDelegationRecord,
+        role: AccountRole.READONLY,
+      });
+
+      const data = Buffer.from(instruction.data ?? []);
+      expect(data[0]).toBe(20);
+      expect(data.readBigUInt64LE(1)).toBe(25n);
+      expect(Buffer.from(data.subarray(9, 41)).equals(Buffer.from(salt))).toBe(
+        true,
+      );
+      expect(data).toHaveLength(41);
+    });
+  });
+
   describe("transferSpl (Ephemeral SPL Token Program)", () => {
     const from = address("11111111111111111111111111111113");
     const to = address("11111111111111111111111111111114");
@@ -928,6 +994,7 @@ describe("Exposed Instructions (@solana/kit)", () => {
     const validator = address(bs58.encode(nacl.sign.keyPair().publicKey));
 
     it("should use the shuttle private transfer instruction for private base-to-base transfers", async () => {
+      const [queue] = await deriveTransferQueue(mint, validator);
       const instructions = await transferSpl(from, to, mint, 25n, {
         visibility: "private",
         fromBalance: "base",
@@ -941,10 +1008,12 @@ describe("Exposed Instructions (@solana/kit)", () => {
         },
       });
 
-      expect(instructions).toHaveLength(1);
-      const data = Buffer.from(instructions[0].data ?? []);
+      expect(instructions).toHaveLength(2);
+      expect(instructions[0].data?.[0]).toBe(28);
+      expect(instructions[0].accounts?.[1].address).toBe(queue);
+      const data = Buffer.from(instructions[1].data ?? []);
       expect(data[0]).toBe(25);
-      expect(instructions[0].accounts).toHaveLength(19);
+      expect(instructions[1].accounts).toHaveLength(19);
       expect(data.readUInt32LE(1)).toBe(7);
       expect(data.readBigUInt64LE(5)).toBe(25n);
 
@@ -962,8 +1031,31 @@ describe("Exposed Instructions (@solana/kit)", () => {
         validatorField.equals(Buffer.from(addressEncoder.encode(validator))),
       ).toBe(true);
       expect(destinationField).toHaveLength(80);
-      expect(suffixField).toHaveLength(69);
+      expect(suffixField).toHaveLength(68);
       expect(endOffset).toBe(data.length);
+    });
+
+    it("should append clientRefId to the encrypted private transfer suffix when provided", async () => {
+      const instructions = await transferSpl(from, to, mint, 25n, {
+        visibility: "private",
+        fromBalance: "base",
+        toBalance: "base",
+        validator,
+        shuttleId: 7,
+        privateTransfer: {
+          minDelayMs: 100n,
+          maxDelayMs: 300n,
+          split: 4,
+          clientRefId: 42n,
+        },
+      });
+
+      const data = Buffer.from(instructions[1].data ?? []);
+      const [, nextOffset] = readLengthPrefixedField(data, 13);
+      const [, suffixOffset] = readLengthPrefixedField(data, nextOffset);
+      const [suffixField] = readLengthPrefixedField(data, suffixOffset);
+
+      expect(suffixField).toHaveLength(76);
     });
 
     it("should initialize the destination ATA and vault when requested", async () => {
@@ -985,10 +1077,11 @@ describe("Exposed Instructions (@solana/kit)", () => {
         },
       });
 
-      expect(instructions).toHaveLength(4);
+      expect(instructions).toHaveLength(5);
       expect(instructions[2].accounts?.[1].address).toBe(vaultEphemeralAta);
       expect(instructions[2].data?.[0]).toBe(4);
-      expect(instructions[3].data?.[0]).toBe(25);
+      expect(instructions[3].data?.[0]).toBe(28);
+      expect(instructions[4].data?.[0]).toBe(25);
     });
 
     it("should prepend source ATA creation when initAtasIfMissing is set on base-source transfers", async () => {
@@ -1080,6 +1173,7 @@ describe("Exposed Instructions (@solana/kit)", () => {
       expect(instructions).toHaveLength(1);
       expect(instructions[0].data?.[0]).toBe(16);
       expect(instructions[0].accounts).toHaveLength(9);
+      expect(instructions[0].accounts?.[5].address).toBe(to);
       expect(instructions[0].accounts?.[8].address).toBe(
         instructions[0].accounts?.[3].address,
       );
@@ -1138,6 +1232,19 @@ describe("Exposed Instructions (@solana/kit)", () => {
       expect(Buffer.from(instructions[0].data ?? []).readBigUInt64LE(1)).toBe(
         25n,
       );
+    });
+
+    it("should not prepend refill for public base-to-base transfers even when validator is provided", async () => {
+      const instructions = await transferSpl(from, to, mint, 25n, {
+        visibility: "public",
+        fromBalance: "base",
+        toBalance: "base",
+        validator,
+      });
+
+      expect(instructions).toHaveLength(1);
+      expect(instructions[0].data?.[0]).toBe(3);
+      expect(instructions[0].accounts).toHaveLength(3);
     });
 
     it("should use a normal transfer for public ephemeral-to-ephemeral transfers", async () => {
@@ -1294,6 +1401,48 @@ describe("Exposed Instructions (@solana/kit)", () => {
 
       expect(instruction.accounts?.[8].address).toBe(reimbursementTokenInfo);
     });
+
+    it("should append clientRefId when provided", () => {
+      const instruction = depositAndQueueTransferIx(
+        queue,
+        vault,
+        mint,
+        source,
+        vaultAta,
+        destination,
+        mockAddress,
+        25n,
+        100n,
+        300n,
+        4,
+        source,
+        42n,
+      );
+
+      expect(Array.from(instruction.data ?? [])).toEqual([
+        16,
+        ...Array.from(
+          Buffer.from(
+            [25n, 100n, 300n].flatMap((value) => {
+              const out = Buffer.alloc(8);
+              out.writeBigUInt64LE(value);
+              return Array.from(out);
+            }),
+          ),
+        ),
+        4,
+        0,
+        0,
+        0,
+        ...Array.from(
+          (() => {
+            const out = Buffer.alloc(8);
+            out.writeBigUInt64LE(42n);
+            return out;
+          })(),
+        ),
+      ]);
+    });
   });
 
   describe("undelegateAndCloseShuttleEphemeralAtaIx (Ephemeral SPL Token Program)", () => {
@@ -1374,6 +1523,48 @@ describe("Exposed Instructions (@solana/kit)", () => {
 
       expect(instruction.accounts).toHaveLength(2);
       expect(Array.from(instruction.data ?? [])).toEqual([27]);
+    });
+
+    it("should derive the sponsored refill accounts for processPendingTransferQueueRefillIx", async () => {
+      const [queue] = await deriveTransferQueue(mint, validator);
+      const instruction = await processPendingTransferQueueRefillIx(queue);
+      const [rentPda] = await deriveRentPda();
+      const [refillState] = await getProgramDerivedAddress({
+        programAddress: EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
+        seeds: [Buffer.from("queue-refill"), addressEncoder.encode(queue)],
+      });
+      const [lamportsPda] = await deriveLamportsPda(
+        rentPda,
+        queue,
+        Uint8Array.from(addressEncoder.encode(queue)),
+      );
+
+      expect(instruction.accounts).toHaveLength(11);
+      expect(instruction.accounts?.[0].address).toBe(refillState);
+      expect(instruction.accounts?.[1].address).toBe(queue);
+      expect(instruction.accounts?.[2].address).toBe(rentPda);
+      expect(instruction.accounts?.[3].address).toBe(lamportsPda);
+      expect(instruction.accounts?.[4].address).toBe(
+        EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
+      );
+      expect(instruction.accounts?.[5].address).toBe(
+        await delegateBufferPdaFromDelegatedAccountAndOwnerProgram(
+          lamportsPda,
+          EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
+        ),
+      );
+      expect(instruction.accounts?.[6].address).toBe(
+        await delegationRecordPdaFromDelegatedAccount(lamportsPda),
+      );
+      expect(instruction.accounts?.[7].address).toBe(
+        await delegationMetadataPdaFromDelegatedAccount(lamportsPda),
+      );
+      expect(instruction.accounts?.[8].address).toBe(DELEGATION_PROGRAM_ID);
+      expect(instruction.accounts?.[9].address).toBe(SYSTEM_PROGRAM_ADDRESS);
+      expect(instruction.accounts?.[10].address).toBe(
+        await delegationRecordPdaFromDelegatedAccount(queue),
+      );
+      expect(Array.from(instruction.data ?? [])).toEqual([28]);
     });
   });
 
