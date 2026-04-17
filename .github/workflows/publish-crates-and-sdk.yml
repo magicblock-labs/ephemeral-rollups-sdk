@@ -64,9 +64,78 @@ jobs:
         run: echo "DRY_RUN=true" >> $GITHUB_ENV
         if: github.event_name == 'push' && startsWith(github.ref, 'refs/heads/release/v')
 
+      - name: publish ephemeral-rollups-kit
+        working-directory: ts/kit/
+        run: |
+          PACKAGE_NAME=$(node -p "require('./package.json').name")
+          PACKAGE_VERSION=$(node -p "require('./package.json').version")
+
+          if npm view "${PACKAGE_NAME}@${PACKAGE_VERSION}" version >/dev/null 2>&1; then
+            echo "${PACKAGE_NAME}@${PACKAGE_VERSION} is already published, skipping"
+            exit 0
+          fi
+
+          npm install --global eslint@^8.33.0
+          npm install --legacy-peer-deps
+          npm run build
+          npm test
+          echo "//registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN}" > ~/.npmrc
+          npm set //registry.npmjs.org/:_authToken "${NODE_AUTH_TOKEN}"
+          npm run build && npm run lint:fix
+          if [ "${DRY_RUN}" = "true" ]; then
+            echo "Running npm publish in dry-run mode"
+            npm publish --access public --dry-run
+          else
+            npm publish --access public
+          fi
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          DRY_RUN: ${{ env.DRY_RUN }}
+
+      - name: publish ephemeral-rollups-sdk
+        working-directory: ts/web3js
+        run: |
+          PACKAGE_NAME=$(node -p "require('./package.json').name")
+          PACKAGE_VERSION=$(node -p "require('./package.json').version")
+
+          if npm view "${PACKAGE_NAME}@${PACKAGE_VERSION}" version >/dev/null 2>&1; then
+            echo "${PACKAGE_NAME}@${PACKAGE_VERSION} is already published, skipping"
+            exit 0
+          fi
+
+          npm install --global eslint@^8.33.0
+          npm install --legacy-peer-deps
+          npm run build
+          npm test
+          echo "//registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN}" > ~/.npmrc
+          npm set //registry.npmjs.org/:_authToken "${NODE_AUTH_TOKEN}"
+          npm run build && npm run lint:fix
+          if [ "${DRY_RUN}" = "true" ]; then
+            echo "Running npm publish in dry-run mode"
+            npm publish --access public --dry-run
+          else
+            npm publish --access public
+          fi
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          DRY_RUN: ${{ env.DRY_RUN }}
+
       - name: cargo publish
         working-directory: rust/
         run: |
+          publish_crate() {
+            local manifest_path="$1"
+            local crate_name
+            crate_name=$(sed -n 's/^name = "\(.*\)"/\1/p' "$manifest_path" | head -n 1)
+
+            if cargo search "$crate_name" --limit 1 | grep -F "${crate_name} = \"${CARGO_PACKAGE_VERSION}\"" >/dev/null 2>&1; then
+              echo "${crate_name} ${CARGO_PACKAGE_VERSION} is already published, skipping"
+              return 0
+            fi
+
+            cargo publish $DRY_RUN_FLAG --manifest-path="$manifest_path" --token "$CRATES_TOKEN" $NO_VERIFY_FLAG
+          }
+
           DRY_RUN_FLAG=""
           if [ "${DRY_RUN}" = "true" ]; then
             DRY_RUN_FLAG="--dry-run"
@@ -74,57 +143,21 @@ jobs:
 
           if [ "${DRY_RUN}" = "true" ]; then
             NO_VERIFY_FLAG="--no-verify"
-          fi      
+          fi
 
-          cargo publish $DRY_RUN_FLAG --manifest-path=ephemeral/Cargo.toml --token $CRATES_TOKEN $NO_VERIFY_FLAG
-          cargo publish $DRY_RUN_FLAG --manifest-path=ephemeral-accounts-attribute/Cargo.toml --token $CRATES_TOKEN $NO_VERIFY_FLAG
-          cargo publish $DRY_RUN_FLAG --manifest-path=delegate/Cargo.toml --token $CRATES_TOKEN $NO_VERIFY_FLAG
-          cargo publish $DRY_RUN_FLAG --manifest-path=commit-attribute/Cargo.toml --token $CRATES_TOKEN $NO_VERIFY_FLAG
-          cargo publish $DRY_RUN_FLAG --manifest-path=action-attribute/Cargo.toml --token $CRATES_TOKEN $NO_VERIFY_FLAG
+          CARGO_PACKAGE_VERSION=$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -n 1)
+
+          publish_crate ephemeral/Cargo.toml
+          publish_crate ephemeral-accounts-attribute/Cargo.toml
+          publish_crate delegate/Cargo.toml
+          publish_crate commit-attribute/Cargo.toml
+          publish_crate action-attribute/Cargo.toml
 
           if [ "${DRY_RUN}" != "true" ]; then
-            cargo publish $DRY_RUN_FLAG --manifest-path=sdk/Cargo.toml --token $CRATES_TOKEN $NO_VERIFY_FLAG
-            cargo publish $DRY_RUN_FLAG --manifest-path=resolver/Cargo.toml --token $CRATES_TOKEN $NO_VERIFY_FLAG
-            cargo publish $DRY_RUN_FLAG --manifest-path=pinocchio/Cargo.toml --token $CRATES_TOKEN $NO_VERIFY_FLAG
+            publish_crate sdk/Cargo.toml
+            publish_crate resolver/Cargo.toml
+            publish_crate pinocchio/Cargo.toml
           fi
         env:
           CRATES_TOKEN: ${{ secrets.CRATES_TOKEN }}
           DRY_RUN: ${{ env.DRY_RUN }}
-
-      - name: publish ephemeral-rollups-kit
-        working-directory: ts/kit/
-        run: |
-          npm install --global eslint@^8.33.0
-          npm install --legacy-peer-deps
-          npm run build
-          npm test
-          echo "//registry.npmjs.org/:_authToken=${{ secrets.NPM_TOKEN }}" > ~/.npmrc
-          npm set //registry.npmjs.org/:_authToken ${{ secrets.NPM_TOKEN }}
-          npm run build && npm run lint:fix
-          if [ "${DRY_RUN}" = "true" ]; then
-            echo "Running npm publish in dry-run mode"
-            npm publish --access public --dry-run
-          else
-            npm publish --access public
-          fi
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-
-      - name: publish ephemeral-rollups-sdk
-        working-directory: ts/web3js
-        run: |
-          npm install --global eslint@^8.33.0
-          npm install --legacy-peer-deps
-          npm run build
-          npm test
-          echo "//registry.npmjs.org/:_authToken=${{ secrets.NPM_TOKEN }}" > ~/.npmrc
-          npm set //registry.npmjs.org/:_authToken ${{ secrets.NPM_TOKEN }}
-          npm run build && npm run lint:fix
-          if [ "${DRY_RUN}" = "true" ]; then
-            echo "Running npm publish in dry-run mode"
-            npm publish --access public --dry-run
-          else
-            npm publish --access public
-          fi
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
