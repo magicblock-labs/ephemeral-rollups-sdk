@@ -1,4 +1,5 @@
 export * from "./constants.js";
+export * from "./lookup-table.js";
 export * from "./pda.js";
 export * from "./utils.js";
 export * from "./resolver.js";
