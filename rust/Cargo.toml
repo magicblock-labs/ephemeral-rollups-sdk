@@ -33,7 +33,8 @@ ephemeral-rollups-sdk-attribute-action = { path = "action-attribute", version = 
 
 
 # Magicblock
-magicblock-delegation-program-api = { version = "0.1.1", default-features = false }
+#magicblock-delegation-program-api = { version = "0.1.1", default-features = false }
+magicblock-delegation-program-api = { path = "/Users/snawaz/projects/mb/delegation-program/dlp-api", default-features = false }
 magicblock-magic-program-api = { version = "0.8.5", default-features = false }
 
 ## External crates
