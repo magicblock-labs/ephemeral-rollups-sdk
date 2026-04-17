@@ -39,7 +39,7 @@ solana-program = { workspace = true }
 serde = { workspace = true, default-features = true }
 json = { workspace = true }
 humantime = { workspace = true }
-borsh = { workspace = true } 
+borsh_1_6 = { workspace = true } 
 
 # codec
 base64 = { workspace = true }

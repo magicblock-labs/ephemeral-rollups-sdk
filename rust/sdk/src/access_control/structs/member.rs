@@ -1,21 +1,15 @@
-#[cfg(feature = "anchor")]
-use anchor_lang::prelude::*;
-
-#[cfg(not(feature = "anchor"))]
-use borsh::{BorshDeserialize, BorshSerialize};
+use borsh_1_6::{self as borsh, BorshDeserialize, BorshSerialize};
 
 use crate::solana_compat::solana::Pubkey;
 
-#[cfg_attr(feature = "anchor", derive(AnchorSerialize, AnchorDeserialize))]
-#[cfg_attr(not(feature = "anchor"), derive(BorshSerialize, BorshDeserialize))]
+#[derive(BorshSerialize, BorshDeserialize)]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Member {
     pub flags: u8,
     pub pubkey: Pubkey,
 }
 
-#[cfg_attr(feature = "anchor", derive(AnchorSerialize, AnchorDeserialize))]
-#[cfg_attr(not(feature = "anchor"), derive(BorshSerialize, BorshDeserialize))]
+#[derive(BorshSerialize, BorshDeserialize)]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct MembersArgs {
     pub members: Option<Vec<Member>>,

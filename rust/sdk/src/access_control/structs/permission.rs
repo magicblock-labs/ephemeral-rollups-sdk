@@ -2,16 +2,11 @@ use crate::access_control::structs::Member;
 use crate::consts::PERMISSION_PROGRAM_ID;
 use crate::solana_compat::solana::Pubkey;
 
-#[cfg(feature = "anchor")]
-use anchor_lang::prelude::*;
-
-#[cfg(not(feature = "anchor"))]
-use borsh::{BorshDeserialize, BorshSerialize};
+use borsh_1_6::{self as borsh, BorshDeserialize, BorshSerialize};
 
 pub const PERMISSION_SEED: &[u8] = b"permission:";
 
-#[cfg_attr(feature = "anchor", derive(AnchorSerialize, AnchorDeserialize))]
-#[cfg_attr(not(feature = "anchor"), derive(BorshSerialize, BorshDeserialize))]
+#[derive(BorshSerialize, BorshDeserialize)]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Permission {
     pub discriminator: u8,

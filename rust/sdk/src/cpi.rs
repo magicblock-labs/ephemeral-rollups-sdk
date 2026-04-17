@@ -1,6 +1,6 @@
 use crate::types::DelegateAccountArgs;
 use crate::utils::{close_pda_with_system_transfer, create_pda, seeds_with_bump};
-use borsh::{to_vec, BorshSerialize};
+use borsh_1_6::{self as borsh, to_vec, BorshSerialize};
 use dlp_api::args::{DelegateArgs, DelegateWithActionsArgs, PostDelegationActions};
 use dlp_api::delegate_buffer_seeds_from_delegated_account;
 use dlp_api::discriminator::DlpDiscriminator;

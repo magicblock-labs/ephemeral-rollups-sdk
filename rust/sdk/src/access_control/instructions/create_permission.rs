@@ -1,4 +1,4 @@
-use borsh::{BorshDeserialize, BorshSerialize};
+use borsh_1_6::{self as borsh, BorshDeserialize, BorshSerialize};
 
 use crate::access_control::structs::MembersArgs;
 use crate::access_control::structs::Permission;

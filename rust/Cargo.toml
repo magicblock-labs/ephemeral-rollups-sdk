@@ -33,8 +33,8 @@ ephemeral-rollups-sdk-attribute-action = { path = "action-attribute", version = 
 
 
 # Magicblock
-#magicblock-delegation-program-api = { version = "0.1.1", default-features = false }
-magicblock-delegation-program-api = { path = "/Users/snawaz/projects/mb/delegation-program/dlp-api", default-features = false }
+magicblock-delegation-program-api = { version = "0.3.0", default-features = false }
+#magicblock-delegation-program-api = { path = "/Users/snawaz/projects/mb/delegation-program/dlp-api", default-features = false }
 magicblock-magic-program-api = { version = "0.8.5", default-features = false }
 
 ## External crates
@@ -96,7 +96,7 @@ serde = { version = "1.0", default-features = false, features = ["derive"] }
 serde_with = { version = "3.16" }
 serde_json = { version = "1.0" }
 json = { package = "sonic-rs", version = "0.3" }
-borsh = "1.5.7"
+borsh_1_6 = { package = "borsh", version = "=1.6" }
 humantime = "2.1"
 
 # codec

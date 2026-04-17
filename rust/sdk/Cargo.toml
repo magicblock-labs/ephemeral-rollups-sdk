@@ -41,7 +41,7 @@ serde = []
 
 [dependencies]
 anchor-lang = { workspace = true, optional = true }
-borsh = { workspace = true }
+borsh_1_6 = { workspace = true }
 bincode = { workspace = true }
 ephemeral-rollups-sdk-attribute-delegate = { workspace = true }
 ephemeral-rollups-sdk-attribute-ephemeral = { workspace = true }
