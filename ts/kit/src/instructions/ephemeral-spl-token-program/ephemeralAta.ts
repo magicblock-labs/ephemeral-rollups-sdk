@@ -1849,7 +1849,10 @@ export async function transferSpl(
 
     case "public":
       if (opts.fromBalance === "base" && opts.toBalance === "base") {
-        return [...instructions, createTransferInstruction(fromAta, toAta, from, amount)];
+        return [
+          ...instructions,
+          createTransferInstruction(fromAta, toAta, from, amount),
+        ];
       }
 
       break;
