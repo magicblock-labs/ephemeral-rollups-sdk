@@ -1,3 +1,4 @@
+import { sha512 } from "@noble/hashes/sha2";
 import { getCollateral, verify, Quote } from "@phala/dcap-qvl";
 import * as nacl from "tweetnacl";
 
@@ -20,16 +21,16 @@ interface ErrorResponse {
 }
 
 /**
- * @deprecated Use {@link verifyTeeIntegrity} instead.
- *
- * Verify the integrity of the RPC
+ * Verify the integrity of the RPC by requesting a custom attestation.
+ * Slower than {@link verifyTeeIntegrity} but more secure as it requests
+ * a specific attestation from the secure hardware.
  * @param rpcUrl - The URL of the RPC server
- * @returns True if the quote is valid, false otherwise
+ * @throws If the attestation is invalid
  */
-export async function verifyTeeRpcIntegrity(rpcUrl: string): Promise<boolean> {
+export async function verifyTeeRpcIntegrity(rpcUrl: string): Promise<void> {
   const challengeBytes = Buffer.from(
     Uint8Array.from(
-      Array(32)
+      Array(64)
         .fill(0)
         .map(() => Math.floor(Math.random() * 256)),
     ),
@@ -45,19 +46,36 @@ export async function verifyTeeRpcIntegrity(rpcUrl: string): Promise<boolean> {
   }
 
   const rawQuote = Uint8Array.from(Buffer.from(responseBody.quote, "base64"));
-  return !!(await verifyQuote(rawQuote));
+  const quote = await verifyQuote(rawQuote);
+  if (!quote) {
+    throw new Error("Invalid quote");
+  }
+
+  const td10 = quote.report.asTd10();
+  const td15 = td10 ? null : quote.report.asTd15();
+  const reportData = td10
+    ? Buffer.from(td10.reportData)
+    : td15
+      ? Buffer.from(td15.base.reportData)
+      : null;
+  if (!reportData) {
+    throw new Error("Unsupported quote report format");
+  }
+  if (!reportData.equals(challengeBytes)) {
+    throw new Error("Quote reportData does not match challenge");
+  }
 }
 
 /**
- * Verify the integrity of the RPC
+ * Verify the integrity of the RPC.
+ * Faster than {@link verifyTeeRpcIntegrity} by reusing a cached attestation.
  * @param rpcUrl - The URL of the RPC server
- * @param validatorIdentity - The expected identity of the validator
- * @returns True if the quote is valid, false otherwise
+ * @throws If the attestation is invalid
  */
-export async function verifyTeeIntegrity(rpcUrl: string): Promise<boolean> {
+export async function verifyTeeIntegrity(rpcUrl: string): Promise<void> {
   const challengeBytes = Buffer.from(
     Uint8Array.from(
-      Array(32)
+      Array(64)
         .fill(0)
         .map(() => Math.floor(Math.random() * 256)),
     ),
@@ -79,7 +97,6 @@ export async function verifyTeeIntegrity(rpcUrl: string): Promise<boolean> {
   }
 
   await verifyChallenge(responseBody, quote, challengeBytes);
-  return true;
 }
 
 async function verifyQuote(rawQuote: Uint8Array): Promise<Quote | null> {
@@ -87,18 +104,7 @@ async function verifyQuote(rawQuote: Uint8Array): Promise<Quote | null> {
   const quoteCollateral = await getCollateral(pccsUrl, rawQuote);
   const now = Math.floor(Date.now() / 1000);
 
-  try {
-    verify(rawQuote, quoteCollateral, now);
-  } catch (error) {
-    // Ignore the error if the SEPT_VE_DISABLE is not enabled
-    // The bug has been reported to Azure.
-    if (
-      error instanceof Error &&
-      !error.message.includes("SEPT_VE_DISABLE is not enabled")
-    ) {
-      throw new Error(error.message);
-    }
-  }
+  verify(rawQuote, quoteCollateral, now);
 
   return Quote.parse(rawQuote);
 }
@@ -107,7 +113,7 @@ async function verifyChallenge(
   response: FastQuoteResponse,
   parsedQuote: Quote,
   challengeBytes: Uint8Array,
-): Promise<boolean> {
+): Promise<void> {
   const msgBytes = Buffer.from(response.challenge, "base64");
   if (!msgBytes.equals(Buffer.from(challengeBytes))) {
     throw new Error("Invalid challenge");
@@ -134,12 +140,10 @@ async function verifyChallenge(
     throw new Error(`Invalid reportData length: ${reportData.length}`);
   }
 
-  const hclVarDataSha256 = Buffer.from(response.hclVarDataSha256, "base64");
-  if (!reportData.subarray(0, 32).equals(hclVarDataSha256)) {
+  let pubkeyHash = sha512(Uint8Array.from(pk));
+  if (!reportData.subarray(0, 64).equals(Buffer.from(pubkeyHash))) {
     throw new Error(
-      `Quote reportData mismatch: ${reportData.subarray(0, 32).toString("hex")} !== ${hclVarDataSha256.toString("hex")}`,
+      `Quote reportData mismatch: ${reportData.subarray(0, 64).toString("hex")} !== ${Buffer.from(pubkeyHash).toString("hex")}`,
     );
   }
-
-  return true;
 }
