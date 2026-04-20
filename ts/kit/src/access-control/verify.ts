@@ -51,21 +51,18 @@ export async function verifyTeeRpcIntegrity(rpcUrl: string): Promise<void> {
     throw new Error("Invalid quote");
   }
 
-  let td10 = quote.report.asTd10();
-  let td15 = quote.report.asTd15();
-
-  if (td10) {
-    if (!Buffer.from(td10.reportData).equals(Buffer.from(challengeBytes))) {
-      throw new Error("Invalid quote");
-    }
-  } else if (td15) {
-    if (
-      !Buffer.from(td15.base.reportData).equals(Buffer.from(challengeBytes))
-    ) {
-      throw new Error("Invalid challenge");
-    }
-  } else {
-    throw new Error("Invalid quote");
+  const td10 = quote.report.asTd10();
+  const td15 = td10 ? null : quote.report.asTd15();
+  const reportData = td10
+    ? Buffer.from(td10.reportData)
+    : td15
+      ? Buffer.from(td15.base.reportData)
+      : null;
+  if (!reportData) {
+    throw new Error("Unsupported quote report format");
+  }
+  if (!reportData.equals(challengeBytes)) {
+    throw new Error("Quote reportData does not match challenge");
   }
 }
 
