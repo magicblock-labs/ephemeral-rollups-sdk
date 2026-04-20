@@ -25,9 +25,9 @@ interface ErrorResponse {
  * Slower than {@link verifyTeeIntegrity} but more secure as it requests
  * a specific attestation from the secure hardware.
  * @param rpcUrl - The URL of the RPC server
- * @returns True if the attestation is valid, false otherwise
+ * @throws If the attestation is invalid
  */
-export async function verifyTeeRpcIntegrity(rpcUrl: string): Promise<boolean> {
+export async function verifyTeeRpcIntegrity(rpcUrl: string): Promise<void> {
   const challengeBytes = Buffer.from(
     Uint8Array.from(
       Array(64)
@@ -67,17 +67,15 @@ export async function verifyTeeRpcIntegrity(rpcUrl: string): Promise<boolean> {
   } else {
     throw new Error("Invalid quote");
   }
-
-  return true;
 }
 
 /**
  * Verify the integrity of the RPC.
  * Faster than {@link verifyTeeRpcIntegrity} by reusing a cached attestation.
  * @param rpcUrl - The URL of the RPC server
- * @returns True if the attestation is valid, false otherwise
+ * @throws If the attestation is invalid
  */
-export async function verifyTeeIntegrity(rpcUrl: string): Promise<boolean> {
+export async function verifyTeeIntegrity(rpcUrl: string): Promise<void> {
   const challengeBytes = Buffer.from(
     Uint8Array.from(
       Array(64)
@@ -102,7 +100,6 @@ export async function verifyTeeIntegrity(rpcUrl: string): Promise<boolean> {
   }
 
   await verifyChallenge(responseBody, quote, challengeBytes);
-  return true;
 }
 
 async function verifyQuote(rawQuote: Uint8Array): Promise<Quote | null> {
@@ -119,7 +116,7 @@ async function verifyChallenge(
   response: FastQuoteResponse,
   parsedQuote: Quote,
   challengeBytes: Uint8Array,
-): Promise<boolean> {
+): Promise<void> {
   const msgBytes = Buffer.from(response.challenge, "base64");
   if (!msgBytes.equals(Buffer.from(challengeBytes))) {
     throw new Error("Invalid challenge");
@@ -152,6 +149,4 @@ async function verifyChallenge(
       `Quote reportData mismatch: ${reportData.subarray(0, 64).toString("hex")} !== ${Buffer.from(pubkeyHash).toString("hex")}`,
     );
   }
-
-  return true;
 }
