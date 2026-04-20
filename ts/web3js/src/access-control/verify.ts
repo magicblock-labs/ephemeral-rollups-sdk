@@ -21,11 +21,11 @@ interface ErrorResponse {
 }
 
 /**
- * @deprecated Use {@link verifyTeeIntegrity} instead.
- *
- * Verify the integrity of the RPC
+ * Verify the integrity of the RPC by requesting a custom attestation.
+ * Slower than {@link verifyTeeIntegrity} but more secure as it requests
+ * a specific attestation from the secure hardware.
  * @param rpcUrl - The URL of the RPC server
- * @returns True if the quote is valid, false otherwise
+ * @returns True if the attestation is valid, false otherwise
  */
 export async function verifyTeeRpcIntegrity(rpcUrl: string): Promise<boolean> {
   const challengeBytes = Buffer.from(
@@ -59,7 +59,9 @@ export async function verifyTeeRpcIntegrity(rpcUrl: string): Promise<boolean> {
       throw new Error("Invalid quote");
     }
   } else if (td15) {
-    if (!Buffer.from(td15.base.reportData).equals(Buffer.from(challengeBytes))) {
+    if (
+      !Buffer.from(td15.base.reportData).equals(Buffer.from(challengeBytes))
+    ) {
       throw new Error("Invalid challenge");
     }
   } else {
@@ -70,10 +72,10 @@ export async function verifyTeeRpcIntegrity(rpcUrl: string): Promise<boolean> {
 }
 
 /**
- * Verify the integrity of the RPC
+ * Verify the integrity of the RPC.
+ * Faster than {@link verifyTeeRpcIntegrity} by reusing a cached attestation.
  * @param rpcUrl - The URL of the RPC server
- * @param validatorIdentity - The expected identity of the validator
- * @returns True if the quote is valid, false otherwise
+ * @returns True if the attestation is valid, false otherwise
  */
 export async function verifyTeeIntegrity(rpcUrl: string): Promise<boolean> {
   const challengeBytes = Buffer.from(
