@@ -140,7 +140,7 @@ async function verifyChallenge(
     throw new Error(`Invalid reportData length: ${reportData.length}`);
   }
 
-  let pubkeyHash = sha512(Uint8Array.from(pk));
+  const pubkeyHash = sha512(Uint8Array.from(pk));
   if (!reportData.subarray(0, 64).equals(Buffer.from(pubkeyHash))) {
     throw new Error(
       `Quote reportData mismatch: ${reportData.subarray(0, 64).toString("hex")} !== ${Buffer.from(pubkeyHash).toString("hex")}`,
