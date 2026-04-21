@@ -1,4 +1,5 @@
 import { AccountRole, Signature, TransactionMessage } from "@solana/kit";
+import { postRouterRpc, RouterRpcError } from "./router-rpc";
 
 /**
  * Extracts all writable accounts from a transaction message.
@@ -26,32 +27,53 @@ export function getWritableAccounts(
 }
 
 /**
- * Checks whether a given Solana RPC endpoint supports router methods.
+ * Probes a Solana RPC endpoint to determine whether it implements Magic
+ * Router methods by calling `getBlockhashForAccounts` with an empty account
+ * set.
  *
- * @param clusterUrlHttp - The HTTP endpoint to test.
- * @returns `true` if router support is detected, otherwise `false`.
+ * Classifies the endpoint as non-router when the probe surfaces a
+ * {@link RouterRpcError} that looks semantically like "method not found":
+ *   - the standard JSON-RPC code `-32601`, OR
+ *   - any code whose message matches `/method not found/i` (covers
+ *     providers like Helius that return the same semantic error under a
+ *     non-standard code such as `-32603`, sometimes on a non-2xx HTTP
+ *     response).
+ *
+ * All other failures — transport errors, HTTP errors whose body isn't a
+ * parseable JSON-RPC error, unexpected JSON-RPC codes without the
+ * method-not-found message — rethrow.
+ *
+ * Non-router classification is a latch: once set at construction, the
+ * `Connection` never re-probes. A transient network or server failure during
+ * the probe must therefore propagate rather than collapse into `false`,
+ * otherwise the `Connection` would be permanently mis-classified for its
+ * lifetime.
+ *
+ * @param clusterUrlHttp - The HTTP RPC endpoint to probe.
+ * @returns `true` if the endpoint responds with a valid router result,
+ *          `false` if the method is unsupported.
+ * @throws {RouterRpcError} If the endpoint returns a JSON-RPC error that
+ *                          is neither `-32601` nor carries a "method not
+ *                          found" message.
+ * @throws {Error} On transport failures or HTTP failures whose body cannot
+ *                 be classified as a JSON-RPC error.
  */
 export async function isRouter(clusterUrlHttp: string): Promise<boolean> {
-  const response = await fetch(clusterUrlHttp, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      jsonrpc: "2.0",
-      id: 1,
-      method: "getBlockhashForAccounts",
-      params: [[]],
-    }),
-  });
-
-  const { result } = (await response.json()) as {
-    result: { blockhash: string; lastValidBlockHeight: number };
-  };
-
-  return (
-    result != null &&
-    typeof result.blockhash === "string" &&
-    result.blockhash.length > 0
-  );
+  try {
+    const result = await postRouterRpc<{
+      blockhash: string;
+      lastValidBlockHeight: number;
+    }>(clusterUrlHttp, "getBlockhashForAccounts", [[]]);
+    return typeof result.blockhash === "string" && result.blockhash.length > 0;
+  } catch (err) {
+    if (
+      err instanceof RouterRpcError &&
+      (err.code === -32601 || /method not found/i.test(err.message))
+    ) {
+      return false;
+    }
+    throw err;
+  }
 }
 
 /**
