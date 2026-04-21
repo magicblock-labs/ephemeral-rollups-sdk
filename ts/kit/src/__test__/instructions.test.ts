@@ -708,7 +708,7 @@ describe("Exposed Instructions (@solana/kit)", () => {
       expect(instruction.accounts?.[1].role).toBe(AccountRole.WRITABLE);
     });
 
-    it("should include accounts to commit and undelegate as readonly", () => {
+    it("should include accounts to commit and undelegate as writable", () => {
       const accountsToCommitAndUndelegate: Address[] = [
         "11111111111111111111111111111113" as Address,
         "11111111111111111111111111111114" as Address,
@@ -722,10 +722,30 @@ describe("Exposed Instructions (@solana/kit)", () => {
       expect(instruction.accounts?.[2].address).toBe(
         accountsToCommitAndUndelegate[0],
       );
-      expect(instruction.accounts?.[2].role).toBe(AccountRole.READONLY);
+      expect(instruction.accounts?.[2].role).toBe(AccountRole.WRITABLE);
       expect(instruction.accounts?.[3].address).toBe(
         accountsToCommitAndUndelegate[1],
       );
+      expect(instruction.accounts?.[3].role).toBe(AccountRole.WRITABLE);
+    });
+
+    it("should mark every delegated PDA writable across multiple accounts", () => {
+      const delegatedAccounts: Address[] = [
+        "22222222222222222222222222222222" as Address,
+        "33333333333333333333333333333333" as Address,
+        "44444444444444444444444444444444" as Address,
+      ];
+      const instruction = createCommitAndUndelegateInstruction(
+        mockAddress,
+        delegatedAccounts,
+      );
+
+      expect(instruction.accounts).toHaveLength(5);
+      delegatedAccounts.forEach((_, index) => {
+        expect(instruction.accounts?.[2 + index].role).toBe(
+          AccountRole.WRITABLE,
+        );
+      });
     });
 
     it("should handle single account to commit and undelegate", () => {
