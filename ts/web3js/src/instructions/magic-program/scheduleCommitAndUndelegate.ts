@@ -20,7 +20,7 @@ export function createCommitAndUndelegateInstruction(
     ...accountsToCommitAndUndelegate.map((account) => ({
       pubkey: account,
       isSigner: false,
-      isWritable: false,
+      isWritable: true,
     })),
   ];
 
