@@ -9,23 +9,25 @@
  * error" from "4xx/5xx with JSON-RPC error" if they need to.
  */
 export class RouterRpcError extends Error {
-  /** JSON-RPC method that produced the error. */
   public readonly method: string;
-  /** JSON-RPC error code returned by the Magic Router. */
   public readonly code: number;
-  /** Optional `data` payload attached to the JSON-RPC error, if any. */
   public readonly data?: unknown;
-  /** HTTP status code, set only when the error body rode on a non-2xx response. */
+  /** Set only when the JSON-RPC error body rode on a non-2xx HTTP response. */
   public readonly httpStatus?: number;
 
   constructor(args: {
     method: string;
-    code: number;
+    code: unknown;
     message: string;
     data?: unknown;
     httpStatus?: number;
     cause?: unknown;
   }) {
+    if (typeof args.code !== "number" || !Number.isFinite(args.code)) {
+      throw new Error(
+        `RouterRpcError requires a finite number code; got ${JSON.stringify(args.code)}`,
+      );
+    }
     const statusPrefix =
       args.httpStatus != null ? `HTTP ${args.httpStatus} ` : "";
     super(
@@ -103,17 +105,6 @@ function parseJsonRpcError(bodyText: string): {
  *
  * Requests are bounded by a 10-second timeout to avoid hanging on routers
  * that accept TCP but never respond.
- *
- * @typeParam T - The shape of the `result` field expected from the router.
- * @param url - The HTTP endpoint of the Magic Router.
- * @param method - The JSON-RPC method name to invoke.
- * @param params - The positional parameters to pass to the method.
- * @returns The decoded `result` payload of the JSON-RPC response.
- * @throws {RouterRpcError} If the response body contains a well-formed
- *                          JSON-RPC `error` (regardless of HTTP status).
- * @throws {Error} If a non-2xx response had no parseable JSON-RPC error
- *                 body, if the 2xx body cannot be parsed as JSON, or if a
- *                 2xx body has neither `result` nor `error`.
  */
 export async function postRouterRpc<T>(
   url: string,
@@ -151,7 +142,7 @@ export async function postRouterRpc<T>(
   }
   let body: {
     result?: T;
-    error?: { code: number; message: string; data?: unknown };
+    error?: { code: unknown; message?: unknown; data?: unknown };
   };
   try {
     body = (await res.json()) as typeof body;
@@ -162,17 +153,12 @@ export async function postRouterRpc<T>(
     (wrapped as Error & { cause?: unknown }).cause = err;
     throw wrapped;
   }
-  if (body.error != null) {
+  if (body.error != null && typeof body.error === "object") {
     const { code, message, data } = body.error;
-    if (typeof code !== "number" || !Number.isFinite(code)) {
-      throw new Error(
-        `Magic Router ${method} returned malformed error body: ${JSON.stringify(body.error)}`,
-      );
-    }
     throw new RouterRpcError({
       method,
       code,
-      message: message ?? "<no message>",
+      message: typeof message === "string" ? message : "<no message>",
       data,
     });
   }

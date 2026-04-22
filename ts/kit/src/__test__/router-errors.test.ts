@@ -387,3 +387,147 @@ describe("Connection.create", () => {
     );
   });
 });
+
+describe("postRouterRpc transport errors via getLatestBlockhashForTransaction", () => {
+  it("propagates AbortError (from the 10s timeout) without masking it", async () => {
+    const conn = await buildRouterConnection();
+
+    // `AbortSignal.timeout(10_000)` surfaces as a DOMException("AbortError")
+    // when it fires. Locks in the contract that the timeout isn't silently
+    // dropped — removing the `signal` option would make this test fail.
+    fetchMock.mockRejectedValueOnce(
+      new DOMException("The operation was aborted.", "AbortError"),
+    );
+
+    await expect(
+      conn.getLatestBlockhashForTransaction(txMessage),
+    ).rejects.toThrow(/aborted/i);
+  });
+
+  it("propagates generic transport errors (e.g. ECONNREFUSED)", async () => {
+    const conn = await buildRouterConnection();
+
+    fetchMock.mockRejectedValueOnce(new Error("ECONNREFUSED"));
+
+    await expect(
+      conn.getLatestBlockhashForTransaction(txMessage),
+    ).rejects.toThrow(/ECONNREFUSED/);
+  });
+});
+
+describe("RouterRpcError invariants", () => {
+  it("throws when constructed with NaN code", () => {
+    expect(
+      () =>
+        new RouterRpcError({
+          method: "x",
+          code: Number.NaN,
+          message: "oops",
+        }),
+    ).toThrow(/finite number code/);
+  });
+
+  it("throws when constructed with Infinity code", () => {
+    expect(
+      () =>
+        new RouterRpcError({
+          method: "x",
+          code: Number.POSITIVE_INFINITY,
+          message: "oops",
+        }),
+    ).toThrow(/finite number code/);
+  });
+
+  it("throws when constructed with a non-number code", () => {
+    expect(
+      () =>
+        new RouterRpcError({
+          method: "x",
+          code: "-32601",
+          message: "oops",
+        }),
+    ).toThrow(/finite number code/);
+  });
+});
+
+describe("postRouterRpc lenient parsing (via getLatestBlockhashForTransaction)", () => {
+  it("falls through to plain HTTP error when non-2xx body has error as a string (not an object)", async () => {
+    const conn = await buildRouterConnection();
+
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({ jsonrpc: "2.0", error: "server broken" }, 500),
+    );
+
+    const call = conn.getLatestBlockhashForTransaction(txMessage);
+    await expect(call).rejects.toThrow(/HTTP 500/);
+    await call.catch((err: unknown) => {
+      expect(err).not.toBeInstanceOf(RouterRpcError);
+    });
+  });
+
+  it("falls through to plain HTTP error when non-2xx body has a non-number code (e.g. stringified)", async () => {
+    const conn = await buildRouterConnection();
+
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(
+        { jsonrpc: "2.0", error: { code: "-32601", message: "Method not found" } },
+        500,
+      ),
+    );
+
+    const call = conn.getLatestBlockhashForTransaction(txMessage);
+    await expect(call).rejects.toThrow(/HTTP 500/);
+    await call.catch((err: unknown) => {
+      expect(err).not.toBeInstanceOf(RouterRpcError);
+    });
+  });
+
+  it("surfaces RouterRpcError with <no message> when non-2xx body omits message", async () => {
+    const conn = await buildRouterConnection();
+
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({ jsonrpc: "2.0", error: { code: -32000 } }, 500),
+    );
+
+    const call = conn.getLatestBlockhashForTransaction(txMessage);
+    await expect(call).rejects.toBeInstanceOf(RouterRpcError);
+    await call.catch((err: unknown) => {
+      expect((err as RouterRpcError).code).toBe(-32000);
+      expect((err as RouterRpcError).message).toMatch(/<no message>/);
+    });
+  });
+
+  it("surfaces RouterRpcError with <no message> when 2xx error body omits message", async () => {
+    const conn = await buildRouterConnection();
+
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({ jsonrpc: "2.0", id: 1, error: { code: -32000 } }),
+    );
+
+    const call = conn.getLatestBlockhashForTransaction(txMessage);
+    await expect(call).rejects.toBeInstanceOf(RouterRpcError);
+    await call.catch((err: unknown) => {
+      expect((err as RouterRpcError).message).toMatch(/<no message>/);
+    });
+  });
+
+  it("throws the constructor invariant error when 2xx error body has a non-finite code", async () => {
+    const conn = await buildRouterConnection();
+
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({
+        jsonrpc: "2.0",
+        id: 1,
+        error: { code: "-32601", message: "Method not found" },
+      }),
+    );
+
+    // The constructor rejects non-number codes; the body never yields a
+    // RouterRpcError, but the caller still sees a meaningful error.
+    const call = conn.getLatestBlockhashForTransaction(txMessage);
+    await expect(call).rejects.toThrow(/finite number code/);
+    await call.catch((err: unknown) => {
+      expect(err).not.toBeInstanceOf(RouterRpcError);
+    });
+  });
+});
