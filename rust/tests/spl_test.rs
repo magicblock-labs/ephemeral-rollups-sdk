@@ -14,8 +14,8 @@ mod tests {
     use ephemeral_rollups_sdk::{
         access_control::structs::Permission,
         consts::{
-            ASSOCIATED_TOKEN_PROGRAM_ID, ESPL_TOKEN_PROGRAM_ID, MAGIC_CONTEXT_ID, MAGIC_PROGRAM_ID,
-            PERMISSION_PROGRAM_ID, TOKEN_PROGRAM_ID,
+            ASSOCIATED_TOKEN_PROGRAM_ID, ESPL_TOKEN_PROGRAM_ID, HYDRA_PROGRAM_ID, MAGIC_CONTEXT_ID,
+            MAGIC_PROGRAM_ID, PERMISSION_PROGRAM_ID, TOKEN_PROGRAM_ID,
         },
         spl::{
             builders::{
@@ -28,13 +28,15 @@ mod tests {
                 EnsureTransferQueueCrankBuilder, InitializeEphemeralAtaBuilder,
                 InitializeGlobalVaultBuilder, InitializeTransferQueueBuilder,
                 LamportsDelegatedTransferBuilder, ProcessPendingTransferQueueRefillBuilder,
-                ResetEphemeralAtaPermissionBuilder, UndelegateAndCloseShuttleEphemeralAtaBuilder,
+                ResetEphemeralAtaPermissionBuilder, SchedulePrivateTransferBuilder,
+                SchedulePrivateTransferBuilderError, UndelegateAndCloseShuttleEphemeralAtaBuilder,
                 UndelegateEphemeralAtaBuilder, UndelegateEphemeralAtaPermissionBuilder,
                 WithdrawSplTokensBuilder,
             },
-            find_lamports_pda, find_rent_pda, find_shuttle_ata, find_shuttle_ephemeral_ata,
-            find_shuttle_wallet_ata, find_transfer_queue, find_transfer_queue_refill_state,
-            find_vault_ata, EphemeralAta, EphemeralSplDiscriminator, GlobalVault,
+            find_hydra_crank_pda, find_lamports_pda, find_rent_pda, find_shuttle_ata,
+            find_shuttle_ephemeral_ata, find_shuttle_wallet_ata, find_stash_pda,
+            find_transfer_queue, find_transfer_queue_refill_state, find_vault_ata, EphemeralAta,
+            EphemeralSplDiscriminator, GlobalVault,
         },
     };
     use magicblock_magic_program_api::Pubkey;
@@ -44,6 +46,13 @@ mod tests {
     use sdk::signer::Signer;
     use solana_system_interface::program as system_program;
     use spl_associated_token_account_interface::address::get_associated_token_address;
+
+    fn read_length_prefixed_field(data: &[u8], offset: usize) -> (&[u8], usize) {
+        let len = data[offset] as usize;
+        let start = offset + 1;
+        let end = start + len;
+        (&data[start..end], end)
+    }
 
     #[test]
     fn test_initialize_global_vault() {
@@ -1106,5 +1115,114 @@ mod tests {
         let suffix_len = instruction.data[suffix_offset] as usize;
         assert_eq!(suffix_len, 76);
         assert_eq!(suffix_offset + 1 + suffix_len, instruction.data.len());
+    }
+
+    #[test]
+    fn test_schedule_private_transfer_rejects_zero_split() {
+        let instruction = SchedulePrivateTransferBuilder {
+            user: Pubkey::new_unique(),
+            mint: Pubkey::new_unique(),
+            shuttle_id: 7,
+            destination_owner: Pubkey::new_unique(),
+            min_delay_ms: 100,
+            max_delay_ms: 300,
+            split: 0,
+            validator: Pubkey::new_unique(),
+            client_ref_id: None,
+        }
+        .instruction();
+
+        assert!(matches!(
+            instruction,
+            Err(SchedulePrivateTransferBuilderError::InvalidSplit(0))
+        ));
+    }
+
+    #[cfg(feature = "encryption")]
+    #[test]
+    fn test_schedule_private_transfer_instruction_layout() {
+        let user = Pubkey::new_unique();
+        let mint = Pubkey::new_unique();
+        let destination_owner = Pubkey::new_unique();
+        let validator = Keypair::new().pubkey();
+        let shuttle_id = 7;
+
+        let instruction = SchedulePrivateTransferBuilder {
+            user,
+            mint,
+            shuttle_id,
+            destination_owner,
+            min_delay_ms: 100,
+            max_delay_ms: 300,
+            split: 4,
+            validator,
+            client_ref_id: None,
+        }
+        .instruction()
+        .unwrap();
+
+        let (stash_pda, _) = find_stash_pda(&user, &mint);
+        let (rent_pda, _) = find_rent_pda();
+        let (hydra_crank_pda, _) = find_hydra_crank_pda(&stash_pda, shuttle_id);
+
+        assert_eq!(instruction.program_id, ESPL_TOKEN_PROGRAM_ID);
+        assert_eq!(instruction.accounts.len(), 7);
+        assert_eq!(instruction.accounts[0].pubkey, user);
+        assert!(instruction.accounts[0].is_writable);
+        assert!(instruction.accounts[0].is_signer);
+        assert_eq!(instruction.accounts[1].pubkey, stash_pda);
+        assert_eq!(instruction.accounts[2].pubkey, rent_pda);
+        assert_eq!(instruction.accounts[3].pubkey, hydra_crank_pda);
+        assert_eq!(instruction.accounts[4].pubkey, HYDRA_PROGRAM_ID);
+        assert_eq!(instruction.accounts[5].pubkey, system_program::id());
+        assert_eq!(instruction.accounts[6].pubkey, TOKEN_PROGRAM_ID);
+
+        assert_eq!(
+            instruction.data[0],
+            EphemeralSplDiscriminator::SchedulePrivateTransfer as u8
+        );
+        assert_eq!(
+            u32::from_le_bytes(instruction.data[1..5].try_into().unwrap()),
+            shuttle_id
+        );
+        assert_eq!(&instruction.data[6..38], mint.as_ref());
+
+        let (validator_field, next_offset) = read_length_prefixed_field(&instruction.data, 48);
+        let (destination_field, suffix_offset) =
+            read_length_prefixed_field(&instruction.data, next_offset);
+        let (suffix_field, end_offset) =
+            read_length_prefixed_field(&instruction.data, suffix_offset);
+
+        assert_eq!(validator_field, validator.as_ref());
+        assert_eq!(destination_field.len(), 80);
+        assert_eq!(suffix_field.len(), 68);
+        assert_eq!(end_offset, instruction.data.len());
+    }
+
+    #[cfg(feature = "encryption")]
+    #[test]
+    fn test_schedule_private_transfer_instruction_layout_with_client_ref_id() {
+        let validator = Keypair::new().pubkey();
+
+        let instruction = SchedulePrivateTransferBuilder {
+            user: Pubkey::new_unique(),
+            mint: Pubkey::new_unique(),
+            shuttle_id: 7,
+            destination_owner: Pubkey::new_unique(),
+            min_delay_ms: 100,
+            max_delay_ms: 300,
+            split: 4,
+            validator,
+            client_ref_id: Some(42),
+        }
+        .instruction()
+        .unwrap();
+
+        let (_, next_offset) = read_length_prefixed_field(&instruction.data, 48);
+        let (_, suffix_offset) = read_length_prefixed_field(&instruction.data, next_offset);
+        let (suffix_field, end_offset) =
+            read_length_prefixed_field(&instruction.data, suffix_offset);
+        assert_eq!(suffix_field.len(), 76);
+        assert_eq!(end_offset, instruction.data.len());
     }
 }

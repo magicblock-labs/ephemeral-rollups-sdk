@@ -34,4 +34,5 @@ pub enum EphemeralSplDiscriminator {
     WithdrawThroughDelegatedShuttleWithMerge = 26,
     AllocateTransferQueue = 27,
     ProcessPendingTransferQueueRefill = 28,
+    SchedulePrivateTransfer = 30,
 }

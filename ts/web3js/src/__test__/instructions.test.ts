@@ -1633,9 +1633,7 @@ describe("Exposed Instructions (web3.js)", () => {
   describe("schedulePrivateTransferIx (Ephemeral SPL Token Program)", () => {
     const user = new PublicKey("11111111111111111111111111111113");
     const mint = new PublicKey("11111111111111111111111111111114");
-    const destinationOwner = new PublicKey(
-      "11111111111111111111111111111115",
-    );
+    const destinationOwner = new PublicKey("11111111111111111111111111111115");
     const validator = Keypair.generate().publicKey;
 
     it("should build a 7-account ix with the right layout", () => {
@@ -1725,7 +1723,10 @@ describe("Exposed Instructions (web3.js)", () => {
 
       const data = Buffer.from(instruction.data);
       const [, afterValidator] = readLengthPrefixedField(data, 48);
-      const [, afterDestination] = readLengthPrefixedField(data, afterValidator);
+      const [, afterDestination] = readLengthPrefixedField(
+        data,
+        afterValidator,
+      );
       const [suffixField] = readLengthPrefixedField(data, afterDestination);
       // Suffix plaintext is now 28 bytes (+u64 clientRefId): 32 + 28 + 16 = 76.
       expect(suffixField).toHaveLength(76);

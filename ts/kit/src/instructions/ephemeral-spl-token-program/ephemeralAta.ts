@@ -17,9 +17,6 @@ import {
   AccountInfoBase,
 } from "@solana/kit";
 import { SYSTEM_PROGRAM_ADDRESS } from "@solana-program/system";
-import { blake2b } from "@noble/hashes/blake2b";
-import { edwardsToMontgomeryPub } from "@noble/curves/ed25519";
-import * as nacl from "tweetnacl";
 
 import {
   DELEGATION_PROGRAM_ID,
@@ -40,6 +37,7 @@ import {
   initTransferQueueIx,
   processPendingTransferQueueRefillIx,
 } from "./transferQueue";
+import { encryptEd25519Recipient } from "./crypto";
 
 // SPL Token program IDs
 const U64_ENCODER = getU64Encoder();
@@ -88,35 +86,6 @@ function createTransferInstruction(
     data: encodeAmountInstructionData(3, amount),
     programAddress: TOKEN_PROGRAM_ADDRESS as Address,
   };
-}
-
-function encryptEd25519Recipient(
-  plaintext: Uint8Array,
-  recipient: Address,
-): Buffer {
-  const recipientBytes = getAddressEncoder().encode(recipient);
-  const recipientX25519 = edwardsToMontgomeryPub(
-    new Uint8Array(recipientBytes),
-  );
-  const ephemeral = nacl.box.keyPair();
-  const nonce = blake2b(
-    Buffer.concat([
-      Buffer.from(ephemeral.publicKey),
-      Buffer.from(recipientX25519),
-    ]),
-    { dkLen: nacl.box.nonceLength },
-  );
-  const ciphertext = nacl.box(
-    plaintext,
-    nonce,
-    recipientX25519,
-    ephemeral.secretKey,
-  );
-
-  return Buffer.concat([
-    Buffer.from(ephemeral.publicKey),
-    Buffer.from(ciphertext),
-  ]);
 }
 
 function encodeLengthPrefixedBytes(bytes: Uint8Array): Buffer {
