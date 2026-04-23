@@ -76,17 +76,39 @@ export function deriveStashAta(
 /**
  * Derive the Hydra crank PDA for a schedule.
  *
- * Hydra seed = the stash PDA's raw bytes, so at most one concurrent
- * schedule per `(user, mint)` can exist (a second attempt collides at
- * `hydra::Create`, which is a useful lock against double-scheduling).
+ * The on-chain Hydra seed is `sha256(stashPda || shuttle_id_le)` so each
+ * `(user, mint, shuttleId)` triple gets its own crank. Callers that only
+ * know the user + mint should derive `stashPda` via `deriveStashPda` first.
  */
 export function deriveHydraCrankPda(
   stashPda: PublicKey,
+  shuttleId: number,
 ): [PublicKey, number] {
+  if (
+    !Number.isInteger(shuttleId) ||
+    shuttleId < 0 ||
+    shuttleId > 0xffff_ffff
+  ) {
+    throw new Error("shuttleId must fit in u32");
+  }
   return PublicKey.findProgramAddressSync(
-    [HYDRA_CRANK_SEED_PREFIX, stashPda.toBuffer()],
+    [HYDRA_CRANK_SEED_PREFIX, hydraSeed(stashPda, shuttleId)],
     HYDRA_PROGRAM_ID,
   );
+}
+
+/**
+ * Build the 32-byte Hydra crank seed for `(stashPda, shuttleId)`.
+ *
+ * Must match the on-chain `derive_hydra_seed` exactly: overwrite the
+ * first 4 bytes of the stash PDA with `shuttle_id_le`. No hashing — we
+ * don't need cryptographic uniformity, just a distinct 32-byte output
+ * per tuple.
+ */
+function hydraSeed(stashPda: PublicKey, shuttleId: number): Buffer {
+  const seed = Buffer.from(stashPda.toBuffer()); // 32-byte copy
+  seed.writeUInt32LE(shuttleId, 0);
+  return seed;
 }
 
 // ---------------------------------------------------------------------------
@@ -200,7 +222,7 @@ export function schedulePrivateTransferIx(
   const [vault, globalVaultBump] = deriveVault(mint);
   const [, vaultTokenBump] = deriveAtaWithBump(vault, mint, tokenProgram);
   const [, queueBump] = deriveTransferQueue(mint, validator);
-  const [hydraCrankPda] = deriveHydraCrankPda(stashPda);
+  const [hydraCrankPda] = deriveHydraCrankPda(stashPda, shuttleId);
 
   // -------- build the encrypted payload (same shape as ix 25) --------
   const encryptedDestination = encryptEd25519Recipient(

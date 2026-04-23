@@ -1658,7 +1658,7 @@ describe("Exposed Instructions (web3.js)", () => {
       // Account ordering: user, stash, rent, crank, hydra, system, token.
       const [stashPda] = deriveStashPda(user, mint);
       const [rentPda] = deriveRentPda();
-      const [hydraCrankPda] = deriveHydraCrankPda(stashPda);
+      const [hydraCrankPda] = deriveHydraCrankPda(stashPda, 7);
 
       expect(instruction.keys[0].pubkey.toBase58()).toBe(user.toBase58());
       expect(instruction.keys[0].isSigner).toBe(true);
