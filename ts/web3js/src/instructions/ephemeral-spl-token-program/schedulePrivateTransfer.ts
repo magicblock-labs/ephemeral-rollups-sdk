@@ -3,15 +3,13 @@ import {
   SystemProgram,
   TransactionInstruction,
 } from "@solana/web3.js";
-import { blake2b } from "@noble/hashes/blake2b";
-import { edwardsToMontgomeryPub } from "@noble/curves/ed25519";
-import * as nacl from "tweetnacl";
 
 import {
   DELEGATION_PROGRAM_ID,
   EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
   HYDRA_PROGRAM_ID,
 } from "../../constants.js";
+import { encryptEd25519Recipient } from "./crypto.js";
 import {
   deriveRentPda,
   deriveShuttleAta,
@@ -157,6 +155,14 @@ export function schedulePrivateTransferIx(
   ) {
     throw new Error("delays and clientRefId must be non-negative");
   }
+  const U64_MAX = 0xffff_ffff_ffff_ffffn;
+  if (
+    minDelayMs > U64_MAX ||
+    maxDelayMs > U64_MAX ||
+    (clientRefId !== undefined && clientRefId > U64_MAX)
+  ) {
+    throw new Error("delays and clientRefId must fit in u64");
+  }
   if (maxDelayMs < minDelayMs) {
     throw new Error("maxDelayMs must be greater than or equal to minDelayMs");
   }
@@ -246,7 +252,7 @@ export function schedulePrivateTransferIx(
 }
 
 // ---------------------------------------------------------------------------
-// Internal helpers (vendored to avoid cross-file private imports)
+// Internal helpers
 // ---------------------------------------------------------------------------
 
 function deriveAtaWithBump(
@@ -258,32 +264,6 @@ function deriveAtaWithBump(
     [wallet.toBuffer(), tokenProgram.toBuffer(), mint.toBuffer()],
     ASSOCIATED_TOKEN_PROGRAM_ID,
   );
-}
-
-function encryptEd25519Recipient(
-  plaintext: Uint8Array,
-  recipient: PublicKey,
-): Buffer {
-  const recipientX25519 = edwardsToMontgomeryPub(recipient.toBytes());
-  const ephemeral = nacl.box.keyPair();
-  const nonce = blake2b(
-    Buffer.concat([
-      Buffer.from(ephemeral.publicKey),
-      Buffer.from(recipientX25519),
-    ]),
-    { dkLen: nacl.box.nonceLength },
-  );
-  const ciphertext = nacl.box(
-    plaintext,
-    nonce,
-    recipientX25519,
-    ephemeral.secretKey,
-  );
-
-  return Buffer.concat([
-    Buffer.from(ephemeral.publicKey),
-    Buffer.from(ciphertext),
-  ]);
 }
 
 function encodeLengthPrefixedBytes(bytes: Uint8Array): Buffer {

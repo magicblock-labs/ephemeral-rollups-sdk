@@ -4,9 +4,6 @@ import {
   SystemProgram,
   AccountInfo,
 } from "@solana/web3.js";
-import { blake2b } from "@noble/hashes/blake2b";
-import { edwardsToMontgomeryPub } from "@noble/curves/ed25519";
-import * as nacl from "tweetnacl";
 
 import {
   DELEGATION_PROGRAM_ID,
@@ -28,6 +25,7 @@ import {
   processPendingTransferQueueRefillIx,
   toTransactionInstruction,
 } from "./transferQueue.js";
+import { encryptEd25519Recipient } from "./crypto.js";
 
 // Minimal SPL Token helpers (vendored) to avoid importing @solana/spl-token.
 // This prevents bundlers from pulling transitive deps like spl-token-group and
@@ -120,32 +118,6 @@ function createTransferInstruction(
     keys,
     data,
   });
-}
-
-function encryptEd25519Recipient(
-  plaintext: Uint8Array,
-  recipient: PublicKey,
-): Buffer {
-  const recipientX25519 = edwardsToMontgomeryPub(recipient.toBytes());
-  const ephemeral = nacl.box.keyPair();
-  const nonce = blake2b(
-    Buffer.concat([
-      Buffer.from(ephemeral.publicKey),
-      Buffer.from(recipientX25519),
-    ]),
-    { dkLen: nacl.box.nonceLength },
-  );
-  const ciphertext = nacl.box(
-    plaintext,
-    nonce,
-    recipientX25519,
-    ephemeral.secretKey,
-  );
-
-  return Buffer.concat([
-    Buffer.from(ephemeral.publicKey),
-    Buffer.from(ciphertext),
-  ]);
 }
 
 function encodeLengthPrefixedBytes(bytes: Uint8Array): Buffer {

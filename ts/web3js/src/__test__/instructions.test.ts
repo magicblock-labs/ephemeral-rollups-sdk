@@ -1685,8 +1685,9 @@ describe("Exposed Instructions (web3.js)", () => {
       const data = Buffer.from(instruction.data);
       expect(data[0]).toBe(30); // discriminator
       expect(data.readUInt32LE(1)).toBe(7); // shuttle_id
-      // 10-byte fixed prefix remains after shuttle_id + stash_bump + mint:
-      //   [5..37] mint  [37..47] 10 bumps  → 3 vardata blobs start at 48.
+      // Layout after the discriminator:
+      //   [1..5) shuttle_id  [5] stash_bump  [6..38) mint
+      //   [38..48) 10 bumps  → 3 vardata blobs start at 48.
       expect(data.subarray(6, 38).equals(mint.toBuffer())).toBe(true);
 
       const [validatorField, nextOffset] = readLengthPrefixedField(data, 48);
@@ -1742,7 +1743,7 @@ describe("Exposed Instructions (web3.js)", () => {
           4,
           validator,
         ),
-      ).toThrow();
+      ).toThrowError(/shuttleId must fit in u32/);
     });
 
     it("should reject maxDelayMs < minDelayMs", () => {
@@ -1757,7 +1758,36 @@ describe("Exposed Instructions (web3.js)", () => {
           4,
           validator,
         ),
-      ).toThrow();
+      ).toThrowError(/maxDelayMs must be greater than or equal to minDelayMs/);
+    });
+
+    it("should reject delays and clientRefId that exceed u64", () => {
+      expect(() =>
+        schedulePrivateTransferIx(
+          user,
+          mint,
+          7,
+          destinationOwner,
+          0x1_0000_0000_0000_0000n,
+          300n,
+          4,
+          validator,
+        ),
+      ).toThrowError(/delays and clientRefId must fit in u64/);
+
+      expect(() =>
+        schedulePrivateTransferIx(
+          user,
+          mint,
+          7,
+          destinationOwner,
+          100n,
+          300n,
+          4,
+          validator,
+          0x1_0000_0000_0000_0000n,
+        ),
+      ).toThrowError(/delays and clientRefId must fit in u64/);
     });
   });
 });
