@@ -6,11 +6,13 @@ import {
 } from "@solana/web3.js";
 
 import {
+  ASSOCIATED_TOKEN_PROGRAM_ID,
   DELEGATION_PROGRAM_ID,
   MAGIC_CONTEXT_ID,
   MAGIC_PROGRAM_ID,
   PERMISSION_PROGRAM_ID,
   EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
+  TOKEN_PROGRAM_ID,
 } from "../../constants.js";
 import {
   delegateBufferPdaFromDelegatedAccountAndOwnerProgram,
@@ -31,13 +33,6 @@ import { encryptEd25519Recipient } from "./crypto.js";
 // This prevents bundlers from pulling transitive deps like spl-token-group and
 // also avoids package.exports issues when targeting browsers.
 
-// SPL Token program IDs
-const TOKEN_PROGRAM_ID = new PublicKey(
-  "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
-);
-const ASSOCIATED_TOKEN_PROGRAM_ID = new PublicKey(
-  "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL",
-);
 // Derive the Associated Token Account for a given mint/owner pair. Mirrors the
 // behavior of @solana/spl-token's getAssociatedTokenAddressSync.
 function getAssociatedTokenAddressSync(

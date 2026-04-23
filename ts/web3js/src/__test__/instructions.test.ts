@@ -1635,6 +1635,9 @@ describe("Exposed Instructions (web3.js)", () => {
     const mint = new PublicKey("11111111111111111111111111111114");
     const destinationOwner = new PublicKey("11111111111111111111111111111115");
     const validator = Keypair.generate().publicKey;
+    const tokenProgram = new PublicKey(
+      "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    );
 
     it("should build a 7-account ix with the right layout", () => {
       const instruction = schedulePrivateTransferIx(
@@ -1729,6 +1732,45 @@ describe("Exposed Instructions (web3.js)", () => {
       );
       const [suffixField] = readLengthPrefixedField(data, afterDestination);
       // Suffix plaintext is now 28 bytes (+u64 clientRefId): 32 + 28 + 16 = 76.
+      expect(suffixField).toHaveLength(76);
+    });
+
+    it("should accept a token program override without a clientRefId placeholder", () => {
+      const instruction = schedulePrivateTransferIx(
+        user,
+        mint,
+        7,
+        destinationOwner,
+        100n,
+        300n,
+        4,
+        validator,
+        tokenProgram,
+      );
+
+      expect(instruction.keys[6].pubkey.toBase58()).toBe(tokenProgram.toBase58());
+    });
+
+    it("should still accept both clientRefId and token program override", () => {
+      const instruction = schedulePrivateTransferIx(
+        user,
+        mint,
+        7,
+        destinationOwner,
+        100n,
+        300n,
+        4,
+        validator,
+        42n,
+        tokenProgram,
+      );
+
+      expect(instruction.keys[6].pubkey.toBase58()).toBe(tokenProgram.toBase58());
+
+      const data = Buffer.from(instruction.data);
+      const [, afterValidator] = readLengthPrefixedField(data, 48);
+      const [, afterDestination] = readLengthPrefixedField(data, afterValidator);
+      const [suffixField] = readLengthPrefixedField(data, afterDestination);
       expect(suffixField).toHaveLength(76);
     });
 

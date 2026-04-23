@@ -22,3 +22,11 @@ export const EPHEMERAL_SPL_TOKEN_PROGRAM_ID = new PublicKey(
 export const HYDRA_PROGRAM_ID = new PublicKey(
   "Hydra17i1feui9deaxu6d1TzSQMRNHeBRkDR1Awy7zea",
 );
+
+export const TOKEN_PROGRAM_ID = new PublicKey(
+  "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+);
+
+export const ASSOCIATED_TOKEN_PROGRAM_ID = new PublicKey(
+  "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL",
+);
