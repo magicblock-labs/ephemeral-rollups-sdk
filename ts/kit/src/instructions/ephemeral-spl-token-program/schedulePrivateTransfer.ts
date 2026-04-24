@@ -229,4 +229,3 @@ async function deriveAtaWithBump(
   });
   return [ata, bump];
 }
-
