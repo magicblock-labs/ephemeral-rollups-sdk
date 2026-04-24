@@ -67,12 +67,14 @@ jobs:
         run: |
           npm install
           npm test
+          npm run lint
           npm run build
       - name: npm run build and test web3js
         working-directory: ts/web3js
         run: |
           npm install
           npm test
+          npm run lint
           npm run build
   integration-tests:
     name: Delegation Program Integration Tests (Anchor)

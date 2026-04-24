@@ -5,6 +5,7 @@ use std::sync::Arc;
 use borsh::BorshDeserialize;
 use mdp::state::record::ErRecord;
 use rpc::nonblocking::rpc_client::RpcClient;
+use rpc_api::{client_error::ErrorKind, request::RpcError};
 use sdk::{account::ReadableAccount, pubkey::Pubkey};
 
 use crate::{
@@ -35,10 +36,21 @@ pub async fn fetch_account_state(
     pubkey: Pubkey,
 ) -> ResolverResult<DelegationStatus> {
     let delegation_record = account::delegation_record_pda(&pubkey);
-    let Ok(account) = chain.get_account(&delegation_record).await else {
-        // RpcClient::get_account returns error for non existing accounts,
-        // and non-existent delegation record is tantamount to undelegated state
-        return Ok(DelegationStatus::Undelegated);
+    let account = match chain.get_account(&delegation_record).await {
+        Ok(account) => account,
+        Err(err) => {
+            // A missing delegation record means the account is undelegated.
+            // Other RPC failures must be surfaced instead of silently routing
+            // delegated traffic back to the base chain.
+            match err.kind() {
+                ErrorKind::RpcError(RpcError::ForUser(message))
+                    if message.starts_with("AccountNotFound:") =>
+                {
+                    return Ok(DelegationStatus::Undelegated);
+                }
+                _ => return Err(Box::new(err).into()),
+            }
+        }
     };
     let is_delegated = account.owner == DELEGATION_PROGRAM_ID && account.lamports != 0;
 
