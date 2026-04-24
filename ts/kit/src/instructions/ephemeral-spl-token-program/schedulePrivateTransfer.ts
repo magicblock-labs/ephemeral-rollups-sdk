@@ -55,9 +55,10 @@ export async function deriveStashPda(
 export async function deriveStashAta(
   user: Address,
   mint: Address,
+  tokenProgram: Address = TOKEN_PROGRAM_ADDRESS,
 ): Promise<[Address, number]> {
   const [stashPda] = await deriveStashPda(user, mint);
-  return deriveAtaWithBump(stashPda, mint);
+  return deriveAtaWithBump(stashPda, mint, tokenProgram);
 }
 
 export async function deriveHydraCrankPda(
@@ -96,6 +97,7 @@ export async function schedulePrivateTransferIx(
   split: number,
   validator: Address,
   clientRefId?: bigint,
+  tokenProgram: Address = TOKEN_PROGRAM_ADDRESS,
 ): Promise<Instruction> {
   if (
     !Number.isInteger(shuttleId) ||
@@ -128,7 +130,11 @@ export async function schedulePrivateTransferIx(
 
   const addressEncoder = getAddressEncoder();
   const [stashPda, stashBump] = await deriveStashPda(user, mint);
-  const [, stashAtaBump] = await deriveAtaWithBump(stashPda, mint);
+  const [, stashAtaBump] = await deriveAtaWithBump(
+    stashPda,
+    mint,
+    tokenProgram,
+  );
   const [rentPda] = await deriveRentPda();
   const [shuttleEphemeralAta, shuttleBump] = await deriveShuttleEphemeralAta(
     stashPda,
@@ -142,6 +148,7 @@ export async function schedulePrivateTransferIx(
   const [, shuttleWalletAtaBump] = await deriveAtaWithBump(
     shuttleEphemeralAta,
     mint,
+    tokenProgram,
   );
   const [, bufferBump] = await getProgramDerivedAddress({
     programAddress: EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
@@ -156,7 +163,7 @@ export async function schedulePrivateTransferIx(
     seeds: [DELEGATION_METADATA_SEED, addressEncoder.encode(shuttleAta)],
   });
   const [vault, globalVaultBump] = await deriveVault(mint);
-  const [, vaultTokenBump] = await deriveAtaWithBump(vault, mint);
+  const [, vaultTokenBump] = await deriveAtaWithBump(vault, mint, tokenProgram);
   const [, queueBump] = await deriveTransferQueue(mint, validator);
   const [hydraCrankPda] = await deriveHydraCrankPda(stashPda, shuttleId);
 
@@ -197,7 +204,7 @@ export async function schedulePrivateTransferIx(
       { address: hydraCrankPda, role: AccountRole.WRITABLE },
       { address: HYDRA_PROGRAM_ID, role: AccountRole.READONLY },
       { address: SYSTEM_PROGRAM_ADDRESS, role: AccountRole.READONLY },
-      { address: TOKEN_PROGRAM_ADDRESS, role: AccountRole.READONLY },
+      { address: tokenProgram, role: AccountRole.READONLY },
     ],
     data,
     programAddress: EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
@@ -207,13 +214,14 @@ export async function schedulePrivateTransferIx(
 async function deriveAtaWithBump(
   wallet: Address,
   mint: Address,
+  tokenProgram: Address,
 ): Promise<[Address, number]> {
   const addressEncoder = getAddressEncoder();
   const [ata, bump] = await getProgramDerivedAddress({
     programAddress: ASSOCIATED_TOKEN_PROGRAM_ADDRESS,
     seeds: [
       addressEncoder.encode(wallet),
-      addressEncoder.encode(TOKEN_PROGRAM_ADDRESS),
+      addressEncoder.encode(tokenProgram),
       addressEncoder.encode(mint),
     ],
   });

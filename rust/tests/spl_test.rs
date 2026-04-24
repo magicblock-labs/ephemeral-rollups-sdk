@@ -1129,6 +1129,7 @@ mod tests {
             split: 0,
             validator: Pubkey::new_unique(),
             client_ref_id: None,
+            token_program: TOKEN_PROGRAM_ID,
         }
         .instruction();
 
@@ -1157,6 +1158,7 @@ mod tests {
             split: 4,
             validator,
             client_ref_id: None,
+            token_program: TOKEN_PROGRAM_ID,
         }
         .instruction()
         .unwrap();
@@ -1214,6 +1216,7 @@ mod tests {
             split: 4,
             validator,
             client_ref_id: Some(42),
+            token_program: TOKEN_PROGRAM_ID,
         }
         .instruction()
         .unwrap();

@@ -1,7 +1,5 @@
 use crate::{
-    consts::{
-        ASSOCIATED_TOKEN_PROGRAM_ID, ESPL_TOKEN_PROGRAM_ID, HYDRA_PROGRAM_ID, TOKEN_PROGRAM_ID,
-    },
+    consts::{ASSOCIATED_TOKEN_PROGRAM_ID, ESPL_TOKEN_PROGRAM_ID, HYDRA_PROGRAM_ID},
     solana_compat::solana::{ProgramError, Pubkey},
 };
 use spl_associated_token_account_interface::address::get_associated_token_address;
@@ -98,9 +96,9 @@ pub fn find_stash_pda(user: &Pubkey, mint: &Pubkey) -> (Pubkey, u8) {
     )
 }
 
-pub fn find_stash_ata(user: &Pubkey, mint: &Pubkey) -> (Pubkey, u8) {
+pub fn find_stash_ata(user: &Pubkey, mint: &Pubkey, token_program: &Pubkey) -> (Pubkey, u8) {
     let (stash_pda, _stash_bump) = find_stash_pda(user, mint);
-    find_associated_token_address_with_bump(&stash_pda, mint)
+    find_associated_token_address_with_bump(&stash_pda, mint, token_program)
 }
 
 pub fn find_shuttle_ephemeral_ata(owner: &Pubkey, mint: &Pubkey, shuttle_id: u32) -> (Pubkey, u8) {
@@ -145,9 +143,13 @@ fn hydra_seed(stash_pda: &Pubkey, shuttle_id: u32) -> [u8; 32] {
     seed
 }
 
-fn find_associated_token_address_with_bump(wallet: &Pubkey, mint: &Pubkey) -> (Pubkey, u8) {
+pub(crate) fn find_associated_token_address_with_bump(
+    wallet: &Pubkey,
+    mint: &Pubkey,
+    token_program: &Pubkey,
+) -> (Pubkey, u8) {
     Pubkey::find_program_address(
-        &[wallet.as_ref(), TOKEN_PROGRAM_ID.as_ref(), mint.as_ref()],
+        &[wallet.as_ref(), token_program.as_ref(), mint.as_ref()],
         &ASSOCIATED_TOKEN_PROGRAM_ID,
     )
 }

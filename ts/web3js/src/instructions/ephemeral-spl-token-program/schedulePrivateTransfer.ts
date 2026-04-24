@@ -152,48 +152,9 @@ export function schedulePrivateTransferIx(
   maxDelayMs: bigint,
   split: number,
   validator: PublicKey,
-  tokenProgram?: PublicKey,
-): TransactionInstruction;
-export function schedulePrivateTransferIx(
-  user: PublicKey,
-  mint: PublicKey,
-  shuttleId: number,
-  destinationOwner: PublicKey,
-  minDelayMs: bigint,
-  maxDelayMs: bigint,
-  split: number,
-  validator: PublicKey,
   clientRefId?: bigint,
-  tokenProgram?: PublicKey,
-): TransactionInstruction;
-export function schedulePrivateTransferIx(
-  user: PublicKey,
-  mint: PublicKey,
-  shuttleId: number,
-  destinationOwner: PublicKey,
-  minDelayMs: bigint,
-  maxDelayMs: bigint,
-  split: number,
-  validator: PublicKey,
-  clientRefIdOrTokenProgram?: bigint | PublicKey,
   tokenProgram: PublicKey = TOKEN_PROGRAM_ID,
 ): TransactionInstruction {
-  const clientRefId =
-    typeof clientRefIdOrTokenProgram === "bigint"
-      ? clientRefIdOrTokenProgram
-      : undefined;
-  const resolvedTokenProgram =
-    clientRefIdOrTokenProgram instanceof PublicKey
-      ? clientRefIdOrTokenProgram
-      : tokenProgram;
-
-  if (
-    clientRefIdOrTokenProgram !== undefined &&
-    typeof clientRefIdOrTokenProgram !== "bigint" &&
-    !(clientRefIdOrTokenProgram instanceof PublicKey)
-  ) {
-    throw new Error("clientRefId must be a bigint");
-  }
   if (
     !Number.isInteger(shuttleId) ||
     shuttleId < 0 ||
@@ -225,11 +186,7 @@ export function schedulePrivateTransferIx(
 
   // -------- derive every pubkey + bump ix 25 will need --------
   const [stashPda, stashBump] = deriveStashPda(user, mint);
-  const [, stashAtaBump] = deriveAtaWithBump(
-    stashPda,
-    mint,
-    resolvedTokenProgram,
-  );
+  const [, stashAtaBump] = deriveAtaWithBump(stashPda, mint, tokenProgram);
   const [rentPda] = deriveRentPda();
   const [shuttleEphemeralAta, shuttleBump] = deriveShuttleEphemeralAta(
     stashPda,
@@ -243,7 +200,7 @@ export function schedulePrivateTransferIx(
   const [, shuttleWalletAtaBump] = deriveAtaWithBump(
     shuttleEphemeralAta,
     mint,
-    resolvedTokenProgram,
+    tokenProgram,
   );
   const [, bufferBump] = PublicKey.findProgramAddressSync(
     [BUFFER_SEED, shuttleAta.toBuffer()],
@@ -258,11 +215,7 @@ export function schedulePrivateTransferIx(
     DELEGATION_PROGRAM_ID,
   );
   const [vault, globalVaultBump] = deriveVault(mint);
-  const [, vaultTokenBump] = deriveAtaWithBump(
-    vault,
-    mint,
-    resolvedTokenProgram,
-  );
+  const [, vaultTokenBump] = deriveAtaWithBump(vault, mint, tokenProgram);
   const [, queueBump] = deriveTransferQueue(mint, validator);
   const [hydraCrankPda] = deriveHydraCrankPda(stashPda, shuttleId);
 
@@ -309,7 +262,7 @@ export function schedulePrivateTransferIx(
       { pubkey: hydraCrankPda, isSigner: false, isWritable: true },
       { pubkey: HYDRA_PROGRAM_ID, isSigner: false, isWritable: false },
       { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
-      { pubkey: resolvedTokenProgram, isSigner: false, isWritable: false },
+      { pubkey: tokenProgram, isSigner: false, isWritable: false },
     ],
     data,
   });

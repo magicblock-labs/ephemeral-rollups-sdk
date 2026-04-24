@@ -1735,7 +1735,7 @@ describe("Exposed Instructions (web3.js)", () => {
       expect(suffixField).toHaveLength(76);
     });
 
-    it("should accept a token program override without a clientRefId placeholder", () => {
+    it("should accept a token program override when clientRefId is omitted", () => {
       const instruction = schedulePrivateTransferIx(
         user,
         mint,
@@ -1745,10 +1745,13 @@ describe("Exposed Instructions (web3.js)", () => {
         300n,
         4,
         validator,
+        undefined,
         tokenProgram,
       );
 
-      expect(instruction.keys[6].pubkey.toBase58()).toBe(tokenProgram.toBase58());
+      expect(instruction.keys[6].pubkey.toBase58()).toBe(
+        tokenProgram.toBase58(),
+      );
     });
 
     it("should still accept both clientRefId and token program override", () => {
@@ -1765,11 +1768,16 @@ describe("Exposed Instructions (web3.js)", () => {
         tokenProgram,
       );
 
-      expect(instruction.keys[6].pubkey.toBase58()).toBe(tokenProgram.toBase58());
+      expect(instruction.keys[6].pubkey.toBase58()).toBe(
+        tokenProgram.toBase58(),
+      );
 
       const data = Buffer.from(instruction.data);
       const [, afterValidator] = readLengthPrefixedField(data, 48);
-      const [, afterDestination] = readLengthPrefixedField(data, afterValidator);
+      const [, afterDestination] = readLengthPrefixedField(
+        data,
+        afterValidator,
+      );
       const [suffixField] = readLengthPrefixedField(data, afterDestination);
       expect(suffixField).toHaveLength(76);
     });

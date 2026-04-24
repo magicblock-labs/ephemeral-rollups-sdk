@@ -1,13 +1,13 @@
 use core::fmt;
 
 use crate::{
-    consts::{ESPL_TOKEN_PROGRAM_ID, HYDRA_PROGRAM_ID, TOKEN_PROGRAM_ID},
+    consts::{ESPL_TOKEN_PROGRAM_ID, HYDRA_PROGRAM_ID},
     cpi::DELEGATION_PROGRAM_ID,
     solana_compat::solana::{system_program, AccountMeta, Instruction, Pubkey},
     spl::{
         find_hydra_crank_pda, find_rent_pda, find_shuttle_ata, find_shuttle_ephemeral_ata,
-        find_stash_ata, find_stash_pda, find_transfer_queue, EphemeralSplDiscriminator,
-        GlobalVault,
+        find_stash_ata, find_stash_pda, find_transfer_queue,
+        types::find_associated_token_address_with_bump, EphemeralSplDiscriminator, GlobalVault,
     },
 };
 
@@ -64,6 +64,7 @@ pub struct SchedulePrivateTransferBuilder {
     pub split: u32,
     pub validator: Pubkey,
     pub client_ref_id: Option<u64>,
+    pub token_program: Pubkey,
 }
 
 impl SchedulePrivateTransferBuilder {
@@ -82,13 +83,18 @@ impl SchedulePrivateTransferBuilder {
         }
 
         let (stash_pda, stash_bump) = find_stash_pda(&self.user, &self.mint);
-        let (_stash_ata, stash_ata_bump) = find_stash_ata(&self.user, &self.mint);
+        let (_stash_ata, stash_ata_bump) =
+            find_stash_ata(&self.user, &self.mint, &self.token_program);
         let (rent_pda, _rent_bump) = find_rent_pda();
         let (shuttle_ephemeral_ata, shuttle_bump) =
             find_shuttle_ephemeral_ata(&stash_pda, &self.mint, self.shuttle_id);
         let (shuttle_ata, shuttle_ata_bump) = find_shuttle_ata(&shuttle_ephemeral_ata, &self.mint);
         let (_shuttle_wallet_ata, shuttle_wallet_ata_bump) =
-            find_associated_token_address_with_bump(&shuttle_ephemeral_ata, &self.mint);
+            find_associated_token_address_with_bump(
+                &shuttle_ephemeral_ata,
+                &self.mint,
+                &self.token_program,
+            );
         let (_buffer, buffer_bump) = Pubkey::find_program_address(
             &[BUFFER_SEED, shuttle_ata.as_ref()],
             &ESPL_TOKEN_PROGRAM_ID,
@@ -103,7 +109,7 @@ impl SchedulePrivateTransferBuilder {
         );
         let (vault, global_vault_bump) = GlobalVault::find_pda(&self.mint);
         let (_vault_ata, vault_token_bump) =
-            find_associated_token_address_with_bump(&vault, &self.mint);
+            find_associated_token_address_with_bump(&vault, &self.mint, &self.token_program);
         let (_queue, queue_bump) = find_transfer_queue(&self.mint, &self.validator);
         let (hydra_crank_pda, _hydra_crank_bump) =
             find_hydra_crank_pda(&stash_pda, self.shuttle_id);
@@ -159,19 +165,11 @@ impl SchedulePrivateTransferBuilder {
                 AccountMeta::new(hydra_crank_pda, false),
                 AccountMeta::new_readonly(HYDRA_PROGRAM_ID, false),
                 AccountMeta::new_readonly(system_program::id(), false),
-                AccountMeta::new_readonly(TOKEN_PROGRAM_ID, false),
+                AccountMeta::new_readonly(self.token_program, false),
             ],
             data,
         })
     }
-}
-
-#[inline(always)]
-fn find_associated_token_address_with_bump(wallet: &Pubkey, mint: &Pubkey) -> (Pubkey, u8) {
-    Pubkey::find_program_address(
-        &[wallet.as_ref(), TOKEN_PROGRAM_ID.as_ref(), mint.as_ref()],
-        &crate::consts::ASSOCIATED_TOKEN_PROGRAM_ID,
-    )
 }
 
 #[inline(always)]
