@@ -24,8 +24,6 @@ pub enum SchedulePrivateTransferBuilderError {
     },
     PrivateTransferPayloadTooLong(usize),
     Encryption(dlp_api::encryption::EncryptionError),
-    #[cfg(not(feature = "encryption"))]
-    EncryptionFeatureDisabled,
 }
 
 impl fmt::Display for SchedulePrivateTransferBuilderError {
@@ -43,13 +41,6 @@ impl fmt::Display for SchedulePrivateTransferBuilderError {
                 write!(f, "encrypted private transfer payload exceeds u8 length: {len}")
             }
             Self::Encryption(err) => write!(f, "private transfer encryption failed: {err}"),
-            #[cfg(not(feature = "encryption"))]
-            Self::EncryptionFeatureDisabled => {
-                write!(
-                    f,
-                    "enable the `encryption` feature for encrypted private transfers"
-                )
-            }
         }
     }
 }
@@ -202,7 +193,6 @@ fn push_length_prefixed(
     Ok(())
 }
 
-#[cfg(feature = "encryption")]
 #[inline(always)]
 fn encrypt_private_transfer_field(
     plaintext: &[u8],
@@ -210,13 +200,4 @@ fn encrypt_private_transfer_field(
 ) -> Result<Vec<u8>, SchedulePrivateTransferBuilderError> {
     dlp_api::encryption::encrypt_ed25519_recipient(plaintext, validator.as_array())
         .map_err(SchedulePrivateTransferBuilderError::Encryption)
-}
-
-#[cfg(not(feature = "encryption"))]
-#[inline(always)]
-fn encrypt_private_transfer_field(
-    _plaintext: &[u8],
-    _validator: &Pubkey,
-) -> Result<Vec<u8>, SchedulePrivateTransferBuilderError> {
-    Err(SchedulePrivateTransferBuilderError::EncryptionFeatureDisabled)
 }

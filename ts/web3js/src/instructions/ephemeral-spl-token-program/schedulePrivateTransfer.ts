@@ -71,9 +71,10 @@ export function deriveStashAta(
 /**
  * Derive the Hydra crank PDA for a schedule.
  *
- * The on-chain Hydra seed is `sha256(stashPda || shuttle_id_le)` so each
- * `(user, mint, shuttleId)` triple gets its own crank. Callers that only
- * know the user + mint should derive `stashPda` via `deriveStashPda` first.
+ * The on-chain Hydra seed overwrites the first 4 bytes of `stashPda` with
+ * `shuttle_id_le` so each `(user, mint, shuttleId)` triple gets its own
+ * crank. Callers that only know the user + mint should derive `stashPda`
+ * via `deriveStashPda` first.
  */
 export function deriveHydraCrankPda(
   stashPda: PublicKey,
@@ -172,6 +173,9 @@ export function schedulePrivateTransferIx(
   ) {
     throw new Error("delays and clientRefId must be non-negative");
   }
+  if (maxDelayMs < minDelayMs) {
+    throw new Error("maxDelayMs must be greater than or equal to minDelayMs");
+  }
   const U64_MAX = 0xffff_ffff_ffff_ffffn;
   if (
     minDelayMs > U64_MAX ||
@@ -179,9 +183,6 @@ export function schedulePrivateTransferIx(
     (clientRefId !== undefined && clientRefId > U64_MAX)
   ) {
     throw new Error("delays and clientRefId must fit in u64");
-  }
-  if (maxDelayMs < minDelayMs) {
-    throw new Error("maxDelayMs must be greater than or equal to minDelayMs");
   }
 
   // -------- derive every pubkey + bump ix 25 will need --------

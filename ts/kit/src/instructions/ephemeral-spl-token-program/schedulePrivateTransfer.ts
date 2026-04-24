@@ -22,6 +22,11 @@ import {
   deriveVault,
 } from "./ephemeralAta";
 import { deriveTransferQueue } from "./transferQueue";
+import {
+  encodeLengthPrefixedBytes,
+  packPrivateTransferSuffix,
+  u32leBuffer,
+} from "./wire";
 
 const SCHEDULE_PRIVATE_TRANSFER_DISCRIMINATOR = 30;
 
@@ -113,6 +118,9 @@ export async function schedulePrivateTransferIx(
   ) {
     throw new Error("delays and clientRefId must be non-negative");
   }
+  if (maxDelayMs < minDelayMs) {
+    throw new Error("maxDelayMs must be greater than or equal to minDelayMs");
+  }
   const U64_MAX = 0xffff_ffff_ffff_ffffn;
   if (
     minDelayMs > U64_MAX ||
@@ -120,9 +128,6 @@ export async function schedulePrivateTransferIx(
     (clientRefId !== undefined && clientRefId > U64_MAX)
   ) {
     throw new Error("delays and clientRefId must fit in u64");
-  }
-  if (maxDelayMs < minDelayMs) {
-    throw new Error("maxDelayMs must be greater than or equal to minDelayMs");
   }
 
   const addressEncoder = getAddressEncoder();
@@ -225,33 +230,3 @@ async function deriveAtaWithBump(
   return [ata, bump];
 }
 
-function encodeLengthPrefixedBytes(bytes: Uint8Array): Buffer {
-  if (bytes.length > 0xff) {
-    throw new Error("payload exceeds u8 length");
-  }
-  return Buffer.concat([Buffer.from([bytes.length]), Buffer.from(bytes)]);
-}
-
-function packPrivateTransferSuffix(
-  minDelayMs: bigint,
-  maxDelayMs: bigint,
-  split: number,
-  clientRefId?: bigint,
-): Buffer {
-  const suffix = Buffer.alloc(
-    clientRefId === undefined ? 8 + 8 + 4 : 8 + 8 + 4 + 8,
-  );
-  suffix.writeBigUInt64LE(minDelayMs, 0);
-  suffix.writeBigUInt64LE(maxDelayMs, 8);
-  suffix.writeUInt32LE(split, 16);
-  if (clientRefId !== undefined) {
-    suffix.writeBigUInt64LE(clientRefId, 20);
-  }
-  return suffix;
-}
-
-function u32leBuffer(value: number): Buffer {
-  const out = Buffer.alloc(4);
-  out.writeUInt32LE(value, 0);
-  return out;
-}
