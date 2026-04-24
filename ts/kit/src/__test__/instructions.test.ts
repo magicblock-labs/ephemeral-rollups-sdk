@@ -27,7 +27,6 @@ import {
   delegateSplWithPrivateTransfer,
   delegateTransferQueueIx,
   deriveEphemeralAta,
-  deriveHydraCrankPda,
   deriveLamportsPda,
   deriveTransferQueue,
   deriveRentPda,
@@ -1628,6 +1627,11 @@ describe("Exposed Instructions (@solana/kit)", () => {
     const mint = address("11111111111111111111111111111114");
     const destinationOwner = address("11111111111111111111111111111115");
     const validator = address(bs58.encode(nacl.sign.keyPair().publicKey));
+    // Computed from the Rust SDK's `find_hydra_crank_pda` for
+    // (user, mint, shuttleId) = (...13, ...14, 7).
+    const expectedHydraCrankPda = address(
+      "GLED9jgBhhgFYppfvWXhmbS3nPYUTabmhtFKHX6GjrhT",
+    );
 
     it("should build a 7-account ix with the right layout", async () => {
       const instruction = await schedulePrivateTransferIx(
@@ -1643,7 +1647,6 @@ describe("Exposed Instructions (@solana/kit)", () => {
 
       const [stashPda] = await deriveStashPda(user, mint);
       const [rentPda] = await deriveRentPda();
-      const [hydraCrankPda] = await deriveHydraCrankPda(stashPda, 7);
 
       expect(instruction.programAddress).toBe(EPHEMERAL_SPL_TOKEN_PROGRAM_ID);
       expect(instruction.accounts).toHaveLength(7);
@@ -1660,7 +1663,7 @@ describe("Exposed Instructions (@solana/kit)", () => {
         role: AccountRole.WRITABLE,
       });
       expect(instruction.accounts?.[3]).toEqual({
-        address: hydraCrankPda,
+        address: expectedHydraCrankPda,
         role: AccountRole.WRITABLE,
       });
       expect(instruction.accounts?.[4]).toEqual({
@@ -1760,8 +1763,8 @@ describe("Exposed Instructions (@solana/kit)", () => {
           mint,
           7,
           destinationOwner,
+          0n,
           0x1_0000_0000_0000_0000n,
-          300n,
           4,
           validator,
         ),
