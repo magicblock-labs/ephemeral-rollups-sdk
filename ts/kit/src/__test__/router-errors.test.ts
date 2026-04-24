@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { Connection } from "../connection";
 import * as utils from "../utils";
-import { RouterRpcError } from "../router-rpc";
+import { postRouterRpc, RouterRpcError } from "../router-rpc";
 import * as solanaKit from "@solana/kit";
 
 // This suite exercises the real router RPC error handling in
@@ -415,41 +415,6 @@ describe("postRouterRpc transport errors via getLatestBlockhashForTransaction", 
   });
 });
 
-describe("RouterRpcError invariants", () => {
-  it("throws when constructed with NaN code", () => {
-    expect(
-      () =>
-        new RouterRpcError({
-          method: "x",
-          code: Number.NaN,
-          message: "oops",
-        }),
-    ).toThrow(/finite number code/);
-  });
-
-  it("throws when constructed with Infinity code", () => {
-    expect(
-      () =>
-        new RouterRpcError({
-          method: "x",
-          code: Number.POSITIVE_INFINITY,
-          message: "oops",
-        }),
-    ).toThrow(/finite number code/);
-  });
-
-  it("throws when constructed with a non-number code", () => {
-    expect(
-      () =>
-        new RouterRpcError({
-          method: "x",
-          code: "-32601",
-          message: "oops",
-        }),
-    ).toThrow(/finite number code/);
-  });
-});
-
 describe("postRouterRpc lenient parsing (via getLatestBlockhashForTransaction)", () => {
   it("falls through to plain HTTP error when non-2xx body has error as a string (not an object)", async () => {
     const conn = await buildRouterConnection();
@@ -511,7 +476,7 @@ describe("postRouterRpc lenient parsing (via getLatestBlockhashForTransaction)",
     });
   });
 
-  it("throws the constructor invariant error when 2xx error body has a non-finite code", async () => {
+  it("falls through to 'returned no result' when 2xx body has a non-finite error code and no result", async () => {
     const conn = await buildRouterConnection();
 
     fetchMock.mockResolvedValueOnce(
@@ -522,12 +487,46 @@ describe("postRouterRpc lenient parsing (via getLatestBlockhashForTransaction)",
       }),
     );
 
-    // The constructor rejects non-number codes; the body never yields a
-    // RouterRpcError, but the caller still sees a meaningful error.
+    // Symmetric with the non-2xx path: a malformed JSON-RPC error (non-finite
+    // code) is not surfaced as a typed RouterRpcError. The caller still sees
+    // a meaningful error.
     const call = conn.getLatestBlockhashForTransaction(txMessage);
-    await expect(call).rejects.toThrow(/finite number code/);
+    await expect(call).rejects.toThrow(/returned no result/);
     await call.catch((err: unknown) => {
       expect(err).not.toBeInstanceOf(RouterRpcError);
+    });
+  });
+
+  it("accepts 2xx response with result: null", async () => {
+    // JSON-RPC spec permits `result: null` as a valid success value. The
+    // generic `postRouterRpc<T>` helper must not treat it as an error — that
+    // would block future callers where `null` is a legitimate response.
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({ jsonrpc: "2.0", id: 1, result: null }),
+    );
+
+    await expect(
+      postRouterRpc<null>("http://router.test", "someMethod", []),
+    ).resolves.toBeNull();
+  });
+
+  it("wraps JSON parse failure with cause on 2xx non-JSON body", async () => {
+    const conn = await buildRouterConnection();
+
+    const parseErr = new SyntaxError("Unexpected token o in JSON");
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => {
+        throw parseErr;
+      },
+      text: async () => "<html>oops</html>",
+    });
+
+    const call = conn.getLatestBlockhashForTransaction(txMessage);
+    await expect(call).rejects.toThrow(/non-JSON body/);
+    await call.catch((err: unknown) => {
+      expect((err as Error & { cause?: unknown }).cause).toBe(parseErr);
     });
   });
 });

@@ -17,17 +17,12 @@ export class RouterRpcError extends Error {
 
   constructor(args: {
     method: string;
-    code: unknown;
+    code: number;
     message: string;
     data?: unknown;
     httpStatus?: number;
     cause?: unknown;
   }) {
-    if (typeof args.code !== "number" || !Number.isFinite(args.code)) {
-      throw new Error(
-        `RouterRpcError requires a finite number code; got ${JSON.stringify(args.code)}`,
-      );
-    }
     const statusPrefix =
       args.httpStatus != null ? `HTTP ${args.httpStatus} ` : "";
     super(
@@ -50,23 +45,15 @@ export class RouterRpcError extends Error {
 }
 
 /**
- * Attempts to extract a well-formed JSON-RPC error object from a response
- * body. Returns `null` if the body isn't JSON at all, isn't an object, has
- * no `error` field, or has an `error` field whose `code` isn't a finite
- * number. Intentionally lenient about the `message` field — some providers
- * omit or mistype it — since the code is the load-bearing classifier.
+ * Extracts a well-formed JSON-RPC error from a parsed body. Lenient on
+ * `message` (defaulted when missing), strict on `code` (must be a finite
+ * number) since `code` is the load-bearing classifier.
  */
-function parseJsonRpcError(bodyText: string): {
+function parseJsonRpcErrorFromObject(parsed: unknown): {
   code: number;
   message: string;
   data?: unknown;
 } | null {
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(bodyText);
-  } catch {
-    return null;
-  }
   if (parsed == null || typeof parsed !== "object") {
     return null;
   }
@@ -89,22 +76,27 @@ function parseJsonRpcError(bodyText: string): {
   };
 }
 
+function parseJsonRpcErrorFromText(bodyText: string): {
+  code: number;
+  message: string;
+  data?: unknown;
+} | null {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(bodyText);
+  } catch {
+    return null;
+  }
+  return parseJsonRpcErrorFromObject(parsed);
+}
+
 /**
  * POSTs a JSON-RPC request to a Magic Router endpoint and returns the parsed
- * `result`. Surfaces structured JSON-RPC errors as {@link RouterRpcError}
- * rather than silently swallowing them, so callers can classify failures by
- * `code` and see the upstream message.
- *
- * Parses JSON-RPC error bodies on BOTH 2xx and non-2xx responses: some
- * providers (notably Helius) return HTTP 404 or 500 with a JSON-RPC error
- * body for unsupported methods. Short-circuiting on `!res.ok` before
- * parsing would force callers to string-match the generic HTTP error
- * message instead of classifying by `code`. When the error body rode on a
- * non-2xx response, the thrown {@link RouterRpcError} carries the HTTP
- * status in `httpStatus`.
- *
- * Requests are bounded by a 10-second timeout to avoid hanging on routers
- * that accept TCP but never respond.
+ * `result`. Parses JSON-RPC error bodies on both 2xx and non-2xx responses
+ * because providers such as Helius return HTTP 4xx/5xx with a structured
+ * JSON-RPC error body for unsupported methods — callers must be able to
+ * classify by `code` instead of string-matching HTTP messages. Bounded by a
+ * 10-second timeout.
  */
 export async function postRouterRpc<T>(
   url: string,
@@ -122,11 +114,9 @@ export async function postRouterRpc<T>(
     try {
       bodyText = await res.text();
     } catch {
-      // Losing the body is acceptable; the status code is the load-bearing
-      // signal and is already in the message.
       bodyText = "<unreadable body>";
     }
-    const rpcError = parseJsonRpcError(bodyText);
+    const rpcError = parseJsonRpcErrorFromText(bodyText);
     if (rpcError != null) {
       throw new RouterRpcError({
         method,
@@ -140,12 +130,9 @@ export async function postRouterRpc<T>(
       `Magic Router ${method} HTTP ${res.status}: ${bodyText.slice(0, 2048)}`,
     );
   }
-  let body: {
-    result?: T;
-    error?: { code: unknown; message?: unknown; data?: unknown };
-  };
+  let body: unknown;
   try {
-    body = (await res.json()) as typeof body;
+    body = await res.json();
   } catch (err) {
     const wrapped = new Error(
       `Magic Router ${method} returned non-JSON body: ${(err as Error).message}`,
@@ -153,19 +140,23 @@ export async function postRouterRpc<T>(
     (wrapped as Error & { cause?: unknown }).cause = err;
     throw wrapped;
   }
-  if (body.error != null && typeof body.error === "object") {
-    const { code, message, data } = body.error;
+  const rpcError = parseJsonRpcErrorFromObject(body);
+  if (rpcError != null) {
     throw new RouterRpcError({
       method,
-      code,
-      message: typeof message === "string" ? message : "<no message>",
-      data,
+      code: rpcError.code,
+      message: rpcError.message,
+      data: rpcError.data,
     });
   }
-  if (body.result == null) {
+  if (
+    body == null ||
+    typeof body !== "object" ||
+    !Object.prototype.hasOwnProperty.call(body, "result")
+  ) {
     throw new Error(
       `Magic Router ${method} returned no result: ${JSON.stringify(body)}`,
     );
   }
-  return body.result;
+  return (body as { result: T }).result;
 }
