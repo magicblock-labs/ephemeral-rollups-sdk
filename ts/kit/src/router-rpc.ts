@@ -77,7 +77,7 @@ function parseJsonRpcErrorFromText(bodyText: string): {
   return parseJsonRpcErrorFromObject(parsed);
 }
 
-/** Parses JSON-RPC errors on both 2xx and non-2xx — providers like Helius return HTTP 4xx/5xx with an RPC error body for unsupported methods. */
+/** Providers like Helius return HTTP 4xx/5xx with a JSON-RPC error body for unsupported methods, so we parse error bodies even when !res.ok. */
 export async function postRouterRpc<T>(
   url: string,
   method: string,
@@ -92,7 +92,6 @@ export async function postRouterRpc<T>(
       signal: AbortSignal.timeout(10_000),
     });
   } catch (err) {
-    // AbortSignal.timeout surfaces as `AbortError` on older Node, `TimeoutError` on newer.
     const name = (err as { name?: unknown })?.name;
     if (name === "AbortError" || name === "TimeoutError") {
       const wrapped = new Error(
