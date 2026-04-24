@@ -737,7 +737,7 @@ describe("Exposed Instructions (web3.js)", () => {
       expect(instruction.keys[1].isWritable).toBe(true);
     });
 
-    it("should include accounts to commit and undelegate as readonly", () => {
+    it("should include accounts to commit and undelegate as writable", () => {
       const accountsToCommitAndUndelegate = [
         new PublicKey("11111111111111111111111111111113"),
         new PublicKey("11111111111111111111111111111114"),
@@ -752,10 +752,28 @@ describe("Exposed Instructions (web3.js)", () => {
         accountsToCommitAndUndelegate[0].toBase58(),
       );
       expect(instruction.keys[2].isSigner).toBe(false);
-      expect(instruction.keys[2].isWritable).toBe(false);
+      expect(instruction.keys[2].isWritable).toBe(true);
       expect(instruction.keys[3].pubkey.toBase58()).toBe(
         accountsToCommitAndUndelegate[1].toBase58(),
       );
+      expect(instruction.keys[3].isWritable).toBe(true);
+    });
+
+    it("should mark every delegated PDA writable across multiple accounts", () => {
+      const delegatedAccounts = [
+        new PublicKey("11111111111111111111111111111113"),
+        new PublicKey("11111111111111111111111111111114"),
+        new PublicKey("11111111111111111111111111111115"),
+      ];
+      const instruction = createCommitAndUndelegateInstruction(
+        mockPublicKey,
+        delegatedAccounts,
+      );
+
+      expect(instruction.keys).toHaveLength(5);
+      delegatedAccounts.forEach((_, index) => {
+        expect(instruction.keys[2 + index].isWritable).toBe(true);
+      });
     });
 
     it("should handle single account to commit and undelegate", () => {
