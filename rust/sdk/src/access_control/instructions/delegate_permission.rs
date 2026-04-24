@@ -30,7 +30,7 @@ pub struct DelegatePermission {
 
     pub delegation_program: Pubkey,
 
-    pub validator: Pubkey,
+    pub validator: Option<Pubkey>,
 }
 
 impl DelegatePermission {
@@ -43,7 +43,8 @@ impl DelegatePermission {
         &self,
         remaining_accounts: &[AccountMeta],
     ) -> Instruction {
-        let mut accounts = Vec::with_capacity(11 + remaining_accounts.len());
+        let optional_accounts = if self.validator.is_some() { 1 } else { 0 };
+        let mut accounts = Vec::with_capacity(10 + optional_accounts + remaining_accounts.len());
         accounts.push(AccountMeta::new(self.payer, true));
         accounts.push(AccountMeta::new_readonly(
             self.authority.0,
@@ -60,7 +61,9 @@ impl DelegatePermission {
         accounts.push(AccountMeta::new(self.delegation_record, false));
         accounts.push(AccountMeta::new(self.delegation_metadata, false));
         accounts.push(AccountMeta::new_readonly(self.delegation_program, false));
-        accounts.push(AccountMeta::new_readonly(self.validator, false));
+        if let Some(validator) = self.validator {
+            accounts.push(AccountMeta::new_readonly(validator, false));
+        }
         accounts.extend_from_slice(remaining_accounts);
         let data = DelegatePermissionInstructionData::new()
             .try_to_vec()
@@ -228,7 +231,7 @@ impl DelegatePermissionBuilder {
             delegation_program: self
                 .delegation_program
                 .expect("delegation_program is not set"),
-            validator: self.validator.expect("validator is not set"),
+            validator: self.validator,
         };
 
         accounts.instruction_with_remaining_accounts(&self.__remaining_accounts)
@@ -578,7 +581,7 @@ impl<'a, 'b> DelegatePermissionCpiBuilder<'a, 'b> {
                 .delegation_program
                 .expect("delegation_program is not set"),
 
-            validator: Some(self.instruction.validator.expect("validator is not set")),
+            validator: self.instruction.validator,
         };
         instruction.invoke_signed_with_remaining_accounts(
             signers_seeds,

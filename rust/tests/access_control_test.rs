@@ -5,7 +5,7 @@
 mod tests {
     use ephemeral_rollups_sdk::access_control::instructions::{
         ClosePermissionBuilder, CommitAndUndelegatePermissionBuilder, CommitPermissionBuilder,
-        CreatePermissionBuilder, UpdatePermissionBuilder,
+        CreatePermissionBuilder, DelegatePermissionBuilder, UpdatePermissionBuilder,
     };
     use ephemeral_rollups_sdk::access_control::structs::MembersArgs;
     use ephemeral_rollups_sdk::consts::PERMISSION_PROGRAM_ID;
@@ -155,6 +155,41 @@ mod tests {
         assert_eq!(instruction.accounts.len(), 4); // permissioned_account, permission, payer, system_program
         assert!(instruction.accounts[0].is_signer); // permissioned_account is signer
         assert!(instruction.accounts[2].is_signer); // payer is signer
+    }
+
+    #[test]
+    fn test_delegate_permission_builder_without_validator() {
+        let payer = Pubkey::new_unique();
+        let authority = Pubkey::new_unique();
+        let permissioned_account = Pubkey::new_unique();
+        let permission = Pubkey::new_unique();
+        let system_program = Pubkey::new_unique();
+        let owner_program = Pubkey::new_unique();
+        let delegation_buffer = Pubkey::new_unique();
+        let delegation_record = Pubkey::new_unique();
+        let delegation_metadata = Pubkey::new_unique();
+        let delegation_program = Pubkey::new_unique();
+
+        let mut builder = DelegatePermissionBuilder::new();
+        builder
+            .payer(payer)
+            .authority(authority, true)
+            .permissioned_account(permissioned_account, false)
+            .permission(permission)
+            .system_program(system_program)
+            .owner_program(owner_program)
+            .delegation_buffer(delegation_buffer)
+            .delegation_record(delegation_record)
+            .delegation_metadata(delegation_metadata)
+            .delegation_program(delegation_program)
+            .validator(None);
+
+        let instruction = builder.instruction();
+
+        assert_eq!(instruction.program_id, PERMISSION_PROGRAM_ID);
+        assert_eq!(instruction.accounts.len(), 10);
+        assert_eq!(instruction.accounts[0].pubkey, payer);
+        assert_eq!(instruction.accounts[9].pubkey, delegation_program);
     }
 
     #[test]
