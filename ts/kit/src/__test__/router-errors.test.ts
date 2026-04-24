@@ -389,22 +389,38 @@ describe("Connection.create", () => {
 });
 
 describe("postRouterRpc transport errors via getLatestBlockhashForTransaction", () => {
-  it("propagates AbortError (from the 10s timeout) without masking it", async () => {
+  it("wraps AbortError (from the 10s timeout) with method context and preserves cause", async () => {
     const conn = await buildRouterConnection();
 
-    // `AbortSignal.timeout(10_000)` surfaces as a DOMException("AbortError")
-    // when it fires. Locks in the contract that the timeout isn't silently
-    // dropped — removing the `signal` option would make this test fail.
-    fetchMock.mockRejectedValueOnce(
-      new DOMException("The operation was aborted.", "AbortError"),
+    const abortErr = new DOMException(
+      "The operation was aborted.",
+      "AbortError",
     );
+    fetchMock.mockRejectedValueOnce(abortErr);
 
-    await expect(
-      conn.getLatestBlockhashForTransaction(txMessage),
-    ).rejects.toThrow(/aborted/i);
+    const call = conn.getLatestBlockhashForTransaction(txMessage);
+    await expect(call).rejects.toThrow(
+      /Magic Router getBlockhashForAccounts timed out after 10s/,
+    );
+    await call.catch((err: unknown) => {
+      expect((err as Error & { cause?: unknown }).cause).toBe(abortErr);
+    });
   });
 
-  it("propagates generic transport errors (e.g. ECONNREFUSED)", async () => {
+  it("wraps TimeoutError (newer runtimes) with the same shape as AbortError", async () => {
+    const conn = await buildRouterConnection();
+
+    const timeoutErr = new DOMException("Timed out.", "TimeoutError");
+    fetchMock.mockRejectedValueOnce(timeoutErr);
+
+    const call = conn.getLatestBlockhashForTransaction(txMessage);
+    await expect(call).rejects.toThrow(/timed out after 10s/);
+    await call.catch((err: unknown) => {
+      expect((err as Error & { cause?: unknown }).cause).toBe(timeoutErr);
+    });
+  });
+
+  it("propagates generic transport errors (e.g. ECONNREFUSED) unchanged", async () => {
     const conn = await buildRouterConnection();
 
     fetchMock.mockRejectedValueOnce(new Error("ECONNREFUSED"));
@@ -412,6 +428,28 @@ describe("postRouterRpc transport errors via getLatestBlockhashForTransaction", 
     await expect(
       conn.getLatestBlockhashForTransaction(txMessage),
     ).rejects.toThrow(/ECONNREFUSED/);
+  });
+
+  it("attaches text-read error as cause when non-2xx body cannot be read", async () => {
+    const conn = await buildRouterConnection();
+
+    const readErr = new Error("stream closed");
+    fetchMock.mockResolvedValueOnce({
+      ok: false,
+      status: 502,
+      json: async () => {
+        throw new Error("not json");
+      },
+      text: async () => {
+        throw readErr;
+      },
+    });
+
+    const call = conn.getLatestBlockhashForTransaction(txMessage);
+    await expect(call).rejects.toThrow(/HTTP 502/);
+    await call.catch((err: unknown) => {
+      expect((err as Error & { cause?: unknown }).cause).toBe(readErr);
+    });
   });
 });
 

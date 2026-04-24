@@ -103,17 +103,35 @@ export async function postRouterRpc<T>(
   method: string,
   params: unknown[],
 ): Promise<T> {
-  const res = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }),
-    signal: AbortSignal.timeout(10_000),
-  });
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }),
+      signal: AbortSignal.timeout(10_000),
+    });
+  } catch (err) {
+    // AbortSignal.timeout surfaces as `AbortError` on Node <20 and
+    // `TimeoutError` on newer runtimes; wrap both to preserve the "which
+    // method timed out" signal while keeping other transport errors raw.
+    const name = (err as { name?: unknown })?.name;
+    if (name === "AbortError" || name === "TimeoutError") {
+      const wrapped = new Error(
+        `Magic Router ${method} timed out after 10s`,
+      );
+      (wrapped as Error & { cause?: unknown }).cause = err;
+      throw wrapped;
+    }
+    throw err;
+  }
   if (!res.ok) {
     let bodyText: string;
+    let readErr: unknown;
     try {
       bodyText = await res.text();
-    } catch {
+    } catch (err) {
+      readErr = err;
       bodyText = "<unreadable body>";
     }
     const rpcError = parseJsonRpcErrorFromText(bodyText);
@@ -126,9 +144,13 @@ export async function postRouterRpc<T>(
         httpStatus: res.status,
       });
     }
-    throw new Error(
+    const httpError = new Error(
       `Magic Router ${method} HTTP ${res.status}: ${bodyText.slice(0, 2048)}`,
     );
+    if (readErr != null) {
+      (httpError as Error & { cause?: unknown }).cause = readErr;
+    }
+    throw httpError;
   }
   let body: unknown;
   try {
