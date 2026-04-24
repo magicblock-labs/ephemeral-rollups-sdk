@@ -27,36 +27,8 @@ export function getWritableAccounts(
 }
 
 /**
- * Probes a Solana RPC endpoint to determine whether it implements Magic
- * Router methods by calling `getBlockhashForAccounts` with an empty account
- * set.
- *
- * Classifies the endpoint as non-router when the probe surfaces a
- * {@link RouterRpcError} that looks semantically like "method not found":
- *   - the standard JSON-RPC code `-32601`, OR
- *   - any code whose message matches `/method not found/i` (covers
- *     providers like Helius that return the same semantic error under a
- *     non-standard code such as `-32603`, sometimes on a non-2xx HTTP
- *     response).
- *
- * All other failures — transport errors, HTTP errors whose body isn't a
- * parseable JSON-RPC error, unexpected JSON-RPC codes without the
- * method-not-found message — rethrow.
- *
- * Non-router classification is a latch: once set at construction, the
- * `Connection` never re-probes. A transient network or server failure during
- * the probe must therefore propagate rather than collapse into `false`,
- * otherwise the `Connection` would be permanently mis-classified for its
- * lifetime.
- *
- * @param clusterUrlHttp - The HTTP RPC endpoint to probe.
- * @returns `true` if the endpoint responds with a valid router result,
- *          `false` if the method is unsupported.
- * @throws {RouterRpcError} If the endpoint returns a JSON-RPC error that
- *                          is neither `-32601` nor carries a "method not
- *                          found" message.
- * @throws {Error} On transport failures or HTTP failures whose body cannot
- *                 be classified as a JSON-RPC error.
+ * Result is latched by Connection; transient probe failures must propagate, not collapse to `false`.
+ * Also matches `/method not found/i` to classify providers like Helius that use `-32603` for this case.
  */
 export async function isRouter(clusterUrlHttp: string): Promise<boolean> {
   try {

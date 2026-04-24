@@ -1,13 +1,4 @@
-/**
- * Error thrown when a Magic Router responds with a structured JSON-RPC
- * `error` body. Exposes the upstream `method`, `code`, and optional `data`
- * so callers can classify failures without parsing the error message string.
- *
- * When the JSON-RPC error body rode on a non-2xx HTTP response (as some RPC
- * providers, e.g. Helius, return for unsupported methods), `httpStatus`
- * records the status code so callers can distinguish "2xx with JSON-RPC
- * error" from "4xx/5xx with JSON-RPC error" if they need to.
- */
+/** Structured JSON-RPC error from a Magic Router response. */
 export class RouterRpcError extends Error {
   public readonly method: string;
   public readonly code: number;
@@ -44,11 +35,7 @@ export class RouterRpcError extends Error {
   }
 }
 
-/**
- * Extracts a well-formed JSON-RPC error from a parsed body. Lenient on
- * `message` (defaulted when missing), strict on `code` (must be a finite
- * number) since `code` is the load-bearing classifier.
- */
+/** Lenient on `message`, strict on `code` — `code` is the load-bearing classifier. */
 function parseJsonRpcErrorFromObject(parsed: unknown): {
   code: number;
   message: string;
@@ -90,14 +77,7 @@ function parseJsonRpcErrorFromText(bodyText: string): {
   return parseJsonRpcErrorFromObject(parsed);
 }
 
-/**
- * POSTs a JSON-RPC request to a Magic Router endpoint and returns the parsed
- * `result`. Parses JSON-RPC error bodies on both 2xx and non-2xx responses
- * because providers such as Helius return HTTP 4xx/5xx with a structured
- * JSON-RPC error body for unsupported methods — callers must be able to
- * classify by `code` instead of string-matching HTTP messages. Bounded by a
- * 10-second timeout.
- */
+/** Parses JSON-RPC errors on both 2xx and non-2xx — providers like Helius return HTTP 4xx/5xx with an RPC error body for unsupported methods. */
 export async function postRouterRpc<T>(
   url: string,
   method: string,
@@ -112,9 +92,7 @@ export async function postRouterRpc<T>(
       signal: AbortSignal.timeout(10_000),
     });
   } catch (err) {
-    // AbortSignal.timeout surfaces as `AbortError` on Node <20 and
-    // `TimeoutError` on newer runtimes; wrap both to preserve the "which
-    // method timed out" signal while keeping other transport errors raw.
+    // AbortSignal.timeout surfaces as `AbortError` on older Node, `TimeoutError` on newer.
     const name = (err as { name?: unknown })?.name;
     if (name === "AbortError" || name === "TimeoutError") {
       const wrapped = new Error(
