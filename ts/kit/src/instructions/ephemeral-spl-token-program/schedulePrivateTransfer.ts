@@ -8,9 +8,11 @@ import {
 import { SYSTEM_PROGRAM_ADDRESS } from "@solana-program/system";
 
 import {
+  ASSOCIATED_TOKEN_PROGRAM_ID,
   DELEGATION_PROGRAM_ID,
   EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
   HYDRA_PROGRAM_ID,
+  TOKEN_PROGRAM_ID,
 } from "../../constants";
 import { encryptEd25519Recipient } from "./crypto";
 import {
@@ -31,11 +33,6 @@ const DELEGATION_METADATA_SEED = new TextEncoder().encode(
   "delegation-metadata",
 );
 
-const TOKEN_PROGRAM_ADDRESS =
-  "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA" as Address;
-const ASSOCIATED_TOKEN_PROGRAM_ADDRESS =
-  "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL" as Address;
-
 export async function deriveStashPda(
   user: Address,
   mint: Address,
@@ -55,7 +52,7 @@ export async function deriveStashPda(
 export async function deriveStashAta(
   user: Address,
   mint: Address,
-  tokenProgram: Address = TOKEN_PROGRAM_ADDRESS,
+  tokenProgram: Address = TOKEN_PROGRAM_ID,
 ): Promise<[Address, number]> {
   const [stashPda] = await deriveStashPda(user, mint);
   return deriveAtaWithBump(stashPda, mint, tokenProgram);
@@ -96,8 +93,8 @@ export async function schedulePrivateTransferIx(
   maxDelayMs: bigint,
   split: number,
   validator: Address,
+  tokenProgram: Address = TOKEN_PROGRAM_ID,
   clientRefId?: bigint,
-  tokenProgram: Address = TOKEN_PROGRAM_ADDRESS,
 ): Promise<Instruction> {
   if (
     !Number.isInteger(shuttleId) ||
@@ -107,7 +104,7 @@ export async function schedulePrivateTransferIx(
     throw new Error("shuttleId must fit in u32");
   }
   if (!Number.isInteger(split) || split <= 0 || split > 0xffff_ffff) {
-    throw new Error("split must fit in u32");
+    throw new Error("split must be a positive u32");
   }
   if (
     minDelayMs < 0n ||
@@ -218,7 +215,7 @@ async function deriveAtaWithBump(
 ): Promise<[Address, number]> {
   const addressEncoder = getAddressEncoder();
   const [ata, bump] = await getProgramDerivedAddress({
-    programAddress: ASSOCIATED_TOKEN_PROGRAM_ADDRESS,
+    programAddress: ASSOCIATED_TOKEN_PROGRAM_ID,
     seeds: [
       addressEncoder.encode(wallet),
       addressEncoder.encode(tokenProgram),

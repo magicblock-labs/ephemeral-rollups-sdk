@@ -22,3 +22,11 @@ export const EPHEMERAL_SPL_TOKEN_PROGRAM_ID = address(
 export const HYDRA_PROGRAM_ID = address(
   "Hydra17i1feui9deaxu6d1TzSQMRNHeBRkDR1Awy7zea",
 );
+
+export const TOKEN_PROGRAM_ID = address(
+  "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+);
+
+export const ASSOCIATED_TOKEN_PROGRAM_ID = address(
+  "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL",
+);

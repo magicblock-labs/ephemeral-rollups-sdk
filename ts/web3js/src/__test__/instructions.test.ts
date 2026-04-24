@@ -1721,6 +1721,7 @@ describe("Exposed Instructions (web3.js)", () => {
         300n,
         4,
         validator,
+        undefined,
         42n,
       );
 
@@ -1745,7 +1746,6 @@ describe("Exposed Instructions (web3.js)", () => {
         300n,
         4,
         validator,
-        undefined,
         tokenProgram,
       );
 
@@ -1764,8 +1764,8 @@ describe("Exposed Instructions (web3.js)", () => {
         300n,
         4,
         validator,
-        42n,
         tokenProgram,
+        42n,
       );
 
       expect(instruction.keys[6].pubkey.toBase58()).toBe(
@@ -1836,6 +1836,7 @@ describe("Exposed Instructions (web3.js)", () => {
           300n,
           4,
           validator,
+          undefined,
           0x1_0000_0000_0000_0000n,
         ),
       ).toThrowError(/delays and clientRefId must fit in u64/);

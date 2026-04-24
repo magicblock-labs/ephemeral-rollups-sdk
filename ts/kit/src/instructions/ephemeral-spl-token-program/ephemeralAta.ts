@@ -19,11 +19,13 @@ import {
 import { SYSTEM_PROGRAM_ADDRESS } from "@solana-program/system";
 
 import {
+  ASSOCIATED_TOKEN_PROGRAM_ID,
   DELEGATION_PROGRAM_ID,
   MAGIC_CONTEXT_ID,
   MAGIC_PROGRAM_ID,
   PERMISSION_PROGRAM_ID,
   EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
+  TOKEN_PROGRAM_ID,
 } from "../../constants";
 import {
   delegateBufferPdaFromDelegatedAccountAndOwnerProgram,
@@ -39,13 +41,7 @@ import {
 } from "./transferQueue";
 import { encryptEd25519Recipient } from "./crypto";
 
-// SPL Token program IDs
 const U64_ENCODER = getU64Encoder();
-
-const TOKEN_PROGRAM_ADDRESS =
-  "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA" as const;
-const ASSOCIATED_TOKEN_PROGRAM_ADDRESS =
-  "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL" as const;
 /**
  * Derive the Associated Token Account for a given mint/owner pair.
  * Mirrors the behavior of @solana/spl-token's getAssociatedTokenAddressSync.
@@ -61,10 +57,10 @@ async function getAssociatedTokenAddressSync(
 ): Promise<Address> {
   const addressEncoder = getAddressEncoder();
   const [ata] = await getProgramDerivedAddress({
-    programAddress: ASSOCIATED_TOKEN_PROGRAM_ADDRESS as Address,
+    programAddress: ASSOCIATED_TOKEN_PROGRAM_ID,
     seeds: [
       addressEncoder.encode(owner),
-      addressEncoder.encode(TOKEN_PROGRAM_ADDRESS as Address),
+      addressEncoder.encode(TOKEN_PROGRAM_ID),
       addressEncoder.encode(mint),
     ],
   });
@@ -84,7 +80,7 @@ function createTransferInstruction(
       { address: owner, role: AccountRole.READONLY_SIGNER },
     ],
     data: encodeAmountInstructionData(3, amount),
-    programAddress: TOKEN_PROGRAM_ADDRESS as Address,
+    programAddress: TOKEN_PROGRAM_ID,
   };
 }
 
@@ -438,10 +434,10 @@ export function initVaultAtaIx(
       { address: vault, role: AccountRole.READONLY },
       { address: mint, role: AccountRole.READONLY },
       { address: SYSTEM_PROGRAM_ADDRESS, role: AccountRole.READONLY },
-      { address: TOKEN_PROGRAM_ADDRESS as Address, role: AccountRole.READONLY },
+      { address: TOKEN_PROGRAM_ID, role: AccountRole.READONLY },
     ],
     data: new Uint8Array([1]),
-    programAddress: ASSOCIATED_TOKEN_PROGRAM_ADDRESS as Address,
+    programAddress: ASSOCIATED_TOKEN_PROGRAM_ID,
   };
 }
 
@@ -468,9 +464,9 @@ export function initVaultIx(
       { address: mint, role: AccountRole.READONLY },
       { address: vaultEphemeralAta, role: AccountRole.WRITABLE },
       { address: vaultAta, role: AccountRole.WRITABLE },
-      { address: TOKEN_PROGRAM_ADDRESS as Address, role: AccountRole.READONLY },
+      { address: TOKEN_PROGRAM_ID, role: AccountRole.READONLY },
       {
-        address: ASSOCIATED_TOKEN_PROGRAM_ADDRESS as Address,
+        address: ASSOCIATED_TOKEN_PROGRAM_ID,
         role: AccountRole.READONLY,
       },
       { address: SYSTEM_PROGRAM_ADDRESS, role: AccountRole.READONLY },
@@ -526,7 +522,7 @@ export function transferToVaultIx(
       { address: sourceAta, role: AccountRole.WRITABLE },
       { address: vaultAta, role: AccountRole.WRITABLE },
       { address: owner, role: AccountRole.READONLY_SIGNER },
-      { address: TOKEN_PROGRAM_ADDRESS as Address, role: AccountRole.READONLY },
+      { address: TOKEN_PROGRAM_ID, role: AccountRole.READONLY },
     ],
     data: encodeAmountInstructionData(2, amount),
     programAddress: EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
@@ -625,9 +621,9 @@ export function initShuttleEphemeralAtaIx(
       { address: shuttleWalletAta, role: AccountRole.WRITABLE },
       { address: owner, role: AccountRole.READONLY },
       { address: mint, role: AccountRole.READONLY },
-      { address: TOKEN_PROGRAM_ADDRESS as Address, role: AccountRole.READONLY },
+      { address: TOKEN_PROGRAM_ID, role: AccountRole.READONLY },
       {
-        address: ASSOCIATED_TOKEN_PROGRAM_ADDRESS as Address,
+        address: ASSOCIATED_TOKEN_PROGRAM_ID,
         role: AccountRole.READONLY,
       },
       { address: SYSTEM_PROGRAM_ADDRESS, role: AccountRole.READONLY },
@@ -765,13 +761,13 @@ export async function setupAndDelegateShuttleEphemeralAtaWithMergeIx(
       { address: delegationMetadata, role: AccountRole.WRITABLE },
       { address: DELEGATION_PROGRAM_ID, role: AccountRole.READONLY },
       {
-        address: ASSOCIATED_TOKEN_PROGRAM_ADDRESS as Address,
+        address: ASSOCIATED_TOKEN_PROGRAM_ID,
         role: AccountRole.READONLY,
       },
       { address: SYSTEM_PROGRAM_ADDRESS, role: AccountRole.READONLY },
       { address: destinationAta, role: AccountRole.WRITABLE },
       { address: mint, role: AccountRole.READONLY },
-      { address: TOKEN_PROGRAM_ADDRESS as Address, role: AccountRole.READONLY },
+      { address: TOKEN_PROGRAM_ID, role: AccountRole.READONLY },
       { address: vault, role: AccountRole.READONLY },
       { address: sourceAta, role: AccountRole.WRITABLE },
       { address: vaultAta, role: AccountRole.WRITABLE },
@@ -891,12 +887,12 @@ export async function depositAndDelegateShuttleEphemeralAtaWithMergeAndPrivateTr
       { address: delegationMetadata, role: AccountRole.WRITABLE },
       { address: DELEGATION_PROGRAM_ID, role: AccountRole.READONLY },
       {
-        address: ASSOCIATED_TOKEN_PROGRAM_ADDRESS as Address,
+        address: ASSOCIATED_TOKEN_PROGRAM_ID,
         role: AccountRole.READONLY,
       },
       { address: SYSTEM_PROGRAM_ADDRESS, role: AccountRole.READONLY },
       { address: mint, role: AccountRole.READONLY },
-      { address: TOKEN_PROGRAM_ADDRESS as Address, role: AccountRole.READONLY },
+      { address: TOKEN_PROGRAM_ID, role: AccountRole.READONLY },
       { address: vault, role: AccountRole.READONLY },
       { address: sourceAta, role: AccountRole.WRITABLE },
       { address: vaultAta, role: AccountRole.WRITABLE },
@@ -969,13 +965,13 @@ export async function withdrawThroughDelegatedShuttleWithMergeIx(
       { address: delegationMetadata, role: AccountRole.WRITABLE },
       { address: DELEGATION_PROGRAM_ID, role: AccountRole.READONLY },
       {
-        address: ASSOCIATED_TOKEN_PROGRAM_ADDRESS as Address,
+        address: ASSOCIATED_TOKEN_PROGRAM_ID,
         role: AccountRole.READONLY,
       },
       { address: SYSTEM_PROGRAM_ADDRESS, role: AccountRole.READONLY },
       { address: ownerAta, role: AccountRole.WRITABLE },
       { address: mint, role: AccountRole.READONLY },
-      { address: TOKEN_PROGRAM_ADDRESS as Address, role: AccountRole.READONLY },
+      { address: TOKEN_PROGRAM_ID, role: AccountRole.READONLY },
     ],
     data,
     programAddress: EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
@@ -1074,7 +1070,7 @@ export function mergeShuttleIntoAtaIx(
       { address: shuttleEphemeralAta, role: AccountRole.READONLY },
       { address: shuttleWalletAta, role: AccountRole.WRITABLE },
       { address: mint, role: AccountRole.READONLY },
-      { address: TOKEN_PROGRAM_ADDRESS as Address, role: AccountRole.READONLY },
+      { address: TOKEN_PROGRAM_ID, role: AccountRole.READONLY },
     ],
     data: new Uint8Array([15]),
     programAddress: EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
@@ -1120,7 +1116,7 @@ export function undelegateAndCloseShuttleEphemeralAtaIx(
       { address: shuttleAta, role: AccountRole.READONLY },
       { address: shuttleWalletAta, role: AccountRole.WRITABLE },
       { address: destinationAta, role: AccountRole.WRITABLE },
-      { address: TOKEN_PROGRAM_ADDRESS as Address, role: AccountRole.READONLY },
+      { address: TOKEN_PROGRAM_ID, role: AccountRole.READONLY },
       { address: MAGIC_CONTEXT_ID, role: AccountRole.WRITABLE },
       { address: MAGIC_PROGRAM_ID, role: AccountRole.READONLY },
     ],
@@ -1154,7 +1150,7 @@ export async function withdrawSplIx(
       { address: mint, role: AccountRole.READONLY },
       { address: vaultAta, role: AccountRole.WRITABLE },
       { address: userDestAta, role: AccountRole.WRITABLE },
-      { address: TOKEN_PROGRAM_ADDRESS as Address, role: AccountRole.READONLY },
+      { address: TOKEN_PROGRAM_ID, role: AccountRole.READONLY },
     ],
     data: encodeAmountInstructionData(3, amount),
     programAddress: EPHEMERAL_SPL_TOKEN_PROGRAM_ID,

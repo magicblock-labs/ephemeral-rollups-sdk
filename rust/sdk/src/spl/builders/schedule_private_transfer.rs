@@ -63,8 +63,8 @@ pub struct SchedulePrivateTransferBuilder {
     pub max_delay_ms: u64,
     pub split: u32,
     pub validator: Pubkey,
-    pub client_ref_id: Option<u64>,
     pub token_program: Pubkey,
+    pub client_ref_id: Option<u64>,
 }
 
 impl SchedulePrivateTransferBuilder {

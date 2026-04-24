@@ -1707,6 +1707,7 @@ describe("Exposed Instructions (@solana/kit)", () => {
         300n,
         4,
         validator,
+        undefined,
         42n,
       );
 
@@ -1776,6 +1777,7 @@ describe("Exposed Instructions (@solana/kit)", () => {
           300n,
           4,
           validator,
+          undefined,
           0x1_0000_0000_0000_0000n,
         ),
       ).rejects.toThrowError(/delays and clientRefId must fit in u64/);

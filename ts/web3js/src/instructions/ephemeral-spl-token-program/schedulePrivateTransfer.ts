@@ -139,9 +139,9 @@ function hydraSeed(stashPda: PublicKey, shuttleId: number): Buffer {
  * @param maxDelayMs Latest it may settle.
  * @param split Number of queue entries to split the transfer across.
  * @param validator The validator that owns the transfer-queue PDA.
- * @param clientRefId Optional u64 correlation id attached to each split.
  * @param tokenProgram Override for the SPL token program (defaults to
  *   classic Token).
+ * @param clientRefId Optional u64 correlation id attached to each split.
  */
 export function schedulePrivateTransferIx(
   user: PublicKey,
@@ -152,8 +152,8 @@ export function schedulePrivateTransferIx(
   maxDelayMs: bigint,
   split: number,
   validator: PublicKey,
-  clientRefId?: bigint,
   tokenProgram: PublicKey = TOKEN_PROGRAM_ID,
+  clientRefId?: bigint,
 ): TransactionInstruction {
   if (
     !Number.isInteger(shuttleId) ||
@@ -163,7 +163,7 @@ export function schedulePrivateTransferIx(
     throw new Error("shuttleId must fit in u32");
   }
   if (!Number.isInteger(split) || split <= 0 || split > 0xffff_ffff) {
-    throw new Error("split must fit in u32");
+    throw new Error("split must be a positive u32");
   }
   if (
     minDelayMs < 0n ||
