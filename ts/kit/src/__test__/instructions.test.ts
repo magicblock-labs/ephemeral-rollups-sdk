@@ -30,6 +30,7 @@ import {
   deriveLamportsPda,
   deriveTransferQueue,
   deriveRentPda,
+  deriveStashPda,
   deriveVault,
   ensureTransferQueueCrankIx,
   initEphemeralAtaIx,
@@ -38,6 +39,7 @@ import {
   initRentPdaIx,
   lamportsDelegatedTransferIx,
   processPendingTransferQueueRefillIx,
+  schedulePrivateTransferIx,
   transferSpl,
   undelegateAndCloseShuttleEphemeralAtaIx,
   withdrawSplIx,
@@ -48,6 +50,7 @@ import {
   MAGIC_PROGRAM_ID,
   MAGIC_CONTEXT_ID,
   EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
+  HYDRA_PROGRAM_ID,
   PERMISSION_PROGRAM_ID,
 } from "../constants";
 import {
@@ -1616,6 +1619,171 @@ describe("Exposed Instructions (@solana/kit)", () => {
           data.byteLength,
         ).getBigUint64(1, true),
       ).toBe(1n);
+    });
+  });
+
+  describe("schedulePrivateTransferIx (Ephemeral SPL Token Program)", () => {
+    const user = address("11111111111111111111111111111113");
+    const mint = address("11111111111111111111111111111114");
+    const destinationOwner = address("11111111111111111111111111111115");
+    const validator = address(bs58.encode(nacl.sign.keyPair().publicKey));
+    // Computed from the Rust SDK's `find_hydra_crank_pda` for
+    // (user, mint, shuttleId) = (...13, ...14, 7).
+    const expectedHydraCrankPda = address(
+      "GLED9jgBhhgFYppfvWXhmbS3nPYUTabmhtFKHX6GjrhT",
+    );
+
+    it("should build a 7-account ix with the right layout", async () => {
+      const instruction = await schedulePrivateTransferIx(
+        user,
+        mint,
+        7,
+        destinationOwner,
+        100n,
+        300n,
+        4,
+        validator,
+      );
+
+      const [stashPda] = await deriveStashPda(user, mint);
+      const [rentPda] = await deriveRentPda();
+
+      expect(instruction.programAddress).toBe(EPHEMERAL_SPL_TOKEN_PROGRAM_ID);
+      expect(instruction.accounts).toHaveLength(7);
+      expect(instruction.accounts?.[0]).toEqual({
+        address: user,
+        role: AccountRole.WRITABLE_SIGNER,
+      });
+      expect(instruction.accounts?.[1]).toEqual({
+        address: stashPda,
+        role: AccountRole.WRITABLE,
+      });
+      expect(instruction.accounts?.[2]).toEqual({
+        address: rentPda,
+        role: AccountRole.WRITABLE,
+      });
+      expect(instruction.accounts?.[3]).toEqual({
+        address: expectedHydraCrankPda,
+        role: AccountRole.WRITABLE,
+      });
+      expect(instruction.accounts?.[4]).toEqual({
+        address: HYDRA_PROGRAM_ID,
+        role: AccountRole.READONLY,
+      });
+      expect(instruction.accounts?.[5]).toEqual({
+        address: SYSTEM_PROGRAM_ADDRESS,
+        role: AccountRole.READONLY,
+      });
+
+      const data = Buffer.from(instruction.data ?? []);
+      expect(data[0]).toBe(30);
+      expect(data.readUInt32LE(1)).toBe(7);
+      expect(
+        data.subarray(6, 38).equals(Buffer.from(addressEncoder.encode(mint))),
+      ).toBe(true);
+
+      const [validatorField, nextOffset] = readLengthPrefixedField(data, 48);
+      const [destinationField, suffixOffset] = readLengthPrefixedField(
+        data,
+        nextOffset,
+      );
+      const [suffixField, endOffset] = readLengthPrefixedField(
+        data,
+        suffixOffset,
+      );
+
+      expect(
+        validatorField.equals(Buffer.from(addressEncoder.encode(validator))),
+      ).toBe(true);
+      expect(destinationField).toHaveLength(80);
+      expect(suffixField).toHaveLength(68);
+      expect(endOffset).toBe(data.length);
+    });
+
+    it("should lengthen the encrypted suffix when clientRefId is provided", async () => {
+      const instruction = await schedulePrivateTransferIx(
+        user,
+        mint,
+        7,
+        destinationOwner,
+        100n,
+        300n,
+        4,
+        validator,
+        undefined,
+        42n,
+      );
+
+      const data = Buffer.from(instruction.data ?? []);
+      const [, afterValidator] = readLengthPrefixedField(data, 48);
+      const [, afterDestination] = readLengthPrefixedField(
+        data,
+        afterValidator,
+      );
+      const [suffixField] = readLengthPrefixedField(data, afterDestination);
+      expect(suffixField).toHaveLength(76);
+    });
+
+    it("should reject non-u32 shuttle ids", async () => {
+      await expect(async () =>
+        schedulePrivateTransferIx(
+          user,
+          mint,
+          0x1_0000_0000,
+          destinationOwner,
+          100n,
+          300n,
+          4,
+          validator,
+        ),
+      ).rejects.toThrowError(/shuttleId must fit in u32/);
+    });
+
+    it("should reject maxDelayMs < minDelayMs", async () => {
+      await expect(async () =>
+        schedulePrivateTransferIx(
+          user,
+          mint,
+          7,
+          destinationOwner,
+          500n,
+          100n,
+          4,
+          validator,
+        ),
+      ).rejects.toThrowError(
+        /maxDelayMs must be greater than or equal to minDelayMs/,
+      );
+    });
+
+    it("should reject delays and clientRefId that exceed u64", async () => {
+      await expect(async () =>
+        schedulePrivateTransferIx(
+          user,
+          mint,
+          7,
+          destinationOwner,
+          0n,
+          0x1_0000_0000_0000_0000n,
+          4,
+          validator,
+        ),
+      ).rejects.toThrowError(/delays and clientRefId must fit in u64/);
+
+      await expect(async () =>
+        schedulePrivateTransferIx(
+          user,
+          mint,
+          7,
+          destinationOwner,
+          100n,
+          300n,
+          4,
+          validator,
+          undefined,
+          0x1_0000_0000_0000_0000n,
+        ),
+      ).rejects.toThrowError(/delays and clientRefId must fit in u64/);
     });
   });
 });

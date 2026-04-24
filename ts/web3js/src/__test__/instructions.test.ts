@@ -23,7 +23,9 @@ import {
   delegateSplWithPrivateTransfer,
   delegateTransferQueueIx,
   deriveEphemeralAta,
+  deriveHydraCrankPda,
   deriveLamportsPda,
+  deriveStashPda,
   deriveTransferQueue,
   deriveRentPda,
   deriveShuttleAta,
@@ -36,6 +38,7 @@ import {
   initRentPdaIx,
   lamportsDelegatedTransferIx,
   processPendingTransferQueueRefillIx,
+  schedulePrivateTransferIx,
   transferSpl,
   undelegateAndCloseShuttleEphemeralAtaIx,
   withdrawSplIx,
@@ -44,6 +47,7 @@ import {
 import {
   DELEGATION_PROGRAM_ID,
   EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
+  HYDRA_PROGRAM_ID,
   MAGIC_PROGRAM_ID,
   MAGIC_CONTEXT_ID,
   PERMISSION_PROGRAM_ID,
@@ -1623,6 +1627,219 @@ describe("Exposed Instructions (web3.js)", () => {
       expect(instruction.data).toHaveLength(9);
       expect(instruction.data[0]).toBe(3);
       expect(Buffer.from(instruction.data).readBigUInt64LE(1)).toBe(1n);
+    });
+  });
+
+  describe("schedulePrivateTransferIx (Ephemeral SPL Token Program)", () => {
+    const user = new PublicKey("11111111111111111111111111111113");
+    const mint = new PublicKey("11111111111111111111111111111114");
+    const destinationOwner = new PublicKey("11111111111111111111111111111115");
+    const validator = Keypair.generate().publicKey;
+    const tokenProgram = new PublicKey(
+      "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    );
+
+    it("should build a 7-account ix with the right layout", () => {
+      const instruction = schedulePrivateTransferIx(
+        user,
+        mint,
+        7,
+        destinationOwner,
+        100n,
+        300n,
+        4,
+        validator,
+      );
+
+      expect(instruction.programId.toBase58()).toBe(
+        EPHEMERAL_SPL_TOKEN_PROGRAM_ID.toBase58(),
+      );
+      expect(instruction.keys).toHaveLength(7);
+
+      // Account ordering: user, stash, rent, crank, hydra, system, token.
+      const [stashPda] = deriveStashPda(user, mint);
+      const [rentPda] = deriveRentPda();
+      const [hydraCrankPda] = deriveHydraCrankPda(stashPda, 7);
+
+      expect(instruction.keys[0].pubkey.toBase58()).toBe(user.toBase58());
+      expect(instruction.keys[0].isSigner).toBe(true);
+      expect(instruction.keys[0].isWritable).toBe(true);
+
+      expect(instruction.keys[1].pubkey.toBase58()).toBe(stashPda.toBase58());
+      expect(instruction.keys[1].isWritable).toBe(true);
+
+      expect(instruction.keys[2].pubkey.toBase58()).toBe(rentPda.toBase58());
+      expect(instruction.keys[2].isWritable).toBe(true);
+
+      expect(instruction.keys[3].pubkey.toBase58()).toBe(
+        hydraCrankPda.toBase58(),
+      );
+      expect(instruction.keys[3].isWritable).toBe(true);
+
+      expect(instruction.keys[4].pubkey.toBase58()).toBe(
+        HYDRA_PROGRAM_ID.toBase58(),
+      );
+      expect(instruction.keys[5].pubkey.toBase58()).toBe(
+        SystemProgram.programId.toBase58(),
+      );
+
+      const data = Buffer.from(instruction.data);
+      expect(data[0]).toBe(30); // discriminator
+      expect(data.readUInt32LE(1)).toBe(7); // shuttle_id
+      // Layout after the discriminator:
+      //   [1..5) shuttle_id  [5] stash_bump  [6..38) mint
+      //   [38..48) 10 bumps  → 3 vardata blobs start at 48.
+      expect(data.subarray(6, 38).equals(mint.toBuffer())).toBe(true);
+
+      const [validatorField, nextOffset] = readLengthPrefixedField(data, 48);
+      const [destinationField, suffixOffset] = readLengthPrefixedField(
+        data,
+        nextOffset,
+      );
+      const [suffixField, endOffset] = readLengthPrefixedField(
+        data,
+        suffixOffset,
+      );
+
+      expect(validatorField.equals(validator.toBuffer())).toBe(true);
+      // ChaCha20-Poly1305 encryption: 32 (ephemeral pubkey) + plaintext +
+      // 16 (tag). 32 + 32 + 16 = 80 for the destination.
+      expect(destinationField).toHaveLength(80);
+      // Suffix plaintext is 20 bytes (min, max, split) without clientRefId;
+      // encrypted length = 32 + 20 + 16 = 68.
+      expect(suffixField).toHaveLength(68);
+      expect(endOffset).toBe(data.length);
+    });
+
+    it("should lengthen the encrypted suffix when clientRefId is provided", () => {
+      const instruction = schedulePrivateTransferIx(
+        user,
+        mint,
+        7,
+        destinationOwner,
+        100n,
+        300n,
+        4,
+        validator,
+        undefined,
+        42n,
+      );
+
+      const data = Buffer.from(instruction.data);
+      const [, afterValidator] = readLengthPrefixedField(data, 48);
+      const [, afterDestination] = readLengthPrefixedField(
+        data,
+        afterValidator,
+      );
+      const [suffixField] = readLengthPrefixedField(data, afterDestination);
+      // Suffix plaintext is now 28 bytes (+u64 clientRefId): 32 + 28 + 16 = 76.
+      expect(suffixField).toHaveLength(76);
+    });
+
+    it("should accept a token program override when clientRefId is omitted", () => {
+      const instruction = schedulePrivateTransferIx(
+        user,
+        mint,
+        7,
+        destinationOwner,
+        100n,
+        300n,
+        4,
+        validator,
+        tokenProgram,
+      );
+
+      expect(instruction.keys[6].pubkey.toBase58()).toBe(
+        tokenProgram.toBase58(),
+      );
+    });
+
+    it("should still accept both clientRefId and token program override", () => {
+      const instruction = schedulePrivateTransferIx(
+        user,
+        mint,
+        7,
+        destinationOwner,
+        100n,
+        300n,
+        4,
+        validator,
+        tokenProgram,
+        42n,
+      );
+
+      expect(instruction.keys[6].pubkey.toBase58()).toBe(
+        tokenProgram.toBase58(),
+      );
+
+      const data = Buffer.from(instruction.data);
+      const [, afterValidator] = readLengthPrefixedField(data, 48);
+      const [, afterDestination] = readLengthPrefixedField(
+        data,
+        afterValidator,
+      );
+      const [suffixField] = readLengthPrefixedField(data, afterDestination);
+      expect(suffixField).toHaveLength(76);
+    });
+
+    it("should reject non-u32 shuttle ids", () => {
+      expect(() =>
+        schedulePrivateTransferIx(
+          user,
+          mint,
+          0x1_0000_0000,
+          destinationOwner,
+          100n,
+          300n,
+          4,
+          validator,
+        ),
+      ).toThrowError(/shuttleId must fit in u32/);
+    });
+
+    it("should reject maxDelayMs < minDelayMs", () => {
+      expect(() =>
+        schedulePrivateTransferIx(
+          user,
+          mint,
+          7,
+          destinationOwner,
+          500n,
+          100n,
+          4,
+          validator,
+        ),
+      ).toThrowError(/maxDelayMs must be greater than or equal to minDelayMs/);
+    });
+
+    it("should reject delays and clientRefId that exceed u64", () => {
+      expect(() =>
+        schedulePrivateTransferIx(
+          user,
+          mint,
+          7,
+          destinationOwner,
+          0n,
+          0x1_0000_0000_0000_0000n,
+          4,
+          validator,
+        ),
+      ).toThrowError(/delays and clientRefId must fit in u64/);
+
+      expect(() =>
+        schedulePrivateTransferIx(
+          user,
+          mint,
+          7,
+          destinationOwner,
+          100n,
+          300n,
+          4,
+          validator,
+          undefined,
+          0x1_0000_0000_0000_0000n,
+        ),
+      ).toThrowError(/delays and clientRefId must fit in u64/);
     });
   });
 });
