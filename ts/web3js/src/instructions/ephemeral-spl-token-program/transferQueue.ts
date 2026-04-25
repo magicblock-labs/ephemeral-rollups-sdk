@@ -19,7 +19,6 @@ import {
   delegationRecordPdaFromDelegatedAccount,
   permissionPdaFromAccount,
 } from "../../pda.js";
-import { instructionBytes, instructionU8Array } from "./index.js";
 
 const TRANSFER_QUEUE_SEED = Buffer.from("queue");
 const QUEUE_REFILL_STATE_SEED = Buffer.from("queue-refill");
@@ -100,13 +99,9 @@ export function initTransferQueueIx(
     ],
     data:
       requestedItems === undefined
-        ? new Uint8Array([
-            ...instructionBytes(INITIALIZE_TRANSFER_QUEUE_DISCRIMINATOR),
-            0 /* None tag */,
-          ])
+        ? new Uint8Array([INITIALIZE_TRANSFER_QUEUE_DISCRIMINATOR])
         : new Uint8Array([
-            ...instructionBytes(INITIALIZE_TRANSFER_QUEUE_DISCRIMINATOR),
-            1, // Some tag
+            INITIALIZE_TRANSFER_QUEUE_DISCRIMINATOR,
             ...u32le(requestedItems),
           ]),
     programAddress: EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
@@ -126,7 +121,7 @@ export function allocateTransferQueueIx(
       { pubkey: queue, isSigner: false, isWritable: true },
       { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
     ],
-    data: instructionU8Array(ALLOCATE_TRANSFER_QUEUE_DISCRIMINATOR),
+    data: new Uint8Array([ALLOCATE_TRANSFER_QUEUE_DISCRIMINATOR]),
     programAddress: EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
   });
 }
@@ -179,24 +174,15 @@ export function depositAndQueueTransferIx(
   }
 
   const data = [
-    ...instructionBytes(DEPOSIT_AND_QUEUE_TRANSFER_DISCRIMINATOR),
+    DEPOSIT_AND_QUEUE_TRANSFER_DISCRIMINATOR,
     ...u64le(amount),
     ...u64le(minDelayMs),
     ...u64le(maxDelayMs),
     ...u32le(split),
-    0, // None; flags: Option<u8>
   ];
   if (clientRefId !== undefined) {
-    data.push(1); // Some: clientRefId
     data.push(...u64le(clientRefId));
-  } else {
-    data.push(0); // None: clientRefId
   }
-
-  console.log(
-    "DEPOSIT_AND_QUEUE_TRANSFER_DISCRIMINATOR: ixdata-len: ",
-    data.length,
-  );
 
   return toTransactionInstruction({
     accounts: [
@@ -239,7 +225,7 @@ export function ensureTransferQueueCrankIx(
       { pubkey: magicContext, isSigner: false, isWritable: true },
       { pubkey: magicProgram, isSigner: false, isWritable: false },
     ],
-    data: instructionU8Array(ENSURE_TRANSFER_QUEUE_CRANK_DISCRIMINATOR),
+    data: new Uint8Array([ENSURE_TRANSFER_QUEUE_CRANK_DISCRIMINATOR]),
     programAddress: EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
   });
 }
@@ -287,7 +273,7 @@ export function delegateTransferQueueIx(
       { pubkey: DELEGATION_PROGRAM_ID, isSigner: false, isWritable: false },
       { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
     ],
-    data: instructionU8Array(DELEGATE_TRANSFER_QUEUE_DISCRIMINATOR),
+    data: new Uint8Array([DELEGATE_TRANSFER_QUEUE_DISCRIMINATOR]),
     programAddress: EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
   });
 }
@@ -350,9 +336,7 @@ export function processPendingTransferQueueRefillIx(
         isWritable: false,
       },
     ],
-    data: instructionU8Array(
-      PROCESS_PENDING_TRANSFER_QUEUE_REFILL_DISCRIMINATOR,
-    ),
+    data: new Uint8Array([PROCESS_PENDING_TRANSFER_QUEUE_REFILL_DISCRIMINATOR]),
     programAddress: EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
   });
 }

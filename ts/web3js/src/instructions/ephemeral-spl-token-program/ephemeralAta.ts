@@ -131,24 +131,14 @@ function packPrivateTransferSuffix(
   clientRefId?: bigint,
 ): Buffer {
   const suffix = Buffer.alloc(
-    clientRefId === undefined ? 8 + 8 + 4 + 1 + 1 : 8 + 8 + 4 + 1 + (1 + 8),
+    clientRefId === undefined ? 8 + 8 + 4 : 8 + 8 + 4 + 8,
   );
   suffix.writeBigUInt64LE(minDelayMs, 0);
   suffix.writeBigUInt64LE(maxDelayMs, 8);
   suffix.writeUInt32LE(split, 16);
-  suffix.writeInt8(0, 20); // None tag for => flags : Option<u8>
   if (clientRefId !== undefined) {
-    suffix.writeInt8(1, 21); // Some tag
-    suffix.writeBigUInt64LE(clientRefId, 22);
-  } else {
-    suffix.writeInt8(0, 21); // None tag
+    suffix.writeBigUInt64LE(clientRefId, 20);
   }
-
-  console.log(
-    "packPrivateTransferSuffix: suffix-len (unencrypted): ",
-    suffix.length,
-  );
-
   return suffix;
 }
 
@@ -409,7 +399,7 @@ export function initEphemeralAtaIx(
       { pubkey: mint, isSigner: false, isWritable: false },
       { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
     ],
-    data: Buffer.from(instructionU8Array(0)),
+    data: Buffer.from([0]),
   });
 }
 
@@ -465,7 +455,7 @@ export function initVaultIx(
       },
       { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
     ],
-    data: Buffer.from(instructionU8Array(1)),
+    data: Buffer.from([1]),
   });
 }
 
@@ -486,7 +476,7 @@ export function initRentPdaIx(
       { pubkey: rentPda, isSigner: false, isWritable: true },
       { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
     ],
-    data: Buffer.from(instructionU8Array(23)),
+    data: Buffer.from([23]),
   });
 }
 
@@ -563,12 +553,8 @@ export function delegateEphemeralAtaIx(
   validator?: PublicKey,
 ): TransactionInstruction {
   const data = validator
-    ? Buffer.concat([
-        Buffer.from(instructionU8Array(4)),
-        Buffer.from([1 /*Some tag*/]),
-        validator.toBuffer(),
-      ])
-    : Buffer.from([...instructionBytes(4), 0 /* None tag*/]);
+    ? Buffer.concat([Buffer.from([4]), validator.toBuffer()])
+    : Buffer.from([4]);
   return new TransactionInstruction({
     programId: EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
     keys: [
@@ -632,10 +618,9 @@ export function initShuttleEphemeralAtaIx(
     throw new Error("shuttleId must fit in u32");
   }
 
-  const data = Buffer.concat([
-    Buffer.from(instructionU8Array(11)),
-    u32leBuffer(shuttleId),
-  ]);
+  const data = Buffer.alloc(5);
+  data[0] = 11;
+  data.writeUInt32LE(shuttleId, 1);
 
   return new TransactionInstruction({
     programId: EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
@@ -674,12 +659,8 @@ export function delegateShuttleEphemeralAtaIx(
   validator?: PublicKey,
 ): TransactionInstruction {
   const data = validator
-    ? Buffer.concat([
-        Buffer.from(instructionU8Array(13)),
-        Buffer.from([1 /* Some tag*/]),
-        validator.toBuffer(),
-      ])
-    : Buffer.from([...instructionBytes(13), 0 /* None tag*/]);
+    ? Buffer.concat([Buffer.from([13]), validator.toBuffer()])
+    : Buffer.from([13]);
 
   return new TransactionInstruction({
     programId: EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
@@ -759,20 +740,13 @@ export function setupAndDelegateShuttleEphemeralAtaWithMergeIx(
   const [vault] = deriveVault(mint);
   const vaultAta = deriveVaultAta(mint, vault);
 
-  const data = validator
-    ? Buffer.concat([
-        Buffer.from(instructionU8Array(24)),
-        u32leBuffer(shuttleId),
-        u64leBuffer(amount),
-        Buffer.from([1 /* Some tag */]),
-        validator.toBuffer(),
-      ])
-    : Buffer.concat([
-        Buffer.from(instructionU8Array(24)),
-        u32leBuffer(shuttleId),
-        u64leBuffer(amount),
-        Buffer.from([0 /* None tag */]),
-      ]);
+  const data = validator ? Buffer.alloc(45) : Buffer.alloc(13);
+  data[0] = 24;
+  data.writeUInt32LE(shuttleId, 1);
+  data.writeBigUInt64LE(amount, 5);
+  if (validator) {
+    validator.toBuffer().copy(data, 13);
+  }
 
   return new TransactionInstruction({
     programId: EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
@@ -885,12 +859,11 @@ export function depositAndDelegateShuttleEphemeralAtaWithMergeAndPrivateTransfer
     validator,
   );
   const data = Buffer.concat([
-    Buffer.from(instructionU8Array(25)),
+    Buffer.from([25]),
     u32leBuffer(shuttleId),
     u64leBuffer(amount),
-    encryptedDestination,
-    Buffer.from([1]) /* Some tag*/,
-    validator.toBytes(),
+    encodeLengthPrefixedBytes(validator.toBytes()),
+    encodeLengthPrefixedBytes(encryptedDestination),
     encodeLengthPrefixedBytes(encryptedSuffix),
   ]);
 
@@ -972,20 +945,13 @@ export function withdrawThroughDelegatedShuttleWithMergeIx(
   }
 
   const [rentPda] = deriveRentPda();
-  const data = validator
-    ? Buffer.concat([
-        Buffer.from(instructionU8Array(26)),
-        u32leBuffer(shuttleId),
-        u64leBuffer(amount),
-        Buffer.from([1]),
-        validator.toBuffer(),
-      ])
-    : Buffer.concat([
-        Buffer.from(instructionU8Array(26)),
-        u32leBuffer(shuttleId),
-        u64leBuffer(amount),
-        Buffer.from([0]),
-      ]);
+  const data = validator ? Buffer.alloc(45) : Buffer.alloc(13);
+  data[0] = 26;
+  data.writeUInt32LE(shuttleId, 1);
+  data.writeBigUInt64LE(amount, 5);
+  if (validator) {
+    validator.toBuffer().copy(data, 13);
+  }
 
   return new TransactionInstruction({
     programId: EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
@@ -1061,11 +1027,10 @@ export function lamportsDelegatedTransferIx(
   const destinationDelegationRecord =
     delegationRecordPdaFromDelegatedAccount(destination);
 
-  const data = Buffer.concat([
-    Buffer.from(instructionU8Array(20)),
-    u64leBuffer(amount),
-    Buffer.from(salt),
-  ]);
+  const data = Buffer.alloc(41);
+  data[0] = 20;
+  data.writeBigUInt64LE(amount, 1);
+  Buffer.from(salt).copy(data, 9);
 
   return new TransactionInstruction({
     programId: EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
@@ -1135,7 +1100,7 @@ export function mergeShuttleIntoAtaIx(
       { pubkey: mint, isSigner: false, isWritable: false },
       { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
     ],
-    data: Buffer.from(instructionU8Array(15)),
+    data: Buffer.from([15]),
   });
 }
 
@@ -1160,8 +1125,8 @@ export function undelegateAndCloseShuttleEphemeralAtaIx(
 ): TransactionInstruction {
   const data =
     escrowIndex === undefined
-      ? Buffer.from(instructionU8Array(14))
-      : Buffer.from([...instructionBytes(14), escrowIndex]);
+      ? Buffer.from([14])
+      : Buffer.from([14, escrowIndex]);
 
   return new TransactionInstruction({
     programId: EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
@@ -1255,7 +1220,7 @@ export function undelegateIx(
         isWritable: false,
       },
     ],
-    data: Buffer.from(instructionU8Array(5)),
+    data: Buffer.from([5]),
   });
 }
 
@@ -1283,7 +1248,7 @@ export function createEataPermissionIx(
       { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
       { pubkey: PERMISSION_PROGRAM_ID, isSigner: false, isWritable: false },
     ],
-    data: Buffer.from([...instructionBytes(6), flags]),
+    data: Buffer.from([6, flags]),
   });
 }
 
@@ -1310,7 +1275,7 @@ export function resetEataPermissionIx(
       { pubkey: payer, isSigner: true, isWritable: false },
       { pubkey: PERMISSION_PROGRAM_ID, isSigner: false, isWritable: false },
     ],
-    data: Buffer.from([...instructionBytes(9), flags]),
+    data: Buffer.from([9, flags]),
   });
 }
 
@@ -1357,7 +1322,7 @@ export function delegateEataPermissionIx(
       { pubkey: DELEGATION_PROGRAM_ID, isSigner: false, isWritable: false },
       { pubkey: validator, isSigner: false, isWritable: false },
     ],
-    data: Buffer.from(instructionU8Array(7)),
+    data: Buffer.from([7]),
   });
 }
 
@@ -1383,7 +1348,7 @@ export function undelegateEataPermissionIx(
       { pubkey: MAGIC_PROGRAM_ID, isSigner: false, isWritable: false },
       { pubkey: MAGIC_CONTEXT_ID, isSigner: false, isWritable: true },
     ],
-    data: Buffer.from(instructionU8Array(8)),
+    data: Buffer.from([8]),
   });
 }
 
@@ -2014,11 +1979,11 @@ function encodeAmountInstructionData(
   amount: bigint,
   ...suffix: number[]
 ): Buffer {
-  const data = Buffer.alloc(8 + 8 + suffix.length);
-  Buffer.from(instructionU8Array(discriminator)).copy(data, 0);
-  data.writeBigUInt64LE(amount, 8);
+  const data = Buffer.alloc(1 + 8 + suffix.length);
+  data[0] = discriminator;
+  data.writeBigUInt64LE(amount, 1);
   if (suffix.length > 0) {
-    data.set(suffix, 16);
+    data.set(suffix, 9);
   }
   return data;
 }

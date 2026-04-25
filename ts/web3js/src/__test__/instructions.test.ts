@@ -36,7 +36,6 @@ import {
   initTransferQueueIx,
   initVaultIx,
   initRentPdaIx,
-  instructionBytes,
   lamportsDelegatedTransferIx,
   processPendingTransferQueueRefillIx,
   schedulePrivateTransferIx,
@@ -336,7 +335,7 @@ describe("Exposed Instructions (web3.js)", () => {
       );
       expect(instruction.keys[0].isSigner).toBe(true);
       expect(instruction.keys[1].pubkey.toBase58()).toBe(rentPda.toBase58());
-      expect(instruction.data).toEqual(Buffer.from(instructionBytes(23)));
+      expect(instruction.data).toEqual(Buffer.from([23]));
     });
   });
 
@@ -828,9 +827,8 @@ describe("Exposed Instructions (web3.js)", () => {
         vaultEphemeralAta.toBase58(),
       );
       expect(instructions[3].data[0]).toBe(4);
-      expect(instructions[3].data[8]).toBe(1);
       expect(
-        Buffer.from(instructions[3].data.subarray(9)).equals(
+        Buffer.from(instructions[3].data.subarray(1)).equals(
           validator.toBuffer(),
         ),
       ).toBe(true);
@@ -850,9 +848,8 @@ describe("Exposed Instructions (web3.js)", () => {
         vaultEphemeralAta.toBase58(),
       );
       expect(instructions[2].data[0]).toBe(4);
-      expect(instructions[2].data[8]).toBe(1);
       expect(
-        Buffer.from(instructions[2].data.subarray(9)).equals(
+        Buffer.from(instructions[2].data.subarray(1)).equals(
           validator.toBuffer(),
         ),
       ).toBe(true);
@@ -875,11 +872,10 @@ describe("Exposed Instructions (web3.js)", () => {
       expect(setupAndDelegateInstruction?.keys).toHaveLength(19);
       expect(instructions.find((ix) => ix.data[0] === 11)).toBeUndefined();
       expect(
-        Buffer.from(setupAndDelegateInstruction.data).readBigUInt64LE(12),
+        Buffer.from(setupAndDelegateInstruction.data).readBigUInt64LE(5),
       ).toBe(1n);
-      expect(setupAndDelegateInstruction.data[20]).toBe(1);
       expect(
-        Buffer.from(setupAndDelegateInstruction.data.subarray(21)).equals(
+        Buffer.from(setupAndDelegateInstruction.data.subarray(13)).equals(
           validator.toBuffer(),
         ),
       ).toBe(true);
@@ -945,19 +941,22 @@ describe("Exposed Instructions (web3.js)", () => {
       }
       expect(privateTransferInstruction?.keys).toHaveLength(19);
       const data = Buffer.from(privateTransferInstruction.data);
-      expect(data.readUInt32LE(8)).toBe(7);
-      expect(data.readBigUInt64LE(12)).toBe(1n);
-      expect(data[20]).toBe(1);
-      const validatorField = Buffer.from(data.subarray(21, 53));
-      const destinationField = Buffer.from(data.subarray(53, 133));
+      expect(data.readUInt32LE(1)).toBe(7);
+      expect(data.readBigUInt64LE(5)).toBe(1n);
+
+      const [validatorField, nextOffset] = readLengthPrefixedField(data, 13);
+      const [destinationField, suffixOffset] = readLengthPrefixedField(
+        data,
+        nextOffset,
+      );
       const [suffixField, endOffset] = readLengthPrefixedField(
         data,
-        133,
+        suffixOffset,
       );
 
       expect(validatorField.equals(validator.toBuffer())).toBe(true);
       expect(destinationField).toHaveLength(80);
-      expect(suffixField).toHaveLength(70);
+      expect(suffixField).toHaveLength(68);
       expect(endOffset).toBe(data.length);
     });
   });
@@ -1034,11 +1033,11 @@ describe("Exposed Instructions (web3.js)", () => {
 
       const data = Buffer.from(instruction.data);
       expect(data[0]).toBe(20);
-      expect(data.readBigUInt64LE(8)).toBe(25n);
-      expect(Buffer.from(data.subarray(16, 48)).equals(Buffer.from(salt))).toBe(
+      expect(data.readBigUInt64LE(1)).toBe(25n);
+      expect(Buffer.from(data.subarray(9, 41)).equals(Buffer.from(salt))).toBe(
         true,
       );
-      expect(data).toHaveLength(48);
+      expect(data).toHaveLength(41);
     });
   });
 
@@ -1069,20 +1068,22 @@ describe("Exposed Instructions (web3.js)", () => {
       const data = Buffer.from(instructions[1].data);
       expect(data[0]).toBe(25);
       expect(instructions[1].keys).toHaveLength(19);
-      expect(data.readUInt32LE(8)).toBe(7);
-      expect(data.readBigUInt64LE(12)).toBe(25n);
+      expect(data.readUInt32LE(1)).toBe(7);
+      expect(data.readBigUInt64LE(5)).toBe(25n);
 
-      expect(data[20]).toBe(1);
-      const validatorField = Buffer.from(data.subarray(21, 53));
-      const destinationField = Buffer.from(data.subarray(53, 133));
+      const [validatorField, nextOffset] = readLengthPrefixedField(data, 13);
+      const [destinationField, suffixOffset] = readLengthPrefixedField(
+        data,
+        nextOffset,
+      );
       const [suffixField, endOffset] = readLengthPrefixedField(
         data,
-        133,
+        suffixOffset,
       );
 
       expect(validatorField.equals(validator.toBuffer())).toBe(true);
       expect(destinationField).toHaveLength(80);
-      expect(suffixField).toHaveLength(70);
+      expect(suffixField).toHaveLength(68);
       expect(endOffset).toBe(data.length);
     });
 
@@ -1102,10 +1103,11 @@ describe("Exposed Instructions (web3.js)", () => {
       });
 
       const data = Buffer.from(instructions[1].data);
-      expect(data[20]).toBe(1);
-      const [suffixField] = readLengthPrefixedField(data, 133);
+      const [, nextOffset] = readLengthPrefixedField(data, 13);
+      const [, suffixOffset] = readLengthPrefixedField(data, nextOffset);
+      const [suffixField] = readLengthPrefixedField(data, suffixOffset);
 
-      expect(suffixField).toHaveLength(78);
+      expect(suffixField).toHaveLength(76);
     });
 
     it("should initialize the destination ATA and vault when requested", async () => {
@@ -1162,7 +1164,7 @@ describe("Exposed Instructions (web3.js)", () => {
       expect(instructions).toHaveLength(1);
       expect(instructions[0].data[0]).toBe(24);
       expect(instructions[0].keys).toHaveLength(19);
-      expect(Buffer.from(instructions[0].data).readBigUInt64LE(12)).toBe(25n);
+      expect(Buffer.from(instructions[0].data).readBigUInt64LE(5)).toBe(25n);
     });
 
     it("should initialize and delegate the receiver eata for private base-to-ephemeral transfers when requested", async () => {
@@ -1231,10 +1233,10 @@ describe("Exposed Instructions (web3.js)", () => {
       expect(instructions[0].keys[8].pubkey.toBase58()).toBe(
         instructions[0].keys[3].pubkey.toBase58(),
       );
-      expect(Buffer.from(instructions[0].data).readBigUInt64LE(8)).toBe(25n);
-      expect(Buffer.from(instructions[0].data).readBigUInt64LE(16)).toBe(100n);
-      expect(Buffer.from(instructions[0].data).readBigUInt64LE(24)).toBe(300n);
-      expect(Buffer.from(instructions[0].data).readUInt32LE(32)).toBe(4);
+      expect(Buffer.from(instructions[0].data).readBigUInt64LE(1)).toBe(25n);
+      expect(Buffer.from(instructions[0].data).readBigUInt64LE(9)).toBe(100n);
+      expect(Buffer.from(instructions[0].data).readBigUInt64LE(17)).toBe(300n);
+      expect(Buffer.from(instructions[0].data).readUInt32LE(25)).toBe(4);
     });
 
     it("should require validator for private ephemeral-to-base transfers", async () => {
@@ -1372,7 +1374,7 @@ describe("Exposed Instructions (web3.js)", () => {
       expect(instruction.keys[8].pubkey.toBase58()).toBe(source.toBase58());
       expect(instruction.keys[8].isWritable).toBe(true);
       expect(Array.from(instruction.data)).toEqual([
-        ...instructionBytes(16),
+        16,
         ...Array.from(
           Buffer.from(
             [25n, 100n, 300n].flatMap((value) => {
@@ -1383,8 +1385,6 @@ describe("Exposed Instructions (web3.js)", () => {
           ),
         ),
         4,
-        0,
-        0,
         0,
         0,
         0,
@@ -1433,7 +1433,7 @@ describe("Exposed Instructions (web3.js)", () => {
       );
 
       expect(Array.from(instruction.data)).toEqual([
-        ...instructionBytes(16),
+        16,
         ...Array.from(
           Buffer.from(
             [25n, 100n, 300n].flatMap((value) => {
@@ -1447,8 +1447,6 @@ describe("Exposed Instructions (web3.js)", () => {
         0,
         0,
         0,
-        0,
-        1,
         ...Array.from(
           (() => {
             const out = Buffer.alloc(8);
@@ -1492,7 +1490,7 @@ describe("Exposed Instructions (web3.js)", () => {
         destinationAta.toBase58(),
       );
       expect(instruction.keys[5].isWritable).toBe(true);
-      expect(Array.from(instruction.data)).toEqual([...instructionBytes(14), 3]);
+      expect(Array.from(instruction.data)).toEqual([14, 3]);
     });
   });
 
@@ -1505,7 +1503,7 @@ describe("Exposed Instructions (web3.js)", () => {
 
       expect(instruction).toBeInstanceOf(TransactionInstruction);
       expect(instruction.keys).toHaveLength(9);
-      expect(Array.from(instruction.data)).toEqual(instructionBytes(19));
+      expect(Array.from(instruction.data)).toEqual([19]);
     });
   });
 
@@ -1539,14 +1537,7 @@ describe("Exposed Instructions (web3.js)", () => {
       expect(instruction.keys[6].pubkey.toBase58()).toBe(
         PERMISSION_PROGRAM_ID.toBase58(),
       );
-      expect(Array.from(instruction.data)).toEqual([
-        ...instructionBytes(12),
-        1,
-        92,
-        0,
-        0,
-        0,
-      ]);
+      expect(Array.from(instruction.data)).toEqual([12, 92, 0, 0, 0]);
     });
 
     it("should serialize discriminator 27 for allocateTransferQueueIx", () => {
@@ -1555,7 +1546,7 @@ describe("Exposed Instructions (web3.js)", () => {
 
       expect(instruction).toBeInstanceOf(TransactionInstruction);
       expect(instruction.keys).toHaveLength(2);
-      expect(Array.from(instruction.data)).toEqual(instructionBytes(27));
+      expect(Array.from(instruction.data)).toEqual([27]);
     });
 
     it("should derive the sponsored refill accounts for processPendingTransferQueueRefillIx", () => {
@@ -1602,7 +1593,7 @@ describe("Exposed Instructions (web3.js)", () => {
       expect(instruction.keys[10].pubkey.toBase58()).toBe(
         delegationRecordPdaFromDelegatedAccount(queue).toBase58(),
       );
-      expect(Array.from(instruction.data)).toEqual(instructionBytes(28));
+      expect(Array.from(instruction.data)).toEqual([28]);
     });
   });
 
@@ -1614,7 +1605,7 @@ describe("Exposed Instructions (web3.js)", () => {
         mockPublicKey,
       );
 
-      expect(Array.from(instruction.data)).toEqual(instructionBytes(7));
+      expect(Array.from(instruction.data)).toEqual([7]);
     });
   });
 
@@ -1627,7 +1618,7 @@ describe("Exposed Instructions (web3.js)", () => {
         differentKey,
       );
 
-      expect(Array.from(instruction.data)).toEqual(instructionBytes(0));
+      expect(Array.from(instruction.data)).toEqual([0]);
     });
   });
 
@@ -1638,7 +1629,7 @@ describe("Exposed Instructions (web3.js)", () => {
       const payer = new PublicKey("11111111111111111111111111111115");
       const instruction = initVaultIx(vault, mint, payer);
 
-      expect(Array.from(instruction.data)).toEqual(instructionBytes(1));
+      expect(Array.from(instruction.data)).toEqual([1]);
       expect(instruction.keys[3].pubkey.toBase58()).toBe(
         deriveEphemeralAta(vault, mint)[0].toBase58(),
       );
@@ -1651,9 +1642,9 @@ describe("Exposed Instructions (web3.js)", () => {
       const mint = new PublicKey("11111111111111111111111111111114");
       const instruction = withdrawSplIx(owner, mint, 1n);
 
-      expect(instruction.data).toHaveLength(16);
+      expect(instruction.data).toHaveLength(9);
       expect(instruction.data[0]).toBe(3);
-      expect(Buffer.from(instruction.data).readBigUInt64LE(8)).toBe(1n);
+      expect(Buffer.from(instruction.data).readBigUInt64LE(1)).toBe(1n);
     });
   });
 
