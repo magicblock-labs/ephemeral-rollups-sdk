@@ -85,11 +85,10 @@ export async function postRouterRpc<T>(
   } catch (err) {
     const name = (err as { name?: unknown })?.name;
     if (name === "AbortError" || name === "TimeoutError") {
-      const wrapped = new Error(
+      throw new Error(
         `Magic Router ${method} timed out after 10s`,
+        { cause: err },
       );
-      (wrapped as Error & { cause?: unknown }).cause = err;
-      throw wrapped;
     }
     throw err;
   }
@@ -112,23 +111,20 @@ export async function postRouterRpc<T>(
         httpStatus: res.status,
       });
     }
-    const httpError = new Error(
+    throw new Error(
       `Magic Router ${method} HTTP ${res.status}: ${bodyText.slice(0, 2048)}`,
+      readErr != null ? { cause: readErr } : undefined,
     );
-    if (readErr != null) {
-      (httpError as Error & { cause?: unknown }).cause = readErr;
-    }
-    throw httpError;
   }
   let body: unknown;
   try {
     body = await res.json();
   } catch (err) {
-    const wrapped = new Error(
-      `Magic Router ${method} returned non-JSON body: ${(err as Error).message}`,
+    const message = err instanceof Error ? err.message : String(err);
+    throw new Error(
+      `Magic Router ${method} returned non-JSON body: ${message}`,
+      { cause: err },
     );
-    (wrapped as Error & { cause?: unknown }).cause = err;
-    throw wrapped;
   }
   const rpcError = parseJsonRpcErrorFromObject(body);
   if (rpcError != null) {

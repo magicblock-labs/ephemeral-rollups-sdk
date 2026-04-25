@@ -137,9 +137,11 @@ describe("getLatestBlockhashForTransaction (Magic Router branch)", () => {
       }),
     );
 
-    await expect(
-      conn.getLatestBlockhashForTransaction(txMessage),
-    ).rejects.toBeInstanceOf(RouterRpcError);
+    const call = conn.getLatestBlockhashForTransaction(txMessage);
+    await expect(call).rejects.toBeInstanceOf(RouterRpcError);
+    await call.catch((err: unknown) => {
+      expect((err as RouterRpcError).code).toBe(-32601);
+    });
   });
 
   it("rejects when blockhash is the empty string", async () => {
@@ -161,20 +163,21 @@ describe("getLatestBlockhashForTransaction (Magic Router branch)", () => {
   it("rejects when the 200 body is not JSON", async () => {
     const conn = await buildRouterConnection();
 
+    const parseErr = new SyntaxError("non-json");
     fetchMock.mockResolvedValueOnce({
       ok: true,
       status: 200,
       json: async () => {
-        throw new SyntaxError("non-json");
+        throw parseErr;
       },
       text: async () => "<html>oops</html>",
     });
 
-    // postRouterRpc wraps the JSON parse failure with method context; the
-    // underlying parser message is preserved in the wrapped error's text.
-    await expect(
-      conn.getLatestBlockhashForTransaction(txMessage),
-    ).rejects.toThrow(/non-json/);
+    const call = conn.getLatestBlockhashForTransaction(txMessage);
+    await expect(call).rejects.toThrow(/returned non-JSON body/);
+    await call.catch((err: unknown) => {
+      expect((err as Error & { cause?: unknown }).cause).toBe(parseErr);
+    });
   });
 
   it("rejects when the 200 body has neither result nor error", async () => {
@@ -496,6 +499,7 @@ describe("postRouterRpc lenient parsing (via getLatestBlockhashForTransaction)",
     await expect(call).rejects.toBeInstanceOf(RouterRpcError);
     await call.catch((err: unknown) => {
       expect((err as RouterRpcError).code).toBe(-32000);
+      expect((err as RouterRpcError).httpStatus).toBe(500);
       expect((err as RouterRpcError).message).toMatch(/<no message>/);
     });
   });
