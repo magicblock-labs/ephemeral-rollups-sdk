@@ -947,9 +947,9 @@ describe("Exposed Instructions (web3.js)", () => {
       const data = Buffer.from(privateTransferInstruction.data);
       expect(data.readUInt32LE(8)).toBe(7);
       expect(data.readBigUInt64LE(12)).toBe(1n);
-      const destinationField = Buffer.from(data.subarray(20, 100));
-      expect(data[100]).toBe(1);
-      const validatorField = Buffer.from(data.subarray(101, 133));
+      expect(data[20]).toBe(1);
+      const validatorField = Buffer.from(data.subarray(21, 53));
+      const destinationField = Buffer.from(data.subarray(53, 133));
       const [suffixField, endOffset] = readLengthPrefixedField(
         data,
         133,
@@ -1072,9 +1072,9 @@ describe("Exposed Instructions (web3.js)", () => {
       expect(data.readUInt32LE(8)).toBe(7);
       expect(data.readBigUInt64LE(12)).toBe(25n);
 
-      const destinationField = Buffer.from(data.subarray(20, 100));
-      expect(data[100]).toBe(1);
-      const validatorField = Buffer.from(data.subarray(101, 133));
+      expect(data[20]).toBe(1);
+      const validatorField = Buffer.from(data.subarray(21, 53));
+      const destinationField = Buffer.from(data.subarray(53, 133));
       const [suffixField, endOffset] = readLengthPrefixedField(
         data,
         133,
@@ -1102,7 +1102,7 @@ describe("Exposed Instructions (web3.js)", () => {
       });
 
       const data = Buffer.from(instructions[1].data);
-      expect(data[100]).toBe(1);
+      expect(data[20]).toBe(1);
       const [suffixField] = readLengthPrefixedField(data, 133);
 
       expect(suffixField).toHaveLength(78);
