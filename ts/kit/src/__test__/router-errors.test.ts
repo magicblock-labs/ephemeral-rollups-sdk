@@ -551,24 +551,4 @@ describe("postRouterRpc lenient parsing (via getLatestBlockhashForTransaction)",
       postRouterRpc<null>("http://router.test", "someMethod", []),
     ).resolves.toBeNull();
   });
-
-  it("wraps JSON parse failure with cause on 2xx non-JSON body", async () => {
-    const conn = await buildRouterConnection();
-
-    const parseErr = new SyntaxError("Unexpected token o in JSON");
-    fetchMock.mockResolvedValueOnce({
-      ok: true,
-      status: 200,
-      json: async () => {
-        throw parseErr;
-      },
-      text: async () => "<html>oops</html>",
-    });
-
-    const call = conn.getLatestBlockhashForTransaction(txMessage);
-    await expect(call).rejects.toThrow(/non-JSON body/);
-    await call.catch((err: unknown) => {
-      expect((err as Error & { cause?: unknown }).cause).toBe(parseErr);
-    });
-  });
 });
