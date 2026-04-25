@@ -12,7 +12,6 @@ export class RouterRpcError extends Error {
     message: string;
     data?: unknown;
     httpStatus?: number;
-    cause?: unknown;
   }) {
     const statusPrefix =
       args.httpStatus != null ? `HTTP ${args.httpStatus} ` : "";
@@ -24,14 +23,6 @@ export class RouterRpcError extends Error {
     this.code = args.code;
     this.data = args.data;
     this.httpStatus = args.httpStatus;
-    // Forward `cause` without requiring the `es2022.error` lib on the
-    // `Error` constructor signature. Runtime support is Node 16.9+.
-    if (args.cause != null) {
-      (this as Error & { cause?: unknown }).cause = args.cause;
-    }
-    // Restore prototype chain so `instanceof RouterRpcError` survives
-    // downlevel emit to ES2015-style `extends Error`.
-    Object.setPrototypeOf(this, new.target.prototype);
   }
 }
 
