@@ -28,7 +28,6 @@ import {
   toTransactionInstruction,
 } from "./transferQueue.js";
 import { encryptEd25519Recipient } from "./crypto.js";
-import { instructionBytes, instructionU8Array } from "./index.js";
 
 // Minimal SPL Token helpers (vendored) to avoid importing @solana/spl-token.
 // This prevents bundlers from pulling transitive deps like spl-token-group and
@@ -854,16 +853,23 @@ export function depositAndDelegateShuttleEphemeralAtaWithMergeAndPrivateTransfer
     destinationOwner.toBytes(),
     validator,
   );
+  if (encryptedDestination.length != 80) {
+    throw new Error(
+      `the length of encryptedDestination must be 80, not ${encryptedDestination.length}`,
+    );
+  }
   const encryptedSuffix = encryptEd25519Recipient(
     packPrivateTransferSuffix(minDelayMs, maxDelayMs, split, clientRefId),
     validator,
   );
+
   const data = Buffer.concat([
     Buffer.from([25]),
     u32leBuffer(shuttleId),
     u64leBuffer(amount),
-    encodeLengthPrefixedBytes(validator.toBytes()),
-    encodeLengthPrefixedBytes(encryptedDestination),
+    encryptedDestination,
+    Buffer.from([1]),
+    validator.toBytes(),
     encodeLengthPrefixedBytes(encryptedSuffix),
   ]);
 
