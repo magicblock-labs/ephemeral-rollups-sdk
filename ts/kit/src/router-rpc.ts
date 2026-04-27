@@ -1,3 +1,5 @@
+const ROUTER_RPC_TIMEOUT_MS = 10_000;
+
 /** Structured JSON-RPC error from a Magic Router response. */
 export class RouterRpcError extends Error {
   public readonly method: string;
@@ -80,13 +82,13 @@ export async function postRouterRpc<T>(
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }),
-      signal: AbortSignal.timeout(10_000),
+      signal: AbortSignal.timeout(ROUTER_RPC_TIMEOUT_MS),
     });
   } catch (err) {
     const name = (err as { name?: unknown })?.name;
     if (name === "AbortError" || name === "TimeoutError") {
       throw new Error(
-        `Magic Router ${method} timed out after 10s`,
+        `Magic Router ${method} timed out after ${ROUTER_RPC_TIMEOUT_MS / 1000}s`,
         { cause: err },
       );
     }
