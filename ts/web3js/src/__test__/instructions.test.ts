@@ -1098,7 +1098,7 @@ describe("Exposed Instructions (web3.js)", () => {
       });
 
       const data = Buffer.from(instructions[1].data);
-      const [suffixField, _] = readLengthPrefixedField(data, 13 + 80 + 1 + 32);
+      const [suffixField] = readLengthPrefixedField(data, 13 + 80 + 1 + 32);
 
       expect(suffixField).toHaveLength(76);
     });

@@ -853,7 +853,7 @@ export function depositAndDelegateShuttleEphemeralAtaWithMergeAndPrivateTransfer
     destinationOwner.toBytes(),
     validator,
   );
-  if (encryptedDestination.length != 80) {
+  if (encryptedDestination.length !== 80) {
     throw new Error(
       `the length of encryptedDestination must be 80, not ${encryptedDestination.length}`,
     );
