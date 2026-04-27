@@ -113,12 +113,10 @@ describe("getLatestBlockhashForTransaction (Magic Router branch)", () => {
     await expect(call).rejects.toThrow(
       /-32604.*account has been delegated to unknown ER node/,
     );
-    await call.catch((err: unknown) => {
-      expect(err).toBeInstanceOf(RouterRpcError);
-      const routerErr = err as RouterRpcError;
-      expect(routerErr.code).toBe(-32604);
-      expect(routerErr.method).toBe("getBlockhashForAccounts");
-      expect(routerErr.data).toEqual({ node: "mAGic..." });
+    await expect(call).rejects.toMatchObject({
+      code: -32604,
+      method: "getBlockhashForAccounts",
+      data: { node: "mAGic..." },
     });
   });
 
@@ -139,9 +137,7 @@ describe("getLatestBlockhashForTransaction (Magic Router branch)", () => {
 
     const call = conn.getLatestBlockhashForTransaction(txMessage);
     await expect(call).rejects.toBeInstanceOf(RouterRpcError);
-    await call.catch((err: unknown) => {
-      expect((err as RouterRpcError).code).toBe(-32601);
-    });
+    await expect(call).rejects.toMatchObject({ code: -32601 });
   });
 
   it("rejects when blockhash is the empty string", async () => {
@@ -175,9 +171,7 @@ describe("getLatestBlockhashForTransaction (Magic Router branch)", () => {
 
     const call = conn.getLatestBlockhashForTransaction(txMessage);
     await expect(call).rejects.toThrow(/returned non-JSON body/);
-    await call.catch((err: unknown) => {
-      expect((err as Error & { cause?: unknown }).cause).toBe(parseErr);
-    });
+    await expect(call).rejects.toHaveProperty("cause", parseErr);
   });
 
   it("rejects when the 200 body has neither result nor error", async () => {
@@ -292,9 +286,7 @@ describe("getLatestBlockhashForTransaction (Magic Router branch)", () => {
 
     const call = conn.getLatestBlockhashForTransaction(txMessage);
     await expect(call).rejects.toThrow(/HTTP 500/);
-    await call.catch((err: unknown) => {
-      expect(err).not.toBeInstanceOf(RouterRpcError);
-    });
+    await expect(call).rejects.not.toBeInstanceOf(RouterRpcError);
   });
 });
 
@@ -405,9 +397,7 @@ describe("postRouterRpc transport errors via getLatestBlockhashForTransaction", 
     await expect(call).rejects.toThrow(
       /Magic Router getBlockhashForAccounts timed out after 10s/,
     );
-    await call.catch((err: unknown) => {
-      expect((err as Error & { cause?: unknown }).cause).toBe(abortErr);
-    });
+    await expect(call).rejects.toHaveProperty("cause", abortErr);
   });
 
   it("wraps TimeoutError (newer runtimes) with the same shape as AbortError", async () => {
@@ -418,9 +408,7 @@ describe("postRouterRpc transport errors via getLatestBlockhashForTransaction", 
 
     const call = conn.getLatestBlockhashForTransaction(txMessage);
     await expect(call).rejects.toThrow(/timed out after 10s/);
-    await call.catch((err: unknown) => {
-      expect((err as Error & { cause?: unknown }).cause).toBe(timeoutErr);
-    });
+    await expect(call).rejects.toHaveProperty("cause", timeoutErr);
   });
 
   it("propagates generic transport errors (e.g. ECONNREFUSED) unchanged", async () => {
@@ -450,9 +438,7 @@ describe("postRouterRpc transport errors via getLatestBlockhashForTransaction", 
 
     const call = conn.getLatestBlockhashForTransaction(txMessage);
     await expect(call).rejects.toThrow(/HTTP 502/);
-    await call.catch((err: unknown) => {
-      expect((err as Error & { cause?: unknown }).cause).toBe(readErr);
-    });
+    await expect(call).rejects.toHaveProperty("cause", readErr);
   });
 });
 
@@ -466,9 +452,7 @@ describe("postRouterRpc lenient parsing (via getLatestBlockhashForTransaction)",
 
     const call = conn.getLatestBlockhashForTransaction(txMessage);
     await expect(call).rejects.toThrow(/HTTP 500/);
-    await call.catch((err: unknown) => {
-      expect(err).not.toBeInstanceOf(RouterRpcError);
-    });
+    await expect(call).rejects.not.toBeInstanceOf(RouterRpcError);
   });
 
   it("falls through to plain HTTP error when non-2xx body has a non-number code (e.g. stringified)", async () => {
@@ -483,9 +467,7 @@ describe("postRouterRpc lenient parsing (via getLatestBlockhashForTransaction)",
 
     const call = conn.getLatestBlockhashForTransaction(txMessage);
     await expect(call).rejects.toThrow(/HTTP 500/);
-    await call.catch((err: unknown) => {
-      expect(err).not.toBeInstanceOf(RouterRpcError);
-    });
+    await expect(call).rejects.not.toBeInstanceOf(RouterRpcError);
   });
 
   it("surfaces RouterRpcError with <no message> when non-2xx body omits message", async () => {
@@ -513,9 +495,7 @@ describe("postRouterRpc lenient parsing (via getLatestBlockhashForTransaction)",
 
     const call = conn.getLatestBlockhashForTransaction(txMessage);
     await expect(call).rejects.toBeInstanceOf(RouterRpcError);
-    await call.catch((err: unknown) => {
-      expect((err as RouterRpcError).message).toMatch(/<no message>/);
-    });
+    await expect(call).rejects.toThrow(/<no message>/);
   });
 
   it("falls through to 'returned no result' when 2xx body has a non-finite error code and no result", async () => {
@@ -534,9 +514,7 @@ describe("postRouterRpc lenient parsing (via getLatestBlockhashForTransaction)",
     // a meaningful error.
     const call = conn.getLatestBlockhashForTransaction(txMessage);
     await expect(call).rejects.toThrow(/returned no result/);
-    await call.catch((err: unknown) => {
-      expect(err).not.toBeInstanceOf(RouterRpcError);
-    });
+    await expect(call).rejects.not.toBeInstanceOf(RouterRpcError);
   });
 
   it("accepts 2xx response with result: null", async () => {
