@@ -27,7 +27,7 @@ import {
   processPendingTransferQueueRefillIx,
   toTransactionInstruction,
 } from "./transferQueue.js";
-import { encryptEd25519Recipient } from "./crypto.js";
+import { encryptWithEd25519Recipient, ENCRYPTION_OVERHEAD } from "./crypto.js";
 
 // Minimal SPL Token helpers (vendored) to avoid importing @solana/spl-token.
 // This prevents bundlers from pulling transitive deps like spl-token-group and
@@ -849,16 +849,16 @@ export function depositAndDelegateShuttleEphemeralAtaWithMergeAndPrivateTransfer
   const [vault] = deriveVault(mint);
   const vaultAta = deriveVaultAta(mint, vault);
   const [queue] = deriveTransferQueue(mint, validator);
-  const encryptedDestination = encryptEd25519Recipient(
+  const encryptedDestination = encryptWithEd25519Recipient(
     destinationOwner.toBytes(),
     validator,
   );
-  if (encryptedDestination.length !== 80) {
+  if (encryptedDestination.length !== 32 + ENCRYPTION_OVERHEAD) {
     throw new Error(
       `the length of encryptedDestination must be 80, not ${encryptedDestination.length}`,
     );
   }
-  const encryptedSuffix = encryptEd25519Recipient(
+  const encryptedSuffix = encryptWithEd25519Recipient(
     packPrivateTransferSuffix(minDelayMs, maxDelayMs, split, clientRefId),
     validator,
   );

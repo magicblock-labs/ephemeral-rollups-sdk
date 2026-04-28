@@ -1695,22 +1695,16 @@ describe("Exposed Instructions (web3.js)", () => {
       );
 
       const data = Buffer.from(instruction.data);
-      expect(data[0]).toBe(30); // discriminator
+      expect(data[0]).toBe(29); // discriminator
       expect(data.readUInt32LE(1)).toBe(7); // shuttle_id
       // Layout after the discriminator:
       //   [1..5) shuttle_id  [5] stash_bump  [6..38) mint
       //   [38..48) 10 bumps  → 3 vardata blobs start at 48.
       expect(data.subarray(6, 38).equals(mint.toBuffer())).toBe(true);
 
-      const [validatorField, nextOffset] = readLengthPrefixedField(data, 48);
-      const [destinationField, suffixOffset] = readLengthPrefixedField(
-        data,
-        nextOffset,
-      );
-      const [suffixField, endOffset] = readLengthPrefixedField(
-        data,
-        suffixOffset,
-      );
+      const validatorField = data.subarray(48, 80);
+      const destinationField = data.subarray(80, 160);
+      const [suffixField, endOffset] = readLengthPrefixedField(data, 160);
 
       expect(validatorField.equals(validator.toBuffer())).toBe(true);
       // ChaCha20-Poly1305 encryption: 32 (ephemeral pubkey) + plaintext +
@@ -1737,12 +1731,7 @@ describe("Exposed Instructions (web3.js)", () => {
       );
 
       const data = Buffer.from(instruction.data);
-      const [, afterValidator] = readLengthPrefixedField(data, 48);
-      const [, afterDestination] = readLengthPrefixedField(
-        data,
-        afterValidator,
-      );
-      const [suffixField] = readLengthPrefixedField(data, afterDestination);
+      const [suffixField] = readLengthPrefixedField(data, 160);
       // Suffix plaintext is now 28 bytes (+u64 clientRefId): 32 + 28 + 16 = 76.
       expect(suffixField).toHaveLength(76);
     });
@@ -1784,12 +1773,7 @@ describe("Exposed Instructions (web3.js)", () => {
       );
 
       const data = Buffer.from(instruction.data);
-      const [, afterValidator] = readLengthPrefixedField(data, 48);
-      const [, afterDestination] = readLengthPrefixedField(
-        data,
-        afterValidator,
-      );
-      const [suffixField] = readLengthPrefixedField(data, afterDestination);
+      const [suffixField] = readLengthPrefixedField(data, 160);
       expect(suffixField).toHaveLength(76);
     });
 

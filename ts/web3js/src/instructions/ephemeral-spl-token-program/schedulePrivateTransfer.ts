@@ -11,7 +11,7 @@ import {
   HYDRA_PROGRAM_ID,
   TOKEN_PROGRAM_ID,
 } from "../../constants.js";
-import { encryptEd25519Recipient } from "./crypto.js";
+import { encryptWithEd25519Recipient, ENCRYPTION_OVERHEAD } from "./crypto.js";
 import {
   deriveRentPda,
   deriveShuttleAta,
@@ -24,7 +24,7 @@ import { deriveTransferQueue } from "./transferQueue.js";
 // Local constants (mirror the on-chain side)
 // ---------------------------------------------------------------------------
 
-const SCHEDULE_PRIVATE_TRANSFER_DISCRIMINATOR = 30;
+const SCHEDULE_PRIVATE_TRANSFER_DISCRIMINATOR = 29;
 
 const STASH_PDA_SEED = Buffer.from("stash");
 const HYDRA_CRANK_SEED_PREFIX = Buffer.from("crank");
@@ -112,7 +112,7 @@ function hydraSeed(stashPda: PublicKey, shuttleId: number): Buffer {
 // ---------------------------------------------------------------------------
 
 /**
- * Build a `schedule_private_transfer` instruction (discriminator 30).
+ * Build a `schedule_private_transfer` instruction (discriminator 29).
  *
  * Appends to a swap transaction so the swap's `destinationTokenAccount`
  * (which the caller sets to the stash ATA) gets privately forwarded to
@@ -221,11 +221,16 @@ export function schedulePrivateTransferIx(
   const [hydraCrankPda] = deriveHydraCrankPda(stashPda, shuttleId);
 
   // -------- build the encrypted payload (same shape as ix 25) --------
-  const encryptedDestination = encryptEd25519Recipient(
+  const encryptedDestination = encryptWithEd25519Recipient(
     destinationOwner.toBytes(),
     validator,
   );
-  const encryptedSuffix = encryptEd25519Recipient(
+  if (encryptedDestination.length !== 32 + ENCRYPTION_OVERHEAD) {
+    throw new Error(
+      `the length of encryptedDestination must be 80, not ${encryptedDestination.length}`,
+    );
+  }
+  const encryptedSuffix = encryptWithEd25519Recipient(
     packPrivateTransferSuffix(minDelayMs, maxDelayMs, split, clientRefId),
     validator,
   );
@@ -249,8 +254,8 @@ export function schedulePrivateTransferIx(
     Buffer.from([vaultTokenBump]),
     Buffer.from([stashAtaBump]),
     Buffer.from([queueBump]),
-    encodeLengthPrefixedBytes(validator.toBytes()),
-    encodeLengthPrefixedBytes(encryptedDestination),
+    validator.toBytes(),
+    encryptedDestination,
     encodeLengthPrefixedBytes(encryptedSuffix),
   ]);
 
