@@ -814,6 +814,7 @@ export function depositAndDelegateShuttleEphemeralAtaWithMergeAndPrivateTransfer
   mint: PublicKey,
   shuttleId: number,
   amount: bigint,
+  exactOut: boolean,
   minDelayMs: bigint,
   maxDelayMs: bigint,
   split: number,
@@ -867,6 +868,7 @@ export function depositAndDelegateShuttleEphemeralAtaWithMergeAndPrivateTransfer
     Buffer.from([25]),
     u32leBuffer(shuttleId),
     u64leBuffer(amount),
+    Buffer.from([exactOut ? 1 : 0]),
     encryptedDestination,
     Buffer.from([1]),
     validator.toBytes(),
@@ -1379,6 +1381,7 @@ export interface DelegateSplWithPrivateTransferOptions
   minDelayMs?: bigint;
   maxDelayMs?: bigint;
   split?: number;
+  exactOut?: boolean;
   clientRefId?: bigint;
   initTransferQueueIfMissing?: boolean;
 }
@@ -1394,6 +1397,7 @@ export interface TransferSplPrivateOptions {
   minDelayMs?: bigint;
   maxDelayMs?: bigint;
   split?: number;
+  exactOut?: boolean;
   clientRefId?: bigint;
 }
 
@@ -1607,6 +1611,7 @@ export async function delegateSplWithPrivateTransfer(
   const minDelayMs = opts?.minDelayMs ?? 0n;
   const maxDelayMs = opts?.maxDelayMs ?? minDelayMs;
   const split = opts?.split ?? 1;
+  const exactOut = opts?.exactOut ?? true;
   const clientRefId = opts?.clientRefId;
 
   if (validator == null) {
@@ -1673,6 +1678,7 @@ export async function delegateSplWithPrivateTransfer(
       mint,
       shuttleId,
       amount,
+      exactOut,
       minDelayMs,
       maxDelayMs,
       split,
@@ -1700,7 +1706,10 @@ export async function transferSpl(
   const minDelayMs = opts.privateTransfer?.minDelayMs ?? 0n;
   const maxDelayMs = opts.privateTransfer?.maxDelayMs ?? minDelayMs;
   const split = opts.privateTransfer?.split ?? 1;
+  const exactOut = opts.privateTransfer?.exactOut ?? true;
   const clientRefId = opts.privateTransfer?.clientRefId;
+
+  console.log("opts: ", opts);
 
   const fromAta = getAssociatedTokenAddressSync(mint, from);
   const toAta = getAssociatedTokenAddressSync(mint, to);
@@ -1817,6 +1826,7 @@ export async function transferSpl(
             mint,
             shuttleId,
             amount,
+            exactOut,
             minDelayMs,
             maxDelayMs,
             split,
