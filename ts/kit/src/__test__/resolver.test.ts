@@ -7,8 +7,11 @@ import type {
 import { Resolver } from "../resolver";
 import { DELEGATION_PROGRAM_ID } from "../constants";
 
+type AccountInfo = (AccountInfoBase & AccountInfoWithBase64EncodedData) | null;
+
 interface AccountNotification {
-  value: (AccountInfoBase & AccountInfoWithBase64EncodedData) | null;
+  context: { slot: bigint };
+  value: AccountInfo;
 }
 
 const kitMocks = vi.hoisted(() => {
@@ -102,12 +105,25 @@ function createNotificationStream() {
   };
 }
 
-async function timeout(ms: number): Promise<"timeout"> {
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      resolve("timeout");
-    }, ms);
-  });
+function createAccountNotification(
+  slot: bigint,
+  value: AccountInfo,
+): AccountNotification {
+  return {
+    context: { slot },
+    value,
+  };
+}
+
+function createDelegatedAccount(): AccountInfoBase &
+  AccountInfoWithBase64EncodedData {
+  return {
+    data: ["AAAA"],
+    executable: false,
+    lamports: 1n,
+    owner: DELEGATION_PROGRAM_ID,
+    space: 0n,
+  } as unknown as AccountInfoBase & AccountInfoWithBase64EncodedData;
 }
 
 describe("Resolver", () => {
@@ -122,12 +138,13 @@ describe("Resolver", () => {
   let accountNotifications: ReturnType<typeof vi.fn>;
   let subscribe: ReturnType<typeof vi.fn>;
   let chainRpc: { getAccountInfo: ReturnType<typeof vi.fn> };
+  let resolver: Resolver | undefined;
 
   beforeEach(() => {
     vi.clearAllMocks();
 
     notificationStream = createNotificationStream();
-    getAccountInfoSend = vi.fn(async () => ({ value: null }));
+    getAccountInfoSend = vi.fn(async () => createAccountNotification(1n, null));
     getAccountInfo = vi.fn(() => ({ send: getAccountInfoSend }));
     accountNotifications = vi.fn(() => ({ subscribe }));
     subscribe = vi.fn(async () => notificationStream.stream);
@@ -148,19 +165,19 @@ describe("Resolver", () => {
   });
 
   afterEach(() => {
+    resolver?.terminate();
     notificationStream.close();
+    resolver = undefined;
   });
 
   it("returns from initial fetch without waiting for a websocket notification", async () => {
-    const resolver = new Resolver(
+    const currentResolver = new Resolver(
       { chain: chainUrl, websocket: "wss://base.example" },
       new Map(),
     );
+    resolver = currentResolver;
 
-    const result = await Promise.race([
-      resolver.trackAccount(accountAddress),
-      timeout(50),
-    ]);
+    const result = await currentResolver.trackAccount(accountAddress);
 
     expect(result).toEqual({ status: 1 });
     expect(accountNotifications).toHaveBeenCalledWith(
@@ -183,48 +200,101 @@ describe("Resolver", () => {
   });
 
   it("does not hang when no websocket notification arrives immediately", async () => {
-    let resolveInitialFetch: ((value: { value: null }) => void) | undefined;
+    let resolveInitialFetch: ((value: AccountNotification) => void) | undefined;
     getAccountInfoSend.mockReturnValue(
       new Promise((resolve) => {
         resolveInitialFetch = resolve;
       }),
     );
-    const resolver = new Resolver(
+    const currentResolver = new Resolver(
       { chain: chainUrl, websocket: "wss://base.example" },
       new Map(),
     );
+    resolver = currentResolver;
 
-    const trackAccount = resolver.trackAccount(accountAddress);
+    const trackAccount = currentResolver.trackAccount(accountAddress);
     await vi.waitFor(() => {
       expect(getAccountInfo).toHaveBeenCalled();
     });
 
-    resolveInitialFetch?.({ value: null });
+    resolveInitialFetch?.(createAccountNotification(1n, null));
     await expect(trackAccount).resolves.toEqual({ status: 1 });
   });
 
   it("continues tracking account updates after returning initial state", async () => {
-    const resolver = new Resolver(
+    const currentResolver = new Resolver(
       { chain: chainUrl, websocket: "wss://base.example" },
       new Map([[kitMocks.validatorAddress, routeUrl]]),
     );
+    resolver = currentResolver;
 
-    await expect(resolver.trackAccount(accountAddress)).resolves.toEqual({
-      status: 1,
-    });
+    await expect(currentResolver.trackAccount(accountAddress)).resolves.toEqual(
+      {
+        status: 1,
+      },
+    );
 
-    notificationStream.push({
-      value: {
-        data: ["AAAA"],
-        executable: false,
-        lamports: 1n,
-        owner: DELEGATION_PROGRAM_ID,
-        space: 0n,
-      } as unknown as AccountInfoBase & AccountInfoWithBase64EncodedData,
-    });
+    notificationStream.push(
+      createAccountNotification(2n, createDelegatedAccount()),
+    );
 
     await vi.waitFor(async () => {
-      await expect(resolver.resolve(accountAddress)).resolves.toBe(routeRpc);
+      await expect(currentResolver.resolve(accountAddress)).resolves.toBe(
+        routeRpc,
+      );
     });
+  });
+
+  it("does not overwrite a fresher websocket notification with the initial fetch", async () => {
+    let resolveInitialFetch: ((value: AccountNotification) => void) | undefined;
+    getAccountInfoSend.mockReturnValue(
+      new Promise((resolve) => {
+        resolveInitialFetch = resolve;
+      }),
+    );
+    const currentResolver = new Resolver(
+      { chain: chainUrl, websocket: "wss://base.example" },
+      new Map([[kitMocks.validatorAddress, routeUrl]]),
+    );
+    resolver = currentResolver;
+
+    const trackAccount = currentResolver.trackAccount(accountAddress);
+    await vi.waitFor(() => {
+      expect(getAccountInfo).toHaveBeenCalled();
+    });
+
+    notificationStream.push(
+      createAccountNotification(2n, createDelegatedAccount()),
+    );
+    await vi.waitFor(() => {
+      expect(kitMocks.decodeDelegationRecord).toHaveBeenCalled();
+    });
+
+    resolveInitialFetch?.(createAccountNotification(1n, null));
+
+    await expect(trackAccount).resolves.toEqual({
+      status: 0,
+      validator: kitMocks.validatorAddress,
+    });
+    await expect(currentResolver.resolve(accountAddress)).resolves.toBe(
+      routeRpc,
+    );
+  });
+
+  it("terminates active account subscriptions", async () => {
+    const currentResolver = new Resolver(
+      { chain: chainUrl, websocket: "wss://base.example" },
+      new Map(),
+    );
+    resolver = currentResolver;
+
+    await currentResolver.trackAccount(accountAddress);
+    const abortSignal = subscribe.mock.calls[0][0].abortSignal as AbortSignal;
+
+    expect(abortSignal.aborted).toBe(false);
+
+    currentResolver.terminate();
+
+    expect(abortSignal.aborted).toBe(true);
   });
 });

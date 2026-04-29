@@ -17,6 +17,8 @@ import {
   getAddressCodec,
   getU8Codec,
   AccountRole,
+  type Slot,
+  type SolanaRpcResponse,
 } from "@solana/kit";
 import { DELEGATION_PROGRAM_ID } from "./constants.js";
 
@@ -41,16 +43,17 @@ type DelegationRecord =
   | { status: DelegationStatus.Delegated; validator: Address }
   | { status: DelegationStatus.Undelegated };
 
-interface AccountNotification {
-  value: (AccountInfoBase & AccountInfoWithBase64EncodedData) | null;
-}
+type AccountInfo = (AccountInfoBase & AccountInfoWithBase64EncodedData) | null;
+type AccountNotification = SolanaRpcResponse<AccountInfo>;
 
 /** Class responsible for resolving connections to Solana validators */
 export class Resolver {
   private readonly routes = new Map<string, Rpc<SolanaRpcApiDevnet>>();
   private readonly delegations = new Map<string, DelegationRecord>();
+  private readonly delegationSlots = new Map<string, Slot>();
   private readonly chain: Rpc<SolanaRpcApiDevnet>;
   private readonly ws: RpcSubscriptions<SolanaRpcSubscriptionsApi>;
+  private readonly subs = new Map<string, AbortController>();
 
   constructor(config: Configuration, routes: Map<string, string>) {
     this.chain = createSolanaRpc(config.chain);
@@ -90,7 +93,12 @@ export class Resolver {
         encoding: "base64",
       })
       .subscribe({ abortSignal: abortController.signal });
-    this.listenForAccountNotifications(accountNotifications, pubkey);
+    this.subs.set(pubkeyStr, abortController);
+    this.listenForAccountNotifications(
+      accountNotifications,
+      pubkey,
+      abortController,
+    );
 
     const accountInfo = await this.chain
       .getAccountInfo(delegationRecord, {
@@ -99,7 +107,7 @@ export class Resolver {
       })
       .send();
 
-    return this.updateStatus(accountInfo.value, pubkey);
+    return this.updateStatusFromResponse(accountInfo, pubkey);
   }
 
   /**
@@ -146,24 +154,72 @@ export class Resolver {
         : undefined;
   }
 
+  /**
+   * Terminates all active WebSocket subscriptions.
+   * Should be called to clean up resources when the resolver is no longer needed.
+   */
+  public terminate(): void {
+    for (const sub of this.subs.values()) {
+      sub.abort();
+    }
+    this.subs.clear();
+  }
+
   private listenForAccountNotifications(
     accountNotifications: AsyncIterable<AccountNotification>,
     pubkey: Address,
+    abortController: AbortController,
   ) {
+    const pubkeyStr = pubkey.toString();
     void (async () => {
-      for await (const accountNotification of accountNotifications) {
-        this.updateStatus(accountNotification.value, pubkey);
+      let shouldClearStatus = false;
+      try {
+        for await (const accountNotification of accountNotifications) {
+          this.updateStatusFromResponse(accountNotification, pubkey);
+        }
+        shouldClearStatus = !abortController.signal.aborted;
+      } catch (error: unknown) {
+        if (
+          (error instanceof DOMException || error instanceof Error) &&
+          error.name === "AbortError"
+        ) {
+          return;
+        }
+        shouldClearStatus = true;
+        console.error(`Account subscription failed for ${pubkey}:`, error);
+      } finally {
+        if (this.subs.get(pubkeyStr) === abortController) {
+          this.subs.delete(pubkeyStr);
+        }
+        if (shouldClearStatus) {
+          this.delegations.delete(pubkeyStr);
+          this.delegationSlots.delete(pubkeyStr);
+        }
       }
-    })().catch((error: unknown) => {
-      if (error instanceof DOMException && error.name === "AbortError") {
-        return;
-      }
-      console.error(`Account subscription failed for ${pubkey}:`, error);
-    });
+    })();
+  }
+
+  private updateStatusFromResponse(
+    accountNotification: AccountNotification,
+    pubkey: Address,
+  ): DelegationRecord {
+    const pubkeyStr = pubkey.toString();
+    const currentSlot = this.delegationSlots.get(pubkeyStr);
+    const currentRecord = this.delegations.get(pubkeyStr);
+    if (
+      currentSlot !== undefined &&
+      accountNotification.context.slot < currentSlot &&
+      currentRecord !== undefined
+    ) {
+      return currentRecord;
+    }
+
+    this.delegationSlots.set(pubkeyStr, accountNotification.context.slot);
+    return this.updateStatus(accountNotification.value, pubkey);
   }
 
   private updateStatus(
-    account: (AccountInfoBase & AccountInfoWithBase64EncodedData) | null,
+    account: AccountInfo,
     pubkey: Address,
   ): DelegationRecord {
     const isDelegated =
