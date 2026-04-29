@@ -41,6 +41,10 @@ type DelegationRecord =
   | { status: DelegationStatus.Delegated; validator: Address }
   | { status: DelegationStatus.Undelegated };
 
+interface AccountNotification {
+  value: (AccountInfoBase & AccountInfoWithBase64EncodedData) | null;
+}
+
 /** Class responsible for resolving connections to Solana validators */
 export class Resolver {
   private readonly routes = new Map<string, Rpc<SolanaRpcApiDevnet>>();
@@ -86,11 +90,7 @@ export class Resolver {
         encoding: "base64",
       })
       .subscribe({ abortSignal: abortController.signal });
-
-    for await (const accountNotification of accountNotifications) {
-      this.updateStatus(accountNotification.value, pubkey);
-      abortController.abort();
-    }
+    this.listenForAccountNotifications(accountNotifications, pubkey);
 
     const accountInfo = await this.chain
       .getAccountInfo(delegationRecord, {
@@ -144,6 +144,22 @@ export class Resolver {
       : validators.size === 0
         ? this.chain
         : undefined;
+  }
+
+  private listenForAccountNotifications(
+    accountNotifications: AsyncIterable<AccountNotification>,
+    pubkey: Address,
+  ) {
+    void (async () => {
+      for await (const accountNotification of accountNotifications) {
+        this.updateStatus(accountNotification.value, pubkey);
+      }
+    })().catch((error: unknown) => {
+      if (error instanceof DOMException && error.name === "AbortError") {
+        return;
+      }
+      console.error(`Account subscription failed for ${pubkey}:`, error);
+    });
   }
 
   private updateStatus(
