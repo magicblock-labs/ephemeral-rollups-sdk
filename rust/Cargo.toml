@@ -34,7 +34,7 @@ ephemeral-rollups-sdk-attribute-action = { path = "action-attribute", version = 
 
 # Magicblock
 magicblock-delegation-program-api = { git = "https://github.com/magicblock-labs/delegation-program.git", branch = "snawaz/upgrade", default-features = false }
-magicblock-magic-program-api = { git = "https://github.com/magicblock-labs/magicblock-validator.git", branch = "bmuddha/epic/migration-solana-v3", default-features = false }
+magicblock-magic-program-api = { git = "https://github.com/magicblock-labs/magicblock-validator.git", branch = "dode/compression-3x", default-features = false }
 
 ## External crates
 anchor-lang = { version = ">=0.28.0" }

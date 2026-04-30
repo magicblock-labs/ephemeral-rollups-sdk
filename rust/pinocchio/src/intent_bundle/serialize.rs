@@ -111,6 +111,9 @@ pub(super) struct MagicIntentBundleSerialize<'i, 'acc, 'args> {
     commit_finalize: Option<()>,
     /// Not yet implemented; always `None`. Reserved for wire-format compatibility.
     commit_finalize_and_undelegate: Option<()>,
+    commit_finalize_compressed: Option<CommitSerialize<'i, 'acc, 'args>>,
+    commit_finalize_compressed_and_undelegate:
+        Option<CommitAndUndelegateSerialize<'i, 'acc, 'args>>,
     standalone_actions: &'args [CallHandler<'args>],
 }
 
@@ -128,6 +131,12 @@ impl<'i, 'acc, 'args> MagicIntentBundleSerialize<'i, 'acc, 'args> {
                 .map(|c| CommitAndUndelegateSerialize::new(c, indices_map)),
             commit_finalize: None,
             commit_finalize_and_undelegate: None,
+            commit_finalize_compressed: bundle
+                .commit_finalize_compressed_intent
+                .map(|c| CommitSerialize::new(c, indices_map)),
+            commit_finalize_compressed_and_undelegate: bundle
+                .commit_finalize_compressed_and_undelegate_intent
+                .map(|c| CommitAndUndelegateSerialize::new(c, indices_map)),
             standalone_actions: bundle.standalone_actions,
             indices_map,
         }
@@ -179,6 +188,24 @@ impl<'i, 'acc, 'args> MagicIntentBundleSerialize<'i, 'acc, 'args> {
             // TODO: implement once supported
         }
 
+        if let Some(ref commit_finalize_compressed) = self.commit_finalize_compressed {
+            let commit_action_len = commit_finalize_compressed.get_actions_len();
+            if action_index < commit_action_len {
+                return commit_finalize_compressed.get_action_callback(action_index);
+            }
+            action_index -= commit_action_len;
+        }
+
+        if let Some(ref commit_finalize_compressed_and_undelegate) =
+            self.commit_finalize_compressed_and_undelegate
+        {
+            let cau_action_len = commit_finalize_compressed_and_undelegate.get_actions_len();
+            if action_index < cau_action_len {
+                return commit_finalize_compressed_and_undelegate.get_action_callback(action_index);
+            }
+            action_index -= cau_action_len;
+        }
+
         let standalone_action_len = self.standalone_actions.len();
         if action_index < standalone_action_len {
             self.get_standalone_action_callback(action_index)
@@ -202,6 +229,16 @@ impl<'i, 'acc, 'args> MagicIntentBundleSerialize<'i, 'acc, 'args> {
                 .unwrap_or(0)
             + 0 // TODO: support commit_finalize & commit_finalize_and_undelegate
             + 0 // TODO: support commit_finalize_and_undelegate
+            + self
+                .commit_finalize_compressed
+                .as_ref()
+                .map(|el| el.get_actions_len())
+                .unwrap_or(0)
+            + self
+                .commit_finalize_compressed_and_undelegate
+                .as_ref()
+                .map(|el| el.get_actions_len())
+                .unwrap_or(0)
     }
 
     pub(super) fn get_standalone_action_callback(
@@ -249,6 +286,9 @@ impl bincode::Encode for MagicIntentBundleSerialize<'_, '_, '_> {
         self.commit_and_undelegate.encode(encoder)?;
         self.commit_finalize.encode(encoder)?;
         self.commit_finalize_and_undelegate.encode(encoder)?;
+        self.commit_finalize_compressed.encode(encoder)?;
+        self.commit_finalize_compressed_and_undelegate
+            .encode(encoder)?;
         encode_handler_slice(self.standalone_actions, self.indices_map, encoder)
     }
 }
