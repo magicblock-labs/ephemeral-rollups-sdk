@@ -221,6 +221,23 @@ describe("Resolver", () => {
     await expect(trackAccount).resolves.toEqual({ status: 1 });
   });
 
+  it("aborts the subscription when the initial fetch fails", async () => {
+    const fetchError = new Error("initial fetch failed");
+    getAccountInfoSend.mockRejectedValue(fetchError);
+    const currentResolver = new Resolver(
+      { chain: chainUrl, websocket: "wss://base.example" },
+      new Map(),
+    );
+    resolver = currentResolver;
+
+    await expect(currentResolver.trackAccount(accountAddress)).rejects.toThrow(
+      fetchError,
+    );
+
+    const abortSignal = subscribe.mock.calls[0][0].abortSignal as AbortSignal;
+    expect(abortSignal.aborted).toBe(true);
+  });
+
   it("continues tracking account updates after returning initial state", async () => {
     const currentResolver = new Resolver(
       { chain: chainUrl, websocket: "wss://base.example" },

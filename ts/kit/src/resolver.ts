@@ -100,14 +100,20 @@ export class Resolver {
       abortController,
     );
 
-    const accountInfo = await this.chain
-      .getAccountInfo(delegationRecord, {
-        commitment: "confirmed",
-        encoding: "base64",
-      })
-      .send();
+    try {
+      const accountInfo = await this.chain
+        .getAccountInfo(delegationRecord, {
+          commitment: "confirmed",
+          encoding: "base64",
+        })
+        .send();
 
-    return this.updateStatusFromResponse(accountInfo, pubkey);
+      return this.updateStatusFromResponse(accountInfo, pubkey);
+    } catch (error) {
+      abortController.abort();
+      this.subs.delete(pubkeyStr);
+      throw error;
+    }
   }
 
   /**
