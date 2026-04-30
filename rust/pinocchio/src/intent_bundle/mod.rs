@@ -104,6 +104,8 @@ impl<'acc, 'args> MagicIntentBundleBuilder<'acc, 'args> {
             standalone_actions: _,
             commit_intent,
             commit_and_undelegate_intent,
+            commit_finalize_compressed_intent,
+            commit_finalize_compressed_and_undelegate_intent,
         } = self.intent_bundle;
 
         MagicIntentBundleBuilder {
@@ -115,6 +117,8 @@ impl<'acc, 'args> MagicIntentBundleBuilder<'acc, 'args> {
                 standalone_actions: actions,
                 commit_intent,
                 commit_and_undelegate_intent,
+                commit_finalize_compressed_intent,
+                commit_finalize_compressed_and_undelegate_intent,
             },
         }
     }
@@ -347,8 +351,8 @@ mod tests {
         MagicIntentBundleBuilder as SdkBuilder,
     };
     use magicblock_magic_program_api::args::ActionArgs as SdkActionArgs;
-    use magicblock_magic_program_api::Pubkey;
     use solana_program::account_info::AccountInfo;
+    use solana_program::pubkey::Pubkey as SolanaPubkey;
 
     use crate::intent_bundle::serialize::MagicIntentBundleSerialize;
 
@@ -373,7 +377,7 @@ mod tests {
 
     impl MockRuntimeAccount {
         fn new_unique() -> Self {
-            Self::new(Pubkey::new_unique().to_bytes())
+            Self::new(SolanaPubkey::new_unique().to_bytes())
         }
 
         fn new(address: [u8; 32]) -> Self {
@@ -400,19 +404,19 @@ mod tests {
 
     /// Helper to hold owned data for an SDK `AccountInfo`.
     struct SdkTestAccount {
-        key: Pubkey,
+        key: SolanaPubkey,
         lamports: u64,
         data: Vec<u8>,
-        owner: Pubkey,
+        owner: SolanaPubkey,
     }
 
     impl SdkTestAccount {
         fn new(address: [u8; 32]) -> Self {
             Self {
-                key: Pubkey::new_from_array(address),
+                key: SolanaPubkey::new_from_array(address),
                 lamports: 1_000_000,
                 data: vec![],
-                owner: Pubkey::new_from_array([0; 32]),
+                owner: SolanaPubkey::new_from_array([0; 32]),
             }
         }
 
@@ -492,7 +496,7 @@ mod tests {
             args: SdkActionArgs::new(action_data.to_vec()),
             compute_units: 200_000,
             escrow_authority: s_escrow.as_signer_info(),
-            destination_program: Pubkey::new_from_array(dest_addr),
+            destination_program: dest_addr.into(),
             accounts: vec![],
         };
         let (accounts, ix) = SdkBuilder::new(
@@ -573,14 +577,14 @@ mod tests {
             args: SdkActionArgs::new(commit_data.to_vec()),
             compute_units: 100_000,
             escrow_authority: s_escrow1.as_signer_info(),
-            destination_program: Pubkey::new_from_array(dest1_addr),
+            destination_program: dest1_addr.into(),
             accounts: vec![],
         };
         let sdk_post_undelegate = SdkCallHandler {
             args: SdkActionArgs::new(undelegate_data.to_vec()),
             compute_units: 50_000,
             escrow_authority: s_escrow2.as_signer_info(),
-            destination_program: Pubkey::new_from_array(dest2_addr),
+            destination_program: dest2_addr.into(),
             accounts: vec![],
         };
         let (accounts, ix) = SdkBuilder::new(
@@ -670,14 +674,14 @@ mod tests {
             args: SdkActionArgs::new(commit_data.to_vec()),
             compute_units: 100_000,
             escrow_authority: s_escrow1.as_signer_info(),
-            destination_program: Pubkey::new_from_array(dest1_addr),
+            destination_program: dest1_addr.into(),
             accounts: vec![],
         };
         let sdk_undelegate_handler = SdkCallHandler {
             args: SdkActionArgs::new(undelegate_data.to_vec()),
             compute_units: 50_000,
             escrow_authority: s_escrow2.as_signer_info(),
-            destination_program: Pubkey::new_from_array(dest2_addr),
+            destination_program: dest2_addr.into(),
             accounts: vec![],
         };
         let (accounts, ix) = SdkBuilder::new(
@@ -925,11 +929,11 @@ mod tests {
             args: SdkActionArgs::new(action_data.to_vec()),
             compute_units: 200_000,
             escrow_authority: s_escrow.as_signer_info(),
-            destination_program: Pubkey::new_from_array(dest_addr),
+            destination_program: dest_addr.into(),
             accounts: vec![],
         };
         let sdk_cb = SdkActionCallback {
-            destination_program: Pubkey::new_from_array(cb_dest_addr),
+            destination_program: cb_dest_addr.into(),
             discriminator: cb_disc.to_vec(),
             payload: cb_payload.to_vec(),
             compute_units: 50_000,
@@ -1064,11 +1068,11 @@ mod tests {
             args: SdkActionArgs::new(commit_data.to_vec()),
             compute_units: 100_000,
             escrow_authority: s_escrow1.as_signer_info(),
-            destination_program: Pubkey::new_from_array(dest1_addr),
+            destination_program: dest1_addr.into(),
             accounts: vec![],
         })
         .then(SdkActionCallback {
-            destination_program: Pubkey::new_from_array(cb1_dest),
+            destination_program: cb1_dest.into(),
             discriminator: cb1_disc.to_vec(),
             payload: vec![],
             compute_units: 30_000,
@@ -1078,11 +1082,11 @@ mod tests {
             args: SdkActionArgs::new(undelegate_data.to_vec()),
             compute_units: 50_000,
             escrow_authority: s_escrow2.as_signer_info(),
-            destination_program: Pubkey::new_from_array(dest2_addr),
+            destination_program: dest2_addr.into(),
             accounts: vec![],
         })
         .then(SdkActionCallback {
-            destination_program: Pubkey::new_from_array(cb2_dest),
+            destination_program: cb2_dest.into(),
             discriminator: cb2_disc.to_vec(),
             payload: vec![],
             compute_units: 20_000,

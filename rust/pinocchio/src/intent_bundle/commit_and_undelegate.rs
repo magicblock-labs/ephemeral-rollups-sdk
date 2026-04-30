@@ -148,6 +148,8 @@ impl<'acc, 'args>
             standalone_actions,
             commit_intent,
             commit_and_undelegate_intent: _,
+            commit_finalize_compressed_intent,
+            commit_finalize_compressed_and_undelegate_intent,
         } = intent_bundle;
 
         let commit_and_undelegate_intent = Some(CommitAndUndelegateIntent {
@@ -164,6 +166,8 @@ impl<'acc, 'args>
                 standalone_actions,
                 commit_intent,
                 commit_and_undelegate_intent,
+                commit_finalize_compressed_intent,
+                commit_finalize_compressed_and_undelegate_intent,
             },
         }
     }
