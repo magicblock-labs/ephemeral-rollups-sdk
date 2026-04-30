@@ -29,11 +29,6 @@ impl<'info> CommitIntentBuilder<'info> {
         self
     }
 
-    pub fn compressed(mut self) -> Self {
-        self.is_compressed = true;
-        self
-    }
-
     /// Adds a single post-commit action. Returns an [`ActionBuilder`] that lets you
     /// optionally attach a callback via `.then()` before continuing the chain.
     pub fn add_post_commit_action(
@@ -53,6 +48,11 @@ impl<'info> CommitIntentBuilder<'info> {
             parent.callbacks.push(callback);
             parent
         })
+    }
+
+    pub fn compressed(mut self) -> Self {
+        self.is_compressed = true;
+        self
     }
 }
 
