@@ -221,6 +221,35 @@ describe("Resolver", () => {
     await expect(trackAccount).resolves.toEqual({ status: 1 });
   });
 
+  it("deduplicates concurrent tracking for the same account", async () => {
+    let resolveInitialFetch: ((value: AccountNotification) => void) | undefined;
+    getAccountInfoSend.mockReturnValue(
+      new Promise((resolve) => {
+        resolveInitialFetch = resolve;
+      }),
+    );
+    const currentResolver = new Resolver(
+      { chain: chainUrl, websocket: "wss://base.example" },
+      new Map(),
+    );
+    resolver = currentResolver;
+
+    const firstTrack = currentResolver.trackAccount(accountAddress);
+    const secondTrack = currentResolver.trackAccount(accountAddress);
+    await vi.waitFor(() => {
+      expect(getAccountInfo).toHaveBeenCalled();
+    });
+
+    expect(accountNotifications).toHaveBeenCalledTimes(1);
+    expect(subscribe).toHaveBeenCalledTimes(1);
+
+    resolveInitialFetch?.(createAccountNotification(1n, null));
+    await expect(Promise.all([firstTrack, secondTrack])).resolves.toEqual([
+      { status: 1 },
+      { status: 1 },
+    ]);
+  });
+
   it("aborts the subscription when the initial fetch fails", async () => {
     const fetchError = new Error("initial fetch failed");
     getAccountInfoSend.mockRejectedValue(fetchError);

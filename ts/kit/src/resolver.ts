@@ -51,6 +51,11 @@ export class Resolver {
   private readonly routes = new Map<string, Rpc<SolanaRpcApiDevnet>>();
   private readonly delegations = new Map<string, DelegationRecord>();
   private readonly delegationSlots = new Map<string, Slot>();
+  private readonly inFlightTracks = new Map<
+    string,
+    Promise<DelegationRecord>
+  >();
+
   private readonly chain: Rpc<SolanaRpcApiDevnet>;
   private readonly ws: RpcSubscriptions<SolanaRpcSubscriptionsApi>;
   private readonly subs = new Map<string, AbortController>();
@@ -80,6 +85,24 @@ export class Resolver {
       );
     }
 
+    const inFlightTrack = this.inFlightTracks.get(pubkeyStr);
+    if (inFlightTrack !== undefined) {
+      return inFlightTrack;
+    }
+
+    const track = this.startTrackingAccount(pubkey, pubkeyStr);
+    this.inFlightTracks.set(pubkeyStr, track);
+    try {
+      return await track;
+    } finally {
+      this.inFlightTracks.delete(pubkeyStr);
+    }
+  }
+
+  private async startTrackingAccount(
+    pubkey: Address,
+    pubkeyStr: string,
+  ): Promise<DelegationRecord> {
     const addressEncoder = getAddressEncoder();
     const [delegationRecord] = await getProgramDerivedAddress({
       programAddress: DELEGATION_PROGRAM_ID,
