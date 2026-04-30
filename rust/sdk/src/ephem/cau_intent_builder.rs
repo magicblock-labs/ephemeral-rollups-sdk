@@ -93,6 +93,11 @@ impl<'info> CommitAndUndelegateIntentBuilder<'info> {
             },
         )
     }
+
+    pub fn compressed(mut self) -> Self {
+        self.is_compressed = true;
+        self
+    }
 }
 
 impl<'info> FoldableIntentBuilder<'info> for CommitAndUndelegateIntentBuilder<'info> {
