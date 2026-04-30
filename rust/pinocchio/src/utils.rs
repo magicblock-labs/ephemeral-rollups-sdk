@@ -173,11 +173,11 @@ fn cpi_delegate_with_discriminator(
 #[cfg(feature = "delegation-actions")]
 pub fn serialize_delegate_with_actions_data(
     delegate_args: DelegateAccountArgs,
-    actions: dlp_api::dlp::args::PostDelegationActions,
+    actions: dlp_api::args::PostDelegationActions,
 ) -> Result<alloc::vec::Vec<u8>, ProgramError> {
     use alloc::vec::Vec;
-    use dlp_api::dlp::args::{DelegateArgs, DelegateWithActionsArgs};
-    use dlp_api::dlp::discriminator::DlpDiscriminator;
+    use dlp_api::args::{DelegateArgs, DelegateWithActionsArgs};
+    use dlp_api::discriminator::DlpDiscriminator;
     use solana_program::pubkey::Pubkey;
 
     let seeds_vec: Vec<Vec<u8>> = delegate_args.seeds.iter().map(|s| s.to_vec()).collect();
@@ -207,7 +207,7 @@ pub fn cpi_delegate_with_actions(
     delegation_metadata: &AccountView,
     system_program: &AccountView,
     delegate_args: DelegateAccountArgs,
-    actions: dlp_api::dlp::args::PostDelegationActions,
+    actions: dlp_api::args::PostDelegationActions,
     action_signer_accounts: &[&AccountView],
     signer_seeds: Signer<'_, '_>,
 ) -> Result<(), ProgramError> {

@@ -4,16 +4,15 @@ import {
   SystemProgram,
   AccountInfo,
 } from "@solana/web3.js";
-import { blake2b } from "@noble/hashes/blake2b";
-import { edwardsToMontgomeryPub } from "@noble/curves/ed25519";
-import * as nacl from "tweetnacl";
 
 import {
+  ASSOCIATED_TOKEN_PROGRAM_ID,
   DELEGATION_PROGRAM_ID,
   MAGIC_CONTEXT_ID,
   MAGIC_PROGRAM_ID,
   PERMISSION_PROGRAM_ID,
   EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
+  TOKEN_PROGRAM_ID,
 } from "../../constants.js";
 import {
   delegateBufferPdaFromDelegatedAccountAndOwnerProgram,
@@ -28,18 +27,12 @@ import {
   processPendingTransferQueueRefillIx,
   toTransactionInstruction,
 } from "./transferQueue.js";
+import { encryptEd25519Recipient } from "./crypto.js";
 
 // Minimal SPL Token helpers (vendored) to avoid importing @solana/spl-token.
 // This prevents bundlers from pulling transitive deps like spl-token-group and
 // also avoids package.exports issues when targeting browsers.
 
-// SPL Token program IDs
-const TOKEN_PROGRAM_ID = new PublicKey(
-  "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
-);
-const ASSOCIATED_TOKEN_PROGRAM_ID = new PublicKey(
-  "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL",
-);
 // Derive the Associated Token Account for a given mint/owner pair. Mirrors the
 // behavior of @solana/spl-token's getAssociatedTokenAddressSync.
 function getAssociatedTokenAddressSync(
@@ -120,32 +113,6 @@ function createTransferInstruction(
     keys,
     data,
   });
-}
-
-function encryptEd25519Recipient(
-  plaintext: Uint8Array,
-  recipient: PublicKey,
-): Buffer {
-  const recipientX25519 = edwardsToMontgomeryPub(recipient.toBytes());
-  const ephemeral = nacl.box.keyPair();
-  const nonce = blake2b(
-    Buffer.concat([
-      Buffer.from(ephemeral.publicKey),
-      Buffer.from(recipientX25519),
-    ]),
-    { dkLen: nacl.box.nonceLength },
-  );
-  const ciphertext = nacl.box(
-    plaintext,
-    nonce,
-    recipientX25519,
-    ephemeral.secretKey,
-  );
-
-  return Buffer.concat([
-    Buffer.from(ephemeral.publicKey),
-    Buffer.from(ciphertext),
-  ]);
 }
 
 function encodeLengthPrefixedBytes(bytes: Uint8Array): Buffer {
@@ -886,16 +853,23 @@ export function depositAndDelegateShuttleEphemeralAtaWithMergeAndPrivateTransfer
     destinationOwner.toBytes(),
     validator,
   );
+  if (encryptedDestination.length !== 80) {
+    throw new Error(
+      `the length of encryptedDestination must be 80, not ${encryptedDestination.length}`,
+    );
+  }
   const encryptedSuffix = encryptEd25519Recipient(
     packPrivateTransferSuffix(minDelayMs, maxDelayMs, split, clientRefId),
     validator,
   );
+
   const data = Buffer.concat([
     Buffer.from([25]),
     u32leBuffer(shuttleId),
     u64leBuffer(amount),
-    encodeLengthPrefixedBytes(validator.toBytes()),
-    encodeLengthPrefixedBytes(encryptedDestination),
+    encryptedDestination,
+    Buffer.from([1]),
+    validator.toBytes(),
     encodeLengthPrefixedBytes(encryptedSuffix),
   ]);
 
@@ -1902,7 +1876,10 @@ export async function transferSpl(
 
     case "public":
       if (opts.fromBalance === "base" && opts.toBalance === "base") {
-        return [...instructions, createTransferInstruction(fromAta, toAta, from, amount)];
+        return [
+          ...instructions,
+          createTransferInstruction(fromAta, toAta, from, amount),
+        ];
       }
 
       // TODO: support public transfers across base/ephemeral balance boundaries.

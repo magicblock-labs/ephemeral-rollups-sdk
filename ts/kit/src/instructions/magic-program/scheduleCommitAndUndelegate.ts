@@ -20,7 +20,7 @@ export function createCommitAndUndelegateInstruction(
     { address: MAGIC_CONTEXT_ID, role: AccountRole.WRITABLE },
     ...accountsToCommitAndUndelegate.map((account) => ({
       address: account,
-      role: AccountRole.READONLY,
+      role: AccountRole.WRITABLE,
     })),
   ] as const;
 

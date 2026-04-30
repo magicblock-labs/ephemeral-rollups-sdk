@@ -11,7 +11,7 @@ pub use crate::ephem::deprecated::v1::{
     MagicInstructionBuilder, UndelegateType,
 };
 use crate::solana_compat::solana::{
-    invoke, AccountInfo, AccountMeta, Instruction, ProgramResult, Pubkey,
+    invoke, invoke_signed, AccountInfo, AccountMeta, Instruction, ProgramResult, Pubkey,
 };
 pub use cau_intent_builder::{CommitAndUndelegateIntentBuilder, FoldableCauIntentBuilder};
 pub use commit_intent_builder::{CommitIntentBuilder, FoldableCommitIntentBuilder};
@@ -61,6 +61,17 @@ impl<'info> IntentInstructions<'info> {
         self.add_callback_ixs
             .into_iter()
             .try_for_each(|(accounts, ix)| invoke(&ix, &accounts))
+    }
+
+    /// Signed variant of [`Self::invoke`]: uses `invoke_signed` with the provided
+    /// PDA seeds for both the `ScheduleIntentBundle` and every `AddActionCallback`.
+    pub fn invoke_signed(self, signers_seeds: &[&[&[u8]]]) -> ProgramResult {
+        let (accounts, ix) = self.schedule_intent_ix;
+        invoke_signed(&ix, &accounts, signers_seeds)?;
+
+        self.add_callback_ixs
+            .into_iter()
+            .try_for_each(|(accounts, ix)| invoke_signed(&ix, &accounts, signers_seeds))
     }
 }
 
@@ -238,6 +249,12 @@ impl<'info> MagicIntentBundleBuilder<'info> {
     /// Convenience wrapper: builds all instructions and invokes them in order.
     pub fn build_and_invoke(self) -> ProgramResult {
         self.build().invoke()
+    }
+
+    /// Convenience wrapper: builds all instructions and invokes them signed with
+    /// the provided PDA seeds.
+    pub fn build_and_invoke_signed(self, signers_seeds: &[&[&[u8]]]) -> ProgramResult {
+        self.build().invoke_signed(signers_seeds)
     }
 }
 
@@ -470,6 +487,10 @@ pub trait FoldableIntentBuilder<'info>: Sized {
 
     fn build_and_invoke(self) -> ProgramResult {
         self.fold_builder().build_and_invoke()
+    }
+
+    fn build_and_invoke_signed(self, signers_seeds: &[&[&[u8]]]) -> ProgramResult {
+        self.fold_builder().build_and_invoke_signed(signers_seeds)
     }
 }
 

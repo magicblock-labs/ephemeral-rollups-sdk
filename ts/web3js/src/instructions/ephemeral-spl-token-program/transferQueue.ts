@@ -11,6 +11,7 @@ import {
   MAGIC_CONTEXT_ID,
   MAGIC_PROGRAM_ID,
   PERMISSION_PROGRAM_ID,
+  TOKEN_PROGRAM_ID,
 } from "../../constants.js";
 import {
   delegateBufferPdaFromDelegatedAccountAndOwnerProgram,
@@ -23,9 +24,6 @@ const TRANSFER_QUEUE_SEED = Buffer.from("queue");
 const QUEUE_REFILL_STATE_SEED = Buffer.from("queue-refill");
 const RENT_PDA_SEED = Buffer.from("rent");
 const LAMPORTS_PDA_SEED = Buffer.from("lamports");
-const TOKEN_PROGRAM_ID = new PublicKey(
-  "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
-);
 const INITIALIZE_TRANSFER_QUEUE_DISCRIMINATOR = 12;
 const DEPOSIT_AND_QUEUE_TRANSFER_DISCRIMINATOR = 16;
 const ENSURE_TRANSFER_QUEUE_CRANK_DISCRIMINATOR = 17;

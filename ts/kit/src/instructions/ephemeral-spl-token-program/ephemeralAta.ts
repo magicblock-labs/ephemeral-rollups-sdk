@@ -17,16 +17,15 @@ import {
   AccountInfoBase,
 } from "@solana/kit";
 import { SYSTEM_PROGRAM_ADDRESS } from "@solana-program/system";
-import { blake2b } from "@noble/hashes/blake2b";
-import { edwardsToMontgomeryPub } from "@noble/curves/ed25519";
-import * as nacl from "tweetnacl";
 
 import {
+  ASSOCIATED_TOKEN_PROGRAM_ID,
   DELEGATION_PROGRAM_ID,
   MAGIC_CONTEXT_ID,
   MAGIC_PROGRAM_ID,
   PERMISSION_PROGRAM_ID,
   EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
+  TOKEN_PROGRAM_ID,
 } from "../../constants";
 import {
   delegateBufferPdaFromDelegatedAccountAndOwnerProgram,
@@ -40,14 +39,15 @@ import {
   initTransferQueueIx,
   processPendingTransferQueueRefillIx,
 } from "./transferQueue";
+import { encryptEd25519Recipient } from "./crypto";
+import {
+  encodeLengthPrefixedBytes,
+  packPrivateTransferSuffix,
+  u32leBuffer,
+  u64leBuffer,
+} from "./wire";
 
-// SPL Token program IDs
 const U64_ENCODER = getU64Encoder();
-
-const TOKEN_PROGRAM_ADDRESS =
-  "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA" as const;
-const ASSOCIATED_TOKEN_PROGRAM_ADDRESS =
-  "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL" as const;
 /**
  * Derive the Associated Token Account for a given mint/owner pair.
  * Mirrors the behavior of @solana/spl-token's getAssociatedTokenAddressSync.
@@ -63,10 +63,10 @@ async function getAssociatedTokenAddressSync(
 ): Promise<Address> {
   const addressEncoder = getAddressEncoder();
   const [ata] = await getProgramDerivedAddress({
-    programAddress: ASSOCIATED_TOKEN_PROGRAM_ADDRESS as Address,
+    programAddress: ASSOCIATED_TOKEN_PROGRAM_ID,
     seeds: [
       addressEncoder.encode(owner),
-      addressEncoder.encode(TOKEN_PROGRAM_ADDRESS as Address),
+      addressEncoder.encode(TOKEN_PROGRAM_ID),
       addressEncoder.encode(mint),
     ],
   });
@@ -86,77 +86,9 @@ function createTransferInstruction(
       { address: owner, role: AccountRole.READONLY_SIGNER },
     ],
     data: encodeAmountInstructionData(3, amount),
-    programAddress: TOKEN_PROGRAM_ADDRESS as Address,
+    programAddress: TOKEN_PROGRAM_ID,
   };
 }
-
-function encryptEd25519Recipient(
-  plaintext: Uint8Array,
-  recipient: Address,
-): Buffer {
-  const recipientBytes = getAddressEncoder().encode(recipient);
-  const recipientX25519 = edwardsToMontgomeryPub(
-    new Uint8Array(recipientBytes),
-  );
-  const ephemeral = nacl.box.keyPair();
-  const nonce = blake2b(
-    Buffer.concat([
-      Buffer.from(ephemeral.publicKey),
-      Buffer.from(recipientX25519),
-    ]),
-    { dkLen: nacl.box.nonceLength },
-  );
-  const ciphertext = nacl.box(
-    plaintext,
-    nonce,
-    recipientX25519,
-    ephemeral.secretKey,
-  );
-
-  return Buffer.concat([
-    Buffer.from(ephemeral.publicKey),
-    Buffer.from(ciphertext),
-  ]);
-}
-
-function encodeLengthPrefixedBytes(bytes: Uint8Array): Buffer {
-  if (bytes.length > 0xff) {
-    throw new Error("encrypted private transfer payload exceeds u8 length");
-  }
-
-  return Buffer.concat([Buffer.from([bytes.length]), Buffer.from(bytes)]);
-}
-
-function packPrivateTransferSuffix(
-  minDelayMs: bigint,
-  maxDelayMs: bigint,
-  split: number,
-  clientRefId?: bigint,
-): Buffer {
-  const suffix = Buffer.alloc(
-    clientRefId === undefined ? 8 + 8 + 4 : 8 + 8 + 4 + 8,
-  );
-  suffix.writeBigUInt64LE(minDelayMs, 0);
-  suffix.writeBigUInt64LE(maxDelayMs, 8);
-  suffix.writeUInt32LE(split, 16);
-  if (clientRefId !== undefined) {
-    suffix.writeBigUInt64LE(clientRefId, 20);
-  }
-  return suffix;
-}
-
-function u32leBuffer(value: number): Buffer {
-  const out = Buffer.alloc(4);
-  out.writeUInt32LE(value, 0);
-  return out;
-}
-
-function u64leBuffer(value: bigint): Buffer {
-  const out = Buffer.alloc(8);
-  out.writeBigUInt64LE(value, 0);
-  return out;
-}
-
 // ---------------------------------------------------------------------------
 // Accounts
 // ---------------------------------------------------------------------------
@@ -469,10 +401,10 @@ export function initVaultAtaIx(
       { address: vault, role: AccountRole.READONLY },
       { address: mint, role: AccountRole.READONLY },
       { address: SYSTEM_PROGRAM_ADDRESS, role: AccountRole.READONLY },
-      { address: TOKEN_PROGRAM_ADDRESS as Address, role: AccountRole.READONLY },
+      { address: TOKEN_PROGRAM_ID, role: AccountRole.READONLY },
     ],
     data: new Uint8Array([1]),
-    programAddress: ASSOCIATED_TOKEN_PROGRAM_ADDRESS as Address,
+    programAddress: ASSOCIATED_TOKEN_PROGRAM_ID,
   };
 }
 
@@ -499,9 +431,9 @@ export function initVaultIx(
       { address: mint, role: AccountRole.READONLY },
       { address: vaultEphemeralAta, role: AccountRole.WRITABLE },
       { address: vaultAta, role: AccountRole.WRITABLE },
-      { address: TOKEN_PROGRAM_ADDRESS as Address, role: AccountRole.READONLY },
+      { address: TOKEN_PROGRAM_ID, role: AccountRole.READONLY },
       {
-        address: ASSOCIATED_TOKEN_PROGRAM_ADDRESS as Address,
+        address: ASSOCIATED_TOKEN_PROGRAM_ID,
         role: AccountRole.READONLY,
       },
       { address: SYSTEM_PROGRAM_ADDRESS, role: AccountRole.READONLY },
@@ -557,7 +489,7 @@ export function transferToVaultIx(
       { address: sourceAta, role: AccountRole.WRITABLE },
       { address: vaultAta, role: AccountRole.WRITABLE },
       { address: owner, role: AccountRole.READONLY_SIGNER },
-      { address: TOKEN_PROGRAM_ADDRESS as Address, role: AccountRole.READONLY },
+      { address: TOKEN_PROGRAM_ID, role: AccountRole.READONLY },
     ],
     data: encodeAmountInstructionData(2, amount),
     programAddress: EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
@@ -656,9 +588,9 @@ export function initShuttleEphemeralAtaIx(
       { address: shuttleWalletAta, role: AccountRole.WRITABLE },
       { address: owner, role: AccountRole.READONLY },
       { address: mint, role: AccountRole.READONLY },
-      { address: TOKEN_PROGRAM_ADDRESS as Address, role: AccountRole.READONLY },
+      { address: TOKEN_PROGRAM_ID, role: AccountRole.READONLY },
       {
-        address: ASSOCIATED_TOKEN_PROGRAM_ADDRESS as Address,
+        address: ASSOCIATED_TOKEN_PROGRAM_ID,
         role: AccountRole.READONLY,
       },
       { address: SYSTEM_PROGRAM_ADDRESS, role: AccountRole.READONLY },
@@ -796,13 +728,13 @@ export async function setupAndDelegateShuttleEphemeralAtaWithMergeIx(
       { address: delegationMetadata, role: AccountRole.WRITABLE },
       { address: DELEGATION_PROGRAM_ID, role: AccountRole.READONLY },
       {
-        address: ASSOCIATED_TOKEN_PROGRAM_ADDRESS as Address,
+        address: ASSOCIATED_TOKEN_PROGRAM_ID,
         role: AccountRole.READONLY,
       },
       { address: SYSTEM_PROGRAM_ADDRESS, role: AccountRole.READONLY },
       { address: destinationAta, role: AccountRole.WRITABLE },
       { address: mint, role: AccountRole.READONLY },
-      { address: TOKEN_PROGRAM_ADDRESS as Address, role: AccountRole.READONLY },
+      { address: TOKEN_PROGRAM_ID, role: AccountRole.READONLY },
       { address: vault, role: AccountRole.READONLY },
       { address: sourceAta, role: AccountRole.WRITABLE },
       { address: vaultAta, role: AccountRole.WRITABLE },
@@ -922,12 +854,12 @@ export async function depositAndDelegateShuttleEphemeralAtaWithMergeAndPrivateTr
       { address: delegationMetadata, role: AccountRole.WRITABLE },
       { address: DELEGATION_PROGRAM_ID, role: AccountRole.READONLY },
       {
-        address: ASSOCIATED_TOKEN_PROGRAM_ADDRESS as Address,
+        address: ASSOCIATED_TOKEN_PROGRAM_ID,
         role: AccountRole.READONLY,
       },
       { address: SYSTEM_PROGRAM_ADDRESS, role: AccountRole.READONLY },
       { address: mint, role: AccountRole.READONLY },
-      { address: TOKEN_PROGRAM_ADDRESS as Address, role: AccountRole.READONLY },
+      { address: TOKEN_PROGRAM_ID, role: AccountRole.READONLY },
       { address: vault, role: AccountRole.READONLY },
       { address: sourceAta, role: AccountRole.WRITABLE },
       { address: vaultAta, role: AccountRole.WRITABLE },
@@ -1000,13 +932,13 @@ export async function withdrawThroughDelegatedShuttleWithMergeIx(
       { address: delegationMetadata, role: AccountRole.WRITABLE },
       { address: DELEGATION_PROGRAM_ID, role: AccountRole.READONLY },
       {
-        address: ASSOCIATED_TOKEN_PROGRAM_ADDRESS as Address,
+        address: ASSOCIATED_TOKEN_PROGRAM_ID,
         role: AccountRole.READONLY,
       },
       { address: SYSTEM_PROGRAM_ADDRESS, role: AccountRole.READONLY },
       { address: ownerAta, role: AccountRole.WRITABLE },
       { address: mint, role: AccountRole.READONLY },
-      { address: TOKEN_PROGRAM_ADDRESS as Address, role: AccountRole.READONLY },
+      { address: TOKEN_PROGRAM_ID, role: AccountRole.READONLY },
     ],
     data,
     programAddress: EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
@@ -1105,7 +1037,7 @@ export function mergeShuttleIntoAtaIx(
       { address: shuttleEphemeralAta, role: AccountRole.READONLY },
       { address: shuttleWalletAta, role: AccountRole.WRITABLE },
       { address: mint, role: AccountRole.READONLY },
-      { address: TOKEN_PROGRAM_ADDRESS as Address, role: AccountRole.READONLY },
+      { address: TOKEN_PROGRAM_ID, role: AccountRole.READONLY },
     ],
     data: new Uint8Array([15]),
     programAddress: EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
@@ -1151,7 +1083,7 @@ export function undelegateAndCloseShuttleEphemeralAtaIx(
       { address: shuttleAta, role: AccountRole.READONLY },
       { address: shuttleWalletAta, role: AccountRole.WRITABLE },
       { address: destinationAta, role: AccountRole.WRITABLE },
-      { address: TOKEN_PROGRAM_ADDRESS as Address, role: AccountRole.READONLY },
+      { address: TOKEN_PROGRAM_ID, role: AccountRole.READONLY },
       { address: MAGIC_CONTEXT_ID, role: AccountRole.WRITABLE },
       { address: MAGIC_PROGRAM_ID, role: AccountRole.READONLY },
     ],
@@ -1185,7 +1117,7 @@ export async function withdrawSplIx(
       { address: mint, role: AccountRole.READONLY },
       { address: vaultAta, role: AccountRole.WRITABLE },
       { address: userDestAta, role: AccountRole.WRITABLE },
-      { address: TOKEN_PROGRAM_ADDRESS as Address, role: AccountRole.READONLY },
+      { address: TOKEN_PROGRAM_ID, role: AccountRole.READONLY },
     ],
     data: encodeAmountInstructionData(3, amount),
     programAddress: EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
@@ -1849,7 +1781,10 @@ export async function transferSpl(
 
     case "public":
       if (opts.fromBalance === "base" && opts.toBalance === "base") {
-        return [...instructions, createTransferInstruction(fromAta, toAta, from, amount)];
+        return [
+          ...instructions,
+          createTransferInstruction(fromAta, toAta, from, amount),
+        ];
       }
 
       break;

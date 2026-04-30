@@ -17,11 +17,11 @@ borsh = { workspace = true, optional = true }
 magicblock-delegation-program-api = { workspace = true, optional = true }
 pinocchio = { workspace = true }
 pinocchio-pubkey = { workspace = true, default-features = false, features = [
-  "const",
+    "const",
 ] }
 pinocchio-system = { workspace = true, default-features = false }
 solana-address = { version = ">=2, <3", default-features = false, features = [
-  "curve25519",
+    "curve25519",
 ] }
 solana-program = { workspace = true, default-features = false }
 
@@ -35,15 +35,15 @@ solana-program = { workspace = true }
 [features]
 default = []
 delegation-actions = [
-  "borsh",
-  "magicblock-delegation-program-api",
-  "pinocchio/alloc",
-  "pinocchio/cpi",
+    "borsh",
+    "magicblock-delegation-program-api",
+    "pinocchio/alloc",
+    "pinocchio/cpi",
 ]
 # Compatibility no-op for downstream manifests; remove in the next breaking release.
 intent-bundle = []
 
 [lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = [
-  "cfg(target_os, values(\"solana\"))",
+    "cfg(target_os, values(\"solana\"))",
 ] }

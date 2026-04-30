@@ -21,19 +21,19 @@ custom-panic = []
 default = ["solana-program", "solana-system-interface"]
 disable-realloc = []
 encryption = [
-  "magicblock-delegation-program-api/encryption",
-  "magicblock-delegation-program-api/instruction",
+    "magicblock-delegation-program-api/encryption",
+    "magicblock-delegation-program-api/instruction",
 ]
 modular-sdk = [
-  "solana-account",
-  "solana-account-info",
-  "solana-cpi",
-  "solana-instruction",
-  "solana-program-error",
-  "solana-program-memory",
-  "solana-pubkey",
-  "solana-system-interface",
-  "solana-sysvar",
+    "solana-account",
+    "solana-account-info",
+    "solana-cpi",
+    "solana-instruction",
+    "solana-program-error",
+    "solana-program-memory",
+    "solana-pubkey",
+    "solana-system-interface",
+    "solana-sysvar",
 ]
 serde = []
 spl = ["encryption", "spl-associated-token-account-interface"]
