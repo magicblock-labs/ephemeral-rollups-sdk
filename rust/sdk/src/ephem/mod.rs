@@ -38,6 +38,10 @@ pub enum MagicIntent<'info> {
     CommitFinalize(CommitType<'info>),
     /// CommitFinalize accounts and undelegate them, optionally with post-commit and post-undelegate actions.
     CommitFinalizeAndUndelegate(CommitAndUndelegate<'info>),
+    /// CommitFinalizeCompressed accounts to base layer, optionally with post-commit actions.
+    CommitFinalizeCompressed(CommitType<'info>),
+    /// CommitFinalizeCompressed accounts and undelegate them, optionally with post-commit and post-undelegate actions.
+    CommitFinalizeAndUndelegateCompressed(CommitAndUndelegate<'info>),
 }
 
 /// The result of [`MagicIntentBundleBuilder::build`].
@@ -120,6 +124,7 @@ impl<'info> MagicIntentBundleBuilder<'info> {
             accounts: accounts.to_vec(),
             actions: vec![],
             callbacks: vec![],
+            is_compressed: false,
         }
     }
 
@@ -140,6 +145,7 @@ impl<'info> MagicIntentBundleBuilder<'info> {
             post_commit_callbacks: vec![],
             post_undelegate_actions: vec![],
             post_undelegate_callbacks: vec![],
+            is_compressed: false,
         }
     }
 
@@ -297,6 +303,8 @@ struct MagicIntentBundle<'info> {
     commit_and_undelegate_intent: Option<CommitAndUndelegate<'info>>,
     commit_finalize_intent: Option<CommitType<'info>>,
     commit_finalize_and_undelegate_intent: Option<CommitAndUndelegate<'info>>,
+    commit_finalize_compressed_intent: Option<CommitType<'info>>,
+    commit_finalize_and_undelegate_compressed_intent: Option<CommitAndUndelegate<'info>>,
 }
 
 impl<'info> MagicIntentBundle<'info> {
@@ -338,6 +346,24 @@ impl<'info> MagicIntentBundle<'info> {
                     self.commit_finalize_and_undelegate_intent = Some(value);
                 }
             }
+            MagicIntent::CommitFinalizeCompressed(value) => {
+                if let Some(ref mut commit_finalize_compressed_intent) =
+                    self.commit_finalize_compressed_intent
+                {
+                    commit_finalize_compressed_intent.merge(value);
+                } else {
+                    self.commit_finalize_compressed_intent = Some(value);
+                }
+            }
+            MagicIntent::CommitFinalizeAndUndelegateCompressed(value) => {
+                if let Some(ref mut commit_finalize_and_undelegate_compressed_intent) =
+                    self.commit_finalize_and_undelegate_compressed_intent
+                {
+                    commit_finalize_and_undelegate_compressed_intent.merge(value);
+                } else {
+                    self.commit_finalize_and_undelegate_compressed_intent = Some(value);
+                }
+            }
         }
     }
 
@@ -355,6 +381,12 @@ impl<'info> MagicIntentBundle<'info> {
             .iter_mut()
             .for_each(|c| c.extract_callbacks(&mut idx, &mut out));
         self.commit_finalize_and_undelegate_intent
+            .iter_mut()
+            .for_each(|cau| cau.extract_callbacks(&mut idx, &mut out));
+        self.commit_finalize_compressed_intent
+            .iter_mut()
+            .for_each(|c| c.extract_callbacks(&mut idx, &mut out));
+        self.commit_finalize_and_undelegate_compressed_intent
             .iter_mut()
             .for_each(|cau| cau.extract_callbacks(&mut idx, &mut out));
         self.standalone_callbacks
@@ -384,6 +416,14 @@ impl<'info> MagicIntentBundle<'info> {
 
             commit_finalize_and_undelegate: self
                 .commit_finalize_and_undelegate_intent
+                .map(|c| c.into_args(indices_map)),
+
+            commit_finalize_compressed: self
+                .commit_finalize_compressed_intent
+                .map(|c| c.into_args(indices_map)),
+
+            commit_finalize_compressed_and_undelegate: self
+                .commit_finalize_and_undelegate_compressed_intent
                 .map(|c| c.into_args(indices_map)),
 
             standalone_actions: self

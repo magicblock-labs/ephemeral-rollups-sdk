@@ -44,6 +44,8 @@ impl<'acc, 'args> CommitIntentBuilder<'acc, 'args, &'static [CallHandler<'static
             standalone_actions,
             commit_intent: _,
             commit_and_undelegate_intent,
+            commit_finalize_compressed_intent,
+            commit_finalize_compressed_and_undelegate_intent,
         } = self.parent.intent_bundle;
 
         MagicIntentBundleBuilder {
@@ -58,6 +60,8 @@ impl<'acc, 'args> CommitIntentBuilder<'acc, 'args, &'static [CallHandler<'static
                     actions,
                 }),
                 commit_and_undelegate_intent,
+                commit_finalize_compressed_intent,
+                commit_finalize_compressed_and_undelegate_intent,
             },
         }
     }
@@ -70,6 +74,8 @@ impl<'acc, 'args> CommitIntentBuilder<'acc, 'args, &'args [CallHandler<'args>]> 
             standalone_actions,
             commit_intent: _,
             commit_and_undelegate_intent,
+            commit_finalize_compressed_intent,
+            commit_finalize_compressed_and_undelegate_intent,
         } = self.parent.intent_bundle;
         let commit_intent = Some(CommitIntent {
             accounts: self.accounts,
@@ -84,6 +90,8 @@ impl<'acc, 'args> CommitIntentBuilder<'acc, 'args, &'args [CallHandler<'args>]> 
                 standalone_actions,
                 commit_intent,
                 commit_and_undelegate_intent,
+                commit_finalize_compressed_intent,
+                commit_finalize_compressed_and_undelegate_intent,
             },
         }
     }

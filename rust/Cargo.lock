@@ -22,6 +22,7 @@ checksum = "d52a2c365c0245cbb8959de725fc2b44c754b673fdf34c9a7f9d4a25c35a7bf1"
 dependencies = [
  "ahash 0.8.12",
  "solana-epoch-schedule 2.2.1",
+ "solana-epoch-schedule 2.2.1",
  "solana-hash 2.3.0",
  "solana-pubkey 2.4.0",
  "solana-sha256-hasher 2.3.0",
@@ -2658,7 +2659,7 @@ dependencies = [
  "solana-system-interface 2.0.0",
  "static_assertions",
  "strum",
- "thiserror 2.0.18",
+ "thiserror 1.0.69",
 ]
 
 [[package]]
@@ -4049,7 +4050,7 @@ dependencies = [
  "solana-program-error 3.0.1",
  "solana-sanitize 3.0.1",
  "solana-sha256-hasher 3.1.0",
- "wincode",
+ "wincode 0.4.7",
 ]
 
 [[package]]

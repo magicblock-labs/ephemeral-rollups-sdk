@@ -104,6 +104,8 @@ impl<'acc, 'args> MagicIntentBundleBuilder<'acc, 'args> {
             standalone_actions: _,
             commit_intent,
             commit_and_undelegate_intent,
+            commit_finalize_compressed_intent,
+            commit_finalize_compressed_and_undelegate_intent,
         } = self.intent_bundle;
 
         MagicIntentBundleBuilder {
@@ -115,6 +117,8 @@ impl<'acc, 'args> MagicIntentBundleBuilder<'acc, 'args> {
                 standalone_actions: actions,
                 commit_intent,
                 commit_and_undelegate_intent,
+                commit_finalize_compressed_intent,
+                commit_finalize_compressed_and_undelegate_intent,
             },
         }
     }
@@ -347,6 +351,7 @@ mod tests {
     use magicblock_magic_program_api::args::ActionArgs as SdkActionArgs;
     use magicblock_magic_program_api::Pubkey as MagicPubkey;
     use solana_program::account_info::AccountInfo;
+    use solana_program::pubkey::Pubkey as SolanaPubkey;
 
     use crate::intent_bundle::serialize::MagicIntentBundleSerialize;
 
