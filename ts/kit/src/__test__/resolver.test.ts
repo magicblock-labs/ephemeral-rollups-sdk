@@ -61,36 +61,66 @@ vi.mock("@solana/kit", () => ({
 
 function createNotificationStream() {
   const values: AccountNotification[] = [];
-  const waiters: Array<(result: IteratorResult<AccountNotification>) => void> =
-    [];
+  const waiters: Array<{
+    abortSignal?: AbortSignal;
+    onAbort?: () => void;
+    resolve: (result: IteratorResult<AccountNotification>) => void;
+  }> = [];
   let closed = false;
 
-  const stream: AsyncIterable<AccountNotification> = {
+  const resolveWaiter = (
+    waiter: (typeof waiters)[number],
+    result: IteratorResult<AccountNotification>,
+  ) => {
+    if (waiter.onAbort !== undefined) {
+      waiter.abortSignal?.removeEventListener("abort", waiter.onAbort);
+    }
+    waiter.resolve(result);
+  };
+
+  const stream = (
+    abortSignal?: AbortSignal,
+  ): AsyncIterable<AccountNotification> => ({
     [Symbol.asyncIterator]() {
       return {
         async next() {
-          if (closed) {
+          if (closed || abortSignal?.aborted === true) {
             return { done: true, value: undefined };
           }
 
-          const value = values.shift();
-          if (value !== undefined) {
-            return { done: false, value };
-          }
-
           return new Promise<IteratorResult<AccountNotification>>((resolve) => {
-            waiters.push(resolve);
+            const value = values.shift();
+            if (value !== undefined) {
+              resolve({ done: false, value });
+              return;
+            }
+
+            const waiter: (typeof waiters)[number] = {
+              abortSignal,
+              resolve,
+            };
+            waiter.onAbort = () => {
+              const index = waiters.indexOf(waiter);
+              if (index !== -1) {
+                waiters.splice(index, 1);
+              }
+              resolveWaiter(waiter, { done: true, value: undefined });
+            };
+            abortSignal?.addEventListener("abort", waiter.onAbort, {
+              once: true,
+            });
+            waiters.push(waiter);
           });
         },
       };
     },
-  };
+  });
 
   return {
     push(value: AccountNotification) {
       const waiter = waiters.shift();
       if (waiter !== undefined) {
-        waiter({ done: false, value });
+        resolveWaiter(waiter, { done: false, value });
         return;
       }
       values.push(value);
@@ -98,7 +128,7 @@ function createNotificationStream() {
     close() {
       closed = true;
       for (const waiter of waiters.splice(0)) {
-        waiter({ done: true, value: undefined });
+        resolveWaiter(waiter, { done: true, value: undefined });
       }
     },
     stream,
@@ -147,7 +177,9 @@ describe("Resolver", () => {
     getAccountInfoSend = vi.fn(async () => createAccountNotification(1n, null));
     getAccountInfo = vi.fn(() => ({ send: getAccountInfoSend }));
     accountNotifications = vi.fn(() => ({ subscribe }));
-    subscribe = vi.fn(async () => notificationStream.stream);
+    subscribe = vi.fn(async ({ abortSignal }: { abortSignal: AbortSignal }) =>
+      notificationStream.stream(abortSignal),
+    );
     chainRpc = { getAccountInfo };
 
     kitMocks.decodeDelegationRecord.mockReturnValue({
@@ -291,7 +323,7 @@ describe("Resolver", () => {
     });
   });
 
-  it("does not overwrite a fresher websocket notification with the initial fetch", async () => {
+  it("does not overwrite a same-slot websocket notification with the initial fetch", async () => {
     let resolveInitialFetch: ((value: AccountNotification) => void) | undefined;
     getAccountInfoSend.mockReturnValue(
       new Promise((resolve) => {
@@ -316,7 +348,7 @@ describe("Resolver", () => {
       expect(kitMocks.decodeDelegationRecord).toHaveBeenCalled();
     });
 
-    resolveInitialFetch?.(createAccountNotification(1n, null));
+    resolveInitialFetch?.(createAccountNotification(2n, null));
 
     await expect(trackAccount).resolves.toEqual({
       status: 0,

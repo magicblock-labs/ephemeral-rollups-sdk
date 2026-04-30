@@ -45,12 +45,14 @@ type DelegationRecord =
 
 type AccountInfo = (AccountInfoBase & AccountInfoWithBase64EncodedData) | null;
 type AccountNotification = SolanaRpcResponse<AccountInfo>;
+type AccountInfoSource = "initial" | "notification";
 
 /** Class responsible for resolving connections to Solana validators */
 export class Resolver {
   private readonly routes = new Map<string, Rpc<SolanaRpcApiDevnet>>();
   private readonly delegations = new Map<string, DelegationRecord>();
   private readonly delegationSlots = new Map<string, Slot>();
+  private readonly delegationSources = new Map<string, AccountInfoSource>();
   private readonly inFlightTracks = new Map<
     string,
     Promise<DelegationRecord>
@@ -131,7 +133,7 @@ export class Resolver {
         })
         .send();
 
-      return this.updateStatusFromResponse(accountInfo, pubkey);
+      return this.updateStatusFromResponse(accountInfo, pubkey, "initial");
     } catch (error) {
       abortController.abort();
       this.subs.delete(pubkeyStr);
@@ -204,7 +206,11 @@ export class Resolver {
       let shouldClearStatus = false;
       try {
         for await (const accountNotification of accountNotifications) {
-          this.updateStatusFromResponse(accountNotification, pubkey);
+          this.updateStatusFromResponse(
+            accountNotification,
+            pubkey,
+            "notification",
+          );
         }
         shouldClearStatus = !abortController.signal.aborted;
       } catch (error: unknown) {
@@ -223,6 +229,7 @@ export class Resolver {
         if (shouldClearStatus) {
           this.delegations.delete(pubkeyStr);
           this.delegationSlots.delete(pubkeyStr);
+          this.delegationSources.delete(pubkeyStr);
         }
       }
     })();
@@ -231,19 +238,25 @@ export class Resolver {
   private updateStatusFromResponse(
     accountNotification: AccountNotification,
     pubkey: Address,
+    source: AccountInfoSource,
   ): DelegationRecord {
     const pubkeyStr = pubkey.toString();
     const currentSlot = this.delegationSlots.get(pubkeyStr);
+    const currentSource = this.delegationSources.get(pubkeyStr);
     const currentRecord = this.delegations.get(pubkeyStr);
     if (
       currentSlot !== undefined &&
-      accountNotification.context.slot < currentSlot &&
+      (accountNotification.context.slot < currentSlot ||
+        (accountNotification.context.slot === currentSlot &&
+          currentSource === "notification" &&
+          source === "initial")) &&
       currentRecord !== undefined
     ) {
       return currentRecord;
     }
 
     this.delegationSlots.set(pubkeyStr, accountNotification.context.slot);
+    this.delegationSources.set(pubkeyStr, source);
     return this.updateStatus(accountNotification.value, pubkey);
   }
 
