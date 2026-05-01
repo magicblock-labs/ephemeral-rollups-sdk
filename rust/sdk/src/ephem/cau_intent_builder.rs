@@ -1,9 +1,9 @@
 use crate::ephem::action_builder::ActionBuilder;
 use crate::ephem::{
     ActionCallback, CallHandler, CommitAndUndelegate, CommitType, FoldableIntentBuilder,
-    MagicIntent, MagicIntentBundleBuilder, UndelegateType,
+    IntentInstructions, MagicIntent, MagicIntentBundleBuilder, UndelegateType,
 };
-use crate::solana_compat::solana::AccountInfo;
+use crate::solana_compat::solana::{AccountInfo, ProgramResult};
 
 /// Builder of CommitAndUndelegate Intent.
 ///
@@ -91,6 +91,30 @@ impl<'info> CommitAndUndelegateIntentBuilder<'info> {
                 parent
             },
         )
+    }
+
+    /// Builds [`IntentInstructions`] without invoking them.
+    ///
+    /// Inherent forwarder to [`FoldableIntentBuilder::build`] so callers
+    /// don't need to import the trait.
+    pub fn build(self) -> IntentInstructions<'info> {
+        <Self as FoldableIntentBuilder>::build(self)
+    }
+
+    /// Builds and invokes the intent bundle via CPI.
+    ///
+    /// Inherent forwarder to [`FoldableIntentBuilder::build_and_invoke`] so callers
+    /// don't need to import the trait.
+    pub fn build_and_invoke(self) -> ProgramResult {
+        <Self as FoldableIntentBuilder>::build_and_invoke(self)
+    }
+
+    /// Builds and invokes the intent bundle via signed CPI using the provided PDA seeds.
+    ///
+    /// Inherent forwarder to [`FoldableIntentBuilder::build_and_invoke_signed`] so callers
+    /// don't need to import the trait.
+    pub fn build_and_invoke_signed(self, signers_seeds: &[&[&[u8]]]) -> ProgramResult {
+        <Self as FoldableIntentBuilder>::build_and_invoke_signed(self, signers_seeds)
     }
 }
 
