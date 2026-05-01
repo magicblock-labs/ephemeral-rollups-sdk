@@ -945,12 +945,12 @@ describe("Exposed Instructions (web3.js)", () => {
       expect(data.readUInt32LE(1)).toBe(7);
       expect(data.readBigUInt64LE(5)).toBe(1n);
 
-      const destinationField = data.subarray(13, 13 + 80);
-      const validatorField = data.subarray(13 + 80 + 1, 13 + 80 + 1 + 32);
+      const destinationField = data.subarray(14, 14 + 80);
+      const validatorField = data.subarray(14 + 80 + 1, 14 + 80 + 1 + 32);
 
       const [suffixField, endOffset] = readLengthPrefixedField(
         data,
-        13 + 80 + 1 + 32,
+        14 + 80 + 1 + 32,
       );
 
       expect(validatorField.equals(validator.toBuffer())).toBe(true);
@@ -1070,11 +1070,11 @@ describe("Exposed Instructions (web3.js)", () => {
       expect(data.readUInt32LE(1)).toBe(7);
       expect(data.readBigUInt64LE(5)).toBe(25n);
 
-      const destinationField = data.subarray(13, 13 + 80);
-      const validatorField = data.subarray(13 + 80 + 1, 13 + 80 + 1 + 32);
+      const destinationField = data.subarray(14, 14 + 80);
+      const validatorField = data.subarray(14 + 80 + 1, 14 + 80 + 1 + 32);
       const [suffixField, endOffset] = readLengthPrefixedField(
         data,
-        13 + 80 + 1 + 32,
+        14 + 80 + 1 + 32,
       );
 
       expect(validatorField.equals(validator.toBuffer())).toBe(true);
@@ -1099,7 +1099,7 @@ describe("Exposed Instructions (web3.js)", () => {
       });
 
       const data = Buffer.from(instructions[1].data);
-      const [suffixField] = readLengthPrefixedField(data, 13 + 80 + 1 + 32);
+      const [suffixField] = readLengthPrefixedField(data, 14 + 80 + 1 + 32);
 
       expect(suffixField).toHaveLength(76);
     });
