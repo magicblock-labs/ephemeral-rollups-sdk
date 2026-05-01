@@ -197,6 +197,67 @@ impl<'a> DelegatePermissionCpiBuilder<'a> {
         validator: &'a AccountView,
         permission_program: &'a Address,
     ) -> Self {
+        Self::new_with_optional_validator(
+            payer,
+            authority,
+            permissioned_account,
+            permission,
+            system_program,
+            owner_program,
+            delegation_buffer,
+            delegation_record,
+            delegation_metadata,
+            delegation_program,
+            Some(validator),
+            permission_program,
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn new_without_validator(
+        payer: &'a AccountView,
+        authority: &'a AccountView,
+        permissioned_account: &'a AccountView,
+        permission: &'a AccountView,
+        system_program: &'a AccountView,
+        owner_program: &'a AccountView,
+        delegation_buffer: &'a AccountView,
+        delegation_record: &'a AccountView,
+        delegation_metadata: &'a AccountView,
+        delegation_program: &'a AccountView,
+        permission_program: &'a Address,
+    ) -> Self {
+        Self::new_with_optional_validator(
+            payer,
+            authority,
+            permissioned_account,
+            permission,
+            system_program,
+            owner_program,
+            delegation_buffer,
+            delegation_record,
+            delegation_metadata,
+            delegation_program,
+            None,
+            permission_program,
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn new_with_optional_validator(
+        payer: &'a AccountView,
+        authority: &'a AccountView,
+        permissioned_account: &'a AccountView,
+        permission: &'a AccountView,
+        system_program: &'a AccountView,
+        owner_program: &'a AccountView,
+        delegation_buffer: &'a AccountView,
+        delegation_record: &'a AccountView,
+        delegation_metadata: &'a AccountView,
+        delegation_program: &'a AccountView,
+        validator: Option<&'a AccountView>,
+        permission_program: &'a Address,
+    ) -> Self {
         Self {
             payer,
             authority,
@@ -208,7 +269,7 @@ impl<'a> DelegatePermissionCpiBuilder<'a> {
             delegation_record,
             delegation_metadata,
             delegation_program,
-            validator: Some(validator),
+            validator,
             permission_program,
             authority_is_signer: true,
             permissioned_account_is_signer: true,
@@ -228,6 +289,11 @@ impl<'a> DelegatePermissionCpiBuilder<'a> {
 
     pub fn signer_seeds(mut self, signer_seeds: Signer<'a, 'a>) -> Self {
         self.signer_seeds = Some(signer_seeds);
+        self
+    }
+
+    pub fn maybe_validator(mut self, validator: Option<&'a AccountView>) -> Self {
+        self.validator = validator;
         self
     }
 
