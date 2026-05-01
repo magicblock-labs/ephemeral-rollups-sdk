@@ -35,6 +35,7 @@ import {
   parseCommitsLogsMessage,
   parseScheduleCommitsLogsMessage,
 } from "./utils";
+import { postRouterRpc } from "./router-rpc";
 
 /** Type representing a recent blockhash and its lifetime validity. */
 type LatestBlockhash = Readonly<{
@@ -320,23 +321,21 @@ export class Connection {
     const writableAccounts = getWritableAccounts(transaction);
 
     if (this.isMagicRouter) {
-      const blockHashResponse = await fetch(this.clusterUrlHttp, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          jsonrpc: "2.0",
-          id: 1,
-          method: "getBlockhashForAccounts",
-          params: [writableAccounts],
-        }),
-      });
+      const result = await postRouterRpc<{
+        blockhash: string;
+        lastValidBlockHeight: number;
+      }>(this.clusterUrlHttp, "getBlockhashForAccounts", [writableAccounts]);
 
-      const { result } = (await blockHashResponse.json()) as {
-        result: { blockhash: string; lastValidBlockHeight: number };
-      };
-
-      if (!result?.blockhash || !result?.lastValidBlockHeight) {
-        throw new Error(`Invalid RPC response: ${JSON.stringify(result)}`);
+      // blockhash: reject null/undefined/empty string; lastValidBlockHeight:
+      // reject only null/undefined (0 is valid on local validators).
+      if (
+        typeof result.blockhash !== "string" ||
+        result.blockhash.length === 0 ||
+        result.lastValidBlockHeight == null
+      ) {
+        throw new Error(
+          `Invalid getBlockhashForAccounts response: ${JSON.stringify(result)}`,
+        );
       }
 
       return {
