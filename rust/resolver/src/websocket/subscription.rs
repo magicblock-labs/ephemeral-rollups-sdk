@@ -5,7 +5,7 @@ use std::sync::{
     Arc,
 };
 
-use sdk::pubkey::Pubkey;
+use solana_address::Address as Pubkey;
 
 use crate::account::delegation_record_pda;
 

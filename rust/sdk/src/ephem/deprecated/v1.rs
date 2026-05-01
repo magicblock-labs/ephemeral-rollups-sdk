@@ -389,7 +389,7 @@ impl ActionCallback {
     pub(crate) fn into_args(self, action_index: u8) -> AddActionCallbackArgs {
         AddActionCallbackArgs {
             action_index,
-            destination_program: self.destination_program,
+            destination_program: self.destination_program.to_bytes().into(),
             discriminator: self.discriminator,
             payload: self.payload,
             compute_units: self.compute_units,

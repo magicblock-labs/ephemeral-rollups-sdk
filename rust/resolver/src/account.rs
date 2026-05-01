@@ -3,9 +3,9 @@
 use std::{ops::Deref, str::FromStr};
 
 use json::Deserialize;
-use sdk::pubkey::Pubkey;
 use serde::{de::Error as _, Deserializer};
 use smallvec::SmallVec;
+use solana_address::Address as Pubkey;
 
 use crate::DELEGATION_PROGRAM_ID;
 
@@ -91,6 +91,12 @@ where
 {
     let string = <&str as Deserialize>::deserialize(deserializer)?;
     Pubkey::from_str(string).map_err(D::Error::custom)
+}
+
+pub fn pubkey_from_bytes(bytes: &[u8]) -> Pubkey {
+    let mut key = [0; 32];
+    key.copy_from_slice(bytes);
+    Pubkey::new_from_array(key)
 }
 
 /// Find the PDA associated with the delegation record for given account
