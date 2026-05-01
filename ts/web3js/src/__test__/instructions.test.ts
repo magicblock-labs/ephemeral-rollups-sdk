@@ -927,6 +927,7 @@ describe("Exposed Instructions (web3.js)", () => {
           minDelayMs: 100n,
           maxDelayMs: 300n,
           split: 4,
+          exactOut: false,
         },
       );
 
