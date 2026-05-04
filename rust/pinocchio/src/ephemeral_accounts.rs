@@ -39,15 +39,15 @@
 //!     .resize(2000)?;
 //! ```
 
-use magicblock_magic_program_api::EPHEMERAL_RENT_PER_BYTE;
 use pinocchio::{
     cpi::{invoke_signed, Seed, Signer},
     instruction::{InstructionAccount, InstructionView},
     AccountView, ProgramResult,
 };
 
-/// Account overhead in bytes (static account size in accountsdb).
+/// Redefined constants to avoid importing the std magicblock-magic-program-api crate.
 const ACCOUNT_OVERHEAD: u32 = 60;
+const EPHEMERAL_RENT_PER_BYTE: u64 = 32;
 
 const CREATE_EPHEMERAL_ACCOUNT_DISCRIMINATOR: u8 = 11;
 const RESIZE_EPHEMERAL_ACCOUNT_DISCRIMINATOR: u8 = 12;
