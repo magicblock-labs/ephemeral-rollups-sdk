@@ -39,7 +39,6 @@
 //!     .resize(2000)?;
 //! ```
 
-use crate::consts::MAGIC_PROGRAM_ID;
 use magicblock_magic_program_api::EPHEMERAL_RENT_PER_BYTE;
 use pinocchio::{
     cpi::{invoke_signed, Seed, Signer},
@@ -86,6 +85,7 @@ pub struct EphemeralAccount<'a> {
     sponsor: &'a AccountView,
     ephemeral: &'a AccountView,
     vault: &'a AccountView,
+    magic_proggram: &'a AccountView,
     signer_seeds: &'a [Seed<'a>],
 }
 
@@ -101,11 +101,13 @@ impl<'a> EphemeralAccount<'a> {
         sponsor: &'a AccountView,
         ephemeral: &'a AccountView,
         vault: &'a AccountView,
+        magic_proggram: &'a AccountView,
     ) -> Self {
         Self {
             sponsor,
             ephemeral,
             vault,
+            magic_proggram,
             signer_seeds: &[],
         }
     }
@@ -155,7 +157,7 @@ impl<'a> EphemeralAccount<'a> {
 
     fn invoke(&self, data: &[u8], ephemeral_is_signer: bool) -> ProgramResult {
         let ix = InstructionView {
-            program_id: &MAGIC_PROGRAM_ID,
+            program_id: self.magic_proggram.address(),
             data,
             accounts: &[
                 InstructionAccount::writable_signer(self.sponsor.address()),
