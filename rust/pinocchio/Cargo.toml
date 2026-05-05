@@ -21,9 +21,7 @@ solana-address = { version = ">=2, <3", default-features = false, features = [
     "curve25519",
 ] }
 solana-program = { workspace = true, default-features = false }
-bincode = { version = "2.0.1", default-features = false, features = [
-    "derive",
-]}
+bincode = { version = "2.0.1", default-features = false, features = ["derive"] }
 magicblock-delegation-program-api = { workspace = true, optional = true }
 borsh = { version = "0.10.4", optional = true }
 
