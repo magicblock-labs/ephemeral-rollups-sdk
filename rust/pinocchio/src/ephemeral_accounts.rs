@@ -49,9 +49,9 @@ use pinocchio::{
 const ACCOUNT_OVERHEAD: u32 = 60;
 const EPHEMERAL_RENT_PER_BYTE: u64 = 32;
 
-const CREATE_EPHEMERAL_ACCOUNT_DISCRIMINATOR: u8 = 12;
-const RESIZE_EPHEMERAL_ACCOUNT_DISCRIMINATOR: u8 = 13;
-const CLOSE_EPHEMERAL_ACCOUNT_DISCRIMINATOR: u8 = 14;
+const CREATE_EPHEMERAL_ACCOUNT_DISCRIMINATOR: u32 = 12;
+const RESIZE_EPHEMERAL_ACCOUNT_DISCRIMINATOR: u32 = 13;
+const CLOSE_EPHEMERAL_ACCOUNT_DISCRIMINATOR: u32 = 14;
 
 // -----------------
 // Utility Functions
@@ -129,9 +129,9 @@ impl<'a> EphemeralAccount<'a> {
     /// **Note:** Ephemeral account must be a signer to prevent pubkey squatting.
     /// Provide seeds via [`Self::with_signer_seeds`] if ephemeral is a PDA.
     pub fn create(&self, data_len: u32) -> ProgramResult {
-        let mut data = [0_u8; 5];
-        data[0] = CREATE_EPHEMERAL_ACCOUNT_DISCRIMINATOR;
-        data[1..5].copy_from_slice(&data_len.to_le_bytes());
+        let mut data = [0_u8; 8];
+        data[0..4].copy_from_slice(&CREATE_EPHEMERAL_ACCOUNT_DISCRIMINATOR.to_le_bytes());
+        data[4..8].copy_from_slice(&data_len.to_le_bytes());
         self.invoke(
             &data, true, // ephemeral must sign on create
         )
@@ -142,9 +142,9 @@ impl<'a> EphemeralAccount<'a> {
     /// Growing: sponsor pays additional rent to vault.
     /// Shrinking: vault refunds excess rent to sponsor.
     pub fn resize(&self, new_data_len: u32) -> ProgramResult {
-        let mut data = [0_u8; 5];
-        data[0] = RESIZE_EPHEMERAL_ACCOUNT_DISCRIMINATOR;
-        data[1..5].copy_from_slice(&new_data_len.to_le_bytes());
+        let mut data = [0_u8; 8];
+        data[0..4].copy_from_slice(&RESIZE_EPHEMERAL_ACCOUNT_DISCRIMINATOR.to_le_bytes());
+        data[4..8].copy_from_slice(&new_data_len.to_le_bytes());
         self.invoke(&data, false)
     }
 
@@ -152,7 +152,7 @@ impl<'a> EphemeralAccount<'a> {
     ///
     /// All rent is refunded from vault to sponsor.
     pub fn close(&self) -> ProgramResult {
-        self.invoke(&[CLOSE_EPHEMERAL_ACCOUNT_DISCRIMINATOR], false)
+        self.invoke(&CLOSE_EPHEMERAL_ACCOUNT_DISCRIMINATOR.to_le_bytes(), false)
     }
 
     fn invoke(&self, data: &[u8], ephemeral_is_signer: bool) -> ProgramResult {
