@@ -17,10 +17,12 @@ pub struct UpdateEphemeralPermission<'a> {
 }
 
 impl<'a> UpdateEphemeralPermission<'a> {
+    /// N is the size of the data buffer, depending on the number of members in the args.
     pub fn invoke<const N: usize>(&self) -> ProgramResult {
         self.invoke_signed::<N>(&[])
     }
 
+    /// N is the size of the data buffer, depending on the number of members in the args.
     pub fn invoke_signed<const N: usize>(&self, signers: &[Signer<'_, '_>]) -> ProgramResult {
         let mut data = [0_u8; N];
         data[0..8].copy_from_slice(&UPDATE_EPHEMERAL_PERMISSION_DISCRIMINATOR.to_le_bytes());

@@ -17,3 +17,9 @@ pub use create_permission::*;
 pub use delegate_permission::*;
 pub use update_ephemeral_permission::*;
 pub use update_permission::*;
+
+use crate::acl::MAX_MEMBER_SIZE;
+
+pub const fn data_buffer_size(n: usize) -> usize {
+    8 + 1 + n * MAX_MEMBER_SIZE
+}

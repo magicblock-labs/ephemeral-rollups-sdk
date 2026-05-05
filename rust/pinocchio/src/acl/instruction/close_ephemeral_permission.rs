@@ -2,7 +2,7 @@ use pinocchio::cpi::invoke_signed;
 use pinocchio::instruction::{InstructionAccount, InstructionView};
 use pinocchio::{cpi::Signer, AccountView, ProgramResult};
 
-use crate::acl::{EphemeralMembersArgs, CLOSE_EPHEMERAL_PERMISSION_DISCRIMINATOR};
+use crate::acl::CLOSE_EPHEMERAL_PERMISSION_DISCRIMINATOR;
 
 pub struct CloseEphemeralPermission<'a> {
     pub permissioned_account: &'a AccountView,
@@ -13,7 +13,6 @@ pub struct CloseEphemeralPermission<'a> {
     pub magic_program: &'a AccountView,
     pub permission_program: &'a AccountView,
     pub authority_is_signer: bool,
-    pub args: EphemeralMembersArgs<'a>,
 }
 
 impl<'a> CloseEphemeralPermission<'a> {
