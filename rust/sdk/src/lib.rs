@@ -1,24 +1,26 @@
-#[cfg(feature = "anchor")]
-pub mod anchor;
+//#[cfg(feature = "anchor")]
+//pub mod anchor;
 pub mod consts;
 pub mod cpi;
 pub mod crank;
 pub mod delegate_args;
-pub mod ephem;
-#[cfg(any(
-    feature = "anchor",
-    feature = "modular-sdk",
-    feature = "solana-program"
-))]
-pub mod ephemeral_accounts;
-mod solana_compat;
+//pub mod ephem;
+//#[cfg(any(
+//    feature = "anchor",
+//    feature = "modular-sdk",
+//    feature = "solana-program"
+//))]
+//pub mod ephemeral_accounts;
+//mod solana_compat;
 pub mod types;
 pub mod utils;
 
-#[cfg(feature = "access-control")]
-pub mod access_control;
-#[cfg(feature = "spl")]
-pub mod spl;
+pub mod compat;
+
+//#[cfg(feature = "access-control")]
+//pub mod access_control;
+//#[cfg(feature = "spl")]
+//pub mod spl;
 
 pub use dlp_api;
 pub use dlp_api::args::CallHandlerArgs;
@@ -35,6 +37,6 @@ pub use magicblock_magic_program_api::args::{
     ShortAccountMeta, UndelegateTypeArgs,
 };
 
-pub const fn id() -> solana_compat::solana::Pubkey {
-    solana_compat::solana::Pubkey::new_from_array(consts::DELEGATION_PROGRAM_ID.to_bytes())
+pub const fn id() -> compat::Pubkey {
+    compat::Pubkey::new_from_array(consts::DELEGATION_PROGRAM_ID.to_bytes())
 }

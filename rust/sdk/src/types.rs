@@ -1,4 +1,5 @@
-use crate::solana_compat::solana::Pubkey;
+//use crate::solana_compat::solana::Pubkey;
+use crate::compat::{borsh, Pubkey};
 use borsh::{BorshDeserialize, BorshSerialize};
 
 #[derive(Debug, BorshSerialize, BorshDeserialize)]

@@ -1,49 +1,57 @@
 use magicblock_magic_program_api::{args::ScheduleTaskArgs, instruction::MagicBlockInstruction};
-
-use crate::solana_compat::solana::{
-    invoke, invoke_signed, AccountInfo, AccountMeta, Instruction, ProgramResult,
+use solana_program::{
+    instruction::{AccountMeta, Instruction},
+    program::{invoke, invoke_signed},
 };
 
+use crate::compat::{self, Compatize, Modernize};
+
 pub struct ScheduleCrankCpi<'a> {
-    pub payer: &'a AccountInfo<'a>,
-    pub magic_program: &'a AccountInfo<'a>,
-    pub instruction_accounts: &'a [AccountInfo<'a>],
+    pub payer: &'a compat::AccountInfo<'a>,
+    pub magic_program: &'a compat::AccountInfo<'a>,
+    pub instruction_accounts: &'a [compat::AccountInfo<'a>],
     pub args: ScheduleTaskArgs,
 }
 
 impl<'a> ScheduleCrankCpi<'a> {
-    pub fn instruction(&self) -> Instruction {
+    pub fn instruction(&self) -> compat::Instruction {
         let mut accounts = Vec::with_capacity(1 + self.instruction_accounts.len());
-        accounts.push(AccountMeta::new(*self.payer.key, true));
+        accounts.push(AccountMeta::new(*self.payer.key.modernize(), true));
         accounts.extend(self.instruction_accounts.iter().map(|ai| AccountMeta {
-            pubkey: *ai.key,
+            pubkey: *ai.key.modernize(),
             is_signer: ai.is_signer,
             is_writable: ai.is_writable,
         }));
 
         Instruction::new_with_bincode(
-            *self.magic_program.key,
+            *self.magic_program.key.modernize(),
             &MagicBlockInstruction::ScheduleTask(self.args.clone()),
             accounts,
         )
+        .compat()
     }
 
-    pub fn invoke(&self) -> ProgramResult {
+    pub fn invoke(&self) -> compat::ProgramResult {
         let accounts = Self::build_accounts(self.payer, self.instruction_accounts);
 
-        invoke(&self.instruction(), &accounts)
+        invoke(&self.instruction().modernize(), &accounts.modernize()).compat()
     }
 
-    pub fn invoke_signed(&self, signers_seeds: &[&[&[u8]]]) -> ProgramResult {
+    pub fn invoke_signed(&self, signers_seeds: &[&[&[u8]]]) -> compat::ProgramResult {
         let accounts = Self::build_accounts(self.payer, self.instruction_accounts);
 
-        invoke_signed(&self.instruction(), &accounts, signers_seeds)
+        invoke_signed(
+            &self.instruction().modernize(),
+            &accounts.modernize(),
+            signers_seeds,
+        )
+        .compat()
     }
 
     fn build_accounts(
-        payer: &'a AccountInfo<'a>,
-        instruction_accounts: &'a [AccountInfo<'a>],
-    ) -> Vec<AccountInfo<'a>> {
+        payer: &'a compat::AccountInfo<'a>,
+        instruction_accounts: &'a [compat::AccountInfo<'a>],
+    ) -> Vec<compat::AccountInfo<'a>> {
         let mut accounts = Vec::with_capacity(1 + instruction_accounts.len());
         accounts.push(payer.clone());
         accounts.extend_from_slice(instruction_accounts);
@@ -52,38 +60,45 @@ impl<'a> ScheduleCrankCpi<'a> {
 }
 
 pub struct CancelCrankCpi<'a> {
-    pub authority: &'a AccountInfo<'a>,
-    pub task_context: &'a AccountInfo<'a>,
-    pub magic_program: &'a AccountInfo<'a>,
+    pub authority: &'a compat::AccountInfo<'a>,
+    pub task_context: &'a compat::AccountInfo<'a>,
+    pub magic_program: &'a compat::AccountInfo<'a>,
     pub crank_id: i64,
 }
 
 impl<'a> CancelCrankCpi<'a> {
-    pub fn instruction(&self) -> Instruction {
+    pub fn instruction(&self) -> compat::Instruction {
         Instruction::new_with_bincode(
-            *self.magic_program.key,
+            *self.magic_program.key.modernize(),
             &MagicBlockInstruction::CancelTask {
                 task_id: self.crank_id,
             },
             vec![
                 if self.authority.is_writable {
-                    AccountMeta::new(*self.authority.key, true)
+                    AccountMeta::new(*self.authority.key.modernize(), true)
                 } else {
-                    AccountMeta::new_readonly(*self.authority.key, true)
+                    AccountMeta::new_readonly(*self.authority.key.modernize(), true)
                 },
-                AccountMeta::new(*self.task_context.key, false),
+                AccountMeta::new(*self.task_context.key.modernize(), false),
             ],
         )
+        .compat()
     }
 
-    pub fn invoke(&self) -> ProgramResult {
-        let accounts = [self.authority.clone(), self.task_context.clone()];
-        invoke(&self.instruction(), &accounts)
+    pub fn invoke(&self) -> compat::ProgramResult {
+        let accounts = [
+            self.authority.modernize().clone(),
+            self.task_context.modernize().clone(),
+        ];
+        invoke(&self.instruction().modernize(), &accounts).compat()
     }
 
-    pub fn invoke_signed(&self, signers_seeds: &[&[&[u8]]]) -> ProgramResult {
-        let accounts = [self.authority.clone(), self.task_context.clone()];
-        invoke_signed(&self.instruction(), &accounts, signers_seeds)
+    pub fn invoke_signed(&self, signers_seeds: &[&[&[u8]]]) -> compat::ProgramResult {
+        let accounts = [
+            self.authority.modernize().clone(),
+            self.task_context.modernize().clone(),
+        ];
+        invoke_signed(&self.instruction().modernize(), &accounts, signers_seeds).compat()
     }
 }
 

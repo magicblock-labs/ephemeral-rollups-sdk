@@ -1,14 +1,20 @@
+use crate::modernize;
 use crate::types::DelegateAccountArgs;
 use crate::utils::{close_pda_with_system_transfer, create_pda, seeds_with_bump};
-use borsh::BorshSerialize;
 use dlp_api::args::{DelegateArgs, DelegateWithActionsArgs, PostDelegationActions};
 use dlp_api::delegate_buffer_seeds_from_delegated_account;
 use dlp_api::discriminator::DlpDiscriminator;
+use solana_program::instruction::{AccountMeta, Instruction};
+use solana_program::program_error::ProgramError;
 
-use crate::solana_compat::solana::{
-    invoke_signed, sol_memset, system_instruction, AccountInfo, AccountMeta, Instruction,
-    ProgramError, ProgramResult, Pubkey,
+use crate::compat::{
+    account_info::AccountInfo,
+    borsh::{self, BorshSerialize},
+    Compatize, Modernize, ProgramResult, Pubkey,
 };
+
+use solana_address::Address;
+use solana_program::{program::invoke_signed, program_memory::sol_memset};
 
 pub const DELEGATION_PROGRAM_ID: Pubkey =
     Pubkey::new_from_array(dlp_api::consts::DELEGATION_PROGRAM_ID.to_bytes());
@@ -47,10 +53,10 @@ pub fn delegate_account<'a, 'info>(
     let buffer_seeds: &[&[u8]] = delegate_buffer_seeds_from_delegated_account!(accounts.pda.key);
 
     let (_, delegate_account_bump) =
-        Pubkey::find_program_address(pda_seeds, accounts.owner_program.key);
+        Address::find_program_address(pda_seeds, accounts.owner_program.key.modernize());
 
     let (_, buffer_pda_bump) =
-        Pubkey::find_program_address(buffer_seeds, accounts.owner_program.key);
+        Address::find_program_address(buffer_seeds, accounts.owner_program.key.modernize());
 
     // Pda signer seeds
     let delegate_account_bump_slice: &[u8] = &[delegate_account_bump];
@@ -96,10 +102,17 @@ pub fn delegate_account<'a, 'info>(
     }
     if accounts.pda.owner != accounts.delegation_program.key {
         invoke_signed(
-            &system_instruction::assign(accounts.pda.key, accounts.delegation_program.key),
-            &[accounts.pda.clone(), accounts.system_program.clone()],
+            &solana_system_interface::instruction::assign(
+                accounts.pda.key.modernize(),
+                accounts.delegation_program.key.modernize(),
+            ),
+            &[
+                accounts.pda.modernize().clone(),
+                accounts.system_program.modernize().clone(),
+            ],
             pda_signer_seeds,
-        )?;
+        )
+        .compat()?;
     }
 
     let seeds_vec: Vec<Vec<u8>> = pda_seeds.iter().map(|&slice| slice.to_vec()).collect();
@@ -142,10 +155,10 @@ pub fn delegate_account_with_actions<'a, 'info>(
     let buffer_seeds: &[&[u8]] = delegate_buffer_seeds_from_delegated_account!(accounts.pda.key);
 
     let (_, delegate_account_bump) =
-        Pubkey::find_program_address(pda_seeds, accounts.owner_program.key);
+        Address::find_program_address(pda_seeds, accounts.owner_program.key.modernize());
 
     let (_, buffer_pda_bump) =
-        Pubkey::find_program_address(buffer_seeds, accounts.owner_program.key);
+        Address::find_program_address(buffer_seeds, accounts.owner_program.key.modernize());
 
     // Pda signer seeds
     let delegate_account_bump_slice: &[u8] = &[delegate_account_bump];
@@ -191,10 +204,17 @@ pub fn delegate_account_with_actions<'a, 'info>(
     }
     if accounts.pda.owner != accounts.delegation_program.key {
         invoke_signed(
-            &system_instruction::assign(accounts.pda.key, accounts.delegation_program.key),
-            &[accounts.pda.clone(), accounts.system_program.clone()],
+            &solana_system_interface::instruction::assign(
+                accounts.pda.key.modernize(),
+                accounts.delegation_program.key.modernize(),
+            ),
+            &[
+                accounts.pda.modernize().clone(),
+                accounts.system_program.modernize().clone(),
+            ],
             pda_signer_seeds,
-        )?;
+        )
+        .compat()?;
     }
 
     let seeds_vec: Vec<Vec<u8>> = pda_seeds.iter().map(|&slice| slice.to_vec()).collect();
@@ -241,15 +261,16 @@ pub fn undelegate_account<'a, 'info>(
     account_signer_seeds: Vec<Vec<u8>>,
 ) -> ProgramResult {
     if !buffer.is_signer {
-        return Err(ProgramError::MissingRequiredSignature);
+        return Err(ProgramError::MissingRequiredSignature.compat());
     }
     if buffer.owner != &DELEGATION_PROGRAM_ID {
-        return Err(ProgramError::InvalidAccountOwner);
+        return Err(ProgramError::InvalidAccountOwner.compat());
     }
 
     let account_seeds: Vec<&[u8]> = account_signer_seeds.iter().map(|v| v.as_slice()).collect();
 
-    let (_, account_bump) = Pubkey::find_program_address(account_seeds.as_ref(), owner_program);
+    let (_, account_bump) =
+        Address::find_program_address(account_seeds.as_ref(), owner_program.modernize());
 
     // Account signer seeds
     let account_bump_slice: &[u8] = &[account_bump];
@@ -288,6 +309,16 @@ pub fn cpi_delegate<'a, 'info>(
     signers_seeds: &[&[&[u8]]],
     args: DelegateAccountArgs,
 ) -> ProgramResult {
+    modernize!(
+        payer,
+        delegate_account,
+        owner_program,
+        buffer,
+        delegation_record,
+        delegation_metadata,
+        system_program
+    );
+
     let mut data: Vec<u8> = vec![0u8; 8];
     args.serialize(&mut data)?;
 
@@ -318,6 +349,7 @@ pub fn cpi_delegate<'a, 'info>(
         ],
         signers_seeds,
     )
+    .compat()
 }
 
 /// CPI to the delegation program to delegate the account with actions
@@ -334,8 +366,19 @@ pub fn cpi_delegate_with_actions<'a, 'info>(
     args: DelegateWithActionsArgs,
     action_signer_infos: &'a [&'a AccountInfo<'info>],
 ) -> ProgramResult {
+    modernize!(
+        payer,
+        delegate_account,
+        owner_program,
+        buffer,
+        delegation_record,
+        delegation_metadata,
+        system_program
+    );
+
     let mut data = DlpDiscriminator::DelegateWithActions.to_vec();
-    let payload = borsh::to_vec(&args).map_err(|_| ProgramError::InvalidInstructionData)?;
+    let payload =
+        borsh::to_vec(&args).map_err(|_| ProgramError::InvalidInstructionData.compat())?;
     data.extend_from_slice(&payload);
 
     let mut accounts = vec![
@@ -348,12 +391,13 @@ pub fn cpi_delegate_with_actions<'a, 'info>(
         AccountMeta::new_readonly(system_program.key.to_bytes().into(), false),
     ];
 
-    let mut signer_infos: Vec<AccountInfo<'info>> = Vec::new();
+    let mut signer_infos = Vec::new();
     for signer in &args.actions.signers {
         let info = action_signer_infos
             .iter()
             .find(|ai| *ai.key.as_array() == *signer)
-            .ok_or(ProgramError::NotEnoughAccountKeys)?;
+            .ok_or(ProgramError::NotEnoughAccountKeys.compat())?
+            .modernize();
         accounts.push(AccountMeta::new_readonly(*info.key, true));
         signer_infos.push((*info).clone());
     }
@@ -375,5 +419,5 @@ pub fn cpi_delegate_with_actions<'a, 'info>(
     ];
     invoke_accounts.extend(signer_infos);
 
-    invoke_signed(&delegation_instruction, &invoke_accounts, signers_seeds)
+    invoke_signed(&delegation_instruction, &invoke_accounts, signers_seeds).compat()
 }

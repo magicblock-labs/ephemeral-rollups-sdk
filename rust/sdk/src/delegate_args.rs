@@ -1,4 +1,4 @@
-use crate::solana_compat::solana::{system_program, AccountMeta, Pubkey};
+use crate::compat::{AccountMeta, Compatize, Pubkey};
 use dlp_api::pda::{
     delegate_buffer_pda_from_delegated_account_and_owner_program,
     delegation_metadata_pda_from_delegated_account, delegation_record_pda_from_delegated_account,
@@ -29,12 +29,12 @@ impl DelegateAccounts {
             delegation_metadata_pda_from_delegated_account(&delegated_account.to_bytes().into());
         Self {
             delegated_account,
-            delegate_buffer: delegate_buffer.to_bytes().into(),
-            delegation_record: delegation_record.to_bytes().into(),
-            delegation_metadata: delegation_metadata.to_bytes().into(),
+            delegate_buffer: delegate_buffer.compat(),
+            delegation_record: delegation_record.compat(),
+            delegation_metadata: delegation_metadata.compat(),
             owner_program,
-            delegation_program: DELEGATION_PROGRAM_ID.to_bytes().into(),
-            system_program: system_program::ID.to_bytes().into(),
+            delegation_program: DELEGATION_PROGRAM_ID.compat(),
+            system_program: solana_system_interface::program::ID.compat(),
         }
     }
 }
