@@ -37,7 +37,7 @@ custom-heap = []
 custom-panic = []
 anchor-debug = []
 serde = []
-
+backward-compat = ["magicblock-delegation-program-api/backward-compat"]
 
 [dependencies]
 anchor-lang = { workspace = true, optional = true }
