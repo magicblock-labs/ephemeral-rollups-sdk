@@ -318,7 +318,15 @@ pub struct EphemeralMembersArgs<'a> {
 
 impl<'a> EphemeralMembersArgs<'a> {
     pub fn to_bytes(&self, bytes: &mut [u8]) -> Result<usize, ProgramError> {
-        if bytes.is_empty() {
+        let members_bytes = self
+            .members
+            .len()
+            .checked_mul(MAX_MEMBER_SIZE)
+            .ok_or(ProgramError::InvalidArgument)?;
+        let required = 1usize
+            .checked_add(members_bytes)
+            .ok_or(ProgramError::InvalidArgument)?;
+        if bytes.len() < required {
             return Err(ProgramError::InvalidArgument);
         }
 
@@ -331,6 +339,6 @@ impl<'a> EphemeralMembersArgs<'a> {
             offset += 32;
         }
 
-        Ok(offset)
+        Ok(required)
     }
 }
