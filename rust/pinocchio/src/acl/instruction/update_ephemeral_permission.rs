@@ -1,4 +1,5 @@
 use pinocchio::cpi::invoke_signed;
+use pinocchio::error::ProgramError;
 use pinocchio::instruction::{InstructionAccount, InstructionView};
 use pinocchio::{cpi::Signer, AccountView, ProgramResult};
 
@@ -24,6 +25,10 @@ impl<'a> UpdateEphemeralPermission<'a> {
 
     /// N is the size of the data buffer, depending on the number of members in the args.
     pub fn invoke_signed<const N: usize>(&self, signers: &[Signer<'_, '_>]) -> ProgramResult {
+        if N < 8 {
+            return Err(ProgramError::InvalidArgument);
+        }
+
         let mut data = [0_u8; N];
         data[0..8].copy_from_slice(&UPDATE_EPHEMERAL_PERMISSION_DISCRIMINATOR.to_le_bytes());
         let len = self.args.to_bytes(&mut data[8..])?;
