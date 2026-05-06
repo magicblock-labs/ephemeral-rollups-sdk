@@ -29,18 +29,18 @@ impl<'a> CreateEphemeralPermission<'a> {
             &InstructionView {
                 program_id: self.permission_program.address(),
                 accounts: &[
+                    InstructionAccount::writable_signer(self.payer.address()),
                     InstructionAccount::readonly_signer(self.permissioned_account.address()),
                     InstructionAccount::writable(self.permission.address()),
-                    InstructionAccount::writable_signer(self.payer.address()),
                     InstructionAccount::writable(self.vault.address()),
                     InstructionAccount::readonly(self.magic_program.address()),
                 ],
                 data: &data[..8 + len],
             },
             &[
+                self.payer,
                 self.permissioned_account,
                 self.permission,
-                self.payer,
                 self.vault,
                 self.magic_program,
             ],

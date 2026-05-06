@@ -25,28 +25,28 @@ impl<'a> CloseEphemeralPermission<'a> {
             &InstructionView {
                 program_id: self.permission_program.address(),
                 accounts: &[
+                    InstructionAccount::writable_signer(self.payer.address()),
+                    InstructionAccount::new(
+                        self.authority.address(),
+                        false,
+                        self.authority_is_signer,
+                    ),
                     InstructionAccount::new(
                         self.permissioned_account.address(),
                         false,
                         !self.authority_is_signer,
                     ),
                     InstructionAccount::writable(self.permission.address()),
-                    InstructionAccount::new(
-                        self.authority.address(),
-                        false,
-                        self.authority_is_signer,
-                    ),
-                    InstructionAccount::writable_signer(self.payer.address()),
                     InstructionAccount::writable(self.vault.address()),
                     InstructionAccount::readonly(self.magic_program.address()),
                 ],
                 data: &CLOSE_EPHEMERAL_PERMISSION_DISCRIMINATOR.to_le_bytes(),
             },
             &[
+                self.payer,
+                self.authority,
                 self.permissioned_account,
                 self.permission,
-                self.authority,
-                self.payer,
                 self.vault,
                 self.magic_program,
             ],
