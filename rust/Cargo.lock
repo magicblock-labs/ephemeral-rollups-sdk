@@ -1284,6 +1284,7 @@ dependencies = [
  "ephemeral-rollups-sdk-attribute-delegate",
  "ephemeral-rollups-sdk-attribute-ephemeral",
  "ephemeral-rollups-sdk-attribute-ephemeral-accounts",
+ "five8 0.2.1",
  "getrandom 0.2.16",
  "magicblock-delegation-program-api",
  "magicblock-magic-program-api",
