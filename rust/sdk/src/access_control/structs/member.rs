@@ -2,16 +2,16 @@
 use anchor_lang::prelude::*;
 
 #[cfg(not(feature = "anchor"))]
-use borsh::{BorshDeserialize, BorshSerialize};
+use crate::compat::borsh::{self, BorshDeserialize, BorshSerialize};
 
-use crate::solana_compat::solana::Pubkey;
+use crate::compat;
 
 #[cfg_attr(feature = "anchor", derive(AnchorSerialize, AnchorDeserialize))]
 #[cfg_attr(not(feature = "anchor"), derive(BorshSerialize, BorshDeserialize))]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Member {
     pub flags: u8,
-    pub pubkey: Pubkey,
+    pub pubkey: compat::Pubkey,
 }
 
 #[cfg_attr(feature = "anchor", derive(AnchorSerialize, AnchorDeserialize))]
@@ -29,15 +29,15 @@ pub const TX_MESSAGE_FLAG: u8 = 1 << 3; // Member can see transaction messages
 pub const ACCOUNT_SIGNATURES_FLAG: u8 = 1 << 4; // Member can see account signatures
 
 impl Member {
-    pub fn is_authority(&self, user: &Pubkey) -> bool {
+    pub fn is_authority(&self, user: &compat::Pubkey) -> bool {
         self.flags & AUTHORITY_FLAG != 0 && &self.pubkey == user
     }
 
-    pub fn can_see_tx_logs(&self, user: &Pubkey) -> bool {
+    pub fn can_see_tx_logs(&self, user: &compat::Pubkey) -> bool {
         self.flags & TX_LOGS_FLAG != 0 && &self.pubkey == user
     }
 
-    pub fn can_see_tx_balances(&self, user: &Pubkey) -> bool {
+    pub fn can_see_tx_balances(&self, user: &compat::Pubkey) -> bool {
         self.flags & TX_BALANCES_FLAG != 0 && &self.pubkey == user
     }
 

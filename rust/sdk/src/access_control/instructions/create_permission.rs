@@ -1,28 +1,27 @@
-use borsh::{BorshDeserialize, BorshSerialize};
+use crate::compat::borsh::{self, BorshDeserialize, BorshSerialize};
 
 use crate::access_control::structs::MembersArgs;
 use crate::access_control::structs::Permission;
+use crate::compat::{self, Compat, Modern};
 use crate::consts::PERMISSION_PROGRAM_ID;
-use crate::solana_compat::solana::{
-    invoke, invoke_signed, AccountInfo, AccountMeta, Instruction, ProgramResult, Pubkey,
-};
+use solana_program::program::{invoke, invoke_signed};
 
 pub const CREATE_PERMISSION_DISCRIMINATOR: u64 = 0;
 
 /// Accounts.
 #[derive(Debug)]
 pub struct CreatePermission {
-    pub permissioned_account: Pubkey,
+    pub permissioned_account: compat::Pubkey,
 
-    pub permission: Pubkey,
+    pub permission: compat::Pubkey,
 
-    pub payer: Pubkey,
+    pub payer: compat::Pubkey,
 
-    pub system_program: Pubkey,
+    pub system_program: compat::Pubkey,
 }
 
 impl CreatePermission {
-    pub fn instruction(&self, args: CreatePermissionInstructionArgs) -> Instruction {
+    pub fn instruction(&self, args: CreatePermissionInstructionArgs) -> compat::Instruction {
         self.instruction_with_remaining_accounts(args, &[])
     }
     #[allow(clippy::arithmetic_side_effects)]
@@ -30,19 +29,25 @@ impl CreatePermission {
     pub fn instruction_with_remaining_accounts(
         &self,
         args: CreatePermissionInstructionArgs,
-        remaining_accounts: &[AccountMeta],
-    ) -> Instruction {
+        remaining_accounts: &[compat::AccountMeta],
+    ) -> compat::Instruction {
         let mut accounts = Vec::with_capacity(4 + remaining_accounts.len());
-        accounts.push(AccountMeta::new_readonly(self.permissioned_account, true));
-        accounts.push(AccountMeta::new(self.permission, false));
-        accounts.push(AccountMeta::new(self.payer, true));
-        accounts.push(AccountMeta::new_readonly(self.system_program, false));
+        accounts.push(compat::AccountMeta::new_readonly(
+            self.permissioned_account,
+            true,
+        ));
+        accounts.push(compat::AccountMeta::new(self.permission, false));
+        accounts.push(compat::AccountMeta::new(self.payer, true));
+        accounts.push(compat::AccountMeta::new_readonly(
+            self.system_program,
+            false,
+        ));
         accounts.extend_from_slice(remaining_accounts);
         let mut data = CreatePermissionInstructionData::new().try_to_vec().unwrap();
         let mut args = args.try_to_vec().unwrap();
         data.append(&mut args);
 
-        Instruction {
+        compat::Instruction {
             program_id: PERMISSION_PROGRAM_ID,
             accounts,
             data,
@@ -84,7 +89,7 @@ impl CreatePermissionInstructionArgs {
     }
 }
 
-/// Instruction builder for `CreatePermission`.
+/// compat::Instruction builder for `CreatePermission`.
 ///
 /// ### Accounts:
 ///
@@ -94,12 +99,12 @@ impl CreatePermissionInstructionArgs {
 ///   3. `[]` system_program
 #[derive(Clone, Debug, Default)]
 pub struct CreatePermissionBuilder {
-    permissioned_account: Option<Pubkey>,
-    permission: Option<Pubkey>,
-    payer: Option<Pubkey>,
-    system_program: Option<Pubkey>,
+    permissioned_account: Option<compat::Pubkey>,
+    permission: Option<compat::Pubkey>,
+    payer: Option<compat::Pubkey>,
+    system_program: Option<compat::Pubkey>,
     args: Option<MembersArgs>,
-    __remaining_accounts: Vec<AccountMeta>,
+    __remaining_accounts: Vec<compat::AccountMeta>,
 }
 
 impl CreatePermissionBuilder {
@@ -107,7 +112,7 @@ impl CreatePermissionBuilder {
         Self::default()
     }
     #[inline(always)]
-    pub fn permissioned_account(&mut self, permissioned_account: Pubkey) -> &mut Self {
+    pub fn permissioned_account(&mut self, permissioned_account: compat::Pubkey) -> &mut Self {
         self.permissioned_account = Some(permissioned_account);
         // Automatically derive and set the permission PDA
         let (permission_pda, _bump) = Permission::find_pda(&permissioned_account);
@@ -115,17 +120,17 @@ impl CreatePermissionBuilder {
         self
     }
     #[inline(always)]
-    pub fn permission(&mut self, permission: Pubkey) -> &mut Self {
+    pub fn permission(&mut self, permission: compat::Pubkey) -> &mut Self {
         self.permission = Some(permission);
         self
     }
     #[inline(always)]
-    pub fn payer(&mut self, payer: Pubkey) -> &mut Self {
+    pub fn payer(&mut self, payer: compat::Pubkey) -> &mut Self {
         self.payer = Some(payer);
         self
     }
     #[inline(always)]
-    pub fn system_program(&mut self, system_program: Pubkey) -> &mut Self {
+    pub fn system_program(&mut self, system_program: compat::Pubkey) -> &mut Self {
         self.system_program = Some(system_program);
         self
     }
@@ -136,18 +141,18 @@ impl CreatePermissionBuilder {
     }
     /// Add an additional account to the instruction.
     #[inline(always)]
-    pub fn add_remaining_account(&mut self, account: AccountMeta) -> &mut Self {
+    pub fn add_remaining_account(&mut self, account: compat::AccountMeta) -> &mut Self {
         self.__remaining_accounts.push(account);
         self
     }
     /// Add additional accounts to the instruction.
     #[inline(always)]
-    pub fn add_remaining_accounts(&mut self, accounts: &[AccountMeta]) -> &mut Self {
+    pub fn add_remaining_accounts(&mut self, accounts: &[compat::AccountMeta]) -> &mut Self {
         self.__remaining_accounts.extend_from_slice(accounts);
         self
     }
     #[allow(clippy::clone_on_copy)]
-    pub fn instruction(&self) -> Instruction {
+    pub fn instruction(&self) -> compat::Instruction {
         let accounts = CreatePermission {
             permissioned_account: self
                 .permissioned_account
@@ -166,34 +171,34 @@ impl CreatePermissionBuilder {
 
 /// `create_permission` CPI accounts.
 pub struct CreatePermissionCpiAccounts<'a, 'b> {
-    pub permissioned_account: &'b AccountInfo<'a>,
+    pub permissioned_account: &'b compat::AccountInfo<'a>,
 
-    pub permission: &'b AccountInfo<'a>,
+    pub permission: &'b compat::AccountInfo<'a>,
 
-    pub payer: &'b AccountInfo<'a>,
+    pub payer: &'b compat::AccountInfo<'a>,
 
-    pub system_program: &'b AccountInfo<'a>,
+    pub system_program: &'b compat::AccountInfo<'a>,
 }
 
 /// `create_permission` CPI instruction.
 pub struct CreatePermissionCpi<'a, 'b> {
     /// The program to invoke.
-    pub __program: &'b AccountInfo<'a>,
+    pub __program: &'b compat::AccountInfo<'a>,
 
-    pub permissioned_account: &'b AccountInfo<'a>,
+    pub permissioned_account: &'b compat::AccountInfo<'a>,
 
-    pub permission: &'b AccountInfo<'a>,
+    pub permission: &'b compat::AccountInfo<'a>,
 
-    pub payer: &'b AccountInfo<'a>,
+    pub payer: &'b compat::AccountInfo<'a>,
 
-    pub system_program: &'b AccountInfo<'a>,
+    pub system_program: &'b compat::AccountInfo<'a>,
     /// The arguments for the instruction.
     pub __args: CreatePermissionInstructionArgs,
 }
 
 impl<'a, 'b> CreatePermissionCpi<'a, 'b> {
     pub fn new(
-        program: &'b AccountInfo<'a>,
+        program: &'b compat::AccountInfo<'a>,
         accounts: CreatePermissionCpiAccounts<'a, 'b>,
         args: CreatePermissionInstructionArgs,
     ) -> Self {
@@ -207,18 +212,18 @@ impl<'a, 'b> CreatePermissionCpi<'a, 'b> {
         }
     }
     #[inline(always)]
-    pub fn invoke(&self) -> ProgramResult {
+    pub fn invoke(&self) -> compat::ProgramResult {
         self.invoke_signed_with_remaining_accounts(&[], &[])
     }
     #[inline(always)]
     pub fn invoke_with_remaining_accounts(
         &self,
-        remaining_accounts: &[(&'b AccountInfo<'a>, bool, bool)],
-    ) -> ProgramResult {
+        remaining_accounts: &[(&'b compat::AccountInfo<'a>, bool, bool)],
+    ) -> compat::ProgramResult {
         self.invoke_signed_with_remaining_accounts(&[], remaining_accounts)
     }
     #[inline(always)]
-    pub fn invoke_signed(&self, signers_seeds: &[&[&[u8]]]) -> ProgramResult {
+    pub fn invoke_signed(&self, signers_seeds: &[&[&[u8]]]) -> compat::ProgramResult {
         self.invoke_signed_with_remaining_accounts(signers_seeds, &[])
     }
     #[allow(clippy::arithmetic_side_effects)]
@@ -227,18 +232,21 @@ impl<'a, 'b> CreatePermissionCpi<'a, 'b> {
     pub fn invoke_signed_with_remaining_accounts(
         &self,
         signers_seeds: &[&[&[u8]]],
-        remaining_accounts: &[(&'b AccountInfo<'a>, bool, bool)],
-    ) -> ProgramResult {
+        remaining_accounts: &[(&'b compat::AccountInfo<'a>, bool, bool)],
+    ) -> compat::ProgramResult {
         let mut accounts = Vec::with_capacity(4 + remaining_accounts.len());
-        accounts.push(AccountMeta::new_readonly(
+        accounts.push(compat::AccountMeta::new_readonly(
             *self.permissioned_account.key,
             true,
         ));
-        accounts.push(AccountMeta::new(*self.permission.key, false));
-        accounts.push(AccountMeta::new(*self.payer.key, true));
-        accounts.push(AccountMeta::new_readonly(*self.system_program.key, false));
+        accounts.push(compat::AccountMeta::new(*self.permission.key, false));
+        accounts.push(compat::AccountMeta::new(*self.payer.key, true));
+        accounts.push(compat::AccountMeta::new_readonly(
+            *self.system_program.key,
+            false,
+        ));
         remaining_accounts.iter().for_each(|remaining_account| {
-            accounts.push(AccountMeta {
+            accounts.push(compat::AccountMeta {
                 pubkey: *remaining_account.0.key,
                 is_signer: remaining_account.2,
                 is_writable: remaining_account.1,
@@ -248,7 +256,7 @@ impl<'a, 'b> CreatePermissionCpi<'a, 'b> {
         let mut args = self.__args.try_to_vec().unwrap();
         data.append(&mut args);
 
-        let instruction = Instruction {
+        let instruction = compat::Instruction {
             program_id: PERMISSION_PROGRAM_ID,
             accounts,
             data,
@@ -264,14 +272,19 @@ impl<'a, 'b> CreatePermissionCpi<'a, 'b> {
             .for_each(|remaining_account| account_infos.push(remaining_account.0.clone()));
 
         if signers_seeds.is_empty() {
-            invoke(&instruction, &account_infos)
+            invoke(&instruction.modern(), &account_infos.modern()).compat()
         } else {
-            invoke_signed(&instruction, &account_infos, signers_seeds)
+            invoke_signed(
+                &instruction.modern(),
+                &account_infos.modern(),
+                signers_seeds,
+            )
+            .compat()
         }
     }
 }
 
-/// Instruction builder for `CreatePermission` via CPI.
+/// compat::Instruction builder for `CreatePermission` via CPI.
 ///
 /// ### Accounts:
 ///
@@ -285,7 +298,7 @@ pub struct CreatePermissionCpiBuilder<'a, 'b> {
 }
 
 impl<'a, 'b> CreatePermissionCpiBuilder<'a, 'b> {
-    pub fn new(program: &'b AccountInfo<'a>) -> Self {
+    pub fn new(program: &'b compat::AccountInfo<'a>) -> Self {
         let instruction = Box::new(CreatePermissionCpiBuilderInstruction {
             __program: program,
             permissioned_account: None,
@@ -298,22 +311,25 @@ impl<'a, 'b> CreatePermissionCpiBuilder<'a, 'b> {
         Self { instruction }
     }
     #[inline(always)]
-    pub fn permissioned_account(&mut self, permissioned_account: &'b AccountInfo<'a>) -> &mut Self {
+    pub fn permissioned_account(
+        &mut self,
+        permissioned_account: &'b compat::AccountInfo<'a>,
+    ) -> &mut Self {
         self.instruction.permissioned_account = Some(permissioned_account);
         self
     }
     #[inline(always)]
-    pub fn permission(&mut self, permission: &'b AccountInfo<'a>) -> &mut Self {
+    pub fn permission(&mut self, permission: &'b compat::AccountInfo<'a>) -> &mut Self {
         self.instruction.permission = Some(permission);
         self
     }
     #[inline(always)]
-    pub fn payer(&mut self, payer: &'b AccountInfo<'a>) -> &mut Self {
+    pub fn payer(&mut self, payer: &'b compat::AccountInfo<'a>) -> &mut Self {
         self.instruction.payer = Some(payer);
         self
     }
     #[inline(always)]
-    pub fn system_program(&mut self, system_program: &'b AccountInfo<'a>) -> &mut Self {
+    pub fn system_program(&mut self, system_program: &'b compat::AccountInfo<'a>) -> &mut Self {
         self.instruction.system_program = Some(system_program);
         self
     }
@@ -326,7 +342,7 @@ impl<'a, 'b> CreatePermissionCpiBuilder<'a, 'b> {
     #[inline(always)]
     pub fn add_remaining_account(
         &mut self,
-        account: &'b AccountInfo<'a>,
+        account: &'b compat::AccountInfo<'a>,
         is_writable: bool,
         is_signer: bool,
     ) -> &mut Self {
@@ -337,12 +353,12 @@ impl<'a, 'b> CreatePermissionCpiBuilder<'a, 'b> {
     }
     /// Add additional accounts to the instruction.
     ///
-    /// Each account is represented by a tuple of the `AccountInfo`, a `bool` indicating whether the account is writable or not,
+    /// Each account is represented by a tuple of the `compat::AccountInfo`, a `bool` indicating whether the account is writable or not,
     /// and a `bool` indicating whether the account is a signer or not.
     #[inline(always)]
     pub fn add_remaining_accounts(
         &mut self,
-        accounts: &[(&'b AccountInfo<'a>, bool, bool)],
+        accounts: &[(&'b compat::AccountInfo<'a>, bool, bool)],
     ) -> &mut Self {
         self.instruction
             .__remaining_accounts
@@ -350,12 +366,12 @@ impl<'a, 'b> CreatePermissionCpiBuilder<'a, 'b> {
         self
     }
     #[inline(always)]
-    pub fn invoke(&self) -> ProgramResult {
+    pub fn invoke(&self) -> compat::ProgramResult {
         self.invoke_signed(&[])
     }
     #[allow(clippy::clone_on_copy)]
     #[allow(clippy::vec_init_then_push)]
-    pub fn invoke_signed(&self, signers_seeds: &[&[&[u8]]]) -> ProgramResult {
+    pub fn invoke_signed(&self, signers_seeds: &[&[&[u8]]]) -> compat::ProgramResult {
         let args = CreatePermissionInstructionArgs {
             args: self.instruction.args.clone().expect("args is not set"),
         };
@@ -386,12 +402,12 @@ impl<'a, 'b> CreatePermissionCpiBuilder<'a, 'b> {
 
 #[derive(Clone, Debug)]
 struct CreatePermissionCpiBuilderInstruction<'a, 'b> {
-    __program: &'b AccountInfo<'a>,
-    permissioned_account: Option<&'b AccountInfo<'a>>,
-    permission: Option<&'b AccountInfo<'a>>,
-    payer: Option<&'b AccountInfo<'a>>,
-    system_program: Option<&'b AccountInfo<'a>>,
+    __program: &'b compat::AccountInfo<'a>,
+    permissioned_account: Option<&'b compat::AccountInfo<'a>>,
+    permission: Option<&'b compat::AccountInfo<'a>>,
+    payer: Option<&'b compat::AccountInfo<'a>>,
+    system_program: Option<&'b compat::AccountInfo<'a>>,
     args: Option<MembersArgs>,
-    /// Additional instruction accounts `(AccountInfo, is_writable, is_signer)`.
-    __remaining_accounts: Vec<(&'b AccountInfo<'a>, bool, bool)>,
+    /// Additional instruction accounts `(compat::AccountInfo, is_writable, is_signer)`.
+    __remaining_accounts: Vec<(&'b compat::AccountInfo<'a>, bool, bool)>,
 }

@@ -1,9 +1,9 @@
 use core::fmt;
 
 use crate::{
+    compat,
     consts::{ESPL_TOKEN_PROGRAM_ID, HYDRA_PROGRAM_ID},
     cpi::DELEGATION_PROGRAM_ID,
-    solana_compat::solana::{system_program, AccountMeta, Instruction, Pubkey},
     spl::{
         find_hydra_crank_pda, find_rent_pda, find_shuttle_ata, find_shuttle_ephemeral_ata,
         find_stash_ata, find_stash_pda, find_transfer_queue,
@@ -46,21 +46,21 @@ impl fmt::Display for SchedulePrivateTransferBuilderError {
 }
 
 pub struct SchedulePrivateTransferBuilder {
-    pub user: Pubkey,
-    pub mint: Pubkey,
+    pub user: compat::Pubkey,
+    pub mint: compat::Pubkey,
     pub shuttle_id: u32,
-    pub destination_owner: Pubkey,
+    pub destination_owner: compat::Pubkey,
     pub min_delay_ms: u64,
     pub max_delay_ms: u64,
     pub split: u32,
-    pub validator: Pubkey,
-    pub token_program: Pubkey,
+    pub validator: compat::Pubkey,
+    pub token_program: compat::Pubkey,
     pub client_ref_id: Option<u64>,
 }
 
 impl SchedulePrivateTransferBuilder {
     #[inline(always)]
-    pub fn instruction(&self) -> Result<Instruction, SchedulePrivateTransferBuilderError> {
+    pub fn instruction(&self) -> Result<compat::Instruction, SchedulePrivateTransferBuilderError> {
         if self.split == 0 {
             return Err(SchedulePrivateTransferBuilderError::InvalidSplit(
                 self.split,
@@ -86,15 +86,15 @@ impl SchedulePrivateTransferBuilder {
                 &self.mint,
                 &self.token_program,
             );
-        let (_buffer, buffer_bump) = Pubkey::find_program_address(
+        let (_buffer, buffer_bump) = compat::Pubkey::find_program_address(
             &[BUFFER_SEED, shuttle_ata.as_ref()],
             &ESPL_TOKEN_PROGRAM_ID,
         );
-        let (_delegation_record, delegation_record_bump) = Pubkey::find_program_address(
+        let (_delegation_record, delegation_record_bump) = compat::Pubkey::find_program_address(
             &[DELEGATION_RECORD_SEED, shuttle_ata.as_ref()],
             &DELEGATION_PROGRAM_ID,
         );
-        let (_delegation_metadata, delegation_metadata_bump) = Pubkey::find_program_address(
+        let (_delegation_metadata, delegation_metadata_bump) = compat::Pubkey::find_program_address(
             &[DELEGATION_METADATA_SEED, shuttle_ata.as_ref()],
             &DELEGATION_PROGRAM_ID,
         );
@@ -147,16 +147,19 @@ impl SchedulePrivateTransferBuilder {
         push_length_prefixed(&mut data, &encrypted_destination)?;
         push_length_prefixed(&mut data, &encrypted_suffix)?;
 
-        Ok(Instruction {
+        Ok(compat::Instruction {
             program_id: ESPL_TOKEN_PROGRAM_ID,
             accounts: vec![
-                AccountMeta::new(self.user, true),
-                AccountMeta::new(stash_pda, false),
-                AccountMeta::new(rent_pda, false),
-                AccountMeta::new(hydra_crank_pda, false),
-                AccountMeta::new_readonly(HYDRA_PROGRAM_ID, false),
-                AccountMeta::new_readonly(system_program::id(), false),
-                AccountMeta::new_readonly(self.token_program, false),
+                compat::AccountMeta::new(self.user, true),
+                compat::AccountMeta::new(stash_pda, false),
+                compat::AccountMeta::new(rent_pda, false),
+                compat::AccountMeta::new(hydra_crank_pda, false),
+                compat::AccountMeta::new_readonly(HYDRA_PROGRAM_ID, false),
+                compat::AccountMeta::new_readonly(
+                    compat::Pubkey::new_from_array(solana_system_interface::program::ID.to_bytes()),
+                    false,
+                ),
+                compat::AccountMeta::new_readonly(self.token_program, false),
             ],
             data,
         })
@@ -196,7 +199,7 @@ fn push_length_prefixed(
 #[inline(always)]
 fn encrypt_private_transfer_field(
     plaintext: &[u8],
-    validator: &Pubkey,
+    validator: &compat::Pubkey,
 ) -> Result<Vec<u8>, SchedulePrivateTransferBuilderError> {
     dlp_api::encryption::encrypt_ed25519_recipient(plaintext, validator.as_array())
         .map_err(SchedulePrivateTransferBuilderError::Encryption)

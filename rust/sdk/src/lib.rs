@@ -1,26 +1,26 @@
-//#[cfg(feature = "anchor")]
-//pub mod anchor;
+#[cfg(feature = "anchor")]
+pub mod anchor;
 pub mod consts;
 pub mod cpi;
 pub mod crank;
 pub mod delegate_args;
-//pub mod ephem;
-//#[cfg(any(
-//    feature = "anchor",
-//    feature = "modular-sdk",
-//    feature = "solana-program"
-//))]
-//pub mod ephemeral_accounts;
+pub mod ephem;
+#[cfg(any(
+    feature = "anchor",
+    feature = "modular-sdk",
+    feature = "solana-program"
+))]
+pub mod ephemeral_accounts;
 //mod solana_compat;
 pub mod types;
 pub mod utils;
 
 pub mod compat;
 
-//#[cfg(feature = "access-control")]
-//pub mod access_control;
-//#[cfg(feature = "spl")]
-//pub mod spl;
+#[cfg(feature = "access-control")]
+pub mod access_control;
+#[cfg(feature = "spl")]
+pub mod spl;
 
 pub use dlp_api;
 pub use dlp_api::args::CallHandlerArgs;

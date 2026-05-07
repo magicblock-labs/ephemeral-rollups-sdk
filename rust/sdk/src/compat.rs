@@ -200,6 +200,13 @@ impl<T: Modern> Modern for Vec<T> {
     }
 }
 
+impl<T: Modern, const N: usize> Modern for [T; N] {
+    type Modern = [<T as Modern>::Modern; N];
+    fn modern(self) -> Self::Modern {
+        self.map(Modern::modern)
+    }
+}
+
 ///
 /// Borrow params as modern references:
 /// - Pubkey

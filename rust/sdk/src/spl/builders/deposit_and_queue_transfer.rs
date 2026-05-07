@@ -1,8 +1,8 @@
 use core::fmt;
 
 use crate::{
+    compat,
     consts::{ESPL_TOKEN_PROGRAM_ID, TOKEN_PROGRAM_ID},
-    solana_compat::solana::{AccountMeta, Instruction, Pubkey},
     spl::EphemeralSplDiscriminator,
 };
 
@@ -31,14 +31,14 @@ impl fmt::Display for DepositAndQueueTransferBuilderError {
 }
 
 pub struct DepositAndQueueTransferBuilder {
-    pub queue: Pubkey,
-    pub vault: Pubkey,
-    pub mint: Pubkey,
-    pub source: Pubkey,
-    pub vault_ata: Pubkey,
-    pub destination: Pubkey,
-    pub owner: Pubkey,
-    pub reimbursement_token_info: Option<Pubkey>,
+    pub queue: compat::Pubkey,
+    pub vault: compat::Pubkey,
+    pub mint: compat::Pubkey,
+    pub source: compat::Pubkey,
+    pub vault_ata: compat::Pubkey,
+    pub destination: compat::Pubkey,
+    pub owner: compat::Pubkey,
+    pub reimbursement_token_info: Option<compat::Pubkey>,
     pub amount: u64,
     pub min_delay_ms: u64,
     pub max_delay_ms: u64,
@@ -48,7 +48,7 @@ pub struct DepositAndQueueTransferBuilder {
 
 impl DepositAndQueueTransferBuilder {
     #[inline(always)]
-    pub fn instruction(&self) -> Result<Instruction, DepositAndQueueTransferBuilderError> {
+    pub fn instruction(&self) -> Result<compat::Instruction, DepositAndQueueTransferBuilderError> {
         if self.split == 0 {
             return Err(DepositAndQueueTransferBuilderError::InvalidSplit(
                 self.split,
@@ -72,18 +72,18 @@ impl DepositAndQueueTransferBuilder {
         }
         let reimbursement_token_info = self.reimbursement_token_info.unwrap_or(self.source);
 
-        Ok(Instruction {
+        Ok(compat::Instruction {
             program_id: ESPL_TOKEN_PROGRAM_ID,
             accounts: vec![
-                AccountMeta::new(self.queue, false),
-                AccountMeta::new_readonly(self.vault, false),
-                AccountMeta::new_readonly(self.mint, false),
-                AccountMeta::new(self.source, false),
-                AccountMeta::new(self.vault_ata, false),
-                AccountMeta::new_readonly(self.destination, false),
-                AccountMeta::new_readonly(self.owner, true),
-                AccountMeta::new_readonly(TOKEN_PROGRAM_ID, false),
-                AccountMeta::new(reimbursement_token_info, false),
+                compat::AccountMeta::new(self.queue, false),
+                compat::AccountMeta::new_readonly(self.vault, false),
+                compat::AccountMeta::new_readonly(self.mint, false),
+                compat::AccountMeta::new(self.source, false),
+                compat::AccountMeta::new(self.vault_ata, false),
+                compat::AccountMeta::new_readonly(self.destination, false),
+                compat::AccountMeta::new_readonly(self.owner, true),
+                compat::AccountMeta::new_readonly(TOKEN_PROGRAM_ID, false),
+                compat::AccountMeta::new(reimbursement_token_info, false),
             ],
             data,
         })
