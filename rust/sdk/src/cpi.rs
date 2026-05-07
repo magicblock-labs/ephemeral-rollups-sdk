@@ -8,31 +8,31 @@ use solana_program::instruction::{AccountMeta, Instruction};
 use solana_program::program_error::ProgramError;
 
 use crate::compat::{
-    account_info::AccountInfo,
+    self,
     borsh::{self, BorshSerialize},
-    AsModern, Compat, Modern, ProgramResult, Pubkey,
+    AsModern, Compat, Modern,
 };
 
 use solana_address::Address;
 use solana_program::{program::invoke_signed, program_memory::sol_memset};
 
-pub const DELEGATION_PROGRAM_ID: Pubkey =
-    Pubkey::new_from_array(dlp_api::consts::DELEGATION_PROGRAM_ID.to_bytes());
+pub const DELEGATION_PROGRAM_ID: compat::Pubkey =
+    compat::Pubkey::new_from_array(dlp_api::consts::DELEGATION_PROGRAM_ID.to_bytes());
 
 pub struct DelegateAccounts<'a, 'info> {
-    pub payer: &'a AccountInfo<'info>,
-    pub pda: &'a AccountInfo<'info>,
-    pub owner_program: &'a AccountInfo<'info>,
-    pub buffer: &'a AccountInfo<'info>,
-    pub delegation_record: &'a AccountInfo<'info>,
-    pub delegation_metadata: &'a AccountInfo<'info>,
-    pub delegation_program: &'a AccountInfo<'info>,
-    pub system_program: &'a AccountInfo<'info>,
+    pub payer: &'a compat::AccountInfo<'info>,
+    pub pda: &'a compat::AccountInfo<'info>,
+    pub owner_program: &'a compat::AccountInfo<'info>,
+    pub buffer: &'a compat::AccountInfo<'info>,
+    pub delegation_record: &'a compat::AccountInfo<'info>,
+    pub delegation_metadata: &'a compat::AccountInfo<'info>,
+    pub delegation_program: &'a compat::AccountInfo<'info>,
+    pub system_program: &'a compat::AccountInfo<'info>,
 }
 
 pub struct DelegateConfig {
     pub commit_frequency_ms: u32,
-    pub validator: Option<Pubkey>,
+    pub validator: Option<compat::Pubkey>,
 }
 
 impl Default for DelegateConfig {
@@ -49,7 +49,7 @@ pub fn delegate_account<'a, 'info>(
     accounts: DelegateAccounts<'a, 'info>,
     pda_seeds: &[&[u8]],
     config: DelegateConfig,
-) -> ProgramResult {
+) -> compat::ProgramResult {
     let buffer_seeds: &[&[u8]] = delegate_buffer_seeds_from_delegated_account!(accounts.pda.key);
 
     let (_, delegate_account_bump) =
@@ -147,8 +147,8 @@ pub fn delegate_account_with_actions<'a, 'info>(
     pda_seeds: &[&[u8]],
     config: DelegateConfig,
     actions: PostDelegationActions,
-    action_signer_infos: &'a [&'a AccountInfo<'info>],
-) -> ProgramResult {
+    action_signer_infos: &'a [&'a compat::AccountInfo<'info>],
+) -> compat::ProgramResult {
     let buffer_seeds: &[&[u8]] = delegate_buffer_seeds_from_delegated_account!(accounts.pda.key);
 
     let (_, delegate_account_bump) =
@@ -247,13 +247,13 @@ pub fn delegate_account_with_actions<'a, 'info>(
 
 /// Undelegate an account
 pub fn undelegate_account<'a, 'info>(
-    delegated_account: &'a AccountInfo<'info>,
-    owner_program: &Pubkey,
-    buffer: &'a AccountInfo<'info>,
-    payer: &'a AccountInfo<'info>,
-    system_program: &'a AccountInfo<'info>,
+    delegated_account: &'a compat::AccountInfo<'info>,
+    owner_program: &compat::Pubkey,
+    buffer: &'a compat::AccountInfo<'info>,
+    payer: &'a compat::AccountInfo<'info>,
+    system_program: &'a compat::AccountInfo<'info>,
     account_signer_seeds: Vec<Vec<u8>>,
-) -> ProgramResult {
+) -> compat::ProgramResult {
     if !buffer.is_signer {
         return Err(ProgramError::MissingRequiredSignature.compat());
     }
@@ -293,16 +293,16 @@ pub fn undelegate_account<'a, 'info>(
 /// CPI to the delegation program to delegate the account
 #[allow(clippy::too_many_arguments)]
 pub fn cpi_delegate<'a, 'info>(
-    payer: &'a AccountInfo<'info>,
-    delegate_account: &'a AccountInfo<'info>,
-    owner_program: &'a AccountInfo<'info>,
-    buffer: &'a AccountInfo<'info>,
-    delegation_record: &'a AccountInfo<'info>,
-    delegation_metadata: &'a AccountInfo<'info>,
-    system_program: &'a AccountInfo<'info>,
+    payer: &'a compat::AccountInfo<'info>,
+    delegate_account: &'a compat::AccountInfo<'info>,
+    owner_program: &'a compat::AccountInfo<'info>,
+    buffer: &'a compat::AccountInfo<'info>,
+    delegation_record: &'a compat::AccountInfo<'info>,
+    delegation_metadata: &'a compat::AccountInfo<'info>,
+    system_program: &'a compat::AccountInfo<'info>,
     signers_seeds: &[&[&[u8]]],
     args: DelegateAccountArgs,
-) -> ProgramResult {
+) -> compat::ProgramResult {
     modernize!(
         payer,
         delegate_account,
@@ -349,17 +349,17 @@ pub fn cpi_delegate<'a, 'info>(
 /// CPI to the delegation program to delegate the account with actions
 #[allow(clippy::too_many_arguments)]
 pub fn cpi_delegate_with_actions<'a, 'info>(
-    payer: &'a AccountInfo<'info>,
-    delegate_account: &'a AccountInfo<'info>,
-    owner_program: &'a AccountInfo<'info>,
-    buffer: &'a AccountInfo<'info>,
-    delegation_record: &'a AccountInfo<'info>,
-    delegation_metadata: &'a AccountInfo<'info>,
-    system_program: &'a AccountInfo<'info>,
+    payer: &'a compat::AccountInfo<'info>,
+    delegate_account: &'a compat::AccountInfo<'info>,
+    owner_program: &'a compat::AccountInfo<'info>,
+    buffer: &'a compat::AccountInfo<'info>,
+    delegation_record: &'a compat::AccountInfo<'info>,
+    delegation_metadata: &'a compat::AccountInfo<'info>,
+    system_program: &'a compat::AccountInfo<'info>,
     signers_seeds: &[&[&[u8]]],
     args: DelegateWithActionsArgs,
-    action_signer_infos: &'a [&'a AccountInfo<'info>],
-) -> ProgramResult {
+    action_signer_infos: &'a [&'a compat::AccountInfo<'info>],
+) -> compat::ProgramResult {
     modernize!(
         payer,
         delegate_account,

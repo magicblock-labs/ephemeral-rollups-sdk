@@ -5,21 +5,21 @@ use solana_program::{
 };
 
 use crate::{
-    compat::{account_info::AccountInfo, AsModern, Compat, ProgramResult, Pubkey},
+    compat::{self, AsModern, Compat},
     modernize,
 };
 
 /// Creates a new pda
 #[inline(always)]
 pub fn create_pda<'a, 'info>(
-    target_account: &'a AccountInfo<'info>, // < 3.0,  < 1.0
-    owner: &Pubkey,                         // < 3.0, < 1.0
+    target_account: &'a compat::AccountInfo<'info>,
+    owner: &compat::Pubkey,
     space: usize,
     pda_seeds: &[&[&[u8]]],
-    system_program: &'a AccountInfo<'info>,
-    payer: &'a AccountInfo<'info>,
+    system_program: &'a compat::AccountInfo<'info>,
+    payer: &'a compat::AccountInfo<'info>,
     rent_exempt: bool,
-) -> ProgramResult {
+) -> compat::ProgramResult {
     modernize!(target_account, owner, system_program, payer);
 
     let rent = Rent::get().map_err(|err| err.compat())?;
@@ -99,9 +99,9 @@ pub fn create_pda<'a, 'info>(
 /// Close PDA
 #[inline(always)]
 pub fn close_pda<'a, 'info>(
-    target_account: &'a AccountInfo<'info>,
-    destination: &'a AccountInfo<'info>,
-) -> ProgramResult {
+    target_account: &'a compat::AccountInfo<'info>,
+    destination: &'a compat::AccountInfo<'info>,
+) -> compat::ProgramResult {
     modernize!(target_account, destination);
 
     // Transfer tokens from the account to the destination.
@@ -119,11 +119,11 @@ pub fn close_pda<'a, 'info>(
 /// Close PDA with transfer
 #[inline(always)]
 pub fn close_pda_with_system_transfer<'a, 'info>(
-    target_account: &'a AccountInfo<'info>,
+    target_account: &'a compat::AccountInfo<'info>,
     seeds: &[&[&[u8]]],
-    destination: &'a AccountInfo<'info>,
-    system_program: &'a AccountInfo<'info>,
-) -> ProgramResult {
+    destination: &'a compat::AccountInfo<'info>,
+    system_program: &'a compat::AccountInfo<'info>,
+) -> compat::ProgramResult {
     modernize!(target_account, destination, system_program);
 
     target_account.resize(0).compat()?;
