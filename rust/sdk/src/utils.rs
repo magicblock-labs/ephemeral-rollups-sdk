@@ -5,7 +5,7 @@ use solana_program::{
 };
 
 use crate::{
-    compat::{account_info::AccountInfo, Compatize, Modernize, ProgramResult, Pubkey},
+    compat::{account_info::AccountInfo, AsModern, Compat, ProgramResult, Pubkey},
     modernize,
 };
 

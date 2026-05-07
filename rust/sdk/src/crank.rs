@@ -4,7 +4,7 @@ use solana_program::{
     program::{invoke, invoke_signed},
 };
 
-use crate::compat::{self, Compatize, Modernize};
+use crate::compat::{self, AsModern, Compat, Modern};
 
 pub struct ScheduleCrankCpi<'a> {
     pub payer: &'a compat::AccountInfo<'a>,
@@ -16,15 +16,15 @@ pub struct ScheduleCrankCpi<'a> {
 impl<'a> ScheduleCrankCpi<'a> {
     pub fn instruction(&self) -> compat::Instruction {
         let mut accounts = Vec::with_capacity(1 + self.instruction_accounts.len());
-        accounts.push(AccountMeta::new(*self.payer.key.modernize(), true));
+        accounts.push(AccountMeta::new(*self.payer.key.as_modern(), true));
         accounts.extend(self.instruction_accounts.iter().map(|ai| AccountMeta {
-            pubkey: *ai.key.modernize(),
+            pubkey: *ai.key.as_modern(),
             is_signer: ai.is_signer,
             is_writable: ai.is_writable,
         }));
 
         Instruction::new_with_bincode(
-            *self.magic_program.key.modernize(),
+            *self.magic_program.key.as_modern(),
             &MagicBlockInstruction::ScheduleTask(self.args.clone()),
             accounts,
         )
@@ -34,15 +34,15 @@ impl<'a> ScheduleCrankCpi<'a> {
     pub fn invoke(&self) -> compat::ProgramResult {
         let accounts = Self::build_accounts(self.payer, self.instruction_accounts);
 
-        invoke(&self.instruction().modernize(), &accounts.modernize()).compat()
+        invoke(&self.instruction().modern(), &accounts.modern()).compat()
     }
 
     pub fn invoke_signed(&self, signers_seeds: &[&[&[u8]]]) -> compat::ProgramResult {
         let accounts = Self::build_accounts(self.payer, self.instruction_accounts);
 
         invoke_signed(
-            &self.instruction().modernize(),
-            &accounts.modernize(),
+            &self.instruction().modern(),
+            &accounts.modern(),
             signers_seeds,
         )
         .compat()
@@ -69,36 +69,30 @@ pub struct CancelCrankCpi<'a> {
 impl<'a> CancelCrankCpi<'a> {
     pub fn instruction(&self) -> compat::Instruction {
         Instruction::new_with_bincode(
-            *self.magic_program.key.modernize(),
+            *self.magic_program.key.as_modern(),
             &MagicBlockInstruction::CancelTask {
                 task_id: self.crank_id,
             },
             vec![
                 if self.authority.is_writable {
-                    AccountMeta::new(*self.authority.key.modernize(), true)
+                    AccountMeta::new(*self.authority.key.as_modern(), true)
                 } else {
-                    AccountMeta::new_readonly(*self.authority.key.modernize(), true)
+                    AccountMeta::new_readonly(*self.authority.key.as_modern(), true)
                 },
-                AccountMeta::new(*self.task_context.key.modernize(), false),
+                AccountMeta::new(*self.task_context.key.as_modern(), false),
             ],
         )
         .compat()
     }
 
     pub fn invoke(&self) -> compat::ProgramResult {
-        let accounts = [
-            self.authority.modernize().clone(),
-            self.task_context.modernize().clone(),
-        ];
-        invoke(&self.instruction().modernize(), &accounts).compat()
+        let accounts = [self.authority.modern(), self.task_context.modern()];
+        invoke(&self.instruction().modern(), &accounts).compat()
     }
 
     pub fn invoke_signed(&self, signers_seeds: &[&[&[u8]]]) -> compat::ProgramResult {
-        let accounts = [
-            self.authority.modernize().clone(),
-            self.task_context.modernize().clone(),
-        ];
-        invoke_signed(&self.instruction().modernize(), &accounts, signers_seeds).compat()
+        let accounts = [self.authority.modern(), self.task_context.modern()];
+        invoke_signed(&self.instruction().modern(), &accounts, signers_seeds).compat()
     }
 }
 
@@ -106,7 +100,7 @@ impl<'a> CancelCrankCpi<'a> {
 mod tests {
     use super::*;
     use magicblock_magic_program_api::args::ScheduleTaskArgs;
-    use solana_program::{account_info::AccountInfo, clock::Epoch, pubkey::Pubkey};
+    use solana_program::{account_info::AccountInfo, pubkey::Pubkey};
 
     fn new_account_info<'a>(
         key: &'a Pubkey,
@@ -116,16 +110,7 @@ mod tests {
         data: &'a mut [u8],
         owner: &'a Pubkey,
     ) -> AccountInfo<'a> {
-        AccountInfo::new(
-            key,
-            is_signer,
-            is_writable,
-            lamports,
-            data,
-            owner,
-            false,
-            Epoch::default(),
-        )
+        AccountInfo::new(key, is_signer, is_writable, lamports, data, owner, false)
     }
 
     #[test]

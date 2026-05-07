@@ -10,7 +10,7 @@ use solana_program::program_error::ProgramError;
 use crate::compat::{
     account_info::AccountInfo,
     borsh::{self, BorshSerialize},
-    Compatize, Modernize, ProgramResult, Pubkey,
+    AsModern, Compat, Modern, ProgramResult, Pubkey,
 };
 
 use solana_address::Address;
@@ -53,10 +53,10 @@ pub fn delegate_account<'a, 'info>(
     let buffer_seeds: &[&[u8]] = delegate_buffer_seeds_from_delegated_account!(accounts.pda.key);
 
     let (_, delegate_account_bump) =
-        Address::find_program_address(pda_seeds, accounts.owner_program.key.modernize());
+        Address::find_program_address(pda_seeds, accounts.owner_program.key.as_modern());
 
     let (_, buffer_pda_bump) =
-        Address::find_program_address(buffer_seeds, accounts.owner_program.key.modernize());
+        Address::find_program_address(buffer_seeds, accounts.owner_program.key.as_modern());
 
     // Pda signer seeds
     let delegate_account_bump_slice: &[u8] = &[delegate_account_bump];
@@ -103,13 +103,10 @@ pub fn delegate_account<'a, 'info>(
     if accounts.pda.owner != accounts.delegation_program.key {
         invoke_signed(
             &solana_system_interface::instruction::assign(
-                accounts.pda.key.modernize(),
-                accounts.delegation_program.key.modernize(),
+                accounts.pda.key.as_modern(),
+                accounts.delegation_program.key.as_modern(),
             ),
-            &[
-                accounts.pda.modernize().clone(),
-                accounts.system_program.modernize().clone(),
-            ],
+            &[accounts.pda.modern(), accounts.system_program.modern()],
             pda_signer_seeds,
         )
         .compat()?;
@@ -155,10 +152,10 @@ pub fn delegate_account_with_actions<'a, 'info>(
     let buffer_seeds: &[&[u8]] = delegate_buffer_seeds_from_delegated_account!(accounts.pda.key);
 
     let (_, delegate_account_bump) =
-        Address::find_program_address(pda_seeds, accounts.owner_program.key.modernize());
+        Address::find_program_address(pda_seeds, accounts.owner_program.key.as_modern());
 
     let (_, buffer_pda_bump) =
-        Address::find_program_address(buffer_seeds, accounts.owner_program.key.modernize());
+        Address::find_program_address(buffer_seeds, accounts.owner_program.key.as_modern());
 
     // Pda signer seeds
     let delegate_account_bump_slice: &[u8] = &[delegate_account_bump];
@@ -205,13 +202,10 @@ pub fn delegate_account_with_actions<'a, 'info>(
     if accounts.pda.owner != accounts.delegation_program.key {
         invoke_signed(
             &solana_system_interface::instruction::assign(
-                accounts.pda.key.modernize(),
-                accounts.delegation_program.key.modernize(),
+                accounts.pda.key.as_modern(),
+                accounts.delegation_program.key.as_modern(),
             ),
-            &[
-                accounts.pda.modernize().clone(),
-                accounts.system_program.modernize().clone(),
-            ],
+            &[accounts.pda.modern(), accounts.system_program.modern()],
             pda_signer_seeds,
         )
         .compat()?;
@@ -270,7 +264,7 @@ pub fn undelegate_account<'a, 'info>(
     let account_seeds: Vec<&[u8]> = account_signer_seeds.iter().map(|v| v.as_slice()).collect();
 
     let (_, account_bump) =
-        Address::find_program_address(account_seeds.as_ref(), owner_program.modernize());
+        Address::find_program_address(account_seeds.as_ref(), owner_program.as_modern());
 
     // Account signer seeds
     let account_bump_slice: &[u8] = &[account_bump];
@@ -397,7 +391,7 @@ pub fn cpi_delegate_with_actions<'a, 'info>(
             .iter()
             .find(|ai| *ai.key.as_array() == *signer)
             .ok_or(ProgramError::NotEnoughAccountKeys.compat())?
-            .modernize();
+            .as_modern();
         accounts.push(AccountMeta::new_readonly(*info.key, true));
         signer_infos.push((*info).clone());
     }
