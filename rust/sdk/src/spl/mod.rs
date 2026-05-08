@@ -13,24 +13,21 @@ pub(crate) mod compat_pda {
         owner_program: &compat::Pubkey,
     ) -> compat::Pubkey {
         dlp_api::pda::delegate_buffer_pda_from_delegated_account_and_owner_program(
-            delegated_account.as_modern(),
-            owner_program.as_modern(),
+            delegated_account,
+            owner_program,
         )
-        .compat()
     }
 
     pub fn delegation_record_pda_from_delegated_account(
         delegated_account: &compat::Pubkey,
     ) -> compat::Pubkey {
-        dlp_api::pda::delegation_record_pda_from_delegated_account(delegated_account.as_modern())
-            .compat()
+        dlp_api::pda::delegation_record_pda_from_delegated_account(delegated_account)
     }
 
     pub fn delegation_metadata_pda_from_delegated_account(
         delegated_account: &compat::Pubkey,
     ) -> compat::Pubkey {
-        dlp_api::pda::delegation_metadata_pda_from_delegated_account(delegated_account.as_modern())
-            .compat()
+        dlp_api::pda::delegation_metadata_pda_from_delegated_account(delegated_account)
     }
 }
 
