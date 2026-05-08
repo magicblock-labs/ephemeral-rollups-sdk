@@ -20,6 +20,7 @@ pub struct CommitAndUndelegateIntentBuilder<'acc, 'args, S1, S2> {
     accounts: &'acc [AccountView],
     post_commit_actions: S1,
     post_undelegate_actions: S2,
+    is_compressed: bool,
 }
 
 /// Builder without actions
@@ -48,6 +49,24 @@ impl<'acc, 'args>
             accounts,
             post_commit_actions: &[],
             post_undelegate_actions: &[],
+            is_compressed: false,
+        }
+    }
+
+    pub fn compressed(
+        self,
+    ) -> CommitAndUndelegateIntentBuilder<
+        'acc,
+        'args,
+        &'static [CallHandler<'static>],
+        &'static [CallHandler<'static>],
+    > {
+        CommitAndUndelegateIntentBuilder {
+            parent: self.parent,
+            accounts: self.accounts,
+            post_commit_actions: self.post_commit_actions,
+            post_undelegate_actions: self.post_undelegate_actions,
+            is_compressed: true,
         }
     }
 }
@@ -69,6 +88,7 @@ impl<'acc, 'args, S2>
             accounts: self.accounts,
             post_commit_actions: actions,
             post_undelegate_actions: self.post_undelegate_actions,
+            is_compressed: self.is_compressed,
         }
     }
 }
@@ -90,6 +110,7 @@ impl<'acc, 'args, T1>
             accounts: self.accounts,
             post_commit_actions: self.post_commit_actions,
             post_undelegate_actions: actions,
+            is_compressed: self.is_compressed,
         }
     }
 }
@@ -136,6 +157,7 @@ impl<'acc, 'args>
             post_commit_actions,
             post_undelegate_actions,
             parent,
+            is_compressed,
         } = self;
         let MagicIntentBundleBuilder {
             payer,
@@ -147,16 +169,31 @@ impl<'acc, 'args>
         let MagicIntentBundle {
             standalone_actions,
             commit_intent,
-            commit_and_undelegate_intent: _,
+            commit_and_undelegate_intent,
             commit_finalize_compressed_intent,
             commit_finalize_compressed_and_undelegate_intent,
         } = intent_bundle;
 
-        let commit_and_undelegate_intent = Some(CommitAndUndelegateIntent {
-            accounts,
-            post_commit_actions,
-            post_undelegate_actions,
-        });
+        let (commit_and_undelegate_intent, commit_finalize_compressed_and_undelegate_intent) =
+            if is_compressed {
+                (
+                    commit_and_undelegate_intent,
+                    Some(CommitAndUndelegateIntent {
+                        accounts,
+                        post_commit_actions,
+                        post_undelegate_actions,
+                    }),
+                )
+            } else {
+                (
+                    Some(CommitAndUndelegateIntent {
+                        accounts,
+                        post_commit_actions,
+                        post_undelegate_actions,
+                    }),
+                    commit_finalize_compressed_and_undelegate_intent,
+                )
+            };
         MagicIntentBundleBuilder {
             payer,
             magic_context,

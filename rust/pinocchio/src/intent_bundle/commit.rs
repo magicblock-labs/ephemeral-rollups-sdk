@@ -15,6 +15,7 @@ pub struct CommitIntentBuilder<'acc, 'args, T> {
     parent: MagicIntentBundleBuilder<'acc, 'args>,
     accounts: &'acc [AccountView],
     actions: T,
+    is_compressed: bool,
 }
 
 impl<'acc, 'args> CommitIntentBuilder<'acc, 'args, &'static [CallHandler<'static>]> {
@@ -29,6 +30,7 @@ impl<'acc, 'args> CommitIntentBuilder<'acc, 'args, &'static [CallHandler<'static
             parent,
             accounts,
             actions: &[],
+            is_compressed: false,
         }
     }
 
@@ -65,6 +67,15 @@ impl<'acc, 'args> CommitIntentBuilder<'acc, 'args, &'static [CallHandler<'static
             },
         }
     }
+
+    pub fn compressed(self) -> CommitIntentBuilder<'acc, 'args, &'static [CallHandler<'static>]> {
+        CommitIntentBuilder {
+            parent: self.parent,
+            accounts: self.accounts,
+            actions: self.actions,
+            is_compressed: true,
+        }
+    }
 }
 
 impl<'acc, 'args> CommitIntentBuilder<'acc, 'args, &'args [CallHandler<'args>]> {
@@ -72,15 +83,29 @@ impl<'acc, 'args> CommitIntentBuilder<'acc, 'args, &'args [CallHandler<'args>]> 
     pub fn fold(self) -> MagicIntentBundleBuilder<'acc, 'args> {
         let MagicIntentBundle {
             standalone_actions,
-            commit_intent: _,
+            commit_intent,
             commit_and_undelegate_intent,
             commit_finalize_compressed_intent,
             commit_finalize_compressed_and_undelegate_intent,
         } = self.parent.intent_bundle;
-        let commit_intent = Some(CommitIntent {
-            accounts: self.accounts,
-            actions: self.actions,
-        });
+
+        let (commit_intent, commit_finalize_compressed_intent) = if self.is_compressed {
+            (
+                commit_intent,
+                Some(CommitIntent {
+                    accounts: self.accounts,
+                    actions: self.actions,
+                }),
+            )
+        } else {
+            (
+                Some(CommitIntent {
+                    accounts: self.accounts,
+                    actions: self.actions,
+                }),
+                commit_finalize_compressed_intent,
+            )
+        };
         MagicIntentBundleBuilder {
             payer: self.parent.payer,
             magic_context: self.parent.magic_context,
