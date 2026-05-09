@@ -16,7 +16,7 @@ default = [
 		# "solana-program",
 		"solana-system-interface"
 ]
-anchor = ["anchor-lang"]
+anchor = ["anchor-lang", "anchor-lang/idl-build"]
 access-control = ["num-derive", "num-traits", "thiserror"]
 spl = ["spl-associated-token-account-interface", "encryption"]
 encryption = [

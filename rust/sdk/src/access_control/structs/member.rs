@@ -4,14 +4,17 @@ use anchor_lang::prelude::*;
 #[cfg(not(feature = "anchor"))]
 use crate::compat::borsh::{self, BorshDeserialize, BorshSerialize};
 
-use crate::compat;
+use crate::compat::{self, Pubkey};
 
+// IMPORTANT: Keep Pubkey unqualified in Anchor IDL-derived structs. Anchor's
+// idl-build recognizes bare Pubkey as the native IDL pubkey type, while
+// compat::Pubkey is treated as a custom type that must implement IdlBuild.
 #[cfg_attr(feature = "anchor", derive(AnchorSerialize, AnchorDeserialize))]
 #[cfg_attr(not(feature = "anchor"), derive(BorshSerialize, BorshDeserialize))]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Member {
     pub flags: u8,
-    pub pubkey: compat::Pubkey,
+    pub pubkey: Pubkey,
 }
 
 #[cfg_attr(feature = "anchor", derive(AnchorSerialize, AnchorDeserialize))]
