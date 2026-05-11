@@ -18,6 +18,8 @@ impl AsModern for backward_compat::Pubkey {
 
 impl<'info> AsModern for backward_compat::AccountInfo<'info> {
     type Modern = solana_program::account_info::AccountInfo<'info>;
+
+    #[cfg(feature = "backward-compat")]
     fn as_modern(&self) -> &Self::Modern {
         const {
             assert!(
@@ -31,6 +33,11 @@ impl<'info> AsModern for backward_compat::AccountInfo<'info> {
         }
 
         unsafe { &*(self as *const Self as *const Self::Modern) }
+    }
+
+    #[cfg(not(feature = "backward-compat"))]
+    fn as_modern(&self) -> &Self::Modern {
+        self
     }
 }
 
