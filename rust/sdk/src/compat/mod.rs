@@ -15,16 +15,12 @@
 /// Solana 3.0. If a value needs to cross back out through the public API, it is
 /// converted back at the boundary.
 ///
-mod as_modern;
-mod compatize;
-mod modern;
 
 #[cfg(feature = "backward-compat")]
 mod backward_compat {
     pub use dlp_api::compat::{borsh, Pubkey};
 
-    pub use account_info::AccountInfo;
-    pub use solana_account_info_compat as account_info;
+    pub use solana_account_info_compat::AccountInfo;
     pub use solana_program_compat::instruction::{AccountMeta, Instruction};
     pub use solana_program_error_compat::{ProgramError, ProgramResult};
 }
@@ -39,6 +35,10 @@ mod backward_compat {
     pub use solana_program::instruction::{AccountMeta, Instruction};
     pub use solana_program::program_error::ProgramError;
 }
+
+mod as_modern;
+mod compatize;
+mod modern;
 
 pub use backward_compat::*;
 

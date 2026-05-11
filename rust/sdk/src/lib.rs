@@ -5,13 +5,8 @@ pub mod cpi;
 pub mod crank;
 pub mod delegate_args;
 pub mod ephem;
-#[cfg(any(
-    feature = "anchor",
-    feature = "modular-sdk",
-    feature = "solana-program"
-))]
+#[cfg(any(feature = "anchor", feature = "modular-sdk",))]
 pub mod ephemeral_accounts;
-//mod solana_compat;
 pub mod types;
 pub mod utils;
 

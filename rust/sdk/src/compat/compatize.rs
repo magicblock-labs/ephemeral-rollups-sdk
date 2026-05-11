@@ -9,9 +9,7 @@ impl Compat for solana_address::Address {
 
 impl Compat for () {
     type Compat = ();
-    fn compat(self) -> Self::Compat {
-        ()
-    }
+    fn compat(self) -> Self::Compat {}
 }
 
 #[cfg(feature = "backward-compat")]

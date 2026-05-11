@@ -29,9 +29,9 @@ impl DelegateAccounts {
             delegation_metadata_pda_from_delegated_account(&delegated_account.to_bytes().into());
         Self {
             delegated_account,
-            delegate_buffer: delegate_buffer,
-            delegation_record: delegation_record,
-            delegation_metadata: delegation_metadata,
+            delegate_buffer,
+            delegation_record,
+            delegation_metadata,
             owner_program,
             delegation_program: DELEGATION_PROGRAM_ID,
             system_program: solana_system_interface::program::ID.compat(),
