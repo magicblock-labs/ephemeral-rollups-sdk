@@ -1,11 +1,21 @@
-#[cfg(feature = "anchor")]
+#[cfg(all(feature = "anchor-modern", feature = "anchor-compat"))]
+compile_error!("features `anchor-modern` and `anchor-compat` are mutually exclusive");
+
+#[cfg(all(
+    feature = "anchor-modern",
+    feature = "backward-compat",
+    not(feature = "anchor-compat")
+))]
+compile_error!("feature `anchor-modern` cannot be combined with `backward-compat`; use `anchor-compat` instead");
+
+#[cfg(feature = "anchor-support")]
 pub mod anchor;
 pub mod consts;
 pub mod cpi;
 pub mod crank;
 pub mod delegate_args;
 pub mod ephem;
-#[cfg(any(feature = "anchor", feature = "modular-sdk",))]
+#[cfg(any(feature = "anchor-support", feature = "modular-sdk",))]
 pub mod ephemeral_accounts;
 pub mod types;
 pub mod utils;

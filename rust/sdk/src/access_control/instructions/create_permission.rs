@@ -56,7 +56,10 @@ impl CreatePermission {
 }
 
 #[derive(BorshSerialize, BorshDeserialize, Clone, Debug, Eq, PartialEq)]
-#[cfg_attr(not(feature = "backward-compat"), borsh(crate = "crate::compat::borsh"))]
+#[cfg_attr(
+    not(feature = "backward-compat"),
+    borsh(crate = "crate::compat::borsh")
+)]
 pub struct CreatePermissionInstructionData {
     discriminator: u64,
 }
@@ -80,7 +83,10 @@ impl Default for CreatePermissionInstructionData {
 }
 
 #[derive(BorshSerialize, BorshDeserialize, Clone, Debug, Eq, PartialEq)]
-#[cfg_attr(not(feature = "backward-compat"), borsh(crate = "crate::compat::borsh"))]
+#[cfg_attr(
+    not(feature = "backward-compat"),
+    borsh(crate = "crate::compat::borsh")
+)]
 pub struct CreatePermissionInstructionArgs {
     pub args: MembersArgs,
 }

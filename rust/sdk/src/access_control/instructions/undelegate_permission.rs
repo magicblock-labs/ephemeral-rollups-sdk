@@ -54,7 +54,10 @@ impl UndelegatePermission {
 }
 
 #[derive(BorshSerialize, BorshDeserialize, Clone, Debug, Eq, PartialEq)]
-#[cfg_attr(not(feature = "backward-compat"), borsh(crate = "crate::compat::borsh"))]
+#[cfg_attr(
+    not(feature = "backward-compat"),
+    borsh(crate = "crate::compat::borsh")
+)]
 pub struct UndelegatePermissionInstructionData {
     discriminator: u64,
 }
@@ -78,7 +81,10 @@ impl Default for UndelegatePermissionInstructionData {
 }
 
 #[derive(BorshSerialize, BorshDeserialize, Clone, Debug, Eq, PartialEq)]
-#[cfg_attr(not(feature = "backward-compat"), borsh(crate = "crate::compat::borsh"))]
+#[cfg_attr(
+    not(feature = "backward-compat"),
+    borsh(crate = "crate::compat::borsh")
+)]
 pub struct UndelegatePermissionInstructionArgs {
     pub args: UndelegateArgs,
 }

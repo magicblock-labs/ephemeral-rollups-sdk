@@ -1,20 +1,17 @@
 use crate::access_control::structs::Member;
 use crate::consts::PERMISSION_PROGRAM_ID;
 
-use crate::compat::{
-    self,
-    Pubkey,
-};
+use crate::compat::{self, Pubkey};
 
-#[cfg(feature = "anchor")]
+#[cfg(feature = "anchor-support")]
 #[allow(unused_imports)]
 use crate::compat::anchor_lang;
-#[cfg(feature = "anchor")]
+#[cfg(feature = "anchor-support")]
 use crate::compat::anchor_lang::{AnchorDeserialize, AnchorSerialize};
-#[cfg(feature = "anchor")]
+#[cfg(feature = "anchor-support")]
 #[allow(unused_imports)]
 use crate::compat::borsh;
-#[cfg(not(feature = "anchor"))]
+#[cfg(not(feature = "anchor-support"))]
 use crate::compat::borsh::{BorshDeserialize, BorshSerialize};
 
 // IMPORTANT: Keep Pubkey unqualified in Anchor IDL-derived structs. Anchor's
@@ -23,8 +20,11 @@ use crate::compat::borsh::{BorshDeserialize, BorshSerialize};
 
 pub const PERMISSION_SEED: &[u8] = b"permission:";
 
-#[cfg_attr(feature = "anchor", derive(AnchorSerialize, AnchorDeserialize))]
-#[cfg_attr(not(feature = "anchor"), derive(BorshSerialize, BorshDeserialize))]
+#[cfg_attr(feature = "anchor-support", derive(AnchorSerialize, AnchorDeserialize))]
+#[cfg_attr(
+    not(feature = "anchor-support"),
+    derive(BorshSerialize, BorshDeserialize)
+)]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Permission {
     pub discriminator: u8,
