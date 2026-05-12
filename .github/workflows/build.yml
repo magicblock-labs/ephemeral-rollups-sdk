@@ -116,6 +116,7 @@ jobs:
         run: |
           export PATH="/home/runner/.local/share/solana/install/active_release/bin:$PATH"
           solana --version
+          cargo update -p toml_parser --precise 1.0.6
           cargo build-sbf --features unit_test_config
 
       - name: Run Anchor build
