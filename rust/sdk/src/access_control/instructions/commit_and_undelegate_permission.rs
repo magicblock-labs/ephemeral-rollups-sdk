@@ -58,6 +58,7 @@ impl CommitAndUndelegatePermission {
 }
 
 #[derive(BorshSerialize, BorshDeserialize, Clone, Debug, Eq, PartialEq)]
+#[cfg_attr(not(feature = "backward-compat"), borsh(crate = "crate::compat::borsh"))]
 pub struct CommitAndUndelegatePermissionInstructionData {
     discriminator: u64,
 }
