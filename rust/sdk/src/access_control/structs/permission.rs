@@ -3,10 +3,19 @@ use crate::consts::PERMISSION_PROGRAM_ID;
 
 use crate::compat::{
     self,
-    anchor_lang::{self, prelude::*},
-    borsh::{self, BorshDeserialize, BorshSerialize},
     Pubkey,
 };
+
+#[cfg(feature = "anchor")]
+#[allow(unused_imports)]
+use crate::compat::anchor_lang;
+#[cfg(feature = "anchor")]
+use crate::compat::anchor_lang::{AnchorDeserialize, AnchorSerialize};
+#[cfg(feature = "anchor")]
+#[allow(unused_imports)]
+use crate::compat::borsh;
+#[cfg(not(feature = "anchor"))]
+use crate::compat::borsh::{BorshDeserialize, BorshSerialize};
 
 // IMPORTANT: Keep Pubkey unqualified in Anchor IDL-derived structs. Anchor's
 // idl-build recognizes bare Pubkey as the native IDL pubkey type, while

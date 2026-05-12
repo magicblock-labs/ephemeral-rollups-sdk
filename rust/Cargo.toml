@@ -74,7 +74,7 @@ pinocchio-pubkey = { version = "0.3", default-features = false, features = [
 pinocchio-system = { version = "0.5", default-features = false }
 pinocchio-token = { version = "0.5", default-features = false }
 
-solana-program = { version = "3.0.0" }
+solana-program = { version = "3.0.0", default-features = false }
 solana-account = { version = "3.0" }
 solana-account-info = { version = "3.1" }
 solana-address = { version = "2.0.0", features = ["bytemuck", "decode", "syscalls", "curve25519", "std"] }
