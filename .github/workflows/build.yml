@@ -116,7 +116,9 @@ jobs:
         run: |
           export PATH="/home/runner/.local/share/solana/install/active_release/bin:$PATH"
           solana --version
-          cargo update -p toml_parser --precise 1.0.6
+          # cargo-build-sbf uses Solana's older Cargo internally. Keep the
+          # proc-macro-crate -> toml_edit -> toml_parser chain pre-Edition-2024.
+          cargo update -p proc-macro-crate@3.5.0 --precise 3.4.0
           cargo build-sbf --features unit_test_config
 
       - name: Run Anchor build
