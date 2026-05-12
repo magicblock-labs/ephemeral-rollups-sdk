@@ -1,15 +1,16 @@
 use crate::access_control::structs::Member;
-use crate::compat::{self, Pubkey};
 use crate::consts::PERMISSION_PROGRAM_ID;
+
+use crate::compat::{
+    self,
+    anchor_lang::{self, prelude::*},
+    borsh::{self, BorshDeserialize, BorshSerialize},
+    Pubkey,
+};
 
 // IMPORTANT: Keep Pubkey unqualified in Anchor IDL-derived structs. Anchor's
 // idl-build recognizes bare Pubkey as the native IDL pubkey type, while
 // compat::Pubkey is treated as a custom type that must implement IdlBuild.
-#[cfg(feature = "anchor")]
-use anchor_lang::prelude::*;
-
-#[cfg(not(feature = "anchor"))]
-use crate::compat::borsh::{self, BorshDeserialize, BorshSerialize};
 
 pub const PERMISSION_SEED: &[u8] = b"permission:";
 

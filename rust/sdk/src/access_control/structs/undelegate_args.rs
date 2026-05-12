@@ -1,8 +1,7 @@
-#[cfg(feature = "anchor")]
-use anchor_lang::prelude::*;
-
-#[cfg(not(feature = "anchor"))]
-use crate::compat::borsh::{self, BorshDeserialize, BorshSerialize};
+use crate::compat::{
+    anchor_lang::{self, prelude::*},
+    borsh::{self, BorshDeserialize, BorshSerialize},
+};
 
 #[cfg_attr(feature = "anchor", derive(AnchorSerialize, AnchorDeserialize))]
 #[cfg_attr(not(feature = "anchor"), derive(BorshSerialize, BorshDeserialize))]

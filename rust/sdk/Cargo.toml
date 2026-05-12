@@ -16,7 +16,7 @@ default = [
 		# "solana-program",
 		"solana-system-interface"
 ]
-anchor = ["anchor-lang", "anchor-lang/idl-build"]
+anchor = ["anchor-lang-compat", "anchor-lang-current", "anchor-lang-compat/idl-build"]
 access-control = ["num-derive", "num-traits", "thiserror"]
 spl = ["spl-associated-token-account-interface", "encryption"]
 encryption = [
@@ -43,8 +43,9 @@ serde = []
 backward-compat = ["magicblock-delegation-program-api/backward-compat"]
 
 [dependencies]
-anchor-lang = { workspace = true, optional = true }
-borsh = "0.10.4"
+anchor-lang-compat = { workspace = true, optional = true }
+anchor-lang-current = { workspace = true, optional = true }
+# borsh = "0.10.4"
 bincode = { workspace = true }
 ephemeral-rollups-sdk-attribute-delegate = { workspace = true }
 ephemeral-rollups-sdk-attribute-ephemeral = { workspace = true }

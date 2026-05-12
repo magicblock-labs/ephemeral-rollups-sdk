@@ -20,6 +20,8 @@
 mod backward_compat {
     pub use dlp_api::compat::{borsh, Pubkey};
 
+    pub use anchor_lang_compat as anchor_lang;
+
     pub use solana_account_info_compat::AccountInfo;
     pub use solana_program_compat::instruction::{AccountMeta, Instruction};
     pub use solana_program_error_compat::{ProgramError, ProgramResult};
@@ -28,6 +30,8 @@ mod backward_compat {
 #[cfg(not(feature = "backward-compat"))]
 mod backward_compat {
     pub use dlp_api::compat::{borsh, Pubkey};
+
+    pub use anchor_lang_current as anchor_lang;
 
     pub use account_info::AccountInfo;
     pub use solana_program::account_info;

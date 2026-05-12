@@ -1,10 +1,9 @@
-#[cfg(feature = "anchor")]
-use anchor_lang::prelude::*;
-
-#[cfg(not(feature = "anchor"))]
-use crate::compat::borsh::{self, BorshDeserialize, BorshSerialize};
-
-use crate::compat::{self, Pubkey};
+use crate::compat::{
+    self,
+    anchor_lang::{self, prelude::*},
+    borsh::{self, BorshDeserialize, BorshSerialize},
+    Pubkey,
+};
 
 // IMPORTANT: Keep Pubkey unqualified in Anchor IDL-derived structs. Anchor's
 // idl-build recognizes bare Pubkey as the native IDL pubkey type, while
