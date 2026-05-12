@@ -13,7 +13,7 @@ env:
   rust_version: 1.93.1
   node_version: 23
   anchor_version: 0.31.1
-  solana_version: v2.2.20
+  solana_version: v3.1.10
 
 jobs:
   install:
@@ -116,9 +116,6 @@ jobs:
         run: |
           export PATH="/home/runner/.local/share/solana/install/active_release/bin:$PATH"
           solana --version
-          # cargo-build-sbf uses Solana's older Cargo internally. Keep the
-          # proc-macro-crate -> toml_edit -> toml_parser chain pre-Edition-2024.
-          cargo update -p proc-macro-crate@3.5.0 --precise 3.4.0
           cargo build-sbf --features unit_test_config
 
       - name: Run Anchor build
