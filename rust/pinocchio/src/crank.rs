@@ -462,7 +462,7 @@ mod tests {
         args::ScheduleTaskArgs, instruction::MagicBlockInstruction,
     };
     use pinocchio::account::RuntimeAccount;
-    use solana_instruction::{AccountMeta, Instruction};
+    use solana_program_compat::instruction::{AccountMeta, Instruction};
 
     use super::*;
 

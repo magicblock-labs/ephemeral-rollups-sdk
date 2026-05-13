@@ -1,14 +1,14 @@
 use core::fmt;
 
-use dlp_api::pda::{
+use crate::spl::compat_pda::{
     delegate_buffer_pda_from_delegated_account_and_owner_program,
     delegation_metadata_pda_from_delegated_account, delegation_record_pda_from_delegated_account,
 };
 
 use crate::{
+    compat,
     consts::{ASSOCIATED_TOKEN_PROGRAM_ID, ESPL_TOKEN_PROGRAM_ID, TOKEN_PROGRAM_ID},
     cpi::DELEGATION_PROGRAM_ID,
-    solana_compat::solana::{system_program, AccountMeta, Instruction, Pubkey},
     spl::{
         find_rent_pda, find_shuttle_ata, find_shuttle_ephemeral_ata, find_shuttle_wallet_ata,
         find_transfer_queue, find_vault_ata, EphemeralSplDiscriminator, GlobalVault,
@@ -49,18 +49,18 @@ impl fmt::Display for DepositAndDelegateShuttleEphemeralAtaWithMergeAndPrivateTr
 }
 
 pub struct DepositAndDelegateShuttleEphemeralAtaWithMergeAndPrivateTransferBuilder {
-    pub payer: Pubkey,
-    pub owner: Pubkey,
-    pub mint: Pubkey,
-    pub source_ata: Pubkey,
-    pub destination_owner: Pubkey,
+    pub payer: compat::Pubkey,
+    pub owner: compat::Pubkey,
+    pub mint: compat::Pubkey,
+    pub source_ata: compat::Pubkey,
+    pub destination_owner: compat::Pubkey,
     pub shuttle_id: u32,
     pub amount: u64,
     pub min_delay_ms: u64,
     pub max_delay_ms: u64,
     pub split: u32,
     pub client_ref_id: Option<u64>,
-    pub validator: Option<Pubkey>,
+    pub validator: Option<compat::Pubkey>,
 }
 
 impl DepositAndDelegateShuttleEphemeralAtaWithMergeAndPrivateTransferBuilder {
@@ -68,7 +68,7 @@ impl DepositAndDelegateShuttleEphemeralAtaWithMergeAndPrivateTransferBuilder {
     pub fn instruction(
         &self,
     ) -> Result<
-        Instruction,
+        compat::Instruction,
         DepositAndDelegateShuttleEphemeralAtaWithMergeAndPrivateTransferBuilderError,
     > {
         let (rent_pda, _rent_bump) = find_rent_pda();
@@ -111,28 +111,31 @@ impl DepositAndDelegateShuttleEphemeralAtaWithMergeAndPrivateTransferBuilder {
         push_length_prefixed(&mut data, &encrypted_destination)?;
         push_length_prefixed(&mut data, &encrypted_suffix)?;
 
-        Ok(Instruction {
+        Ok(compat::Instruction {
             program_id: ESPL_TOKEN_PROGRAM_ID,
             accounts: vec![
-                AccountMeta::new(self.payer, true),
-                AccountMeta::new(rent_pda, false),
-                AccountMeta::new(shuttle_ephemeral_ata, false),
-                AccountMeta::new(shuttle_ata, false),
-                AccountMeta::new(shuttle_wallet_ata, false),
-                AccountMeta::new_readonly(self.owner, true),
-                AccountMeta::new_readonly(ESPL_TOKEN_PROGRAM_ID, false),
-                AccountMeta::new(delegation_buffer, false),
-                AccountMeta::new(delegation_record, false),
-                AccountMeta::new(delegation_metadata, false),
-                AccountMeta::new_readonly(DELEGATION_PROGRAM_ID, false),
-                AccountMeta::new_readonly(ASSOCIATED_TOKEN_PROGRAM_ID, false),
-                AccountMeta::new_readonly(system_program::id(), false),
-                AccountMeta::new_readonly(self.mint, false),
-                AccountMeta::new_readonly(TOKEN_PROGRAM_ID, false),
-                AccountMeta::new_readonly(vault, false),
-                AccountMeta::new(self.source_ata, false),
-                AccountMeta::new(vault_ata, false),
-                AccountMeta::new(queue, false),
+                compat::AccountMeta::new(self.payer, true),
+                compat::AccountMeta::new(rent_pda, false),
+                compat::AccountMeta::new(shuttle_ephemeral_ata, false),
+                compat::AccountMeta::new(shuttle_ata, false),
+                compat::AccountMeta::new(shuttle_wallet_ata, false),
+                compat::AccountMeta::new_readonly(self.owner, true),
+                compat::AccountMeta::new_readonly(ESPL_TOKEN_PROGRAM_ID, false),
+                compat::AccountMeta::new(delegation_buffer, false),
+                compat::AccountMeta::new(delegation_record, false),
+                compat::AccountMeta::new(delegation_metadata, false),
+                compat::AccountMeta::new_readonly(DELEGATION_PROGRAM_ID, false),
+                compat::AccountMeta::new_readonly(ASSOCIATED_TOKEN_PROGRAM_ID, false),
+                compat::AccountMeta::new_readonly(
+                    compat::Pubkey::new_from_array(solana_system_interface::program::ID.to_bytes()),
+                    false,
+                ),
+                compat::AccountMeta::new_readonly(self.mint, false),
+                compat::AccountMeta::new_readonly(TOKEN_PROGRAM_ID, false),
+                compat::AccountMeta::new_readonly(vault, false),
+                compat::AccountMeta::new(self.source_ata, false),
+                compat::AccountMeta::new(vault_ata, false),
+                compat::AccountMeta::new(queue, false),
             ],
             data,
         })
@@ -141,8 +144,10 @@ impl DepositAndDelegateShuttleEphemeralAtaWithMergeAndPrivateTransferBuilder {
     #[inline(always)]
     fn require_validator(
         &self,
-    ) -> Result<&Pubkey, DepositAndDelegateShuttleEphemeralAtaWithMergeAndPrivateTransferBuilderError>
-    {
+    ) -> Result<
+        &compat::Pubkey,
+        DepositAndDelegateShuttleEphemeralAtaWithMergeAndPrivateTransferBuilderError,
+    > {
         self.validator.as_ref().ok_or(
             DepositAndDelegateShuttleEphemeralAtaWithMergeAndPrivateTransferBuilderError::MissingValidator,
         )
@@ -185,7 +190,7 @@ fn push_length_prefixed(
 #[inline(always)]
 fn encrypt_private_transfer_field(
     plaintext: &[u8],
-    validator: &Pubkey,
+    validator: &compat::Pubkey,
 ) -> Result<Vec<u8>, DepositAndDelegateShuttleEphemeralAtaWithMergeAndPrivateTransferBuilderError> {
     dlp_api::encryption::encrypt_ed25519_recipient(plaintext, validator.as_array()).map_err(
         DepositAndDelegateShuttleEphemeralAtaWithMergeAndPrivateTransferBuilderError::Encryption,
@@ -196,7 +201,7 @@ fn encrypt_private_transfer_field(
 #[inline(always)]
 fn encrypt_private_transfer_field(
     _plaintext: &[u8],
-    _validator: &Pubkey,
+    _validator: &compat::Pubkey,
 ) -> Result<Vec<u8>, DepositAndDelegateShuttleEphemeralAtaWithMergeAndPrivateTransferBuilderError> {
     Err(
         DepositAndDelegateShuttleEphemeralAtaWithMergeAndPrivateTransferBuilderError::EncryptionFeatureDisabled,

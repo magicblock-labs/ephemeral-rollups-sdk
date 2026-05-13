@@ -12,8 +12,19 @@ edition = { workspace = true }
 readme = "README.md"
 
 [features]
-default = ["solana-program", "solana-system-interface"]
-anchor = ["anchor-lang"]
+default = [
+		# "solana-program",
+		"solana-system-interface"
+]
+anchor = ["anchor-modern"]
+anchor-modern = ["anchor-support", "anchor-lang-current"]
+anchor-compat = [
+    "anchor-support",
+    "backward-compat",
+    "anchor-lang-compat",
+]
+anchor-compat-idl-build = ["anchor-compat", "anchor-lang-compat/idl-build"]
+anchor-support = []
 access-control = ["num-derive", "num-traits", "thiserror"]
 spl = ["spl-associated-token-account-interface", "encryption"]
 encryption = [
@@ -37,18 +48,20 @@ custom-heap = []
 custom-panic = []
 anchor-debug = []
 serde = []
-
+backward-compat = ["magicblock-delegation-program-api/backward-compat"]
 
 [dependencies]
-anchor-lang = { workspace = true, optional = true }
-borsh = "0.10.4"
+anchor-lang-compat = { workspace = true, optional = true }
+anchor-lang-current = { workspace = true, optional = true }
+# borsh = "0.10.4"
 bincode = { workspace = true }
 ephemeral-rollups-sdk-attribute-delegate = { workspace = true }
 ephemeral-rollups-sdk-attribute-ephemeral = { workspace = true }
 ephemeral-rollups-sdk-attribute-ephemeral-accounts = { workspace = true }
 ephemeral-rollups-sdk-attribute-commit = { workspace = true }
 ephemeral-rollups-sdk-attribute-action = { workspace = true }
-solana-program = { workspace = true, optional = true }
+solana-program = { workspace = true }
+solana-address = { workspace = true }
 solana-account = { workspace = true, optional = true }
 solana-account-info = { workspace = true, optional = true }
 solana-cpi = { workspace = true, optional = true }
@@ -65,9 +78,16 @@ num-derive = { workspace = true, optional = true }
 num-traits = { workspace = true, optional = true }
 thiserror = { workspace = true, optional = true }
 
+solana-account-info-compat = { workspace = true }
+solana-program-error-compat = { workspace = true }
+solana-program-compat = { workspace = true }
+
 # Fix for older toolchain
 base64ct = { workspace = true }
 getrandom = { version = "^0.2", features = ["custom"] }
+
+# Manually resolve to fix five8::decode_64 related error
+five8 = { version = "0.2", features = ["std"] }
 
 [[test]]
 name = "integration_test"

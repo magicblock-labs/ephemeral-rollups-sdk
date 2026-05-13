@@ -1,72 +1,77 @@
-use borsh::{BorshDeserialize, BorshSerialize};
+use crate::compat::borsh::{self, BorshDeserialize, BorshSerialize};
 
+use crate::compat::{self, Compat, Modern};
 use crate::consts::PERMISSION_PROGRAM_ID;
-use crate::solana_compat::solana::{
-    invoke, invoke_signed, AccountInfo, AccountMeta, Instruction, ProgramResult, Pubkey,
-};
+use solana_program::program::{invoke, invoke_signed};
 
 pub const DELEGATE_PERMISSION_DISCRIMINATOR: u64 = 3;
 
 /// Accounts.
 #[derive(Debug)]
 pub struct DelegatePermission {
-    pub payer: Pubkey,
+    pub payer: compat::Pubkey,
 
-    pub authority: (Pubkey, bool),
+    pub authority: (compat::Pubkey, bool),
 
-    pub permissioned_account: (Pubkey, bool),
+    pub permissioned_account: (compat::Pubkey, bool),
 
-    pub permission: Pubkey,
+    pub permission: compat::Pubkey,
 
-    pub system_program: Pubkey,
+    pub system_program: compat::Pubkey,
 
-    pub owner_program: Pubkey,
+    pub owner_program: compat::Pubkey,
 
-    pub delegation_buffer: Pubkey,
+    pub delegation_buffer: compat::Pubkey,
 
-    pub delegation_record: Pubkey,
+    pub delegation_record: compat::Pubkey,
 
-    pub delegation_metadata: Pubkey,
+    pub delegation_metadata: compat::Pubkey,
 
-    pub delegation_program: Pubkey,
+    pub delegation_program: compat::Pubkey,
 
-    pub validator: Pubkey,
+    pub validator: compat::Pubkey,
 }
 
 impl DelegatePermission {
-    pub fn instruction(&self) -> Instruction {
+    pub fn instruction(&self) -> compat::Instruction {
         self.instruction_with_remaining_accounts(&[])
     }
     #[allow(clippy::arithmetic_side_effects)]
     #[allow(clippy::vec_init_then_push)]
     pub fn instruction_with_remaining_accounts(
         &self,
-        remaining_accounts: &[AccountMeta],
-    ) -> Instruction {
+        remaining_accounts: &[compat::AccountMeta],
+    ) -> compat::Instruction {
         let mut accounts = Vec::with_capacity(11 + remaining_accounts.len());
-        accounts.push(AccountMeta::new(self.payer, true));
-        accounts.push(AccountMeta::new_readonly(
+        accounts.push(compat::AccountMeta::new(self.payer, true));
+        accounts.push(compat::AccountMeta::new_readonly(
             self.authority.0,
             self.authority.1,
         ));
-        accounts.push(AccountMeta::new_readonly(
+        accounts.push(compat::AccountMeta::new_readonly(
             self.permissioned_account.0,
             self.permissioned_account.1,
         ));
-        accounts.push(AccountMeta::new(self.permission, false));
-        accounts.push(AccountMeta::new_readonly(self.system_program, false));
-        accounts.push(AccountMeta::new_readonly(self.owner_program, false));
-        accounts.push(AccountMeta::new(self.delegation_buffer, false));
-        accounts.push(AccountMeta::new(self.delegation_record, false));
-        accounts.push(AccountMeta::new(self.delegation_metadata, false));
-        accounts.push(AccountMeta::new_readonly(self.delegation_program, false));
-        accounts.push(AccountMeta::new_readonly(self.validator, false));
+        accounts.push(compat::AccountMeta::new(self.permission, false));
+        accounts.push(compat::AccountMeta::new_readonly(
+            self.system_program,
+            false,
+        ));
+        accounts.push(compat::AccountMeta::new_readonly(self.owner_program, false));
+        accounts.push(compat::AccountMeta::new(self.delegation_buffer, false));
+        accounts.push(compat::AccountMeta::new(self.delegation_record, false));
+        accounts.push(compat::AccountMeta::new(self.delegation_metadata, false));
+        accounts.push(compat::AccountMeta::new_readonly(
+            self.delegation_program,
+            false,
+        ));
+        accounts.push(compat::AccountMeta::new_readonly(self.validator, false));
         accounts.extend_from_slice(remaining_accounts);
         let data = DelegatePermissionInstructionData::new()
             .try_to_vec()
             .expect("failed to serialize DelegatePermissionInstructionData");
 
-        Instruction {
+        compat::Instruction {
             program_id: PERMISSION_PROGRAM_ID,
             accounts,
             data,
@@ -75,6 +80,10 @@ impl DelegatePermission {
 }
 
 #[derive(BorshSerialize, BorshDeserialize, Clone, Debug, Eq, PartialEq)]
+#[cfg_attr(
+    not(feature = "backward-compat"),
+    borsh(crate = "crate::compat::borsh")
+)]
 pub struct DelegatePermissionInstructionData {
     discriminator: u64,
 }
@@ -97,7 +106,7 @@ impl Default for DelegatePermissionInstructionData {
     }
 }
 
-/// Instruction builder for `DelegatePermission`.
+/// compat::Instruction builder for `DelegatePermission`.
 ///
 /// ### Accounts (auto-derived from permissioned_account):
 ///
@@ -114,18 +123,18 @@ impl Default for DelegatePermissionInstructionData {
 ///   10. `[optional]` validator
 #[derive(Clone, Debug, Default)]
 pub struct DelegatePermissionBuilder {
-    payer: Option<Pubkey>,
-    authority: Option<(Pubkey, bool)>,
-    permissioned_account: Option<(Pubkey, bool)>,
-    permission: Option<Pubkey>,
-    system_program: Option<Pubkey>,
-    owner_program: Option<Pubkey>,
-    delegation_buffer: Option<Pubkey>,
-    delegation_record: Option<Pubkey>,
-    delegation_metadata: Option<Pubkey>,
-    delegation_program: Option<Pubkey>,
-    validator: Option<Pubkey>,
-    __remaining_accounts: Vec<AccountMeta>,
+    payer: Option<compat::Pubkey>,
+    authority: Option<(compat::Pubkey, bool)>,
+    permissioned_account: Option<(compat::Pubkey, bool)>,
+    permission: Option<compat::Pubkey>,
+    system_program: Option<compat::Pubkey>,
+    owner_program: Option<compat::Pubkey>,
+    delegation_buffer: Option<compat::Pubkey>,
+    delegation_record: Option<compat::Pubkey>,
+    delegation_metadata: Option<compat::Pubkey>,
+    delegation_program: Option<compat::Pubkey>,
+    validator: Option<compat::Pubkey>,
+    __remaining_accounts: Vec<compat::AccountMeta>,
 }
 
 impl DelegatePermissionBuilder {
@@ -134,79 +143,79 @@ impl DelegatePermissionBuilder {
     }
 
     #[inline(always)]
-    pub fn payer(&mut self, payer: Pubkey) -> &mut Self {
+    pub fn payer(&mut self, payer: compat::Pubkey) -> &mut Self {
         self.payer = Some(payer);
         self
     }
     #[inline(always)]
-    pub fn authority(&mut self, authority: Pubkey, as_signer: bool) -> &mut Self {
+    pub fn authority(&mut self, authority: compat::Pubkey, as_signer: bool) -> &mut Self {
         self.authority = Some((authority, as_signer));
         self
     }
     #[inline(always)]
     pub fn permissioned_account(
         &mut self,
-        permissioned_account: Pubkey,
+        permissioned_account: compat::Pubkey,
         as_signer: bool,
     ) -> &mut Self {
         self.permissioned_account = Some((permissioned_account, as_signer));
         self
     }
     #[inline(always)]
-    pub fn permission(&mut self, permission: Pubkey) -> &mut Self {
+    pub fn permission(&mut self, permission: compat::Pubkey) -> &mut Self {
         self.permission = Some(permission);
         self
     }
     #[inline(always)]
-    pub fn system_program(&mut self, system_program: Pubkey) -> &mut Self {
+    pub fn system_program(&mut self, system_program: compat::Pubkey) -> &mut Self {
         self.system_program = Some(system_program);
         self
     }
     #[inline(always)]
-    pub fn owner_program(&mut self, owner_program: Pubkey) -> &mut Self {
+    pub fn owner_program(&mut self, owner_program: compat::Pubkey) -> &mut Self {
         self.owner_program = Some(owner_program);
         self
     }
     #[inline(always)]
-    pub fn delegation_buffer(&mut self, delegation_buffer: Pubkey) -> &mut Self {
+    pub fn delegation_buffer(&mut self, delegation_buffer: compat::Pubkey) -> &mut Self {
         self.delegation_buffer = Some(delegation_buffer);
         self
     }
     #[inline(always)]
-    pub fn delegation_record(&mut self, delegation_record: Pubkey) -> &mut Self {
+    pub fn delegation_record(&mut self, delegation_record: compat::Pubkey) -> &mut Self {
         self.delegation_record = Some(delegation_record);
         self
     }
     #[inline(always)]
-    pub fn delegation_metadata(&mut self, delegation_metadata: Pubkey) -> &mut Self {
+    pub fn delegation_metadata(&mut self, delegation_metadata: compat::Pubkey) -> &mut Self {
         self.delegation_metadata = Some(delegation_metadata);
         self
     }
     #[inline(always)]
-    pub fn delegation_program(&mut self, delegation_program: Pubkey) -> &mut Self {
+    pub fn delegation_program(&mut self, delegation_program: compat::Pubkey) -> &mut Self {
         self.delegation_program = Some(delegation_program);
         self
     }
     /// `[optional account]`
     #[inline(always)]
-    pub fn validator(&mut self, validator: Option<Pubkey>) -> &mut Self {
+    pub fn validator(&mut self, validator: Option<compat::Pubkey>) -> &mut Self {
         self.validator = validator;
         self
     }
     /// Add an additional account to the instruction.
     #[inline(always)]
-    pub fn add_remaining_account(&mut self, account: AccountMeta) -> &mut Self {
+    pub fn add_remaining_account(&mut self, account: compat::AccountMeta) -> &mut Self {
         self.__remaining_accounts.push(account);
         self
     }
     /// Add additional accounts to the instruction.
     #[inline(always)]
-    pub fn add_remaining_accounts(&mut self, accounts: &[AccountMeta]) -> &mut Self {
+    pub fn add_remaining_accounts(&mut self, accounts: &[compat::AccountMeta]) -> &mut Self {
         self.__remaining_accounts.extend_from_slice(accounts);
         self
     }
     #[allow(clippy::clone_on_copy)]
-    pub fn instruction(&self) -> Instruction {
+    pub fn instruction(&self) -> compat::Instruction {
         let accounts = DelegatePermission {
             payer: self.payer.expect("payer is not set"),
             authority: self.authority.expect("authority is not set"),
@@ -237,60 +246,60 @@ impl DelegatePermissionBuilder {
 
 /// `delegate_permission` CPI accounts.
 pub struct DelegatePermissionCpiAccounts<'a, 'b> {
-    pub payer: &'b AccountInfo<'a>,
+    pub payer: &'b compat::AccountInfo<'a>,
 
-    pub authority: (&'b AccountInfo<'a>, bool),
+    pub authority: (&'b compat::AccountInfo<'a>, bool),
 
-    pub permissioned_account: (&'b AccountInfo<'a>, bool),
+    pub permissioned_account: (&'b compat::AccountInfo<'a>, bool),
 
-    pub permission: &'b AccountInfo<'a>,
+    pub permission: &'b compat::AccountInfo<'a>,
 
-    pub system_program: &'b AccountInfo<'a>,
+    pub system_program: &'b compat::AccountInfo<'a>,
 
-    pub owner_program: &'b AccountInfo<'a>,
+    pub owner_program: &'b compat::AccountInfo<'a>,
 
-    pub delegation_buffer: &'b AccountInfo<'a>,
+    pub delegation_buffer: &'b compat::AccountInfo<'a>,
 
-    pub delegation_record: &'b AccountInfo<'a>,
+    pub delegation_record: &'b compat::AccountInfo<'a>,
 
-    pub delegation_metadata: &'b AccountInfo<'a>,
+    pub delegation_metadata: &'b compat::AccountInfo<'a>,
 
-    pub delegation_program: &'b AccountInfo<'a>,
+    pub delegation_program: &'b compat::AccountInfo<'a>,
 
-    pub validator: Option<&'b AccountInfo<'a>>,
+    pub validator: Option<&'b compat::AccountInfo<'a>>,
 }
 
 /// `delegate_permission` CPI instruction.
 pub struct DelegatePermissionCpi<'a, 'b> {
     /// The program to invoke.
-    pub __program: &'b AccountInfo<'a>,
+    pub __program: &'b compat::AccountInfo<'a>,
 
-    pub payer: &'b AccountInfo<'a>,
+    pub payer: &'b compat::AccountInfo<'a>,
 
-    pub authority: (&'b AccountInfo<'a>, bool),
+    pub authority: (&'b compat::AccountInfo<'a>, bool),
 
-    pub permissioned_account: (&'b AccountInfo<'a>, bool),
+    pub permissioned_account: (&'b compat::AccountInfo<'a>, bool),
 
-    pub permission: &'b AccountInfo<'a>,
+    pub permission: &'b compat::AccountInfo<'a>,
 
-    pub system_program: &'b AccountInfo<'a>,
+    pub system_program: &'b compat::AccountInfo<'a>,
 
-    pub owner_program: &'b AccountInfo<'a>,
+    pub owner_program: &'b compat::AccountInfo<'a>,
 
-    pub delegation_buffer: &'b AccountInfo<'a>,
+    pub delegation_buffer: &'b compat::AccountInfo<'a>,
 
-    pub delegation_record: &'b AccountInfo<'a>,
+    pub delegation_record: &'b compat::AccountInfo<'a>,
 
-    pub delegation_metadata: &'b AccountInfo<'a>,
+    pub delegation_metadata: &'b compat::AccountInfo<'a>,
 
-    pub delegation_program: &'b AccountInfo<'a>,
+    pub delegation_program: &'b compat::AccountInfo<'a>,
 
-    pub validator: Option<&'b AccountInfo<'a>>,
+    pub validator: Option<&'b compat::AccountInfo<'a>>,
 }
 
 impl<'a, 'b> DelegatePermissionCpi<'a, 'b> {
     pub fn new(
-        program: &'b AccountInfo<'a>,
+        program: &'b compat::AccountInfo<'a>,
         accounts: DelegatePermissionCpiAccounts<'a, 'b>,
     ) -> Self {
         Self {
@@ -309,18 +318,18 @@ impl<'a, 'b> DelegatePermissionCpi<'a, 'b> {
         }
     }
     #[inline(always)]
-    pub fn invoke(&self) -> ProgramResult {
+    pub fn invoke(&self) -> compat::ProgramResult {
         self.invoke_signed_with_remaining_accounts(&[], &[])
     }
     #[inline(always)]
     pub fn invoke_with_remaining_accounts(
         &self,
-        remaining_accounts: &[(&'b AccountInfo<'a>, bool, bool)],
-    ) -> ProgramResult {
+        remaining_accounts: &[(&'b compat::AccountInfo<'a>, bool, bool)],
+    ) -> compat::ProgramResult {
         self.invoke_signed_with_remaining_accounts(&[], remaining_accounts)
     }
     #[inline(always)]
-    pub fn invoke_signed(&self, signers_seeds: &[&[&[u8]]]) -> ProgramResult {
+    pub fn invoke_signed(&self, signers_seeds: &[&[&[u8]]]) -> compat::ProgramResult {
         self.invoke_signed_with_remaining_accounts(signers_seeds, &[])
     }
     #[allow(clippy::arithmetic_side_effects)]
@@ -329,33 +338,42 @@ impl<'a, 'b> DelegatePermissionCpi<'a, 'b> {
     pub fn invoke_signed_with_remaining_accounts(
         &self,
         signers_seeds: &[&[&[u8]]],
-        remaining_accounts: &[(&'b AccountInfo<'a>, bool, bool)],
-    ) -> ProgramResult {
+        remaining_accounts: &[(&'b compat::AccountInfo<'a>, bool, bool)],
+    ) -> compat::ProgramResult {
         let mut accounts = Vec::with_capacity(11 + remaining_accounts.len());
-        accounts.push(AccountMeta::new(*self.payer.key, true));
-        accounts.push(AccountMeta::new_readonly(
+        accounts.push(compat::AccountMeta::new(*self.payer.key, true));
+        accounts.push(compat::AccountMeta::new_readonly(
             *self.authority.0.key,
             self.authority.1,
         ));
-        accounts.push(AccountMeta::new_readonly(
+        accounts.push(compat::AccountMeta::new_readonly(
             *self.permissioned_account.0.key,
             self.permissioned_account.1,
         ));
-        accounts.push(AccountMeta::new(*self.permission.key, false));
-        accounts.push(AccountMeta::new_readonly(*self.system_program.key, false));
-        accounts.push(AccountMeta::new_readonly(*self.owner_program.key, false));
-        accounts.push(AccountMeta::new(*self.delegation_buffer.key, false));
-        accounts.push(AccountMeta::new(*self.delegation_record.key, false));
-        accounts.push(AccountMeta::new(*self.delegation_metadata.key, false));
-        accounts.push(AccountMeta::new_readonly(
+        accounts.push(compat::AccountMeta::new(*self.permission.key, false));
+        accounts.push(compat::AccountMeta::new_readonly(
+            *self.system_program.key,
+            false,
+        ));
+        accounts.push(compat::AccountMeta::new_readonly(
+            *self.owner_program.key,
+            false,
+        ));
+        accounts.push(compat::AccountMeta::new(*self.delegation_buffer.key, false));
+        accounts.push(compat::AccountMeta::new(*self.delegation_record.key, false));
+        accounts.push(compat::AccountMeta::new(
+            *self.delegation_metadata.key,
+            false,
+        ));
+        accounts.push(compat::AccountMeta::new_readonly(
             *self.delegation_program.key,
             false,
         ));
         if let Some(validator) = self.validator {
-            accounts.push(AccountMeta::new_readonly(*validator.key, false));
+            accounts.push(compat::AccountMeta::new_readonly(*validator.key, false));
         }
         remaining_accounts.iter().for_each(|remaining_account| {
-            accounts.push(AccountMeta {
+            accounts.push(compat::AccountMeta {
                 pubkey: *remaining_account.0.key,
                 is_signer: remaining_account.2,
                 is_writable: remaining_account.1,
@@ -365,7 +383,7 @@ impl<'a, 'b> DelegatePermissionCpi<'a, 'b> {
             .try_to_vec()
             .expect("failed to serialize DelegatePermissionInstructionData");
 
-        let instruction = Instruction {
+        let instruction = compat::Instruction {
             program_id: PERMISSION_PROGRAM_ID,
             accounts,
             data,
@@ -390,14 +408,19 @@ impl<'a, 'b> DelegatePermissionCpi<'a, 'b> {
             .for_each(|remaining_account| account_infos.push(remaining_account.0.clone()));
 
         if signers_seeds.is_empty() {
-            invoke(&instruction, &account_infos)
+            invoke(&instruction.modern(), &account_infos.modern()).compat()
         } else {
-            invoke_signed(&instruction, &account_infos, signers_seeds)
+            invoke_signed(
+                &instruction.modern(),
+                &account_infos.modern(),
+                signers_seeds,
+            )
+            .compat()
         }
     }
 }
 
-/// Instruction builder for `DelegatePermission` via CPI.
+/// compat::Instruction builder for `DelegatePermission` via CPI.
 ///
 /// ### Accounts:
 ///
@@ -420,9 +443,9 @@ pub struct DelegatePermissionCpiBuilder<'a, 'b> {
 impl<'a, 'b> DelegatePermissionCpiBuilder<'a, 'b> {
     /// Create a new delegate permission CPI builder.
     ///
-    /// Optionally accepts a `permission` AccountInfo. All other accounts must be set
+    /// Optionally accepts a `permission` compat::AccountInfo. All other accounts must be set
     /// via their respective builder methods (payer, authority, permissioned_account, etc.)
-    pub fn new(program: &'b AccountInfo<'a>) -> Self {
+    pub fn new(program: &'b compat::AccountInfo<'a>) -> Self {
         let instruction = Box::new(DelegatePermissionCpiBuilderInstruction {
             __program: program,
             payer: None,
@@ -441,62 +464,78 @@ impl<'a, 'b> DelegatePermissionCpiBuilder<'a, 'b> {
         Self { instruction }
     }
     #[inline(always)]
-    pub fn payer(&mut self, payer: &'b AccountInfo<'a>) -> &mut Self {
+    pub fn payer(&mut self, payer: &'b compat::AccountInfo<'a>) -> &mut Self {
         self.instruction.payer = Some(payer);
         self
     }
     #[inline(always)]
-    pub fn authority(&mut self, authority: &'b AccountInfo<'a>, as_signer: bool) -> &mut Self {
+    pub fn authority(
+        &mut self,
+        authority: &'b compat::AccountInfo<'a>,
+        as_signer: bool,
+    ) -> &mut Self {
         self.instruction.authority = Some((authority, as_signer));
         self
     }
     #[inline(always)]
     pub fn permissioned_account(
         &mut self,
-        permissioned_account: &'b AccountInfo<'a>,
+        permissioned_account: &'b compat::AccountInfo<'a>,
         as_signer: bool,
     ) -> &mut Self {
         self.instruction.permissioned_account = Some((permissioned_account, as_signer));
         self
     }
     #[inline(always)]
-    pub fn permission(&mut self, permission: &'b AccountInfo<'a>) -> &mut Self {
+    pub fn permission(&mut self, permission: &'b compat::AccountInfo<'a>) -> &mut Self {
         self.instruction.permission = Some(permission);
         self
     }
     #[inline(always)]
-    pub fn system_program(&mut self, system_program: &'b AccountInfo<'a>) -> &mut Self {
+    pub fn system_program(&mut self, system_program: &'b compat::AccountInfo<'a>) -> &mut Self {
         self.instruction.system_program = Some(system_program);
         self
     }
     #[inline(always)]
-    pub fn owner_program(&mut self, owner_program: &'b AccountInfo<'a>) -> &mut Self {
+    pub fn owner_program(&mut self, owner_program: &'b compat::AccountInfo<'a>) -> &mut Self {
         self.instruction.owner_program = Some(owner_program);
         self
     }
     #[inline(always)]
-    pub fn delegation_buffer(&mut self, delegation_buffer: &'b AccountInfo<'a>) -> &mut Self {
+    pub fn delegation_buffer(
+        &mut self,
+        delegation_buffer: &'b compat::AccountInfo<'a>,
+    ) -> &mut Self {
         self.instruction.delegation_buffer = Some(delegation_buffer);
         self
     }
     #[inline(always)]
-    pub fn delegation_record(&mut self, delegation_record: &'b AccountInfo<'a>) -> &mut Self {
+    pub fn delegation_record(
+        &mut self,
+        delegation_record: &'b compat::AccountInfo<'a>,
+    ) -> &mut Self {
         self.instruction.delegation_record = Some(delegation_record);
         self
     }
     #[inline(always)]
-    pub fn delegation_metadata(&mut self, delegation_metadata: &'b AccountInfo<'a>) -> &mut Self {
+    pub fn delegation_metadata(
+        &mut self,
+        delegation_metadata: &'b compat::AccountInfo<'a>,
+    ) -> &mut Self {
         self.instruction.delegation_metadata = Some(delegation_metadata);
         self
     }
     #[inline(always)]
-    pub fn delegation_program(&mut self, delegation_program: &'b AccountInfo<'a>) -> &mut Self {
+    pub fn delegation_program(
+        &mut self,
+        delegation_program: &'b compat::AccountInfo<'a>,
+    ) -> &mut Self {
         self.instruction.delegation_program = Some(delegation_program);
         self
     }
     /// `[optional account]`
     #[inline(always)]
-    pub fn validator(&mut self, validator: Option<&'b AccountInfo<'a>>) -> &mut Self {
+    pub fn validator(&mut self, validator: Option<&'b compat::AccountInfo<'a>>) -> &mut Self {
         self.instruction.validator = validator;
         self
     }
@@ -504,7 +543,7 @@ impl<'a, 'b> DelegatePermissionCpiBuilder<'a, 'b> {
     #[inline(always)]
     pub fn add_remaining_account(
         &mut self,
-        account: &'b AccountInfo<'a>,
+        account: &'b compat::AccountInfo<'a>,
         is_writable: bool,
         is_signer: bool,
     ) -> &mut Self {
@@ -515,12 +554,12 @@ impl<'a, 'b> DelegatePermissionCpiBuilder<'a, 'b> {
     }
     /// Add additional accounts to the instruction.
     ///
-    /// Each account is represented by a tuple of the `AccountInfo`, a `bool` indicating whether the account is writable or not,
+    /// Each account is represented by a tuple of the `compat::AccountInfo`, a `bool` indicating whether the account is writable or not,
     /// and a `bool` indicating whether the account is a signer or not.
     #[inline(always)]
     pub fn add_remaining_accounts(
         &mut self,
-        accounts: &[(&'b AccountInfo<'a>, bool, bool)],
+        accounts: &[(&'b compat::AccountInfo<'a>, bool, bool)],
     ) -> &mut Self {
         self.instruction
             .__remaining_accounts
@@ -528,12 +567,12 @@ impl<'a, 'b> DelegatePermissionCpiBuilder<'a, 'b> {
         self
     }
     #[inline(always)]
-    pub fn invoke(&self) -> ProgramResult {
+    pub fn invoke(&self) -> compat::ProgramResult {
         self.invoke_signed(&[])
     }
     #[allow(clippy::clone_on_copy)]
     #[allow(clippy::vec_init_then_push)]
-    pub fn invoke_signed(&self, signers_seeds: &[&[&[u8]]]) -> ProgramResult {
+    pub fn invoke_signed(&self, signers_seeds: &[&[&[u8]]]) -> compat::ProgramResult {
         let instruction = DelegatePermissionCpi {
             __program: self.instruction.__program,
 
@@ -589,18 +628,18 @@ impl<'a, 'b> DelegatePermissionCpiBuilder<'a, 'b> {
 
 #[derive(Clone, Debug)]
 struct DelegatePermissionCpiBuilderInstruction<'a, 'b> {
-    __program: &'b AccountInfo<'a>,
-    payer: Option<&'b AccountInfo<'a>>,
-    authority: Option<(&'b AccountInfo<'a>, bool)>,
-    permissioned_account: Option<(&'b AccountInfo<'a>, bool)>,
-    permission: Option<&'b AccountInfo<'a>>,
-    system_program: Option<&'b AccountInfo<'a>>,
-    owner_program: Option<&'b AccountInfo<'a>>,
-    delegation_buffer: Option<&'b AccountInfo<'a>>,
-    delegation_record: Option<&'b AccountInfo<'a>>,
-    delegation_metadata: Option<&'b AccountInfo<'a>>,
-    delegation_program: Option<&'b AccountInfo<'a>>,
-    validator: Option<&'b AccountInfo<'a>>,
-    /// Additional instruction accounts `(AccountInfo, is_writable, is_signer)`.
-    __remaining_accounts: Vec<(&'b AccountInfo<'a>, bool, bool)>,
+    __program: &'b compat::AccountInfo<'a>,
+    payer: Option<&'b compat::AccountInfo<'a>>,
+    authority: Option<(&'b compat::AccountInfo<'a>, bool)>,
+    permissioned_account: Option<(&'b compat::AccountInfo<'a>, bool)>,
+    permission: Option<&'b compat::AccountInfo<'a>>,
+    system_program: Option<&'b compat::AccountInfo<'a>>,
+    owner_program: Option<&'b compat::AccountInfo<'a>>,
+    delegation_buffer: Option<&'b compat::AccountInfo<'a>>,
+    delegation_record: Option<&'b compat::AccountInfo<'a>>,
+    delegation_metadata: Option<&'b compat::AccountInfo<'a>>,
+    delegation_program: Option<&'b compat::AccountInfo<'a>>,
+    validator: Option<&'b compat::AccountInfo<'a>>,
+    /// Additional instruction accounts `(compat::AccountInfo, is_writable, is_signer)`.
+    __remaining_accounts: Vec<(&'b compat::AccountInfo<'a>, bool, bool)>,
 }
