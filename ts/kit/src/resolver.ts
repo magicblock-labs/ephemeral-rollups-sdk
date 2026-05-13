@@ -17,6 +17,8 @@ import {
   getAddressCodec,
   getU8Codec,
   AccountRole,
+  type Slot,
+  type SolanaRpcResponse,
 } from "@solana/kit";
 import { DELEGATION_PROGRAM_ID } from "./constants.js";
 
@@ -41,12 +43,24 @@ type DelegationRecord =
   | { status: DelegationStatus.Delegated; validator: Address }
   | { status: DelegationStatus.Undelegated };
 
+type AccountInfo = (AccountInfoBase & AccountInfoWithBase64EncodedData) | null;
+type AccountNotification = SolanaRpcResponse<AccountInfo>;
+type AccountInfoSource = "initial" | "notification";
+
 /** Class responsible for resolving connections to Solana validators */
 export class Resolver {
   private readonly routes = new Map<string, Rpc<SolanaRpcApiDevnet>>();
   private readonly delegations = new Map<string, DelegationRecord>();
+  private readonly delegationSlots = new Map<string, Slot>();
+  private readonly delegationSources = new Map<string, AccountInfoSource>();
+  private readonly inFlightTracks = new Map<
+    string,
+    Promise<DelegationRecord>
+  >();
+
   private readonly chain: Rpc<SolanaRpcApiDevnet>;
   private readonly ws: RpcSubscriptions<SolanaRpcSubscriptionsApi>;
+  private readonly subs = new Map<string, AbortController>();
 
   constructor(config: Configuration, routes: Map<string, string>) {
     this.chain = createSolanaRpc(config.chain);
@@ -73,6 +87,24 @@ export class Resolver {
       );
     }
 
+    const inFlightTrack = this.inFlightTracks.get(pubkeyStr);
+    if (inFlightTrack !== undefined) {
+      return inFlightTrack;
+    }
+
+    const track = this.startTrackingAccount(pubkey, pubkeyStr);
+    this.inFlightTracks.set(pubkeyStr, track);
+    try {
+      return await track;
+    } finally {
+      this.inFlightTracks.delete(pubkeyStr);
+    }
+  }
+
+  private async startTrackingAccount(
+    pubkey: Address,
+    pubkeyStr: string,
+  ): Promise<DelegationRecord> {
     const addressEncoder = getAddressEncoder();
     const [delegationRecord] = await getProgramDerivedAddress({
       programAddress: DELEGATION_PROGRAM_ID,
@@ -86,20 +118,27 @@ export class Resolver {
         encoding: "base64",
       })
       .subscribe({ abortSignal: abortController.signal });
+    this.subs.set(pubkeyStr, abortController);
+    this.listenForAccountNotifications(
+      accountNotifications,
+      pubkey,
+      abortController,
+    );
 
-    for await (const accountNotification of accountNotifications) {
-      this.updateStatus(accountNotification.value, pubkey);
+    try {
+      const accountInfo = await this.chain
+        .getAccountInfo(delegationRecord, {
+          commitment: "confirmed",
+          encoding: "base64",
+        })
+        .send();
+
+      return this.updateStatusFromResponse(accountInfo, pubkey, "initial");
+    } catch (error) {
       abortController.abort();
+      this.subs.delete(pubkeyStr);
+      throw error;
     }
-
-    const accountInfo = await this.chain
-      .getAccountInfo(delegationRecord, {
-        commitment: "confirmed",
-        encoding: "base64",
-      })
-      .send();
-
-    return this.updateStatus(accountInfo.value, pubkey);
   }
 
   /**
@@ -146,8 +185,83 @@ export class Resolver {
         : undefined;
   }
 
+  /**
+   * Terminates all active WebSocket subscriptions.
+   * Should be called to clean up resources when the resolver is no longer needed.
+   */
+  public terminate(): void {
+    for (const sub of this.subs.values()) {
+      sub.abort();
+    }
+    this.subs.clear();
+  }
+
+  private listenForAccountNotifications(
+    accountNotifications: AsyncIterable<AccountNotification>,
+    pubkey: Address,
+    abortController: AbortController,
+  ) {
+    const pubkeyStr = pubkey.toString();
+    void (async () => {
+      let shouldClearStatus = false;
+      try {
+        for await (const accountNotification of accountNotifications) {
+          this.updateStatusFromResponse(
+            accountNotification,
+            pubkey,
+            "notification",
+          );
+        }
+        shouldClearStatus = !abortController.signal.aborted;
+      } catch (error: unknown) {
+        if (
+          (error instanceof DOMException || error instanceof Error) &&
+          error.name === "AbortError"
+        ) {
+          return;
+        }
+        shouldClearStatus = true;
+        console.error(`Account subscription failed for ${pubkey}:`, error);
+      } finally {
+        if (this.subs.get(pubkeyStr) === abortController) {
+          this.subs.delete(pubkeyStr);
+        }
+        if (shouldClearStatus) {
+          this.delegations.delete(pubkeyStr);
+          this.delegationSlots.delete(pubkeyStr);
+          this.delegationSources.delete(pubkeyStr);
+        }
+      }
+    })();
+  }
+
+  private updateStatusFromResponse(
+    accountNotification: AccountNotification,
+    pubkey: Address,
+    source: AccountInfoSource,
+  ): DelegationRecord {
+    const pubkeyStr = pubkey.toString();
+    const currentSlot = this.delegationSlots.get(pubkeyStr);
+    const currentSource = this.delegationSources.get(pubkeyStr);
+    const currentRecord = this.delegations.get(pubkeyStr);
+    if (
+      currentSlot !== undefined &&
+      (accountNotification.context.slot < currentSlot ||
+        (accountNotification.context.slot === currentSlot &&
+          currentSource === "notification" &&
+          source === "initial")) &&
+      currentRecord !== undefined
+    ) {
+      return currentRecord;
+    }
+
+    this.delegationSlots.set(pubkeyStr, accountNotification.context.slot);
+    this.delegationSources.set(pubkeyStr, source);
+    return this.updateStatus(accountNotification.value, pubkey);
+  }
+
   private updateStatus(
-    account: (AccountInfoBase & AccountInfoWithBase64EncodedData) | null,
+    account: AccountInfo,
     pubkey: Address,
   ): DelegationRecord {
     const isDelegated =
