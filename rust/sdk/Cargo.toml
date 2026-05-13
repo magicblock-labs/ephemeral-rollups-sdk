@@ -13,24 +13,43 @@ readme = "README.md"
 
 [features]
 default = [
-		# "solana-program",
 		"solana-system-interface"
 ]
+
+# =============== modern ===============
+# 
+# As long as neither anchor-compat nor backward-compat is 
+# specified, all features support Solana 3.0 and Anchor 1.0.
+#
+# To get backward compatability, combine any flag with backward-compat. 
+# However, for anchor <1.0 support, use anchor-compat (and backward-compat is implied). 
+#
+
+# anchor 1.0 support (CANNOT be combined with backward-compat) 
 anchor = ["anchor-modern"]
 anchor-modern = ["anchor-support", "anchor-lang-current"]
+
+# anchor >=0.28.0, <1.0 support (backward-compat is implied)
 anchor-compat = [
     "anchor-support",
     "backward-compat",
     "anchor-lang-compat",
 ]
-anchor-compat-idl-build = ["anchor-compat", "anchor-lang-compat/idl-build"]
-anchor-support = []
+
+# access-control support (can be combined with [anchor-compat | anchor | backward-compat]) 
 access-control = ["num-derive", "num-traits", "thiserror"]
+
+# spl support.
 spl = ["spl-associated-token-account-interface", "encryption"]
+
 encryption = [
     "magicblock-delegation-program-api/encryption",
     "magicblock-delegation-program-api/instruction",
 ]
+
+# backward compatability support (can be combined with [access-control | encryption])
+backward-compat = ["magicblock-delegation-program-api/backward-compat"]
+
 crank = []
 disable-realloc = []
 modular-sdk = [
@@ -48,7 +67,10 @@ custom-heap = []
 custom-panic = []
 anchor-debug = []
 serde = []
-backward-compat = ["magicblock-delegation-program-api/backward-compat"]
+
+# =========== internal features ===========
+anchor-support = []
+#anchor-compat-idl-build = ["anchor-compat", "anchor-lang-compat/idl-build"]
 
 [dependencies]
 anchor-lang-compat = { workspace = true, optional = true }

@@ -21,17 +21,14 @@ impl<'info> AsModern for backward_compat::AccountInfo<'info> {
 
     #[cfg(feature = "backward-compat")]
     fn as_modern(&self) -> &Self::Modern {
-        const {
-            assert!(
-                core::mem::size_of::<backward_compat::AccountInfo<'static>>()
-                    == core::mem::size_of::<solana_program::account_info::AccountInfo<'static>>()
-            );
-            assert!(
-                core::mem::align_of::<backward_compat::AccountInfo<'static>>()
-                    == core::mem::align_of::<solana_program::account_info::AccountInfo<'static>>()
-            );
-        }
-
+        assert!(
+            core::mem::size_of::<backward_compat::AccountInfo<'static>>()
+                == core::mem::size_of::<solana_program::account_info::AccountInfo<'static>>()
+        );
+        assert!(
+            core::mem::align_of::<backward_compat::AccountInfo<'static>>()
+                == core::mem::align_of::<solana_program::account_info::AccountInfo<'static>>()
+        );
         unsafe { &*(self as *const Self as *const Self::Modern) }
     }
 
