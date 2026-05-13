@@ -26,8 +26,9 @@ default = [
 #
 
 # anchor 1.0 support (CANNOT be combined with backward-compat) 
-anchor = ["anchor-modern"]
+anchor = ["anchor-modern"] 
 anchor-modern = ["anchor-support", "anchor-lang-current"]
+anchor-debug = ["anchor-lang-current/anchor-debug"]
 
 # anchor >=0.28.0, <1.0 support (backward-compat is implied)
 anchor-compat = [
@@ -35,6 +36,7 @@ anchor-compat = [
     "backward-compat",
     "anchor-lang-compat",
 ]
+anchor-compat-debug = ["anchor-lang-compat/anchor-debug"]
 
 # access-control support (can be combined with [anchor-compat | anchor | backward-compat]) 
 access-control = ["num-derive", "num-traits", "thiserror"]
@@ -51,7 +53,6 @@ encryption = [
 backward-compat = ["magicblock-delegation-program-api/backward-compat"]
 
 crank = []
-disable-realloc = []
 modular-sdk = [
     "solana-account",
     "solana-account-info",
@@ -63,10 +64,6 @@ modular-sdk = [
     "solana-sysvar",
     "solana-system-interface",
 ]
-custom-heap = []
-custom-panic = []
-anchor-debug = []
-serde = []
 
 # =========== internal features ===========
 anchor-support = []
