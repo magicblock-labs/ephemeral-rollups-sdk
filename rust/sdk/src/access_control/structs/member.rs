@@ -22,6 +22,10 @@ use crate::compat::borsh::{BorshDeserialize, BorshSerialize};
     not(feature = "anchor-support"),
     derive(BorshSerialize, BorshDeserialize)
 )]
+#[cfg_attr(
+    all(not(feature = "anchor-support"), not(feature = "backward-compat")),
+    borsh(crate = "crate::compat::borsh")
+)]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Member {
     pub flags: u8,
@@ -32,6 +36,10 @@ pub struct Member {
 #[cfg_attr(
     not(feature = "anchor-support"),
     derive(BorshSerialize, BorshDeserialize)
+)]
+#[cfg_attr(
+    all(not(feature = "anchor-support"), not(feature = "backward-compat")),
+    borsh(crate = "crate::compat::borsh")
 )]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct MembersArgs {

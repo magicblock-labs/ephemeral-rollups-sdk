@@ -17,6 +17,10 @@ use crate::compat::borsh::{BorshDeserialize, BorshSerialize};
     not(feature = "anchor-support"),
     derive(BorshSerialize, BorshDeserialize)
 )]
+#[cfg_attr(
+    all(not(feature = "anchor-support"), not(feature = "backward-compat")),
+    borsh(crate = "crate::compat::borsh")
+)]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct UndelegateArgs {
     pub pda_seeds: Vec<Vec<u8>>,
