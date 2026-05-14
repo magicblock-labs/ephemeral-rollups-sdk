@@ -62,6 +62,11 @@ jobs:
           cargo build
           cargo test
 
+      - name: build all sensible features combinations
+        working-directory: rust/sdk
+        run: |
+          ./scripts/test-combinations.sh --no-color
+
       - name: npm run build and test kit
         working-directory: ts/kit
         run: |
