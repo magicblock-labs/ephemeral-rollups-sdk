@@ -2,14 +2,38 @@
 
 set -euo pipefail
 
+color=true
+
+if [[ "${1:-}" == "--no-color" ]]; then
+    color=false
+    shift
+fi
+
+if [[ $# -gt 0 ]]; then
+    echo "usage: $0 [--no-color]" >&2
+    exit 1
+fi
+
+print_command() {
+    local command="$1"
+
+    echo
+    if [[ "$color" == true ]]; then
+        printf '\033[32m==> %s\033[0m\n' "$command"
+    else
+        printf '==> %s\n' "$command"
+    fi
+    echo
+}
+
 build() {
     local features="${1:-}"
 
     if [[ -z "$features" ]]; then
-        echo "==> cargo build"
+        print_command "cargo build"
         cargo build
     else
-        echo "==> cargo build --features $features"
+        print_command "cargo build --features $features"
         cargo build --features "$features"
     fi
 }
@@ -18,10 +42,10 @@ build_no_default() {
     local features="${1:-}"
 
     if [[ -z "$features" ]]; then
-        echo "==> cargo build --no-default-features"
+        print_command "cargo build --no-default-features"
         cargo build --no-default-features
     else
-        echo "==> cargo build --no-default-features --features $features"
+        print_command "cargo build --no-default-features --features $features"
         cargo build --no-default-features --features "$features"
     fi
 }
