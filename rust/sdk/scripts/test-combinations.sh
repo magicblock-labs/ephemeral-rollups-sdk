@@ -3,6 +3,7 @@
 set -euo pipefail
 
 color=true
+build_count=0
 
 if [[ "${1:-}" == "--no-color" ]]; then
     color=false
@@ -16,12 +17,15 @@ fi
 
 print_command() {
     local command="$1"
+    local line="────────────────────────────────────────────────────────────"
+
+    build_count=$((build_count + 1))
 
     echo
     if [[ "$color" == true ]]; then
-        printf '\033[32m==> %s\033[0m\n' "$command"
+        printf '\033[32m%s\n==> [%02d] %s\n%s\033[0m\n' "$line" "$build_count" "$command" "$line"
     else
-        printf '==> %s\n' "$command"
+        printf '%s\n==> [%02d] %s\n%s\n' "$line" "$build_count" "$command" "$line"
     fi
     echo
 }

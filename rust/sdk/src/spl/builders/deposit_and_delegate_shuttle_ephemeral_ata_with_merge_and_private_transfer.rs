@@ -1,6 +1,6 @@
 use core::fmt;
 
-use crate::spl::compat_pda::{
+use crate::pda::{
     delegate_buffer_pda_from_delegated_account_and_owner_program,
     delegation_metadata_pda_from_delegated_account, delegation_record_pda_from_delegated_account,
 };
