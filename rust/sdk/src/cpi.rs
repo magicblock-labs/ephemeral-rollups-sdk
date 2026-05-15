@@ -315,7 +315,7 @@ pub fn cpi_delegate<'a, 'info>(
 
     let mut data: Vec<u8> = vec![0u8; 8];
     args.serialize(&mut data)
-        .map_err(|_| compat::ProgramError::InvalidRealloc)?;
+        .map_err(|_| compat::latest::ProgramError::BorshIoError.compat())?;
 
     let delegation_instruction = Instruction {
         program_id: crate::id().to_bytes().into(),

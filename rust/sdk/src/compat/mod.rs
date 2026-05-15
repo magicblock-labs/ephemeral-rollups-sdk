@@ -28,9 +28,8 @@ mod backward_compat {
     pub use solana_program_error_compat::{ProgramError, ProgramResult};
 }
 
-#[cfg(not(feature = "backward-compat"))]
-mod backward_compat {
-    pub use dlp_api::compat::{borsh, Pubkey};
+pub(crate) mod latest {
+    pub use dlp_api::compat::latest::{borsh, Pubkey};
 
     #[cfg(feature = "anchor-modern")]
     pub use anchor_lang_current as anchor_lang;
@@ -46,7 +45,11 @@ mod as_modern;
 mod compatize;
 mod modern;
 
+#[cfg(feature = "backward-compat")]
 pub use backward_compat::*;
+
+#[cfg(not(feature = "backward-compat"))]
+pub use latest::*;
 
 ///
 /// Borrowed modernization for layout-compatible values.

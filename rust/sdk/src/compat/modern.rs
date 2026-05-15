@@ -1,4 +1,4 @@
-use super::{backward_compat, AsModern, Modern};
+use super::{AsModern, Modern};
 
 impl<T: AsModern + ?Sized> Modern for &T
 where
@@ -10,21 +10,38 @@ where
     }
 }
 
-impl Modern for backward_compat::Pubkey {
+#[cfg(feature = "backward-compat")]
+impl Modern for super::backward_compat::Pubkey {
     type Modern = solana_address::Address;
     fn modern(self) -> Self::Modern {
         *self.as_modern()
     }
 }
 
-impl<'info> Modern for backward_compat::AccountInfo<'info> {
+impl Modern for super::latest::Pubkey {
+    type Modern = solana_address::Address;
+    fn modern(self) -> Self::Modern {
+        *self.as_modern()
+    }
+}
+
+#[cfg(feature = "backward-compat")]
+impl<'info> Modern for super::backward_compat::AccountInfo<'info> {
     type Modern = solana_program::account_info::AccountInfo<'info>;
     fn modern(self) -> Self::Modern {
         self.as_modern().clone()
     }
 }
 
-impl Modern for backward_compat::AccountMeta {
+impl<'info> Modern for super::latest::AccountInfo<'info> {
+    type Modern = solana_program::account_info::AccountInfo<'info>;
+    fn modern(self) -> Self::Modern {
+        self
+    }
+}
+
+#[cfg(feature = "backward-compat")]
+impl Modern for super::backward_compat::AccountMeta {
     type Modern = solana_program::instruction::AccountMeta;
     fn modern(self) -> Self::Modern {
         Self::Modern {
@@ -35,7 +52,15 @@ impl Modern for backward_compat::AccountMeta {
     }
 }
 
-impl Modern for backward_compat::Instruction {
+impl Modern for super::latest::AccountMeta {
+    type Modern = solana_program::instruction::AccountMeta;
+    fn modern(self) -> Self::Modern {
+        self
+    }
+}
+
+#[cfg(feature = "backward-compat")]
+impl Modern for super::backward_compat::Instruction {
     type Modern = solana_program::instruction::Instruction;
     fn modern(self) -> Self::Modern {
         Self::Modern {
@@ -43,6 +68,13 @@ impl Modern for backward_compat::Instruction {
             accounts: self.accounts.modern(),
             data: self.data,
         }
+    }
+}
+
+impl Modern for super::latest::Instruction {
+    type Modern = solana_program::instruction::Instruction;
+    fn modern(self) -> Self::Modern {
+        self
     }
 }
 
@@ -54,10 +86,10 @@ impl Modern for () {
 }
 
 #[cfg(feature = "backward-compat")]
-impl Modern for backward_compat::ProgramError {
+impl Modern for super::backward_compat::ProgramError {
     type Modern = solana_program::program_error::ProgramError;
     fn modern(self) -> Self::Modern {
-        use backward_compat::ProgramError as CompatError;
+        use super::backward_compat::ProgramError as CompatError;
         use solana_program::program_error::ProgramError as ModernError;
 
         match self {
@@ -97,8 +129,7 @@ impl Modern for backward_compat::ProgramError {
     }
 }
 
-#[cfg(not(feature = "backward-compat"))]
-impl Modern for backward_compat::ProgramError {
+impl Modern for super::latest::ProgramError {
     type Modern = solana_program::program_error::ProgramError;
     fn modern(self) -> Self::Modern {
         self
