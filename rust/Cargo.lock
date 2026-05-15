@@ -1134,6 +1134,7 @@ dependencies = [
  "magicblock-delegation-program-api",
  "magicblock-magic-program-api",
  "pinocchio 0.10.2",
+ "pinocchio-log",
  "pinocchio-pubkey",
  "pinocchio-system",
  "solana-address 2.6.0",
