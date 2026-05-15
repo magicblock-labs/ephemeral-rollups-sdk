@@ -2,9 +2,7 @@
 
 use crate::compat::{self, AsModern, Compat, Modern};
 pub use crate::ephem::deprecated::v0::{
-    commit_accounts, commit_and_undelegate_accounts, commit_finalize_accounts,
-    commit_finalize_and_undelegate_accounts, create_finalize_schedule_commit_ix,
-    create_schedule_commit_ix,
+    commit_accounts, commit_and_undelegate_accounts, create_schedule_commit_ix,
 };
 use crate::ephem::deprecated::v1::utils;
 pub use crate::ephem::deprecated::v1::{
