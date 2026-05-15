@@ -29,7 +29,6 @@ magicblock-magic-program-api = { workspace = true }
 ephemeral-rollups-sdk = { workspace = true }
 solana-program = { workspace = true }
 solana-instruction = { workspace = true }
-solana-program-compat = { workspace = true }
 
 [features]
 default = []
