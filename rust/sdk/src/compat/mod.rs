@@ -11,9 +11,10 @@
 ///
 /// In practice, compat::{Pubkey, borsh, ...} is used only for public function
 /// parameters and return types. As soon as execution enters a function body, inputs
-/// are normalized to the Solana 3.0 types, and the internal logic runs entirely on
-/// Solana 3.0. If a value needs to cross back out through the public API, it is
-/// converted back at the boundary.
+/// are normalized to the Solana 3.0 types. with the help of AsModern and Modern traits
+/// and the internal logic runs entirely on Solana 3.0. If a value needs to cross
+/// back out through the public API, it is converted back at the boundary with the help
+/// of Compat trait.
 ///
 
 #[cfg(feature = "backward-compat")]
@@ -28,9 +29,8 @@ mod backward_compat {
     pub use solana_program_error_compat::{ProgramError, ProgramResult};
 }
 
-#[cfg(not(feature = "backward-compat"))]
-mod backward_compat {
-    pub use dlp_api::compat::{borsh, Pubkey};
+pub(crate) mod latest {
+    pub use dlp_api::compat::latest::{borsh, Pubkey};
 
     #[cfg(feature = "anchor-modern")]
     pub use anchor_lang_current as anchor_lang;
@@ -46,7 +46,11 @@ mod as_modern;
 mod compatize;
 mod modern;
 
+#[cfg(feature = "backward-compat")]
 pub use backward_compat::*;
+
+#[cfg(not(feature = "backward-compat"))]
+pub use latest::*;
 
 ///
 /// Borrowed modernization for layout-compatible values.
