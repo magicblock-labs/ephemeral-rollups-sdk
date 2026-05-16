@@ -11,9 +11,10 @@
 ///
 /// In practice, compat::{Pubkey, borsh, ...} is used only for public function
 /// parameters and return types. As soon as execution enters a function body, inputs
-/// are normalized to the Solana 3.0 types, and the internal logic runs entirely on
-/// Solana 3.0. If a value needs to cross back out through the public API, it is
-/// converted back at the boundary.
+/// are normalized to the Solana 3.0 types. with the help of AsModern and Modern traits
+/// and the internal logic runs entirely on Solana 3.0. If a value needs to cross
+/// back out through the public API, it is converted back at the boundary with the help
+/// of Compat trait.
 ///
 
 #[cfg(feature = "backward-compat")]
