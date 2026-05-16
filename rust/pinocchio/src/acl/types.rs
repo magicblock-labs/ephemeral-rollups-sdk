@@ -303,3 +303,42 @@ impl MemberFlags {
         flags
     }
 }
+
+pub struct EphemeralPermission<'a> {
+    pub discriminator: u8,
+    pub bump: u8,
+    pub permissioned_account: Address,
+    pub members: Option<&'a [Member]>,
+}
+
+pub struct EphemeralMembersArgs<'a> {
+    pub is_private: bool,
+    pub members: &'a [Member],
+}
+
+impl<'a> EphemeralMembersArgs<'a> {
+    pub fn to_bytes(&self, bytes: &mut [u8]) -> Result<usize, ProgramError> {
+        let members_bytes = self
+            .members
+            .len()
+            .checked_mul(MAX_MEMBER_SIZE)
+            .ok_or(ProgramError::InvalidArgument)?;
+        let required = 1usize
+            .checked_add(members_bytes)
+            .ok_or(ProgramError::InvalidArgument)?;
+        if bytes.len() < required {
+            return Err(ProgramError::InvalidArgument);
+        }
+
+        bytes[0] = if self.is_private { 1 } else { 0 };
+        let mut offset = 1;
+        for member in self.members.iter() {
+            bytes[offset] = member.flags.as_u8();
+            offset += 1;
+            bytes[offset..offset + 32].copy_from_slice(member.pubkey.as_ref());
+            offset += 32;
+        }
+
+        Ok(required)
+    }
+}
