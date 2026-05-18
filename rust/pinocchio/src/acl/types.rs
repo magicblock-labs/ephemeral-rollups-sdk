@@ -308,7 +308,14 @@ pub struct EphemeralPermission<'a> {
     pub discriminator: u8,
     pub bump: u8,
     pub permissioned_account: Address,
-    pub members: Option<&'a [Member]>,
+    pub private: bool,
+    pub members: &'a [Member],
+}
+
+impl<'a> EphemeralPermission<'a> {
+    pub const fn size_of(members: usize) -> usize {
+        35 + members * MAX_MEMBER_SIZE
+    }
 }
 
 pub struct EphemeralMembersArgs<'a> {

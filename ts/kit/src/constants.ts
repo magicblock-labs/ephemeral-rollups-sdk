@@ -30,3 +30,7 @@ export const TOKEN_PROGRAM_ID = address(
 export const ASSOCIATED_TOKEN_PROGRAM_ID = address(
   "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL",
 );
+
+export const EPHEMERAL_VAULT_ID = address(
+  "MagicVau1t999999999999999999999999999999999",
+);
