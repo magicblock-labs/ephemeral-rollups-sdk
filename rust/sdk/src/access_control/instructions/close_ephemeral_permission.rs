@@ -1,7 +1,7 @@
+use solana_program::program::invoke_signed;
+
+use crate::compat::{AccountInfo, AccountMeta, Instruction, ProgramResult, Pubkey};
 use crate::consts::PERMISSION_PROGRAM_ID;
-use crate::solana_compat::solana::{
-    invoke_signed, AccountInfo, AccountMeta, Instruction, ProgramResult, Pubkey,
-};
 
 pub const CLOSE_EPHEMERAL_PERMISSION_DISCRIMINATOR: u64 = 8;
 

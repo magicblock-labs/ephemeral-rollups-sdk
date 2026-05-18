@@ -1,7 +1,7 @@
+use solana_program::program::invoke_signed;
+
 use crate::access_control::structs::EphemeralMembersArgs;
-use crate::solana_compat::solana::{
-    invoke_signed, AccountInfo, AccountMeta, Instruction, ProgramError, ProgramResult, Pubkey,
-};
+use crate::compat::{AccountInfo, AccountMeta, Instruction, ProgramError, ProgramResult, Pubkey};
 
 pub const UPDATE_EPHEMERAL_PERMISSION_DISCRIMINATOR: u64 = 7;
 

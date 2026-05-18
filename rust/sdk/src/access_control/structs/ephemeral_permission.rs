@@ -1,6 +1,6 @@
 use crate::access_control::structs::{Member, PERMISSION_SEED};
+use crate::compat::{ProgramError, Pubkey};
 use crate::consts::PERMISSION_PROGRAM_ID;
-use crate::solana_compat::solana::{ProgramError, Pubkey};
 
 pub struct EphemeralPermission<'a> {
     pub discriminator: u8,

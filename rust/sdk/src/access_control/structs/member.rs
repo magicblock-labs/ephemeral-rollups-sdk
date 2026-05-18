@@ -1,3 +1,5 @@
+use bytemuck::{Pod, Zeroable};
+
 use crate::compat::{self, Pubkey};
 
 #[cfg(feature = "anchor-support")]
@@ -5,14 +7,17 @@ use crate::compat::{self, Pubkey};
 use crate::compat::anchor_lang;
 
 #[cfg(feature = "anchor-support")]
-use crate::compat::anchor_lang::{AnchorDeserialize, AnchorSerialize};
+use crate::compat::anchor_lang::{AnchorDeserialize, AnchorSerialize, ProgramError};
 
 //#[cfg(feature = "anchor-support")]
 #[allow(unused_imports)]
 use crate::compat::borsh;
 
 #[cfg(not(feature = "anchor-support"))]
-use crate::compat::borsh::{BorshDeserialize, BorshSerialize};
+use crate::compat::{
+    borsh::{BorshDeserialize, BorshSerialize},
+    ProgramError,
+};
 
 // IMPORTANT: Keep Pubkey unqualified in Anchor IDL-derived structs. Anchor's
 // idl-build recognizes bare Pubkey as the native IDL pubkey type, while
@@ -26,7 +31,8 @@ use crate::compat::borsh::{BorshDeserialize, BorshSerialize};
     all(not(feature = "anchor-support"), not(feature = "backward-compat")),
     borsh(crate = "crate::compat::borsh")
 )]
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[repr(C)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Pod, Zeroable)]
 pub struct Member {
     pub flags: u8,
     pub pubkey: Pubkey,
