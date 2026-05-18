@@ -313,8 +313,10 @@ pub struct EphemeralPermission<'a> {
 }
 
 impl<'a> EphemeralPermission<'a> {
+    /// Computes the exact size needed to serialize this permission.
+    /// Accounts for the default member.
     pub const fn size_of(members: usize) -> usize {
-        35 + members * MAX_MEMBER_SIZE
+        35 + (1 + members) * MAX_MEMBER_SIZE
     }
 }
 
