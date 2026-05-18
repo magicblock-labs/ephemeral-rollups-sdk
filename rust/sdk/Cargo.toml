@@ -12,9 +12,7 @@ edition = { workspace = true }
 readme = "README.md"
 
 [features]
-default = [
-		"solana-system-interface"
-]
+default = ["solana-system-interface"]
 
 # =============== modern ===============
 # 
@@ -26,16 +24,12 @@ default = [
 #
 
 # anchor 1.0 support (CANNOT be combined with backward-compat) 
-anchor = ["anchor-modern"] 
+anchor = ["anchor-modern"]
 anchor-modern = ["anchor-support", "anchor-lang-current"]
 anchor-debug = ["anchor-lang-current/anchor-debug"]
 
 # anchor >=0.28.0, <1.0 support (backward-compat is implied)
-anchor-compat = [
-    "anchor-support",
-    "backward-compat",
-    "anchor-lang-compat",
-]
+anchor-compat = ["anchor-support", "backward-compat", "anchor-lang-compat"]
 anchor-compat-debug = ["anchor-lang-compat/anchor-debug"]
 
 # access-control support (can be combined with [anchor-compat | anchor | backward-compat]) 
@@ -74,6 +68,7 @@ anchor-lang-compat = { workspace = true, optional = true }
 anchor-lang-current = { workspace = true, optional = true }
 # borsh = "0.10.4"
 bincode = { workspace = true }
+bytemuck = { workspace = true }
 ephemeral-rollups-sdk-attribute-delegate = { workspace = true }
 ephemeral-rollups-sdk-attribute-ephemeral = { workspace = true }
 ephemeral-rollups-sdk-attribute-ephemeral-accounts = { workspace = true }
