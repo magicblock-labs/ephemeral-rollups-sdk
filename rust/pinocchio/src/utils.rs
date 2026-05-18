@@ -177,8 +177,8 @@ pub fn serialize_delegate_with_actions_data(
 ) -> Result<alloc::vec::Vec<u8>, ProgramError> {
     use alloc::vec::Vec;
     use dlp_api::args::{DelegateArgs, DelegateWithActionsArgs};
+    use dlp_api::compat::Pubkey;
     use dlp_api::discriminator::DlpDiscriminator;
-    use solana_program::pubkey::Pubkey;
 
     let seeds_vec: Vec<Vec<u8>> = delegate_args.seeds.iter().map(|s| s.to_vec()).collect();
     let delegate = DelegateArgs {
