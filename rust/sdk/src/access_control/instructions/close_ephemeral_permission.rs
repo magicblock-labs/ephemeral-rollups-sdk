@@ -1,40 +1,37 @@
 use solana_program::program::invoke_signed;
 
-use crate::compat::{
-    AccountInfo, AccountMeta, AsModern, Compat, Instruction, Modern, ProgramResult, Pubkey,
-};
-use crate::modernize;
+use crate::compat::{self, Compat, Modern};
 
 pub const CLOSE_EPHEMERAL_PERMISSION_DISCRIMINATOR: u64 = 8;
 
 /// Accounts.
 #[derive(Debug)]
 pub struct CloseEphemeralPermission {
-    pub payer: Pubkey,
-    pub authority: Pubkey,
-    pub permissioned_account: Pubkey,
-    pub permission: Pubkey,
-    pub vault: Pubkey,
-    pub magic_program: Pubkey,
-    pub permission_program: Pubkey,
+    pub payer: compat::Pubkey,
+    pub authority: compat::Pubkey,
+    pub permissioned_account: compat::Pubkey,
+    pub permission: compat::Pubkey,
+    pub vault: compat::Pubkey,
+    pub magic_program: compat::Pubkey,
+    pub permission_program: compat::Pubkey,
     pub authority_is_signer: bool,
 }
 
 impl CloseEphemeralPermission {
-    pub fn instruction(&self) -> Instruction {
+    pub fn instruction(&self) -> compat::Instruction {
         let accounts = vec![
-            AccountMeta::new(self.payer, true),
-            AccountMeta::new_readonly(self.authority, self.authority_is_signer),
-            AccountMeta::new_readonly(self.permissioned_account, !self.authority_is_signer),
-            AccountMeta::new(self.permission, false),
-            AccountMeta::new(self.vault, false),
-            AccountMeta::new_readonly(self.magic_program, false),
+            compat::AccountMeta::new(self.payer, true),
+            compat::AccountMeta::new_readonly(self.authority, self.authority_is_signer),
+            compat::AccountMeta::new_readonly(self.permissioned_account, !self.authority_is_signer),
+            compat::AccountMeta::new(self.permission, false),
+            compat::AccountMeta::new(self.vault, false),
+            compat::AccountMeta::new_readonly(self.magic_program, false),
         ];
         let data = CLOSE_EPHEMERAL_PERMISSION_DISCRIMINATOR
             .to_le_bytes()
             .to_vec();
 
-        Instruction {
+        compat::Instruction {
             program_id: self.permission_program,
             accounts,
             data,
@@ -43,51 +40,31 @@ impl CloseEphemeralPermission {
 }
 
 pub struct CloseEphemeralPermissionCpi<'a> {
-    pub permissioned_account: AccountInfo<'a>,
-    pub permission: AccountInfo<'a>,
-    pub payer: AccountInfo<'a>,
-    pub authority: AccountInfo<'a>,
-    pub vault: AccountInfo<'a>,
-    pub magic_program: AccountInfo<'a>,
-    pub permission_program: AccountInfo<'a>,
+    pub permissioned_account: compat::AccountInfo<'a>,
+    pub permission: compat::AccountInfo<'a>,
+    pub payer: compat::AccountInfo<'a>,
+    pub authority: compat::AccountInfo<'a>,
+    pub vault: compat::AccountInfo<'a>,
+    pub magic_program: compat::AccountInfo<'a>,
+    pub permission_program: compat::AccountInfo<'a>,
     pub authority_is_signer: bool,
 }
 
 impl<'a> CloseEphemeralPermissionCpi<'a> {
-    pub fn invoke(self) -> ProgramResult {
+    pub fn invoke(self) -> compat::ProgramResult {
         self.invoke_signed(&[])
     }
 
-    pub fn invoke_signed(self, signers: &[&[&[u8]]]) -> ProgramResult {
-        let CloseEphemeralPermissionCpi {
-            permissioned_account,
-            permission,
-            payer,
-            authority,
-            vault,
-            magic_program,
-            permission_program,
-            authority_is_signer,
-        } = self;
-        modernize!(
-            payer,
-            permissioned_account,
-            permission,
-            authority,
-            vault,
-            magic_program,
-            permission_program,
-        );
-
+    pub fn invoke_signed(self, signers: &[&[&[u8]]]) -> compat::ProgramResult {
         let ix = CloseEphemeralPermission {
-            payer: payer.key.compat(),
-            authority: authority.key.compat(),
-            permissioned_account: permissioned_account.key.compat(),
-            permission: permission.key.compat(),
-            vault: vault.key.compat(),
-            magic_program: magic_program.key.compat(),
-            permission_program: permission_program.key.compat(),
-            authority_is_signer,
+            payer: *self.payer.key,
+            authority: *self.authority.key,
+            permissioned_account: *self.permissioned_account.key,
+            permission: *self.permission.key,
+            vault: *self.vault.key,
+            magic_program: *self.magic_program.key,
+            permission_program: *self.permission_program.key,
+            authority_is_signer: self.authority_is_signer,
         }
         .instruction()
         .modern();
@@ -95,12 +72,12 @@ impl<'a> CloseEphemeralPermissionCpi<'a> {
         invoke_signed(
             &ix,
             &[
-                payer.clone(),
-                authority.clone(),
-                permissioned_account.clone(),
-                permission.clone(),
-                vault.clone(),
-                magic_program.clone(),
+                self.payer.modern(),
+                self.authority.modern(),
+                self.permissioned_account.modern(),
+                self.permission.modern(),
+                self.vault.modern(),
+                self.magic_program.modern(),
             ],
             signers,
         )
