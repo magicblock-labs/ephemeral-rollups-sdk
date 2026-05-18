@@ -10,7 +10,7 @@
 //! - **Ephemeral**: Must be a signer only on `create` (prevents pubkey squatting).
 //!   Not required to sign on `resize` or `close`.
 //!
-//! For PDA accounts, provide seeds via [`EphemeralAccount::with_signer_seeds`] so the
+//! For PDA accounts, provide signers via [`EphemeralAccount::with_signers`] so the
 //! CPI can sign on their behalf using `invoke_signed`. Oncurve accounts must have
 //! signed the original transaction.
 //!
@@ -21,17 +21,17 @@
 //!
 //! // Create: both sponsor and ephemeral are PDAs - provide seeds for both
 //! EphemeralAccount::new(&ctx.sponsor, &ctx.ephemeral, &ctx.vault, &ctx.magic_program)
-//!     .with_signer_seeds(&[&sponsor_seeds, &ephemeral_seeds])
+//!     .with_signers(&[&sponsor_signer, &ephemeral_signer])
 //!     .create(1000)?;
 //!
 //! // Resize/Close: only sponsor needs to sign - only sponsor seeds needed
 //! EphemeralAccount::new(&ctx.sponsor, &ctx.ephemeral, &ctx.vault, &ctx.magic_program)
-//!     .with_signer_seeds(&[&sponsor_seeds])
+//!     .with_signers(&[&sponsor_signer])
 //!     .resize(2000)?;
 //!
 //! // Create with oncurve sponsor (signed tx), ephemeral is PDA
 //! EphemeralAccount::new(&ctx.sponsor, &ctx.ephemeral, &ctx.vault, &ctx.magic_program)
-//!     .with_signer_seeds(&[&ephemeral_seeds])
+//!     .with_signers(&[&ephemeral_signer])
 //!     .create(1000)?;
 //!
 //! // Resize/Close with oncurve sponsor - no seeds needed
@@ -97,6 +97,7 @@ impl<'a> EphemeralAccount<'a> {
     /// * `sponsor` - Account paying rent (must be signer for all operations)
     /// * `ephemeral` - Account to create/modify (must be signer only on create)
     /// * `vault` - Rent vault ([`crate::consts::EPHEMERAL_VAULT_ID`])
+    /// * `magic_program` - Magic program ([`crate::consts::MAGIC_PROGRAM_ID`])
     pub fn new(
         sponsor: &'a AccountView,
         ephemeral: &'a AccountView,
@@ -127,7 +128,7 @@ impl<'a> EphemeralAccount<'a> {
     /// Rent is transferred from sponsor to vault.
     ///
     /// **Note:** Ephemeral account must be a signer to prevent pubkey squatting.
-    /// Provide seeds via [`Self::with_signer_seeds`] if ephemeral is a PDA.
+    /// Provide signers via [`Self::with_signers`] if ephemeral or sponsor is a PDA.
     pub fn create(&self, data_len: u32) -> ProgramResult {
         let mut data = [0_u8; 8];
         data[0..4].copy_from_slice(&CREATE_EPHEMERAL_ACCOUNT_DISCRIMINATOR.to_le_bytes());
