@@ -89,13 +89,78 @@ impl<'acc, 'args> Deref for CommitAndUndelegateSerialize<'_, 'acc, 'args> {
 }
 
 impl bincode::Encode for CommitAndUndelegateSerialize<'_, '_, '_> {
+    /// Streaming encoder that avoids materializing `CommitAndUndelegateArgs` (~1712 bytes)
+    /// on the stack, staying within the Solana sBPF 4096-byte stack-frame limit.
+    ///
+    /// Wire format is identical to `CommitAndUndelegateArgs::encode()`.
     #[inline(never)]
     fn encode<E: Encoder>(&self, encoder: &mut E) -> Result<(), EncodeError> {
-        self.inner // Copy — CommitAndUndelegateIntent is three fat pointers
-            .into_args(self.indices_map)
-            .map_err(|_| EncodeError::Other("CommitAndUndelegateIntent::into_args failed"))?
-            .encode(encoder)
+        let indices_map = self.indices_map;
+        let accounts = self.inner.accounts;
+        let post_commit_actions = self.inner.post_commit_actions;
+        let post_undelegate_actions = self.inner.post_undelegate_actions;
+
+        // Build account indices (same logic as into_args)
+        // Note: We encode indices inline rather than pre-building a NoVec to save stack space.
+
+        // ===== commit_type (enum) =====
+        if post_commit_actions.is_empty() {
+            // CommitTypeArgs::Standalone(indices) - variant index 0
+            (0u32).encode(encoder)?;
+            // NoVec<u8>: length + elements
+            (accounts.len() as u64).encode(encoder)?;
+            for account in accounts {
+                get_index(indices_map, account.address())
+                    .ok_or(EncodeError::Other("account not in indices_map"))?
+                    .encode(encoder)?;
+            }
+        } else {
+            // CommitTypeArgs::WithBaseActions { committed_accounts, base_actions } - variant index 1
+            (1u32).encode(encoder)?;
+            // committed_accounts: NoVec<u8>
+            (accounts.len() as u64).encode(encoder)?;
+            for account in accounts {
+                get_index(indices_map, account.address())
+                    .ok_or(EncodeError::Other("account not in indices_map"))?
+                    .encode(encoder)?;
+            }
+            // base_actions: NoVec<BaseActionArgs>
+            encode_handlers_as_base_actions(post_commit_actions, indices_map, encoder)?;
+        }
+
+        // ===== undelegate_type (enum) =====
+        if post_undelegate_actions.is_empty() {
+            // UndelegateTypeArgs::Standalone - variant index 0 (no data)
+            (0u32).encode(encoder)?;
+        } else {
+            // UndelegateTypeArgs::WithBaseActions { base_actions } - variant index 1
+            (1u32).encode(encoder)?;
+            // base_actions: NoVec<BaseActionArgs>
+            encode_handlers_as_base_actions(post_undelegate_actions, indices_map, encoder)?;
+        }
+
+        Ok(())
     }
+}
+
+/// Encodes a slice of `CallHandler` as a `NoVec<BaseActionArgs>` (length + elements).
+///
+/// Each handler is converted to `BaseActionArgs` on-the-fly using `handler.args()`,
+/// avoiding stack allocation of the full NoVec structure.
+#[inline(never)]
+fn encode_handlers_as_base_actions<E: Encoder>(
+    handlers: &[CallHandler<'_>],
+    indices_map: &[&Address],
+    encoder: &mut E,
+) -> Result<(), EncodeError> {
+    (handlers.len() as u64).encode(encoder)?;
+    for handler in handlers {
+        let base_action = handler
+            .args(indices_map)
+            .map_err(|_| EncodeError::Other("handler.args() failed"))?;
+        base_action.encode(encoder)?;
+    }
+    Ok(())
 }
 
 /// Streaming encoder for `MagicIntentBundleArgs`.
