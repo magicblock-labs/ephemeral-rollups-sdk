@@ -1,7 +1,9 @@
 use solana_program::program::invoke_signed;
 
-use crate::compat::{AccountInfo, AccountMeta, Instruction, ProgramResult, Pubkey};
-use crate::consts::PERMISSION_PROGRAM_ID;
+use crate::compat::{
+    AccountInfo, AccountMeta, AsModern, Compat, Instruction, Modern, ProgramResult, Pubkey,
+};
+use crate::modernize;
 
 pub const CLOSE_EPHEMERAL_PERMISSION_DISCRIMINATOR: u64 = 8;
 
@@ -14,6 +16,7 @@ pub struct CloseEphemeralPermission {
     pub permission: Pubkey,
     pub vault: Pubkey,
     pub magic_program: Pubkey,
+    pub permission_program: Pubkey,
     pub authority_is_signer: bool,
 }
 
@@ -32,7 +35,7 @@ impl CloseEphemeralPermission {
             .to_vec();
 
         Instruction {
-            program_id: PERMISSION_PROGRAM_ID,
+            program_id: self.permission_program,
             accounts,
             data,
         }
@@ -51,32 +54,56 @@ pub struct CloseEphemeralPermissionCpi<'a> {
 }
 
 impl<'a> CloseEphemeralPermissionCpi<'a> {
-    pub fn invoke(&self) -> ProgramResult {
+    pub fn invoke(self) -> ProgramResult {
         self.invoke_signed(&[])
     }
 
-    pub fn invoke_signed(&self, signers: &[&[&[u8]]]) -> ProgramResult {
+    pub fn invoke_signed(self, signers: &[&[&[u8]]]) -> ProgramResult {
+        let CloseEphemeralPermissionCpi {
+            permissioned_account,
+            permission,
+            payer,
+            authority,
+            vault,
+            magic_program,
+            permission_program,
+            authority_is_signer,
+        } = self;
+        modernize!(
+            payer,
+            permissioned_account,
+            permission,
+            authority,
+            vault,
+            magic_program,
+            permission_program,
+        );
+
         let ix = CloseEphemeralPermission {
-            payer: *self.payer.key,
-            authority: *self.authority.key,
-            permissioned_account: *self.permissioned_account.key,
-            permission: *self.permission.key,
-            vault: *self.vault.key,
-            magic_program: *self.magic_program.key,
-            authority_is_signer: self.authority_is_signer,
+            payer: payer.key.compat(),
+            authority: authority.key.compat(),
+            permissioned_account: permissioned_account.key.compat(),
+            permission: permission.key.compat(),
+            vault: vault.key.compat(),
+            magic_program: magic_program.key.compat(),
+            permission_program: permission_program.key.compat(),
+            authority_is_signer,
         }
-        .instruction();
+        .instruction()
+        .modern();
+
         invoke_signed(
             &ix,
             &[
-                self.payer.clone(),
-                self.authority.clone(),
-                self.permissioned_account.clone(),
-                self.permission.clone(),
-                self.vault.clone(),
-                self.magic_program.clone(),
+                payer.clone(),
+                authority.clone(),
+                permissioned_account.clone(),
+                permission.clone(),
+                vault.clone(),
+                magic_program.clone(),
             ],
             signers,
         )
+        .compat()
     }
 }

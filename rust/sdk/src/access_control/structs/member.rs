@@ -7,7 +7,9 @@ use crate::compat::{self, Pubkey};
 use crate::compat::anchor_lang;
 
 #[cfg(feature = "anchor-support")]
-use crate::compat::anchor_lang::{AnchorDeserialize, AnchorSerialize, ProgramError};
+use crate::compat::anchor_lang::{
+    solana_program::program_error::ProgramError, AnchorDeserialize, AnchorSerialize,
+};
 
 //#[cfg(feature = "anchor-support")]
 #[allow(unused_imports)]
