@@ -1,6 +1,6 @@
 use crate::access_control::structs::EphemeralMembersArgs;
 use crate::solana_compat::solana::{
-    invoke_signed, AccountInfo, AccountMeta, Instruction, ProgramResult, Pubkey,
+    invoke_signed, AccountInfo, AccountMeta, Instruction, ProgramError, ProgramResult, Pubkey,
 };
 
 pub const CREATE_EPHEMERAL_PERMISSION_DISCRIMINATOR: u64 = 6;
@@ -17,7 +17,7 @@ pub struct CreateEphemeralPermission<'a> {
 }
 
 impl<'a> CreateEphemeralPermission<'a> {
-    pub fn instruction(&self) -> Instruction {
+    pub fn instruction(&self) -> Result<Instruction, ProgramError> {
         let accounts = vec![
             AccountMeta::new(self.payer, true),
             AccountMeta::new_readonly(self.permissioned_account, true),
@@ -28,7 +28,7 @@ impl<'a> CreateEphemeralPermission<'a> {
         let mut bytes = vec![0; EphemeralMembersArgs::required_bytes(self.args.members.len())];
         self.args
             .to_bytes(&mut bytes)
-            .expect("Failed to serialize members args");
+            .map_err(|_| ProgramError::InvalidInstructionData)?;
         let data = [
             CREATE_EPHEMERAL_PERMISSION_DISCRIMINATOR
                 .to_le_bytes()
@@ -37,11 +37,11 @@ impl<'a> CreateEphemeralPermission<'a> {
         ]
         .concat();
 
-        Instruction {
+        Ok(Instruction {
             program_id: self.permission_program,
             accounts,
             data,
-        }
+        })
     }
 }
 
@@ -70,7 +70,7 @@ impl<'a> CreateEphemeralPermissionCpi<'a> {
             permission_program: *self.permission_program.key,
             args: &self.args,
         }
-        .instruction();
+        .instruction()?;
 
         invoke_signed(
             &ix,
