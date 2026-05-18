@@ -226,6 +226,53 @@ fn extract_bare_field<'a>(expr: &Expr, field_names: &'a [Ident]) -> Option<&'a I
 
 // ==================== Code Generation ====================
 
+fn unchecked_account_type() -> TokenStream2 {
+    if cfg!(feature = "backward-compat") {
+        quote! { AccountInfo<'info> }
+    } else {
+        quote! { UncheckedAccount<'info> }
+    }
+}
+
+fn is_account_info_type(ty: &Type) -> bool {
+    matches!(ty, Type::Path(type_path) if type_path
+        .path
+        .segments
+        .last()
+        .is_some_and(|segment| segment.ident == "AccountInfo"))
+}
+
+fn is_option_account_info_type(ty: &Type) -> bool {
+    let Type::Path(type_path) = ty else {
+        return false;
+    };
+    let Some(segment) = type_path.path.segments.last() else {
+        return false;
+    };
+    if segment.ident != "Option" {
+        return false;
+    }
+    let syn::PathArguments::AngleBracketed(args) = &segment.arguments else {
+        return false;
+    };
+    args.args
+        .iter()
+        .any(|arg| matches!(arg, syn::GenericArgument::Type(inner) if is_account_info_type(inner)))
+}
+
+fn modernize_account_info_type(ty: &Type) -> Type {
+    if cfg!(feature = "backward-compat") {
+        return ty.clone();
+    }
+    if is_account_info_type(ty) {
+        syn::parse_quote! { UncheckedAccount<'info> }
+    } else if is_option_account_info_type(ty) {
+        syn::parse_quote! { Option<UncheckedAccount<'info>> }
+    } else {
+        ty.clone()
+    }
+}
+
 /// Generates PDA signer seeds computation with bump derivation.
 ///
 /// Assumes `crate::id()` as the program owner for `find_program_address`.
@@ -574,12 +621,13 @@ pub fn ephemeral_accounts(_attr: TokenStream, item: TokenStream) -> TokenStream 
     let original_attrs = &input.attrs;
     let sponsor = ctx.sponsor.as_ref();
 
+    let unchecked_account = unchecked_account_type();
     let mut new_fields = Vec::new();
     let mut methods = Vec::new();
 
     for field in input.fields.iter() {
         let name = field.ident.as_ref().unwrap();
-        let ty = &field.ty;
+        let ty = modernize_account_info_type(&field.ty);
         let mut attrs = field.attrs.clone();
 
         let is_eph = has_marker(field, MARKER_EPH);
@@ -620,7 +668,7 @@ pub fn ephemeral_accounts(_attr: TokenStream, item: TokenStream) -> TokenStream 
             new_fields.push(quote! {
                 /// CHECK: Ephemeral rent vault
                 #[account(mut, address = ephemeral_rollups_sdk::consts::EPHEMERAL_VAULT_ID)]
-                pub vault: AccountInfo<'info>,
+                pub vault: #unchecked_account,
             });
         }
         if !ctx.has_magic_program {

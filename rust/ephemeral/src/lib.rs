@@ -106,7 +106,16 @@ fn modify_component_module(mut module: ItemMod) -> ItemMod {
 }
 
 /// Generates the undelegate function and struct.
+fn unchecked_account_type() -> TokenStream2 {
+    if cfg!(feature = "backward-compat") {
+        quote! { AccountInfo<'info> }
+    } else {
+        quote! { UncheckedAccount<'info> }
+    }
+}
+
 fn generate_undelegate() -> (TokenStream2, TokenStream2, TokenStream2) {
+    let unchecked_account = unchecked_account_type();
     (
         quote! {
             use ephemeral_rollups_sdk::cpi::undelegate_account;
@@ -114,18 +123,16 @@ fn generate_undelegate() -> (TokenStream2, TokenStream2, TokenStream2) {
         quote! {
             #[automatically_derived]
             pub fn process_undelegation(ctx: Context<InitializeAfterUndelegation>, account_seeds: Vec<Vec<u8>>) -> Result<()> {
-                let [delegated_account, buffer, payer, system_program] = [
-                    &ctx.accounts.base_account,
-                    &ctx.accounts.buffer,
-                    &ctx.accounts.payer,
-                    &ctx.accounts.system_program,
-                ];
+                let delegated_account = anchor_lang::ToAccountInfo::to_account_info(&ctx.accounts.base_account);
+                let buffer = anchor_lang::ToAccountInfo::to_account_info(&ctx.accounts.buffer);
+                let payer = anchor_lang::ToAccountInfo::to_account_info(&ctx.accounts.payer);
+                let system_program = anchor_lang::ToAccountInfo::to_account_info(&ctx.accounts.system_program);
                 undelegate_account(
-                    delegated_account,
+                    &delegated_account,
                     &id(),
-                    buffer,
-                    payer,
-                    system_program,
+                    &buffer,
+                    &payer,
+                    &system_program,
                     account_seeds,
                 )?;
                 Ok(())
@@ -137,15 +144,15 @@ fn generate_undelegate() -> (TokenStream2, TokenStream2, TokenStream2) {
                 pub struct InitializeAfterUndelegation<'info> {
                 /// CHECK:`
                 #[account(mut)]
-                pub base_account: AccountInfo<'info>,
+                pub base_account: #unchecked_account,
                 /// CHECK:`
                 #[account()]
-                pub buffer: AccountInfo<'info>,
+                pub buffer: #unchecked_account,
                 /// CHECK:`
                 #[account(mut)]
-                pub payer: AccountInfo<'info>,
+                pub payer: #unchecked_account,
                 /// CHECK:`
-                pub system_program: AccountInfo<'info>,
+                pub system_program: #unchecked_account,
             }
         },
     )
