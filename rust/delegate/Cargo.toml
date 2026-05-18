@@ -10,6 +10,7 @@ edition = { workspace = true }
 
 [features]
 default = []
+backward-compat = []
 
 [lib]
 proc-macro = true

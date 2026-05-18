@@ -1,8 +1,17 @@
 extern crate proc_macro;
 use proc_macro::TokenStream;
+use proc_macro2::TokenStream as TokenStream2;
 use quote::quote;
 use syn::parse::Parser;
 use syn::{parse_macro_input, Field, Fields, ItemStruct};
+
+fn generated_unchecked_account_type() -> TokenStream2 {
+    if cfg!(feature = "backward-compat") {
+        quote! { AccountInfo<'info> }
+    } else {
+        quote! { UncheckedAccount<'info> }
+    }
+}
 
 #[proc_macro_attribute]
 pub fn commit(_attr: TokenStream, item: TokenStream) -> TokenStream {
@@ -10,6 +19,7 @@ pub fn commit(_attr: TokenStream, item: TokenStream) -> TokenStream {
 
     let name = &input.ident;
     let attrs = &input.attrs; // Capture all attributes
+    let unchecked_account = generated_unchecked_account_type();
     let expanded = if let Fields::Named(fields_named) = &input.fields {
         let mut has_magic_program = false;
         let mut has_magic_context = false;
@@ -42,7 +52,7 @@ pub fn commit(_attr: TokenStream, item: TokenStream) -> TokenStream {
                     .parse2(quote! {
                         #[account(mut, address = ephemeral_rollups_sdk::consts::MAGIC_CONTEXT_ID)]
                         /// CHECK:`
-                        pub magic_context: AccountInfo<'info>
+                        pub magic_context: #unchecked_account
                     })
                     .unwrap(),
             );

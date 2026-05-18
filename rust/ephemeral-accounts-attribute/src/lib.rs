@@ -12,6 +12,14 @@ const ATTR_ACCOUNT: &str = "account";
 const ATTR_SEEDS: &str = "seeds";
 const ATTR_INIT: &str = "init";
 
+fn generated_unchecked_account_type() -> TokenStream2 {
+    if cfg!(feature = "backward-compat") {
+        quote! { AccountInfo<'info> }
+    } else {
+        quote! { UncheckedAccount<'info> }
+    }
+}
+
 // ==================== Parsing Helpers ====================
 
 /// Returns the `#[account(...)]` attribute's inner tokens as a string.
@@ -573,6 +581,7 @@ pub fn ephemeral_accounts(_attr: TokenStream, item: TokenStream) -> TokenStream 
     let struct_name = &input.ident;
     let original_attrs = &input.attrs;
     let sponsor = ctx.sponsor.as_ref();
+    let unchecked_account = generated_unchecked_account_type();
 
     let mut new_fields = Vec::new();
     let mut methods = Vec::new();
@@ -620,7 +629,7 @@ pub fn ephemeral_accounts(_attr: TokenStream, item: TokenStream) -> TokenStream 
             new_fields.push(quote! {
                 /// CHECK: Ephemeral rent vault
                 #[account(mut, address = ephemeral_rollups_sdk::consts::EPHEMERAL_VAULT_ID)]
-                pub vault: AccountInfo<'info>,
+                pub vault: #unchecked_account,
             });
         }
         if !ctx.has_magic_program {
