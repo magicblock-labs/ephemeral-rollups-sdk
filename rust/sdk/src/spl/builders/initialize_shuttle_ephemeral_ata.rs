@@ -1,6 +1,6 @@
 use crate::{
+    compat,
     consts::{ASSOCIATED_TOKEN_PROGRAM_ID, ESPL_TOKEN_PROGRAM_ID, TOKEN_PROGRAM_ID},
-    solana_compat::solana::{system_program, AccountMeta, Instruction, Pubkey},
     spl::{
         find_shuttle_ata, find_shuttle_ephemeral_ata, find_shuttle_wallet_ata,
         EphemeralSplDiscriminator,
@@ -8,15 +8,15 @@ use crate::{
 };
 
 pub struct InitializeShuttleEphemeralAtaBuilder {
-    pub payer: Pubkey,
-    pub owner: Pubkey,
-    pub mint: Pubkey,
+    pub payer: compat::Pubkey,
+    pub owner: compat::Pubkey,
+    pub mint: compat::Pubkey,
     pub shuttle_id: u32,
 }
 
 impl InitializeShuttleEphemeralAtaBuilder {
     #[inline(always)]
-    pub fn instruction(&self) -> Instruction {
+    pub fn instruction(&self) -> compat::Instruction {
         let (shuttle_ephemeral_ata, _shuttle_bump) =
             find_shuttle_ephemeral_ata(&self.owner, &self.mint, self.shuttle_id);
         let (shuttle_ata, _shuttle_ata_bump) = find_shuttle_ata(&shuttle_ephemeral_ata, &self.mint);
@@ -26,18 +26,21 @@ impl InitializeShuttleEphemeralAtaBuilder {
         data.push(EphemeralSplDiscriminator::InitializeShuttleEphemeralAta as u8);
         data.extend_from_slice(&self.shuttle_id.to_le_bytes());
 
-        Instruction {
+        compat::Instruction {
             program_id: ESPL_TOKEN_PROGRAM_ID,
             accounts: vec![
-                AccountMeta::new(self.payer, true),
-                AccountMeta::new(shuttle_ephemeral_ata, false),
-                AccountMeta::new(shuttle_ata, false),
-                AccountMeta::new(shuttle_wallet_ata, false),
-                AccountMeta::new_readonly(self.owner, false),
-                AccountMeta::new_readonly(self.mint, false),
-                AccountMeta::new_readonly(TOKEN_PROGRAM_ID, false),
-                AccountMeta::new_readonly(ASSOCIATED_TOKEN_PROGRAM_ID, false),
-                AccountMeta::new_readonly(system_program::id(), false),
+                compat::AccountMeta::new(self.payer, true),
+                compat::AccountMeta::new(shuttle_ephemeral_ata, false),
+                compat::AccountMeta::new(shuttle_ata, false),
+                compat::AccountMeta::new(shuttle_wallet_ata, false),
+                compat::AccountMeta::new_readonly(self.owner, false),
+                compat::AccountMeta::new_readonly(self.mint, false),
+                compat::AccountMeta::new_readonly(TOKEN_PROGRAM_ID, false),
+                compat::AccountMeta::new_readonly(ASSOCIATED_TOKEN_PROGRAM_ID, false),
+                compat::AccountMeta::new_readonly(
+                    compat::Pubkey::new_from_array(solana_system_interface::program::ID.to_bytes()),
+                    false,
+                ),
             ],
             data,
         }

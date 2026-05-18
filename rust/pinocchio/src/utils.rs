@@ -191,7 +191,8 @@ pub fn serialize_delegate_with_actions_data(
     let args = DelegateWithActionsArgs { delegate, actions };
 
     let mut data = DlpDiscriminator::DelegateWithActions.to_vec();
-    let payload = borsh::to_vec(&args).map_err(|_| ProgramError::InvalidInstructionData)?;
+    let payload =
+        dlp_api::compat::borsh::to_vec(&args).map_err(|_| ProgramError::InvalidInstructionData)?;
     data.extend_from_slice(&payload);
     Ok(data)
 }

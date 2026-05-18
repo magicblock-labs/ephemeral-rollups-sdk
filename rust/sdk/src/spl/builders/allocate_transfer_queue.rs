@@ -1,21 +1,20 @@
-use crate::{
-    consts::ESPL_TOKEN_PROGRAM_ID,
-    solana_compat::solana::{system_program, AccountMeta, Instruction, Pubkey},
-    spl::EphemeralSplDiscriminator,
-};
+use crate::{compat, consts::ESPL_TOKEN_PROGRAM_ID, spl::EphemeralSplDiscriminator};
 
 pub struct AllocateTransferQueueBuilder {
-    pub queue: Pubkey,
+    pub queue: compat::Pubkey,
 }
 
 impl AllocateTransferQueueBuilder {
     #[inline(always)]
-    pub fn instruction(&self) -> Instruction {
-        Instruction {
+    pub fn instruction(&self) -> compat::Instruction {
+        compat::Instruction {
             program_id: ESPL_TOKEN_PROGRAM_ID,
             accounts: vec![
-                AccountMeta::new(self.queue, false),
-                AccountMeta::new_readonly(system_program::id(), false),
+                compat::AccountMeta::new(self.queue, false),
+                compat::AccountMeta::new_readonly(
+                    compat::Pubkey::new_from_array(solana_system_interface::program::ID.to_bytes()),
+                    false,
+                ),
             ],
             data: vec![EphemeralSplDiscriminator::AllocateTransferQueue as u8],
         }

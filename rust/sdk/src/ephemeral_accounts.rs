@@ -40,10 +40,14 @@
 //! ```
 
 use crate::{
+    compat::{self, AsModern, Compat, Modern},
     consts::MAGIC_PROGRAM_ID,
-    solana_compat::solana::{invoke_signed, AccountInfo, AccountMeta, Instruction, ProgramResult},
 };
 use magicblock_magic_program_api::{instruction::MagicBlockInstruction, EPHEMERAL_RENT_PER_BYTE};
+use solana_program::{
+    instruction::{AccountMeta, Instruction},
+    program::invoke_signed,
+};
 
 /// Account overhead in bytes (static account size in accountsdb).
 const ACCOUNT_OVERHEAD: u32 = 60;
@@ -77,9 +81,9 @@ pub const fn rent(data_len: u32) -> u64 {
 ///
 /// Use [`crate::consts::EPHEMERAL_VAULT_ID`] when setting up your account structs.
 pub struct EphemeralAccount<'a, 'info> {
-    sponsor: &'a AccountInfo<'info>,
-    ephemeral: &'a AccountInfo<'info>,
-    vault: &'a AccountInfo<'info>,
+    sponsor: &'a compat::AccountInfo<'info>,
+    ephemeral: &'a compat::AccountInfo<'info>,
+    vault: &'a compat::AccountInfo<'info>,
     signer_seeds: &'a [&'a [&'a [u8]]],
 }
 
@@ -92,9 +96,9 @@ impl<'a, 'info> EphemeralAccount<'a, 'info> {
     /// * `ephemeral` - Account to create/modify (must be signer only on create)
     /// * `vault` - Rent vault ([`crate::consts::EPHEMERAL_VAULT_ID`])
     pub fn new(
-        sponsor: &'a AccountInfo<'info>,
-        ephemeral: &'a AccountInfo<'info>,
-        vault: &'a AccountInfo<'info>,
+        sponsor: &'a compat::AccountInfo<'info>,
+        ephemeral: &'a compat::AccountInfo<'info>,
+        vault: &'a compat::AccountInfo<'info>,
     ) -> Self {
         Self {
             sponsor,
@@ -120,7 +124,7 @@ impl<'a, 'info> EphemeralAccount<'a, 'info> {
     ///
     /// **Note:** Ephemeral account must be a signer to prevent pubkey squatting.
     /// Provide seeds via [`Self::with_signer_seeds`] if ephemeral is a PDA.
-    pub fn create(&self, data_len: u32) -> ProgramResult {
+    pub fn create(&self, data_len: u32) -> compat::ProgramResult {
         self.invoke(
             MagicBlockInstruction::CreateEphemeralAccount { data_len },
             true, // ephemeral must sign on create
@@ -131,7 +135,7 @@ impl<'a, 'info> EphemeralAccount<'a, 'info> {
     ///
     /// Growing: sponsor pays additional rent to vault.
     /// Shrinking: vault refunds excess rent to sponsor.
-    pub fn resize(&self, new_data_len: u32) -> ProgramResult {
+    pub fn resize(&self, new_data_len: u32) -> compat::ProgramResult {
         self.invoke(
             MagicBlockInstruction::ResizeEphemeralAccount { new_data_len },
             false,
@@ -141,7 +145,7 @@ impl<'a, 'info> EphemeralAccount<'a, 'info> {
     /// Closes an ephemeral account.
     ///
     /// All rent is refunded from vault to sponsor.
-    pub fn close(&self) -> ProgramResult {
+    pub fn close(&self) -> compat::ProgramResult {
         self.invoke(MagicBlockInstruction::CloseEphemeralAccount, false)
     }
 
@@ -149,25 +153,26 @@ impl<'a, 'info> EphemeralAccount<'a, 'info> {
         &self,
         instruction: MagicBlockInstruction,
         ephemeral_is_signer: bool,
-    ) -> ProgramResult {
+    ) -> compat::ProgramResult {
         let ix = Instruction::new_with_bincode(
-            MAGIC_PROGRAM_ID,
+            *MAGIC_PROGRAM_ID.as_modern(),
             &instruction,
             vec![
-                AccountMeta::new(*self.sponsor.key, true),
-                AccountMeta::new(*self.ephemeral.key, ephemeral_is_signer),
-                AccountMeta::new(*self.vault.key, false),
+                AccountMeta::new(*self.sponsor.key.as_modern(), true),
+                AccountMeta::new(*self.ephemeral.key.as_modern(), ephemeral_is_signer),
+                AccountMeta::new(*self.vault.key.as_modern(), false),
             ],
         );
 
         invoke_signed(
             &ix,
             &[
-                self.sponsor.clone(),
-                self.ephemeral.clone(),
-                self.vault.clone(),
+                self.sponsor.modern(),
+                self.ephemeral.modern(),
+                self.vault.modern(),
             ],
             self.signer_seeds,
         )
+        .compat()
     }
 }

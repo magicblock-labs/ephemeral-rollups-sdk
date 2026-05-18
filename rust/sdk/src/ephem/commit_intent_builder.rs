@@ -1,9 +1,9 @@
+use crate::compat;
 use crate::ephem::action_builder::ActionBuilder;
 use crate::ephem::{
     ActionCallback, CallHandler, CommitType, FoldableIntentBuilder, MagicIntent,
     MagicIntentBundleBuilder,
 };
-use crate::solana_compat::solana::AccountInfo;
 
 /// Builder of Commit Intent.
 ///
@@ -11,7 +11,7 @@ use crate::solana_compat::solana::AccountInfo;
 /// and returns it (or a sibling sub-builder) on every transition/terminal call.
 pub struct CommitIntentBuilder<'info> {
     pub(in crate::ephem) parent: MagicIntentBundleBuilder<'info>,
-    pub(in crate::ephem) accounts: Vec<AccountInfo<'info>>,
+    pub(in crate::ephem) accounts: Vec<compat::AccountInfo<'info>>,
     pub(in crate::ephem) actions: Vec<CallHandler<'info>>,
     pub(in crate::ephem) callbacks: Vec<Option<ActionCallback>>,
 }

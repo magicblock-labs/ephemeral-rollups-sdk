@@ -13,7 +13,7 @@ env:
   rust_version: 1.93.1
   node_version: 23
   anchor_version: 0.31.1
-  solana_version: v2.2.20
+  solana_version: v3.1.10
 
 jobs:
   install:
@@ -61,6 +61,11 @@ jobs:
         run: |
           cargo build
           cargo test
+
+      - name: build all sensible features combinations
+        working-directory: rust/sdk
+        run: |
+          ./scripts/test-combinations.sh --no-color
 
       - name: npm run build and test kit
         working-directory: ts/kit

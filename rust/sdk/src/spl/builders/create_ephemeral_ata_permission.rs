@@ -1,32 +1,35 @@
 use crate::{
     access_control::structs::Permission,
+    compat,
     consts::{ESPL_TOKEN_PROGRAM_ID, PERMISSION_PROGRAM_ID},
-    solana_compat::solana::{system_program, AccountMeta, Instruction, Pubkey},
     spl::{EphemeralAta, EphemeralSplDiscriminator},
 };
 
 /// For details on the flag byte, see the [MemberFlags](`crate::access_control::structs::Member`) struct.
 pub struct CreateEphemeralAtaPermissionBuilder {
-    pub payer: Pubkey,
-    pub user: Pubkey,
-    pub mint: Pubkey,
+    pub payer: compat::Pubkey,
+    pub user: compat::Pubkey,
+    pub mint: compat::Pubkey,
     pub flag_byte: u8,
 }
 
 impl CreateEphemeralAtaPermissionBuilder {
     #[inline(always)]
-    pub fn instruction(&self) -> Instruction {
+    pub fn instruction(&self) -> compat::Instruction {
         let (eata, _eata_bump) = EphemeralAta::find_pda(&self.user, &self.mint);
         let (permission, _permission_bump) = Permission::find_pda(&eata);
 
-        Instruction {
+        compat::Instruction {
             program_id: ESPL_TOKEN_PROGRAM_ID,
             accounts: vec![
-                AccountMeta::new(eata, false),
-                AccountMeta::new(permission, false),
-                AccountMeta::new(self.payer, true),
-                AccountMeta::new_readonly(system_program::id(), false),
-                AccountMeta::new_readonly(PERMISSION_PROGRAM_ID, false),
+                compat::AccountMeta::new(eata, false),
+                compat::AccountMeta::new(permission, false),
+                compat::AccountMeta::new(self.payer, true),
+                compat::AccountMeta::new_readonly(
+                    compat::Pubkey::new_from_array(solana_system_interface::program::ID.to_bytes()),
+                    false,
+                ),
+                compat::AccountMeta::new_readonly(PERMISSION_PROGRAM_ID, false),
             ],
             data: vec![
                 EphemeralSplDiscriminator::CreateEphemeralAtaPermission as u8,

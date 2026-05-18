@@ -1,62 +1,65 @@
 use crate::{
+    compat::{self, Compat, Modern},
     consts::ESPL_TOKEN_PROGRAM_ID,
-    solana_compat::solana::{
-        invoke, invoke_signed, AccountInfo, AccountMeta, Instruction, ProgramResult,
-    },
     spl::EphemeralSplDiscriminator,
 };
+use solana_program::program::{invoke, invoke_signed};
 
 /// Create an initialize ephemeral ATA instruction.
 pub struct InitializeEphemeralAta<'a> {
-    pub payer: AccountInfo<'a>,
-    pub eata: AccountInfo<'a>,
-    pub user: AccountInfo<'a>,
-    pub mint: AccountInfo<'a>,
-    pub system_program: AccountInfo<'a>,
+    pub payer: compat::AccountInfo<'a>,
+    pub eata: compat::AccountInfo<'a>,
+    pub user: compat::AccountInfo<'a>,
+    pub mint: compat::AccountInfo<'a>,
+    pub system_program: compat::AccountInfo<'a>,
 }
 
 impl<'a> InitializeEphemeralAta<'a> {
     #[inline(always)]
-    pub fn instruction(&self) -> Instruction {
-        Instruction {
+    pub fn instruction(&self) -> compat::Instruction {
+        compat::Instruction {
             program_id: ESPL_TOKEN_PROGRAM_ID,
             accounts: vec![
-                AccountMeta::new(*self.eata.key, false),
-                AccountMeta::new(*self.payer.key, false),
-                AccountMeta::new_readonly(*self.user.key, false),
-                AccountMeta::new_readonly(*self.mint.key, false),
-                AccountMeta::new_readonly(*self.system_program.key, false),
+                compat::AccountMeta::new(*self.eata.key, false),
+                compat::AccountMeta::new(*self.payer.key, false),
+                compat::AccountMeta::new_readonly(*self.user.key, false),
+                compat::AccountMeta::new_readonly(*self.mint.key, false),
+                compat::AccountMeta::new_readonly(*self.system_program.key, false),
             ],
             data: vec![EphemeralSplDiscriminator::InitializeEphemeralAta as u8],
         }
     }
 
     #[inline(always)]
-    pub fn invoke(&self) -> ProgramResult {
+    pub fn invoke(&self) -> compat::ProgramResult {
         invoke(
-            &self.instruction(),
+            &self.instruction().modern(),
             &[
                 self.eata.clone(),
                 self.payer.clone(),
                 self.user.clone(),
                 self.mint.clone(),
                 self.system_program.clone(),
-            ],
+            ]
+            .modern(),
         )
+        .compat()
     }
 
     #[inline(always)]
-    pub fn invoke_signed(&self, signers_seeds: &[&[&[u8]]]) -> ProgramResult {
+    pub fn invoke_signed(&self, signers_seeds: &[&[&[u8]]]) -> compat::ProgramResult {
         invoke_signed(
-            &self.instruction(),
+            &self.instruction().modern(),
             &[
                 self.eata.clone(),
                 self.payer.clone(),
                 self.user.clone(),
                 self.mint.clone(),
                 self.system_program.clone(),
-            ],
+            ]
+            .modern(),
             signers_seeds,
         )
+        .compat()
     }
 }

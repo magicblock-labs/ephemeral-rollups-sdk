@@ -1,48 +1,47 @@
 use crate::{
+    compat::{self, Compat, Modern},
     consts::ESPL_TOKEN_PROGRAM_ID,
-    solana_compat::solana::{
-        invoke, invoke_signed, AccountInfo, AccountMeta, Instruction, ProgramResult,
-    },
     spl::EphemeralSplDiscriminator,
 };
+use solana_program::program::{invoke, invoke_signed};
 
 /// Deposit SPL tokens into an ephemeral ATA.
 pub struct DepositSplTokens<'a> {
-    pub authority: AccountInfo<'a>,
-    pub eata: AccountInfo<'a>,
-    pub vault: AccountInfo<'a>,
-    pub mint: AccountInfo<'a>,
-    pub user_source_token_acc: AccountInfo<'a>,
-    pub vault_token_acc: AccountInfo<'a>,
-    pub token_program: AccountInfo<'a>,
+    pub authority: compat::AccountInfo<'a>,
+    pub eata: compat::AccountInfo<'a>,
+    pub vault: compat::AccountInfo<'a>,
+    pub mint: compat::AccountInfo<'a>,
+    pub user_source_token_acc: compat::AccountInfo<'a>,
+    pub vault_token_acc: compat::AccountInfo<'a>,
+    pub token_program: compat::AccountInfo<'a>,
     pub amount: u64,
 }
 
 impl<'a> DepositSplTokens<'a> {
     #[inline(always)]
-    pub fn instruction(&self) -> Instruction {
+    pub fn instruction(&self) -> compat::Instruction {
         let mut data = Vec::with_capacity(9);
         data.push(EphemeralSplDiscriminator::DepositSplTokens as u8);
         data.extend_from_slice(self.amount.to_le_bytes().as_ref());
-        Instruction {
+        compat::Instruction {
             program_id: ESPL_TOKEN_PROGRAM_ID,
             accounts: vec![
-                AccountMeta::new(*self.eata.key, false),
-                AccountMeta::new_readonly(*self.vault.key, false),
-                AccountMeta::new_readonly(*self.mint.key, false),
-                AccountMeta::new(*self.user_source_token_acc.key, false),
-                AccountMeta::new(*self.vault_token_acc.key, false),
-                AccountMeta::new_readonly(*self.authority.key, true),
-                AccountMeta::new_readonly(*self.token_program.key, false),
+                compat::AccountMeta::new(*self.eata.key, false),
+                compat::AccountMeta::new_readonly(*self.vault.key, false),
+                compat::AccountMeta::new_readonly(*self.mint.key, false),
+                compat::AccountMeta::new(*self.user_source_token_acc.key, false),
+                compat::AccountMeta::new(*self.vault_token_acc.key, false),
+                compat::AccountMeta::new_readonly(*self.authority.key, true),
+                compat::AccountMeta::new_readonly(*self.token_program.key, false),
             ],
             data,
         }
     }
 
     #[inline(always)]
-    pub fn invoke(&self) -> ProgramResult {
+    pub fn invoke(&self) -> compat::ProgramResult {
         invoke(
-            &self.instruction(),
+            &self.instruction().modern(),
             &[
                 self.eata.clone(),
                 self.vault.clone(),
@@ -51,14 +50,16 @@ impl<'a> DepositSplTokens<'a> {
                 self.vault_token_acc.clone(),
                 self.authority.clone(),
                 self.token_program.clone(),
-            ],
+            ]
+            .modern(),
         )
+        .compat()
     }
 
     #[inline(always)]
-    pub fn invoke_signed(&self, signers_seeds: &[&[&[u8]]]) -> ProgramResult {
+    pub fn invoke_signed(&self, signers_seeds: &[&[&[u8]]]) -> compat::ProgramResult {
         invoke_signed(
-            &self.instruction(),
+            &self.instruction().modern(),
             &[
                 self.eata.clone(),
                 self.vault.clone(),
@@ -67,8 +68,10 @@ impl<'a> DepositSplTokens<'a> {
                 self.vault_token_acc.clone(),
                 self.authority.clone(),
                 self.token_program.clone(),
-            ],
+            ]
+            .modern(),
             signers_seeds,
         )
+        .compat()
     }
 }

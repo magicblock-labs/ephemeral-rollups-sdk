@@ -1,5 +1,6 @@
 #![allow(deprecated)]
 
+use crate::compat::{self, AsModern, Compat, Modern};
 pub use crate::ephem::deprecated::v0::{
     commit_accounts, commit_and_undelegate_accounts, commit_finalize_accounts,
     commit_finalize_and_undelegate_accounts, create_finalize_schedule_commit_ix,
@@ -10,14 +11,13 @@ pub use crate::ephem::deprecated::v1::{
     ActionCallback, CallHandler, CommitAndUndelegate, CommitType, MagicAction,
     MagicInstructionBuilder, UndelegateType,
 };
-use crate::solana_compat::solana::{
-    invoke, invoke_signed, AccountInfo, AccountMeta, Instruction, ProgramResult, Pubkey,
-};
 pub use cau_intent_builder::{CommitAndUndelegateIntentBuilder, FoldableCauIntentBuilder};
 pub use commit_intent_builder::{CommitIntentBuilder, FoldableCommitIntentBuilder};
 use magicblock_magic_program_api::args::MagicIntentBundleArgs;
 use magicblock_magic_program_api::instruction::MagicBlockInstruction;
 pub use magicblock_magic_program_api::response::MagicResponse;
+use solana_program::instruction::{AccountMeta, Instruction};
+use solana_program::program::{invoke, invoke_signed};
 use std::collections::HashMap;
 
 pub mod action_builder;
@@ -48,30 +48,34 @@ pub enum MagicIntent<'info> {
 /// that must be invoked after it. Call [`invoke`](IntentInstructions::invoke) to execute
 /// all of them in order, or inspect the fields to drive the CPIs yourself.
 pub struct IntentInstructions<'info> {
-    pub schedule_intent_ix: (Vec<AccountInfo<'info>>, Instruction),
-    pub add_callback_ixs: Vec<(Vec<AccountInfo<'info>>, Instruction)>,
+    pub schedule_intent_ix: (Vec<compat::AccountInfo<'info>>, compat::Instruction),
+    pub add_callback_ixs: Vec<(Vec<compat::AccountInfo<'info>>, compat::Instruction)>,
 }
 
 impl<'info> IntentInstructions<'info> {
     /// Invokes `ScheduleIntentBundle` followed by each `AddActionCallback` in order.
-    pub fn invoke(self) -> ProgramResult {
+    pub fn invoke(self) -> compat::ProgramResult {
         let (accounts, ix) = self.schedule_intent_ix;
-        invoke(&ix, &accounts)?;
+        invoke(&ix.modern(), &accounts.modern()).compat()?;
 
         self.add_callback_ixs
             .into_iter()
-            .try_for_each(|(accounts, ix)| invoke(&ix, &accounts))
+            .try_for_each(|(accounts, ix)| invoke(&ix.modern(), &accounts.modern()))
+            .compat()
     }
 
     /// Signed variant of [`Self::invoke`]: uses `invoke_signed` with the provided
     /// PDA seeds for both the `ScheduleIntentBundle` and every `AddActionCallback`.
-    pub fn invoke_signed(self, signers_seeds: &[&[&[u8]]]) -> ProgramResult {
+    pub fn invoke_signed(self, signers_seeds: &[&[&[u8]]]) -> compat::ProgramResult {
         let (accounts, ix) = self.schedule_intent_ix;
-        invoke_signed(&ix, &accounts, signers_seeds)?;
+        invoke_signed(&ix.modern(), &accounts.modern(), signers_seeds).compat()?;
 
         self.add_callback_ixs
             .into_iter()
-            .try_for_each(|(accounts, ix)| invoke_signed(&ix, &accounts, signers_seeds))
+            .try_for_each(|(accounts, ix)| {
+                invoke_signed(&ix.modern(), &accounts.modern(), signers_seeds)
+            })
+            .compat()
     }
 }
 
@@ -79,18 +83,18 @@ impl<'info> IntentInstructions<'info> {
 /// multiple independent intents (base actions, commits, commit+undelegate), normalizing them,
 /// and producing a deduplicated account list plus the corresponding CPI `Instruction`.
 pub struct MagicIntentBundleBuilder<'info> {
-    payer: AccountInfo<'info>,
-    magic_context: AccountInfo<'info>,
-    magic_program: AccountInfo<'info>,
-    magic_fee_vault: Option<AccountInfo<'info>>,
+    payer: compat::AccountInfo<'info>,
+    magic_context: compat::AccountInfo<'info>,
+    magic_program: compat::AccountInfo<'info>,
+    magic_fee_vault: Option<compat::AccountInfo<'info>>,
     intent_bundle: MagicIntentBundle<'info>,
 }
 
 impl<'info> MagicIntentBundleBuilder<'info> {
     pub fn new(
-        payer: AccountInfo<'info>,
-        magic_context: AccountInfo<'info>,
-        magic_program: AccountInfo<'info>,
+        payer: compat::AccountInfo<'info>,
+        magic_context: compat::AccountInfo<'info>,
+        magic_program: compat::AccountInfo<'info>,
     ) -> Self {
         Self {
             payer,
@@ -103,7 +107,7 @@ impl<'info> MagicIntentBundleBuilder<'info> {
 
     /// Sets an optional magic fee vault account to be passed at index 2
     /// (right after payer and magic_context). Required when the payer is delegated.
-    pub fn magic_fee_vault(mut self, vault: AccountInfo<'info>) -> Self {
+    pub fn magic_fee_vault(mut self, vault: compat::AccountInfo<'info>) -> Self {
         self.magic_fee_vault = Some(vault);
         self
     }
@@ -112,7 +116,7 @@ impl<'info> MagicIntentBundleBuilder<'info> {
     ///
     /// The returned builder lets you chain `.add_post_commit_actions()`, transition to other
     /// intents via `.commit_and_undelegate()`, or finalize via `.build()` / `.build_and_invoke()`.
-    pub fn commit(self, accounts: &[AccountInfo<'info>]) -> CommitIntentBuilder<'info> {
+    pub fn commit(self, accounts: &[compat::AccountInfo<'info>]) -> CommitIntentBuilder<'info> {
         CommitIntentBuilder {
             parent: self,
             accounts: accounts.to_vec(),
@@ -129,7 +133,7 @@ impl<'info> MagicIntentBundleBuilder<'info> {
     /// or finalize via `.build()` / `.build_and_invoke()`.
     pub fn commit_and_undelegate(
         self,
-        accounts: &[AccountInfo<'info>],
+        accounts: &[compat::AccountInfo<'info>],
     ) -> CommitAndUndelegateIntentBuilder<'info> {
         CommitAndUndelegateIntentBuilder {
             parent: self,
@@ -174,7 +178,9 @@ impl<'info> MagicIntentBundleBuilder<'info> {
         })
     }
 
-    fn build_callback_ixs(&mut self) -> Vec<(Vec<AccountInfo<'info>>, Instruction)> {
+    fn build_callback_ixs(
+        &mut self,
+    ) -> Vec<(Vec<compat::AccountInfo<'info>>, compat::Instruction)> {
         let callbacks = self.intent_bundle.extract_callbacks();
         if callbacks.is_empty() {
             return vec![];
@@ -185,12 +191,12 @@ impl<'info> MagicIntentBundleBuilder<'info> {
             .map(|(action_index, callback)| {
                 let args = callback.into_args(action_index);
                 let payer_meta = AccountMeta {
-                    pubkey: *self.payer.key,
+                    pubkey: *self.payer.key.as_modern(),
                     is_signer: true,
                     is_writable: true,
                 };
                 let ctx_meta = AccountMeta {
-                    pubkey: *self.magic_context.key,
+                    pubkey: *self.magic_context.key.as_modern(),
                     is_signer: false,
                     is_writable: true,
                 };
@@ -198,14 +204,15 @@ impl<'info> MagicIntentBundleBuilder<'info> {
                 let mut account_infos = vec![self.payer.clone(), self.magic_context.clone()];
                 if let Some(ref magic_fee_vault) = self.magic_fee_vault {
                     account_infos.push(magic_fee_vault.clone());
-                    accounts.push(AccountMeta::new(*magic_fee_vault.key, false));
+                    accounts.push(AccountMeta::new(*magic_fee_vault.key.as_modern(), false));
                 };
 
                 let ix = Instruction::new_with_bincode(
-                    *self.magic_program.key,
+                    *self.magic_program.key.as_modern(),
                     &MagicBlockInstruction::AddActionCallback(args),
                     accounts,
-                );
+                )
+                .compat();
                 (account_infos, ix)
             })
             .collect()
@@ -229,16 +236,17 @@ impl<'info> MagicIntentBundleBuilder<'info> {
         let metas = all_accounts
             .iter()
             .map(|ai| AccountMeta {
-                pubkey: *ai.key,
+                pubkey: *ai.key.as_modern(),
                 is_signer: ai.is_signer,
                 is_writable: ai.is_writable,
             })
             .collect();
         let schedule_ix = Instruction::new_with_bincode(
-            *self.magic_program.key,
+            *self.magic_program.key.as_modern(),
             &MagicBlockInstruction::ScheduleIntentBundle(args),
             metas,
-        );
+        )
+        .compat();
 
         IntentInstructions {
             schedule_intent_ix: (all_accounts, schedule_ix),
@@ -247,13 +255,13 @@ impl<'info> MagicIntentBundleBuilder<'info> {
     }
 
     /// Convenience wrapper: builds all instructions and invokes them in order.
-    pub fn build_and_invoke(self) -> ProgramResult {
+    pub fn build_and_invoke(self) -> compat::ProgramResult {
         self.build().invoke()
     }
 
     /// Convenience wrapper: builds all instructions and invokes them signed with
     /// the provided PDA seeds.
-    pub fn build_and_invoke_signed(self, signers_seeds: &[&[&[u8]]]) -> ProgramResult {
+    pub fn build_and_invoke_signed(self, signers_seeds: &[&[&[u8]]]) -> compat::ProgramResult {
         self.build().invoke_signed(signers_seeds)
     }
 }
@@ -345,8 +353,8 @@ impl<'info> MagicIntentBundle<'info> {
         out
     }
 
-    /// Consumes the bundle and encodes it into `MagicIntentBundleArgs` using a `Pubkey -> u8` indices map.
-    fn into_args(self, indices_map: &HashMap<Pubkey, u8>) -> MagicIntentBundleArgs {
+    /// Consumes the bundle and encodes it into `MagicIntentBundleArgs` using a `compat::Pubkey -> u8` indices map.
+    fn into_args(self, indices_map: &HashMap<compat::Pubkey, u8>) -> MagicIntentBundleArgs {
         MagicIntentBundleArgs {
             commit: self.commit_intent.map(|c| c.into_args(indices_map)),
 
@@ -371,7 +379,7 @@ impl<'info> MagicIntentBundle<'info> {
     }
 
     /// Collects all accounts referenced by intents in this bundle.
-    fn collect_accounts(&self, all_accounts: &mut Vec<AccountInfo<'info>>) {
+    fn collect_accounts(&self, all_accounts: &mut Vec<compat::AccountInfo<'info>>) {
         for el in &self.standalone_actions {
             el.collect_accounts(all_accounts);
         }
@@ -448,13 +456,13 @@ impl<'info> MagicIntentBundle<'info> {
 pub trait FoldableIntentBuilder<'info>: Sized {
     fn fold_builder(self) -> MagicIntentBundleBuilder<'info>;
 
-    fn commit(self, accounts: &[AccountInfo<'info>]) -> CommitIntentBuilder<'info> {
+    fn commit(self, accounts: &[compat::AccountInfo<'info>]) -> CommitIntentBuilder<'info> {
         self.fold_builder().commit(accounts)
     }
 
     fn commit_and_undelegate(
         self,
-        accounts: &[AccountInfo<'info>],
+        accounts: &[compat::AccountInfo<'info>],
     ) -> CommitAndUndelegateIntentBuilder<'info> {
         self.fold_builder().commit_and_undelegate(accounts)
     }
@@ -485,11 +493,11 @@ pub trait FoldableIntentBuilder<'info>: Sized {
         self.fold_builder().build()
     }
 
-    fn build_and_invoke(self) -> ProgramResult {
+    fn build_and_invoke(self) -> compat::ProgramResult {
         self.fold_builder().build_and_invoke()
     }
 
-    fn build_and_invoke_signed(self, signers_seeds: &[&[&[u8]]]) -> ProgramResult {
+    fn build_and_invoke_signed(self, signers_seeds: &[&[&[u8]]]) -> compat::ProgramResult {
         self.fold_builder().build_and_invoke_signed(signers_seeds)
     }
 }
@@ -497,22 +505,22 @@ pub trait FoldableIntentBuilder<'info>: Sized {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::solana_compat::solana::{AccountInfo, Pubkey};
+    use crate::compat;
     use magicblock_magic_program_api::args::ActionArgs;
     use magicblock_magic_program_api::instruction::MagicBlockInstruction;
     use std::cell::RefCell;
     use std::rc::Rc;
 
-    /// Helper to create a mock AccountInfo for testing
+    /// Helper to create a mock compat::AccountInfo for testing
     fn create_mock_account_info<'a>(
-        key: &'a Pubkey,
+        key: &'a compat::Pubkey,
         lamports: &'a mut u64,
         data: &'a mut [u8],
-        owner: &'a Pubkey,
+        owner: &'a compat::Pubkey,
         is_signer: bool,
         is_writable: bool,
-    ) -> AccountInfo<'a> {
-        AccountInfo {
+    ) -> compat::AccountInfo<'a> {
+        compat::AccountInfo {
             key,
             is_signer,
             is_writable,
@@ -520,11 +528,14 @@ mod tests {
             data: Rc::new(RefCell::new(data)),
             owner,
             executable: false,
+            #[cfg(feature = "backward-compat")]
             rent_epoch: 0,
+            #[cfg(not(feature = "backward-compat"))]
+            _unused: 0,
         }
     }
 
-    fn make_info(acc: &mut TestAccount) -> AccountInfo<'_> {
+    fn make_info(acc: &mut TestAccount) -> compat::AccountInfo<'_> {
         create_mock_account_info(
             &acc.key,
             &mut acc.lamports,
@@ -538,39 +549,39 @@ mod tests {
     /// Helper struct to hold account data for tests
     #[allow(dead_code)]
     struct TestAccount {
-        key: Pubkey,
+        key: compat::Pubkey,
         lamports: u64,
         data: Vec<u8>,
-        owner: Pubkey,
+        owner: compat::Pubkey,
     }
 
     impl TestAccount {
         fn new() -> Self {
             Self {
-                key: Pubkey::new_unique(),
+                key: compat::Pubkey::new_unique(),
                 lamports: 1_000_000,
                 data: vec![0u8; 32],
-                owner: Pubkey::new_unique(),
+                owner: compat::Pubkey::new_unique(),
             }
         }
 
-        fn with_key(key: Pubkey) -> Self {
+        fn with_key(key: compat::Pubkey) -> Self {
             Self {
                 key,
                 lamports: 1_000_000,
                 data: vec![0u8; 32],
-                owner: Pubkey::new_unique(),
+                owner: compat::Pubkey::new_unique(),
             }
         }
     }
 
     /// Helper to create a CallHandler for testing
-    fn create_test_call_handler(escrow_authority: AccountInfo) -> CallHandler {
+    fn create_test_call_handler(escrow_authority: compat::AccountInfo) -> CallHandler {
         CallHandler {
             args: ActionArgs::new(vec![1, 2, 3]),
             compute_units: 100_000,
             escrow_authority,
-            destination_program: Pubkey::new_unique(),
+            destination_program: compat::Pubkey::new_unique(),
             accounts: vec![],
         }
     }
@@ -582,8 +593,8 @@ mod tests {
         payer: &'a mut TestAccount,
         magic_ctx: &'a mut TestAccount,
         magic_prog: &'a mut TestAccount,
-        owner: &'a Pubkey,
-    ) -> (MagicIntentBundleBuilder<'a>, Pubkey) {
+        owner: &'a compat::Pubkey,
+    ) -> (MagicIntentBundleBuilder<'a>, compat::Pubkey) {
         let payer_info = create_mock_account_info(
             &payer.key,
             &mut payer.lamports,
@@ -617,7 +628,7 @@ mod tests {
 
     #[test]
     fn test_fluent_commit_standalone() {
-        let owner = Pubkey::new_unique();
+        let owner = compat::Pubkey::new_unique();
         let mut payer = TestAccount::new();
         let mut magic_ctx = TestAccount::new();
         let mut magic_prog = TestAccount::new();
@@ -654,7 +665,7 @@ mod tests {
 
     #[test]
     fn test_fluent_commit_with_handler() {
-        let owner = Pubkey::new_unique();
+        let owner = compat::Pubkey::new_unique();
         let mut payer = TestAccount::new();
         let mut magic_ctx = TestAccount::new();
         let mut magic_prog = TestAccount::new();
@@ -697,7 +708,7 @@ mod tests {
 
     #[test]
     fn test_fluent_commit_and_undelegate_standalone() {
-        let owner = Pubkey::new_unique();
+        let owner = compat::Pubkey::new_unique();
         let mut payer = TestAccount::new();
         let mut magic_ctx = TestAccount::new();
         let mut magic_prog = TestAccount::new();
@@ -724,7 +735,7 @@ mod tests {
 
     #[test]
     fn test_fluent_commit_and_undelegate_with_actions() {
-        let owner = Pubkey::new_unique();
+        let owner = compat::Pubkey::new_unique();
         let mut payer = TestAccount::new();
         let mut magic_ctx = TestAccount::new();
         let mut magic_prog = TestAccount::new();
@@ -775,7 +786,7 @@ mod tests {
 
     #[test]
     fn test_fluent_commit_then_commit_and_undelegate() {
-        let owner = Pubkey::new_unique();
+        let owner = compat::Pubkey::new_unique();
         let mut payer = TestAccount::new();
         let mut magic_ctx = TestAccount::new();
         let mut magic_prog = TestAccount::new();
@@ -813,7 +824,7 @@ mod tests {
 
     #[test]
     fn test_fluent_commit_and_undelegate_then_commit() {
-        let owner = Pubkey::new_unique();
+        let owner = compat::Pubkey::new_unique();
         let mut payer = TestAccount::new();
         let mut magic_ctx = TestAccount::new();
         let mut magic_prog = TestAccount::new();
@@ -851,7 +862,7 @@ mod tests {
 
     #[test]
     fn test_fluent_full_chain_with_actions() {
-        let owner = Pubkey::new_unique();
+        let owner = compat::Pubkey::new_unique();
         let mut payer = TestAccount::new();
         let mut magic_ctx = TestAccount::new();
         let mut magic_prog = TestAccount::new();
@@ -914,11 +925,11 @@ mod tests {
 
     #[test]
     fn test_bundle_dedup_within_commit_intent() {
-        let shared_key = Pubkey::new_unique();
+        let shared_key = compat::Pubkey::new_unique();
         let mut acc1 = TestAccount::with_key(shared_key);
         let mut acc2 = TestAccount::with_key(shared_key); // duplicate key
         let mut acc3 = TestAccount::new();
-        let owner = Pubkey::new_unique();
+        let owner = compat::Pubkey::new_unique();
 
         let info1 = create_mock_account_info(
             &acc1.key,
@@ -960,11 +971,11 @@ mod tests {
     #[test]
     fn test_bundle_cross_intent_overlap_resolution() {
         // Accounts in both Commit and CommitAndUndelegate should only be in CommitAndUndelegate
-        let shared_key = Pubkey::new_unique();
+        let shared_key = compat::Pubkey::new_unique();
         let mut shared_acc1 = TestAccount::with_key(shared_key);
         let mut shared_acc2 = TestAccount::with_key(shared_key);
         let mut unique_acc = TestAccount::new();
-        let owner = Pubkey::new_unique();
+        let owner = compat::Pubkey::new_unique();
 
         let shared_info1 = create_mock_account_info(
             &shared_acc1.key,
@@ -1024,11 +1035,11 @@ mod tests {
     fn test_bundle_commit_becomes_empty_after_overlap() {
         // When all Commit accounts are in CommitAndUndelegate, Commit is removed
         // and its handlers are merged into CommitAndUndelegate
-        let shared_key = Pubkey::new_unique();
+        let shared_key = compat::Pubkey::new_unique();
         let mut shared_acc1 = TestAccount::with_key(shared_key);
         let mut shared_acc2 = TestAccount::with_key(shared_key);
         let mut escrow_acc = TestAccount::new();
-        let owner = Pubkey::new_unique();
+        let owner = compat::Pubkey::new_unique();
 
         let shared_info1 = create_mock_account_info(
             &shared_acc1.key,
@@ -1098,7 +1109,7 @@ mod tests {
     fn test_bundle_merge_multiple_commit_intents() {
         let mut acc1 = TestAccount::new();
         let mut acc2 = TestAccount::new();
-        let owner = Pubkey::new_unique();
+        let owner = compat::Pubkey::new_unique();
 
         let info1 = create_mock_account_info(
             &acc1.key,
@@ -1137,7 +1148,7 @@ mod tests {
     fn test_bundle_merge_base_actions() {
         let mut escrow_acc1 = TestAccount::new();
         let mut escrow_acc2 = TestAccount::new();
-        let owner = Pubkey::new_unique();
+        let owner = compat::Pubkey::new_unique();
 
         let escrow_info1 = create_mock_account_info(
             &escrow_acc1.key,
@@ -1175,7 +1186,7 @@ mod tests {
         let mut magic_ctx = TestAccount::new();
         let mut magic_prog = TestAccount::new();
         let mut acc1 = TestAccount::new();
-        let owner = Pubkey::new_unique();
+        let owner = compat::Pubkey::new_unique();
 
         let payer_info = create_mock_account_info(
             &payer.key,
@@ -1232,10 +1243,10 @@ mod tests {
         let mut magic_prog = TestAccount::new();
 
         // Same key used multiple times
-        let shared_key = Pubkey::new_unique();
+        let shared_key = compat::Pubkey::new_unique();
         let mut acc1 = TestAccount::with_key(shared_key);
         let mut acc2 = TestAccount::with_key(shared_key);
-        let owner = Pubkey::new_unique();
+        let owner = compat::Pubkey::new_unique();
 
         let payer_info = create_mock_account_info(
             &payer.key,
@@ -1295,7 +1306,7 @@ mod tests {
         let mut commit_acc = TestAccount::new();
         let mut cau_acc = TestAccount::new();
         let mut escrow_acc = TestAccount::new();
-        let owner = Pubkey::new_unique();
+        let owner = compat::Pubkey::new_unique();
 
         let payer_info = create_mock_account_info(
             &payer.key,
@@ -1368,7 +1379,7 @@ mod tests {
         let mut magic_ctx = TestAccount::new();
         let mut magic_prog = TestAccount::new();
         let mut acc1 = TestAccount::new();
-        let owner = Pubkey::new_unique();
+        let owner = compat::Pubkey::new_unique();
 
         let payer_info = create_mock_account_info(
             &payer.key,
@@ -1417,7 +1428,7 @@ mod tests {
     #[test]
     fn test_collect_accounts_from_call_handler() {
         let mut escrow_acc = TestAccount::new();
-        let owner = Pubkey::new_unique();
+        let owner = compat::Pubkey::new_unique();
 
         let escrow_info = create_mock_account_info(
             &escrow_acc.key,
@@ -1440,7 +1451,7 @@ mod tests {
     fn test_collect_accounts_from_commit_with_handler() {
         let mut acc1 = TestAccount::new();
         let mut escrow_acc = TestAccount::new();
-        let owner = Pubkey::new_unique();
+        let owner = compat::Pubkey::new_unique();
 
         let acc1_info = create_mock_account_info(
             &acc1.key,
@@ -1476,7 +1487,7 @@ mod tests {
     // Verifies flat action index ordering:
     #[test]
     fn test_callback_action_index_ordering() {
-        let owner = Pubkey::new_unique();
+        let owner = compat::Pubkey::new_unique();
         let mut payer = TestAccount::new();
         let mut magic_ctx = TestAccount::new();
         let mut magic_prog = TestAccount::new();
@@ -1490,7 +1501,7 @@ mod tests {
         let (builder, _) = create_test_builder(&mut payer, &mut magic_ctx, &mut magic_prog, &owner);
 
         let make_callback = || ActionCallback {
-            destination_program: Pubkey::new_unique(),
+            destination_program: compat::Pubkey::new_unique(),
             discriminator: vec![0u8; 8],
             payload: vec![],
             compute_units: 10_000,
