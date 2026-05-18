@@ -44,7 +44,7 @@ encryption = [
 ]
 
 # backward compatability support (can be combined with [access-control | encryption])
-backward-compat = ["magicblock-delegation-program-api/backward-compat"]
+backward-compat = ["magicblock-delegation-program-api/backward-compat", "magicblock-magic-program-api/backward-compat"]
 
 crank = []
 modular-sdk = [
