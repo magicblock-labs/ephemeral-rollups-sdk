@@ -1,49 +1,48 @@
 use crate::{
+    compat::{self, Compat, Modern},
     consts::ESPL_TOKEN_PROGRAM_ID,
-    solana_compat::solana::{
-        invoke, invoke_signed, AccountInfo, AccountMeta, Instruction, ProgramResult,
-    },
     spl::EphemeralSplDiscriminator,
 };
+use solana_program::program::{invoke, invoke_signed};
 
 /// Build a withdraw SPL tokens instruction.
 pub struct WithdrawSplTokens<'a> {
-    pub payer: AccountInfo<'a>,
-    pub eata: AccountInfo<'a>,
-    pub vault: AccountInfo<'a>,
-    pub mint: AccountInfo<'a>,
-    pub vault_ata: AccountInfo<'a>,
-    pub user_ata: AccountInfo<'a>,
-    pub token_program: AccountInfo<'a>,
+    pub payer: compat::AccountInfo<'a>,
+    pub eata: compat::AccountInfo<'a>,
+    pub vault: compat::AccountInfo<'a>,
+    pub mint: compat::AccountInfo<'a>,
+    pub vault_ata: compat::AccountInfo<'a>,
+    pub user_ata: compat::AccountInfo<'a>,
+    pub token_program: compat::AccountInfo<'a>,
     pub vault_bump: u8,
     pub amount: u64,
 }
 
 impl<'a> WithdrawSplTokens<'a> {
     #[inline(always)]
-    pub fn instruction(&self) -> Instruction {
+    pub fn instruction(&self) -> compat::Instruction {
         let mut data = Vec::with_capacity(9);
         data.push(EphemeralSplDiscriminator::WithdrawSplTokens as u8);
         data.extend_from_slice(self.amount.to_le_bytes().as_ref());
-        Instruction {
+        compat::Instruction {
             program_id: ESPL_TOKEN_PROGRAM_ID,
             accounts: vec![
-                AccountMeta::new(*self.eata.key, false),
-                AccountMeta::new_readonly(*self.vault.key, false),
-                AccountMeta::new_readonly(*self.mint.key, false),
-                AccountMeta::new(*self.vault_ata.key, false),
-                AccountMeta::new(*self.user_ata.key, false),
-                AccountMeta::new_readonly(*self.payer.key, true),
-                AccountMeta::new_readonly(*self.token_program.key, false),
+                compat::AccountMeta::new(*self.eata.key, false),
+                compat::AccountMeta::new_readonly(*self.vault.key, false),
+                compat::AccountMeta::new_readonly(*self.mint.key, false),
+                compat::AccountMeta::new(*self.vault_ata.key, false),
+                compat::AccountMeta::new(*self.user_ata.key, false),
+                compat::AccountMeta::new_readonly(*self.payer.key, true),
+                compat::AccountMeta::new_readonly(*self.token_program.key, false),
             ],
             data,
         }
     }
 
     #[inline(always)]
-    pub fn invoke(&self) -> ProgramResult {
+    pub fn invoke(&self) -> compat::ProgramResult {
         invoke(
-            &self.instruction(),
+            &self.instruction().modern(),
             &[
                 self.eata.clone(),
                 self.vault.clone(),
@@ -52,14 +51,16 @@ impl<'a> WithdrawSplTokens<'a> {
                 self.user_ata.clone(),
                 self.payer.clone(),
                 self.token_program.clone(),
-            ],
+            ]
+            .modern(),
         )
+        .compat()
     }
 
     #[inline(always)]
-    pub fn invoke_signed(&self, signers_seeds: &[&[&[u8]]]) -> ProgramResult {
+    pub fn invoke_signed(&self, signers_seeds: &[&[&[u8]]]) -> compat::ProgramResult {
         invoke_signed(
-            &self.instruction(),
+            &self.instruction().modern(),
             &[
                 self.eata.clone(),
                 self.vault.clone(),
@@ -68,8 +69,10 @@ impl<'a> WithdrawSplTokens<'a> {
                 self.user_ata.clone(),
                 self.payer.clone(),
                 self.token_program.clone(),
-            ],
+            ]
+            .modern(),
             signers_seeds,
         )
+        .compat()
     }
 }
