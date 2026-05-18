@@ -85,7 +85,7 @@ pub struct EphemeralAccount<'a> {
     sponsor: &'a AccountView,
     ephemeral: &'a AccountView,
     vault: &'a AccountView,
-    magic_proggram: &'a AccountView,
+    magic_program: &'a AccountView,
     signer_seeds: &'a [Signer<'a, 'a>],
 }
 
@@ -101,13 +101,13 @@ impl<'a> EphemeralAccount<'a> {
         sponsor: &'a AccountView,
         ephemeral: &'a AccountView,
         vault: &'a AccountView,
-        magic_proggram: &'a AccountView,
+        magic_program: &'a AccountView,
     ) -> Self {
         Self {
             sponsor,
             ephemeral,
             vault,
-            magic_proggram,
+            magic_program,
             signer_seeds: &[],
         }
     }
@@ -157,7 +157,7 @@ impl<'a> EphemeralAccount<'a> {
 
     fn invoke(&self, data: &[u8], ephemeral_is_signer: bool) -> ProgramResult {
         let ix = InstructionView {
-            program_id: self.magic_proggram.address(),
+            program_id: self.magic_program.address(),
             data,
             accounts: &[
                 InstructionAccount::writable_signer(self.sponsor.address()),
