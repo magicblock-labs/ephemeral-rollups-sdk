@@ -20,27 +20,27 @@
 //! use ephemeral_rollups_pinocchio::ephemeral_accounts::EphemeralAccount;
 //!
 //! // Create: both sponsor and ephemeral are PDAs - provide seeds for both
-//! EphemeralAccount::new(&ctx.sponsor, &ctx.ephemeral, &ctx.vault)
+//! EphemeralAccount::new(&ctx.sponsor, &ctx.ephemeral, &ctx.vault, &ctx.magic_program)
 //!     .with_signer_seeds(&[&sponsor_seeds, &ephemeral_seeds])
 //!     .create(1000)?;
 //!
 //! // Resize/Close: only sponsor needs to sign - only sponsor seeds needed
-//! EphemeralAccount::new(&ctx.sponsor, &ctx.ephemeral, &ctx.vault)
+//! EphemeralAccount::new(&ctx.sponsor, &ctx.ephemeral, &ctx.vault, &ctx.magic_program)
 //!     .with_signer_seeds(&[&sponsor_seeds])
 //!     .resize(2000)?;
 //!
 //! // Create with oncurve sponsor (signed tx), ephemeral is PDA
-//! EphemeralAccount::new(&ctx.sponsor, &ctx.ephemeral, &ctx.vault)
+//! EphemeralAccount::new(&ctx.sponsor, &ctx.ephemeral, &ctx.vault, &ctx.magic_program)
 //!     .with_signer_seeds(&[&ephemeral_seeds])
 //!     .create(1000)?;
 //!
 //! // Resize/Close with oncurve sponsor - no seeds needed
-//! EphemeralAccount::new(&ctx.sponsor, &ctx.ephemeral, &ctx.vault)
+//! EphemeralAccount::new(&ctx.sponsor, &ctx.ephemeral, &ctx.vault, &ctx.magic_program)
 //!     .resize(2000)?;
 //! ```
 
 use pinocchio::{
-    cpi::{invoke_signed, Seed, Signer},
+    cpi::{invoke_signed, Signer},
     instruction::{InstructionAccount, InstructionView},
     AccountView, ProgramResult,
 };
@@ -86,7 +86,7 @@ pub struct EphemeralAccount<'a> {
     ephemeral: &'a AccountView,
     vault: &'a AccountView,
     magic_proggram: &'a AccountView,
-    signer_seeds: &'a [Seed<'a>],
+    signer_seeds: &'a [Signer<'a, 'a>],
 }
 
 impl<'a> EphemeralAccount<'a> {
@@ -114,9 +114,9 @@ impl<'a> EphemeralAccount<'a> {
 
     /// Sets signer seeds for PDA signing via `invoke_signed`.
     ///
-    /// Provide seeds for any PDA accounts (sponsor and/or ephemeral).
+    /// Provide one signer per PDA account (sponsor and/or ephemeral).
     /// Oncurve accounts that signed the original transaction don't need seeds.
-    pub fn with_signer_seeds(mut self, seeds: &'a [Seed<'a>]) -> Self {
+    pub fn with_signers(mut self, seeds: &'a [Signer<'a, 'a>]) -> Self {
         self.signer_seeds = seeds;
         self
     }
@@ -166,7 +166,10 @@ impl<'a> EphemeralAccount<'a> {
             ],
         };
 
-        let signer = Signer::from(self.signer_seeds);
-        invoke_signed(&ix, &[self.sponsor, self.ephemeral, self.vault], &[signer])
+        invoke_signed(
+            &ix,
+            &[self.sponsor, self.ephemeral, self.vault],
+            self.signer_seeds,
+        )
     }
 }
