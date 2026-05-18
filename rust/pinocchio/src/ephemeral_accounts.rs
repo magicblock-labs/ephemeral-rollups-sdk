@@ -64,7 +64,7 @@ const CLOSE_EPHEMERAL_ACCOUNT_DISCRIMINATOR: u32 = 14;
 /// # Example
 ///
 /// ```
-/// use ephemeral_rollups_sdk::ephemeral_accounts::rent;
+/// use ephemeral_rollups_pinocchio::ephemeral_accounts::rent;
 ///
 /// let cost = rent(1000); // Cost for 1KB of data
 /// assert_eq!(cost, (1000 + 60) * 32);
