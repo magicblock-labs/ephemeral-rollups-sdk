@@ -42,7 +42,7 @@ pub fn commit(_attr: TokenStream, item: TokenStream) -> TokenStream {
                     .parse2(quote! {
                         #[account(mut, address = ephemeral_rollups_sdk::consts::MAGIC_CONTEXT_ID)]
                         /// CHECK:`
-                        pub magic_context: AccountInfo<'info>
+                        pub magic_context: UncheckedAccount<'info>
                     })
                     .unwrap(),
             );

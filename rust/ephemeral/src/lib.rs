@@ -48,22 +48,22 @@ use syn::{parse_macro_input, ItemMod};
 ///     pub payer: Signer<'info>,
 ///     /// CHECK: The pda to delegate
 ///     #[account(mut)]
-///     pub pda: AccountInfo<'info>,
+///     pub pda: UncheckedAccount<'info>,
 ///     /// CHECK: The owner program of the pda
-///     pub owner_program: AccountInfo<'info>,
+///     pub owner_program: UncheckedAccount<'info>,
 ///     /// CHECK: The buffer to temporarily store the pda data
 ///     #[account(mut)]
-///     pub buffer: AccountInfo<'info>,
+///     pub buffer: UncheckedAccount<'info>,
 ///     /// CHECK: The delegation record
 ///     #[account(mut)]
-///     pub delegation_record: AccountInfo<'info>,
+///     pub delegation_record: UncheckedAccount<'info>,
 ///     /// CHECK: The delegation account seeds
 ///     #[account(mut)]
-///     pub delegation_metadata: AccountInfo<'info>,
+///     pub delegation_metadata: UncheckedAccount<'info>,
 ///     /// CHECK: The delegation program
-///     pub delegation_program: AccountInfo<'info>,
+///     pub delegation_program: UncheckedAccount<'info>,
 ///     /// CHECK: The system program
-///     pub system_program: AccountInfo<'info>,
+///     pub system_program: UncheckedAccount<'info>,
 /// }
 /// ```
 #[proc_macro_attribute]
@@ -137,15 +137,15 @@ fn generate_undelegate() -> (TokenStream2, TokenStream2, TokenStream2) {
                 pub struct InitializeAfterUndelegation<'info> {
                 /// CHECK:`
                 #[account(mut)]
-                pub base_account: AccountInfo<'info>,
+                pub base_account: UncheckedAccount<'info>,
                 /// CHECK:`
                 #[account()]
-                pub buffer: AccountInfo<'info>,
+                pub buffer: UncheckedAccount<'info>,
                 /// CHECK:`
                 #[account(mut)]
-                pub payer: AccountInfo<'info>,
+                pub payer: UncheckedAccount<'info>,
                 /// CHECK:`
-                pub system_program: AccountInfo<'info>,
+                pub system_program: UncheckedAccount<'info>,
             }
         },
     )

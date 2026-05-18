@@ -67,7 +67,7 @@ pub fn delegate(_attr: TokenStream, item: TokenStream) -> TokenStream {
                     mut, seeds = [ephemeral_rollups_sdk::pda::DELEGATE_BUFFER_TAG, #field_name.key().as_ref()],
                     bump, seeds::program = crate::id()
                 )]
-                pub #buffer_field: AccountInfo<'info>,
+                pub #buffer_field: UncheckedAccount<'info>,
             });
 
             new_fields.push(quote! {
@@ -76,7 +76,7 @@ pub fn delegate(_attr: TokenStream, item: TokenStream) -> TokenStream {
                     mut, seeds = [ephemeral_rollups_sdk::pda::DELEGATION_RECORD_TAG, #field_name.key().as_ref()],
                     bump, seeds::program = delegation_program.key()
                 )]
-                pub #delegation_record_field: AccountInfo<'info>,
+                pub #delegation_record_field: UncheckedAccount<'info>,
             });
 
             new_fields.push(quote! {
@@ -85,7 +85,7 @@ pub fn delegate(_attr: TokenStream, item: TokenStream) -> TokenStream {
                     mut, seeds = [ephemeral_rollups_sdk::pda::DELEGATION_METADATA_TAG, #field_name.key().as_ref()],
                     bump, seeds::program = delegation_program.key()
                 )]
-                pub #delegation_metadata_field: AccountInfo<'info>,
+                pub #delegation_metadata_field: UncheckedAccount<'info>,
             });
 
             // Add delegate method
@@ -137,14 +137,14 @@ pub fn delegate(_attr: TokenStream, item: TokenStream) -> TokenStream {
         new_fields.push(quote! {
             /// CHECK: The owner program of the pda
             #[account(address = crate::id())]
-            pub owner_program: AccountInfo<'info>,
+            pub owner_program: UncheckedAccount<'info>,
         });
     }
     if !has_delegation_program {
         new_fields.push(quote! {
             /// CHECK: The delegation program
             #[account(address = ephemeral_rollups_sdk::id())]
-            pub delegation_program: AccountInfo<'info>,
+            pub delegation_program: UncheckedAccount<'info>,
         });
     }
     if !has_system_program {
