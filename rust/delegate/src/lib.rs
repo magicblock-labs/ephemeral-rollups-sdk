@@ -1,55 +1,7 @@
 use proc_macro::TokenStream;
-use proc_macro2::TokenStream as TokenStream2;
 use quote::quote;
 use syn::spanned::Spanned;
 use syn::{parse_macro_input, ItemStruct};
-
-fn unchecked_account_type() -> TokenStream2 {
-    if cfg!(feature = "backward-compat") {
-        quote! { AccountInfo<'info> }
-    } else {
-        quote! { UncheckedAccount<'info> }
-    }
-}
-
-fn is_account_info_type(ty: &syn::Type) -> bool {
-    matches!(ty, syn::Type::Path(type_path) if type_path
-        .path
-        .segments
-        .last()
-        .is_some_and(|segment| segment.ident == "AccountInfo"))
-}
-
-fn is_option_account_info_type(ty: &syn::Type) -> bool {
-    let syn::Type::Path(type_path) = ty else {
-        return false;
-    };
-    let Some(segment) = type_path.path.segments.last() else {
-        return false;
-    };
-    if segment.ident != "Option" {
-        return false;
-    }
-    let syn::PathArguments::AngleBracketed(args) = &segment.arguments else {
-        return false;
-    };
-    args.args
-        .iter()
-        .any(|arg| matches!(arg, syn::GenericArgument::Type(inner) if is_account_info_type(inner)))
-}
-
-fn modernize_account_info_type(ty: &syn::Type) -> syn::Type {
-    if cfg!(feature = "backward-compat") {
-        return ty.clone();
-    }
-    if is_account_info_type(ty) {
-        syn::parse_quote! { UncheckedAccount<'info> }
-    } else if is_option_account_info_type(ty) {
-        syn::parse_quote! { Option<UncheckedAccount<'info>> }
-    } else {
-        ty.clone()
-    }
-}
 
 #[proc_macro_attribute]
 pub fn delegate(_attr: TokenStream, item: TokenStream) -> TokenStream {
@@ -63,7 +15,6 @@ pub fn delegate(_attr: TokenStream, item: TokenStream) -> TokenStream {
     // Process fields to modify them according to the rules
     let mut new_fields = Vec::new();
     let mut delegate_methods = Vec::new();
-    let unchecked_account = unchecked_account_type();
     let mut has_owner_program = false;
     let mut has_delegation_program = false;
     let mut has_system_program = false;
@@ -116,7 +67,7 @@ pub fn delegate(_attr: TokenStream, item: TokenStream) -> TokenStream {
                     mut, seeds = [ephemeral_rollups_sdk::pda::DELEGATE_BUFFER_TAG, #field_name.key().as_ref()],
                     bump, seeds::program = crate::id()
                 )]
-                pub #buffer_field: #unchecked_account,
+                pub #buffer_field: AccountInfo<'info>,
             });
 
             new_fields.push(quote! {
@@ -125,7 +76,7 @@ pub fn delegate(_attr: TokenStream, item: TokenStream) -> TokenStream {
                     mut, seeds = [ephemeral_rollups_sdk::pda::DELEGATION_RECORD_TAG, #field_name.key().as_ref()],
                     bump, seeds::program = delegation_program.key()
                 )]
-                pub #delegation_record_field: #unchecked_account,
+                pub #delegation_record_field: AccountInfo<'info>,
             });
 
             new_fields.push(quote! {
@@ -134,7 +85,7 @@ pub fn delegate(_attr: TokenStream, item: TokenStream) -> TokenStream {
                     mut, seeds = [ephemeral_rollups_sdk::pda::DELEGATION_METADATA_TAG, #field_name.key().as_ref()],
                     bump, seeds::program = delegation_program.key()
                 )]
-                pub #delegation_metadata_field: #unchecked_account,
+                pub #delegation_metadata_field: AccountInfo<'info>,
             });
 
             // Add delegate method
@@ -147,23 +98,15 @@ pub fn delegate(_attr: TokenStream, item: TokenStream) -> TokenStream {
                     seeds: &[&[u8]],
                     config: ephemeral_rollups_sdk::cpi::DelegateConfig,
                 ) -> anchor_lang::solana_program::entrypoint::ProgramResult {
-                    let payer = anchor_lang::ToAccountInfo::to_account_info(payer);
-                    let pda = anchor_lang::ToAccountInfo::to_account_info(&self.#field_name);
-                    let owner_program = anchor_lang::ToAccountInfo::to_account_info(&self.owner_program);
-                    let buffer = anchor_lang::ToAccountInfo::to_account_info(&self.#buffer_field);
-                    let delegation_record = anchor_lang::ToAccountInfo::to_account_info(&self.#delegation_record_field);
-                    let delegation_metadata = anchor_lang::ToAccountInfo::to_account_info(&self.#delegation_metadata_field);
-                    let delegation_program = anchor_lang::ToAccountInfo::to_account_info(&self.delegation_program);
-                    let system_program = anchor_lang::ToAccountInfo::to_account_info(&self.system_program);
                     let del_accounts = ephemeral_rollups_sdk::cpi::DelegateAccounts {
-                        payer: &payer,
-                        pda: &pda,
-                        owner_program: &owner_program,
-                        buffer: &buffer,
-                        delegation_record: &delegation_record,
-                        delegation_metadata: &delegation_metadata,
-                        delegation_program: &delegation_program,
-                        system_program: &system_program,
+                        payer,
+                        pda: &self.#field_name.to_account_info(),
+                        owner_program: &self.owner_program,
+                        buffer: &self.#buffer_field,
+                        delegation_record: &self.#delegation_record_field,
+                        delegation_metadata: &self.#delegation_metadata_field,
+                        delegation_program: &self.delegation_program,
+                        system_program: &self.system_program,
                     };
                     ephemeral_rollups_sdk::cpi::delegate_account(del_accounts, seeds, config)
                 }
@@ -171,7 +114,7 @@ pub fn delegate(_attr: TokenStream, item: TokenStream) -> TokenStream {
         }
 
         // Add the original field without `del`
-        let field_type = modernize_account_info_type(&field.ty);
+        let field_type = &field.ty;
         new_fields.push(quote! {
             #(#field_attrs)*
             pub #field_name: #field_type,
@@ -194,14 +137,14 @@ pub fn delegate(_attr: TokenStream, item: TokenStream) -> TokenStream {
         new_fields.push(quote! {
             /// CHECK: The owner program of the pda
             #[account(address = crate::id())]
-            pub owner_program: #unchecked_account,
+            pub owner_program: AccountInfo<'info>,
         });
     }
     if !has_delegation_program {
         new_fields.push(quote! {
             /// CHECK: The delegation program
             #[account(address = ephemeral_rollups_sdk::id())]
-            pub delegation_program: #unchecked_account,
+            pub delegation_program: AccountInfo<'info>,
         });
     }
     if !has_system_program {
