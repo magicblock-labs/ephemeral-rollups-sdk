@@ -1,7 +1,7 @@
-use super::{backward_compat, Compat};
+use super::Compat;
 
 impl Compat for solana_address::Address {
-    type Compat = backward_compat::Pubkey;
+    type Compat = super::Pubkey;
     fn compat(self) -> Self::Compat {
         self.to_bytes().into()
     }
@@ -14,9 +14,9 @@ impl Compat for () {
 
 #[cfg(feature = "backward-compat")]
 impl Compat for solana_program::program_error::ProgramError {
-    type Compat = backward_compat::ProgramError;
+    type Compat = super::ProgramError;
     fn compat(self) -> Self::Compat {
-        use backward_compat::ProgramError as CompatError;
+        use super::ProgramError as CompatError;
         use solana_program::program_error::ProgramError as ModernError;
 
         match self {
@@ -58,7 +58,7 @@ impl Compat for solana_program::program_error::ProgramError {
 
 #[cfg(not(feature = "backward-compat"))]
 impl Compat for solana_program::program_error::ProgramError {
-    type Compat = backward_compat::ProgramError;
+    type Compat = super::ProgramError;
     fn compat(self) -> Self::Compat {
         self
     }
@@ -82,7 +82,7 @@ impl<T: Compat> Compat for Vec<T> {
 }
 
 impl Compat for solana_program::instruction::AccountMeta {
-    type Compat = backward_compat::AccountMeta;
+    type Compat = super::AccountMeta;
     fn compat(self) -> Self::Compat {
         Self::Compat {
             pubkey: self.pubkey.compat(),
@@ -93,7 +93,7 @@ impl Compat for solana_program::instruction::AccountMeta {
 }
 
 impl Compat for solana_program::instruction::Instruction {
-    type Compat = backward_compat::Instruction;
+    type Compat = super::Instruction;
     fn compat(self) -> Self::Compat {
         Self::Compat {
             program_id: self.program_id.compat(),

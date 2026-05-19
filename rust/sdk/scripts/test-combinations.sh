@@ -23,7 +23,7 @@ print_command() {
 
     echo
     if [[ "$color" == true ]]; then
-        printf '\033[32m%s\n==> [%02d] %s\n%s\033[0m\n' "$line" "$build_count" "$command" "$line"
+        printf '\033[34;01m%s\n==> [%02d] %s\n%s\033[0m\n' "$line" "$build_count" "$command" "$line"
     else
         printf '%s\n==> [%02d] %s\n%s\n' "$line" "$build_count" "$command" "$line"
     fi
