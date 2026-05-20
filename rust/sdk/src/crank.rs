@@ -6,6 +6,11 @@ use solana_program::{
 
 use crate::compat::{self, AsModern, Compat, Modern};
 
+/// Get the crank signer PDA for a given authority.
+pub fn crank_signer_pda(authority: &compat::Pubkey) -> compat::Pubkey {
+    magicblock_magic_program_api::pda::crank_signer_pda(authority.as_modern()).compat()
+}
+
 pub struct ScheduleCrankCpi<'a> {
     pub payer: &'a compat::AccountInfo<'a>,
     pub magic_program: &'a compat::AccountInfo<'a>,

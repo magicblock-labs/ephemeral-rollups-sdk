@@ -37,12 +37,9 @@ pub use dlp_api::{
     fees_vault_seeds, program_config_seeds_from_program_id,
     undelegate_buffer_seeds_from_delegated_account, validator_fees_vault_seeds_from_validator,
 };
-pub use magicblock_magic_program_api::{
-    args::{
-        ActionArgs, BaseActionArgs, CommitAndUndelegateArgs, CommitTypeArgs, MagicBaseIntentArgs,
-        ShortAccountMeta, UndelegateTypeArgs,
-    },
-    pda::crank_signer_pda,
+pub use magicblock_magic_program_api::args::{
+    ActionArgs, BaseActionArgs, CommitAndUndelegateArgs, CommitTypeArgs, MagicBaseIntentArgs,
+    ShortAccountMeta, UndelegateTypeArgs,
 };
 
 pub const fn id() -> compat::Pubkey {
