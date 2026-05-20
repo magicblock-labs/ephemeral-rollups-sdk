@@ -10,6 +10,13 @@ use pinocchio::{
     AccountView, Address, ProgramResult,
 };
 
+pub const CRANK_PROGRAM_ID: Address =
+    Address::from_str_const("Crank11111111111111111111111111111111111111");
+const CRANK_SEED: &[u8] = b"crank-executor";
+pub fn crank_signer_pda(authority: &Address) -> Address {
+    Address::find_program_address(&[CRANK_SEED, authority.as_ref()], &CRANK_PROGRAM_ID).0
+}
+
 const SCHEDULE_CRANK_DISCRIMINANT: [u8; 4] = 6_u32.to_le_bytes();
 
 pub struct CrankInstruction<'a> {

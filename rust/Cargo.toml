@@ -33,7 +33,8 @@ ephemeral-rollups-sdk-attribute-action = { path = "action-attribute", version = 
 
 # Magicblock
 magicblock-delegation-program-api = { version = "3.0.0", default-features = false }
-magicblock-magic-program-api = { version = "0.10.1", default-features = false }
+# magicblock-magic-program-api = { version = "0.10.1", default-features = false }
+magicblock-magic-program-api = { git = "https://github.com/magicblock-labs/magicblock-validator", rev = "fbb1b2a032a0527b2ab0a6f4a8c8bd313ceec8e4", default-features = false }
 
 ## External crates
 anchor-lang-compat = { package = "anchor-lang", version = ">=0.28.0, <1.0.0" }
@@ -76,7 +77,13 @@ pinocchio-token = { version = "0.5", default-features = false }
 solana-program = { version = "3.0.0", default-features = false }
 solana-account = { version = "3.0" }
 solana-account-info = { version = "3.1" }
-solana-address = { version = "2.0.0", features = ["bytemuck", "decode", "syscalls", "curve25519", "std"] }
+solana-address = { version = "2.0.0", features = [
+	"bytemuck",
+	"decode",
+	"syscalls",
+	"curve25519",
+	"std",
+] }
 solana-cpi = { version = "3.0" }
 solana-pubkey = { version = "3.0" }
 solana-program-error = { version = "3.0" }
