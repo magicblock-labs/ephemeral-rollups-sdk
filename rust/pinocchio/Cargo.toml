@@ -24,7 +24,6 @@ pinocchio-log = { workspace = true }
 solana-address = { version = ">=2, <3", default-features = false, features = [
     "curve25519",
 ] }
-solana-program = { workspace = true, default-features = false }
 
 [dev-dependencies]
 bincode1 = { package = "bincode", version = "1.3" }
