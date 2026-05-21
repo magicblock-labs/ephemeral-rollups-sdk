@@ -224,8 +224,8 @@ impl<'info> MagicIntentBundleBuilder<'info> {
         let add_callback_ixs = self.build_callback_ixs();
 
         // Build ScheduleIntentBundle instruction
-        let mut all_accounts = vec![self.payer, self.magic_context];
-        if let Some(vault) = self.magic_fee_vault {
+        let mut all_accounts = vec![self.payer.clone(), self.magic_context.clone()];
+        if let Some(vault) = self.magic_fee_vault.clone() {
             all_accounts.push(vault);
         }
         self.intent_bundle.collect_accounts(&mut all_accounts);
@@ -233,10 +233,28 @@ impl<'info> MagicIntentBundleBuilder<'info> {
         let args = self.intent_bundle.into_args(&indices_map);
         let metas = all_accounts
             .iter()
-            .map(|ai| AccountMeta {
-                pubkey: *ai.key.as_modern(),
-                is_signer: ai.is_signer,
-                is_writable: ai.is_writable,
+            .map(|ai| {
+                let mut meta = AccountMeta {
+                    pubkey: *ai.key.as_modern(),
+                    is_signer: ai.is_signer,
+                    is_writable: ai.is_writable,
+                };
+
+                // Set correct meta for fixed accounts
+                if ai.key == self.payer.key {
+                    meta.is_signer = true;
+                    meta.is_writable = true;
+                }
+                if ai.key == self.magic_context.key {
+                    meta.is_writable = true;
+                    meta.is_signer = false;
+                }
+                if Some(ai.key) == self.magic_fee_vault.as_ref().map(|el| el.key) {
+                    meta.is_writable = true;
+                    meta.is_signer = false;
+                }
+
+                meta
             })
             .collect();
         let schedule_ix = Instruction::new_with_bincode(
