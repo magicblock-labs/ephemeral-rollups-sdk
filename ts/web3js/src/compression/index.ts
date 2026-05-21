@@ -79,18 +79,21 @@ export function convertValidityProofToBytes(
 export function convertPackedAddressTreeInfoToBytes(
   packedAddressTreeInfo: PackedAddressTreeInfo,
 ) {
+  // Wire layout must match the on-chain `CdpPackedAddressTreeInfo` decoder in
+  // magicblock-validator's compressed-delegation-api:
+  //   byte 0:    address_merkle_tree_pubkey_index (u8)
+  //   byte 1:    address_queue_pubkey_index      (u8)
+  //   bytes 2-3: root_index                      (u16 LE)
   const packedAddressTreeInfoBytes = Buffer.alloc(4);
-  // rootIndex is two bytes, little-endian
-  packedAddressTreeInfoBytes.writeUInt16LE(packedAddressTreeInfo.rootIndex, 0);
   packedAddressTreeInfoBytes.writeUInt8(
     packedAddressTreeInfo.addressMerkleTreePubkeyIndex,
-    2,
+    0,
   );
-  packedAddressTreeInfo.addressMerkleTreePubkeyIndex;
   packedAddressTreeInfoBytes.writeUInt8(
     packedAddressTreeInfo.addressQueuePubkeyIndex,
-    3,
+    1,
   );
+  packedAddressTreeInfoBytes.writeUInt16LE(packedAddressTreeInfo.rootIndex, 2);
   return packedAddressTreeInfoBytes;
 }
 
