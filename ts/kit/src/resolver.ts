@@ -64,10 +64,13 @@ export async function getDelegationRecord(
   commitment: Commitment = "confirmed",
 ): Promise<DelegationRecord> {
   const accountInfo = await rpc
-    .getAccountInfo(await delegationRecordPdaFromDelegatedAccount(delegatedAccount), {
-      commitment,
-      encoding: "base64",
-    })
+    .getAccountInfo(
+      await delegationRecordPdaFromDelegatedAccount(delegatedAccount),
+      {
+        commitment,
+        encoding: "base64",
+      },
+    )
     .send();
   return parseDelegationRecordAccount(accountInfo.value);
 }

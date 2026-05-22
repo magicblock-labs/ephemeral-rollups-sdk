@@ -20,8 +20,7 @@ import {
 
 type DelegationAccountInfo = AccountInfoBase & AccountInfoWithBase64EncodedData;
 
-const delegatedAccount =
-  "11111111111111111111111111111111" as Address;
+const delegatedAccount = "11111111111111111111111111111111" as Address;
 const validator = "11111111111111111111111111111112" as Address;
 
 function createDelegationAccountInfo(
