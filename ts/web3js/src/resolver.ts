@@ -3,8 +3,10 @@ import {
   Connection,
   AccountInfo,
   Transaction,
+  Commitment,
 } from "@solana/web3.js";
 import { DELEGATION_PROGRAM_ID } from "./constants.js";
+import { delegationRecordPdaFromDelegatedAccount } from "./pda.js";
 /**
  * Interface representing the configuration for the connection resolver.
  */
@@ -16,15 +18,42 @@ export interface Configuration {
 }
 
 /** Enumeration of possible delegation statuses */
-enum DelegationStatus {
+export enum DelegationStatus {
   Delegated,
   Undelegated,
 }
 
 /** Type representing a delegation record with status and optional validator information */
-type DelegationRecord =
+export type DelegationRecord =
   | { status: DelegationStatus.Delegated; validator: PublicKey }
   | { status: DelegationStatus.Undelegated };
+
+export function parseDelegationRecordAccount(
+  account: AccountInfo<Buffer> | null,
+): DelegationRecord {
+  const isDelegated =
+    account !== null &&
+    account.owner.equals(DELEGATION_PROGRAM_ID) &&
+    account.lamports !== 0;
+  return isDelegated
+    ? {
+        status: DelegationStatus.Delegated,
+        validator: new PublicKey(account.data.subarray(8, 40)),
+      }
+    : { status: DelegationStatus.Undelegated };
+}
+
+export async function getDelegationRecord(
+  connection: Connection,
+  delegatedAccount: PublicKey,
+  commitment: Commitment = "confirmed",
+): Promise<DelegationRecord> {
+  const accountInfo = await connection.getAccountInfo(
+    delegationRecordPdaFromDelegatedAccount(delegatedAccount),
+    commitment,
+  );
+  return parseDelegationRecordAccount(accountInfo);
+}
 
 /** Class responsible for resolving connections to Solana validators */
 export class Resolver {
@@ -137,16 +166,7 @@ export class Resolver {
     account: AccountInfo<Buffer> | null,
     pubkey: PublicKey,
   ): DelegationRecord {
-    const isDelegated =
-      account !== null &&
-      account.owner.equals(DELEGATION_PROGRAM_ID) &&
-      account.lamports !== 0;
-    const record: DelegationRecord = isDelegated
-      ? {
-          status: DelegationStatus.Delegated,
-          validator: new PublicKey(account.data.subarray(8, 40)),
-        }
-      : { status: DelegationStatus.Undelegated };
+    const record = parseDelegationRecordAccount(account);
     this.delegations.set(pubkey.toString(), record);
     return record;
   }
