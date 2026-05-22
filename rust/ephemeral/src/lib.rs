@@ -4,6 +4,14 @@ use proc_macro2::TokenStream as TokenStream2;
 use quote::quote;
 use syn::{parse_macro_input, ItemMod};
 
+fn generated_unchecked_account_type() -> TokenStream2 {
+    if cfg!(feature = "backward-compat") {
+        quote! { AccountInfo<'info> }
+    } else {
+        quote! { UncheckedAccount<'info> }
+    }
+}
+
 /// This macro attribute is used to inject instructions and struct needed from the delegation program.
 ///
 /// Components can be delegate and undelegated to allow fast udpates in the Ephemeral Rollups.
@@ -107,6 +115,7 @@ fn modify_component_module(mut module: ItemMod) -> ItemMod {
 
 /// Generates the undelegate function and struct.
 fn generate_undelegate() -> (TokenStream2, TokenStream2, TokenStream2) {
+    let unchecked_account = generated_unchecked_account_type();
     (
         quote! {
             use ephemeral_rollups_sdk::cpi::undelegate_account;
@@ -137,15 +146,15 @@ fn generate_undelegate() -> (TokenStream2, TokenStream2, TokenStream2) {
                 pub struct InitializeAfterUndelegation<'info> {
                 /// CHECK:`
                 #[account(mut)]
-                pub base_account: AccountInfo<'info>,
+                pub base_account: #unchecked_account,
                 /// CHECK:`
                 #[account()]
-                pub buffer: AccountInfo<'info>,
+                pub buffer: #unchecked_account,
                 /// CHECK:`
                 #[account(mut)]
-                pub payer: AccountInfo<'info>,
+                pub payer: #unchecked_account,
                 /// CHECK:`
-                pub system_program: AccountInfo<'info>,
+                pub system_program: #unchecked_account,
             }
         },
     )
