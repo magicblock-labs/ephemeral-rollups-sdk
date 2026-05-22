@@ -1,7 +1,8 @@
 import {
   Address,
-  address,
   AccountInfoBase,
+  Commitment,
+  getAddressDecoder,
   lamports,
   getAddressEncoder,
   getProgramDerivedAddress,
@@ -13,12 +14,10 @@ import {
   Rpc,
   SolanaRpcApiDevnet,
   AccountInfoWithBase64EncodedData,
-  getStructCodec,
-  getAddressCodec,
-  getU8Codec,
   AccountRole,
 } from "@solana/kit";
 import { DELEGATION_PROGRAM_ID } from "./constants.js";
+import { delegationRecordPdaFromDelegatedAccount } from "./pda.js";
 
 /**
  * Interface representing the configuration for the connection resolver.
@@ -31,15 +30,50 @@ export interface Configuration {
 }
 
 /** Enumeration of possible delegation statuses */
-enum DelegationStatus {
+export enum DelegationStatus {
   Delegated,
   Undelegated,
 }
 
 /** Type representing a delegation record with status and optional validator information */
-type DelegationRecord =
+export type DelegationRecord =
   | { status: DelegationStatus.Delegated; validator: Address }
   | { status: DelegationStatus.Undelegated };
+
+export function parseDelegationRecordAccount(
+  account: (AccountInfoBase & AccountInfoWithBase64EncodedData) | null,
+): DelegationRecord {
+  const isDelegated =
+    account !== null &&
+    account.owner === DELEGATION_PROGRAM_ID &&
+    account.lamports !== lamports(BigInt(0));
+
+  return isDelegated
+    ? {
+        status: DelegationStatus.Delegated,
+        validator: getAddressDecoder().decode(
+          Buffer.from(account.data[0], "base64").subarray(8, 40),
+        ),
+      }
+    : { status: DelegationStatus.Undelegated };
+}
+
+export async function getDelegationRecord(
+  rpc: Rpc<SolanaRpcApiDevnet>,
+  delegatedAccount: Address,
+  commitment: Commitment = "confirmed",
+): Promise<DelegationRecord> {
+  const accountInfo = await rpc
+    .getAccountInfo(
+      await delegationRecordPdaFromDelegatedAccount(delegatedAccount),
+      {
+        commitment,
+        encoding: "base64",
+      },
+    )
+    .send();
+  return parseDelegationRecordAccount(accountInfo.value);
+}
 
 /** Class responsible for resolving connections to Solana validators */
 export class Resolver {
@@ -150,28 +184,8 @@ export class Resolver {
     account: (AccountInfoBase & AccountInfoWithBase64EncodedData) | null,
     pubkey: Address,
   ): DelegationRecord {
-    const isDelegated =
-      account !== null &&
-      account.owner === DELEGATION_PROGRAM_ID &&
-      account.lamports !== lamports(BigInt(0));
-
-    const record: DelegationRecord = isDelegated
-      ? {
-          status: DelegationStatus.Delegated,
-          validator: (() => {
-            const decodedData = delegationRecordCodec.decode(
-              Buffer.from(account.data[0], "base64"),
-            );
-            return address(decodedData.validator);
-          })(),
-        }
-      : { status: DelegationStatus.Undelegated };
+    const record = parseDelegationRecordAccount(account);
     this.delegations.set(pubkey.toString(), record);
     return record;
   }
 }
-
-const delegationRecordCodec = getStructCodec([
-  ["delegationStatus", getU8Codec()],
-  ["validator", getAddressCodec()],
-]);
