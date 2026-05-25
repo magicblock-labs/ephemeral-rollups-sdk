@@ -103,9 +103,9 @@ impl<'a> DelegateCompressed<'a> {
 
         let account_views = core::array::from_fn::<_, TOTAL_ACCOUNTS, _>(|i| {
             if i == 0 {
-                &self.payer
+                self.payer
             } else if i == 1 {
-                &self.delegated_account
+                self.delegated_account
             } else {
                 &self.remaining_accounts[i - 2]
             }

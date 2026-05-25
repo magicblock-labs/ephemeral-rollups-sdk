@@ -451,6 +451,14 @@ impl<'info> MagicIntentBundle<'info> {
         if let Some(cau_finalize) = &self.commit_finalize_and_undelegate_intent {
             cau_finalize.collect_accounts(all_accounts);
         }
+        if let Some(commit_finalize_compressed) = &self.commit_finalize_compressed_intent {
+            commit_finalize_compressed.collect_accounts(all_accounts);
+        }
+        if let Some(cau_finalize_compressed) =
+            &self.commit_finalize_and_undelegate_compressed_intent
+        {
+            cau_finalize_compressed.collect_accounts(all_accounts);
+        }
     }
 
     /// Normalizes the bundle into a valid, canonical form.
@@ -717,6 +725,46 @@ mod tests {
         assert_eq!(*accounts[2].key, acc1.key);
         assert_eq!(*accounts[3].key, acc2.key);
         assert_eq!(ix.program_id, prog_key);
+    }
+
+    #[test]
+    fn test_fluent_compressed_commit_standalone_collects_accounts() {
+        let owner = compat::Pubkey::new_unique();
+        let mut payer = TestAccount::new();
+        let mut magic_ctx = TestAccount::new();
+        let mut magic_prog = TestAccount::new();
+        let mut acc1 = TestAccount::new();
+
+        let (builder, _) = create_test_builder(&mut payer, &mut magic_ctx, &mut magic_prog, &owner);
+        let info1 = create_mock_account_info(
+            &acc1.key,
+            &mut acc1.lamports,
+            &mut acc1.data,
+            &owner,
+            false,
+            true,
+        );
+
+        let (accounts, ix) = builder
+            .commit(&[info1])
+            .compressed()
+            .build()
+            .schedule_intent_ix;
+
+        assert_eq!(accounts.len(), 3);
+        assert_eq!(*accounts[2].key, acc1.key);
+
+        let MagicBlockInstruction::ScheduleIntentBundle(args) =
+            bincode::deserialize(&ix.data).unwrap()
+        else {
+            panic!("expected ScheduleIntentBundle");
+        };
+        let commit_finalize_compressed =
+            args.commit_finalize_compressed.expect("compressed intent");
+        assert_eq!(
+            commit_finalize_compressed.committed_accounts_indices(),
+            &vec![2]
+        );
     }
 
     #[test]

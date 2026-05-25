@@ -94,9 +94,9 @@ impl<'a> InitializeCompressedRecord<'a> {
 
         let account_views: [&AccountView; TOTAL_ACCOUNTS] = core::array::from_fn(|i| {
             if i == 0 {
-                &self.payer
+                self.payer
             } else if i == 1 {
-                &self.delegated_account
+                self.delegated_account
             } else {
                 &self.remaining_accounts[i - 2]
             }

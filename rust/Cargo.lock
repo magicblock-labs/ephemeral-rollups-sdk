@@ -22,7 +22,6 @@ checksum = "d52a2c365c0245cbb8959de725fc2b44c754b673fdf34c9a7f9d4a25c35a7bf1"
 dependencies = [
  "ahash 0.8.12",
  "solana-epoch-schedule 2.2.1",
- "solana-epoch-schedule 2.2.1",
  "solana-hash 2.3.0",
  "solana-pubkey 2.4.0",
  "solana-sha256-hasher 2.3.0",
@@ -1487,7 +1486,7 @@ dependencies = [
  "ephemeral-vrf-sdk",
  "magicblock-delegation-program-api",
  "magicblock-magic-program-api",
- "pinocchio 0.10.2",
+ "pinocchio 0.10.1",
  "pinocchio-log",
  "pinocchio-pubkey",
  "pinocchio-system",
@@ -2665,9 +2664,8 @@ dependencies = [
 
 [[package]]
 name = "magicblock-magic-program-api"
-version = "0.10.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1dc8fba0307c90b91b70c9ed06d4242d6c4159f331b2f05bf8f875c2a94e0e98"
+version = "0.11.1"
+source = "git+https://github.com/magicblock-labs/magicblock-validator.git?branch=dode%2Fcompression-3x#3bcedc0e292b860972920a18aef6e4f19f9d1fef"
 dependencies = [
  "bincode 1.3.3",
  "const-crypto",
@@ -4051,7 +4049,7 @@ dependencies = [
  "solana-program-error 3.0.1",
  "solana-sanitize 3.0.1",
  "solana-sha256-hasher 3.1.0",
- "wincode 0.4.7",
+ "wincode",
 ]
 
 [[package]]

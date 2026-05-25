@@ -351,7 +351,6 @@ mod tests {
     use magicblock_magic_program_api::args::ActionArgs as SdkActionArgs;
     use magicblock_magic_program_api::Pubkey as MagicPubkey;
     use solana_program::account_info::AccountInfo;
-    use solana_program::pubkey::Pubkey as SolanaPubkey;
 
     use crate::intent_bundle::serialize::MagicIntentBundleSerialize;
 
