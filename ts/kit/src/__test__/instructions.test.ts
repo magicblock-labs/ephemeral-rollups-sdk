@@ -1017,7 +1017,7 @@ describe("Exposed Instructions (@solana/kit)", () => {
     const validator = address(bs58.encode(nacl.sign.keyPair().publicKey));
 
     it("should use the shuttle private transfer instruction for private base-to-base transfers", async () => {
-      const [queue] = await deriveTransferQueue(mint, validator);
+      const [fromEphemeralAta] = await deriveEphemeralAta(from, mint);
       const instructions = await transferSpl(from, to, mint, 25n, {
         visibility: "private",
         fromBalance: "base",
@@ -1031,12 +1031,14 @@ describe("Exposed Instructions (@solana/kit)", () => {
         },
       });
 
-      expect(instructions).toHaveLength(2);
-      expect(instructions[0].data?.[0]).toBe(28);
-      expect(instructions[0].accounts?.[1].address).toBe(queue);
-      const data = Buffer.from(instructions[1].data ?? []);
+      expect(instructions).toHaveLength(3);
+      expect(instructions[0].data?.[0]).toBe(0);
+      expect(instructions[0].accounts?.[0].address).toBe(fromEphemeralAta);
+      expect(instructions[1].data?.[0]).toBe(4);
+      expect(instructions[1].accounts?.[1].address).toBe(fromEphemeralAta);
+      const data = Buffer.from(instructions[2].data ?? []);
       expect(data[0]).toBe(25);
-      expect(instructions[1].accounts).toHaveLength(19);
+      expect(instructions[2].accounts).toHaveLength(19);
       expect(data.readUInt32LE(1)).toBe(7);
       expect(data.readBigUInt64LE(5)).toBe(25n);
 
@@ -1073,7 +1075,7 @@ describe("Exposed Instructions (@solana/kit)", () => {
         },
       });
 
-      const data = Buffer.from(instructions[1].data ?? []);
+      const data = Buffer.from(instructions[2].data ?? []);
       const [, nextOffset] = readLengthPrefixedField(data, 13);
       const [, suffixOffset] = readLengthPrefixedField(data, nextOffset);
       const [suffixField] = readLengthPrefixedField(data, suffixOffset);
@@ -1084,6 +1086,7 @@ describe("Exposed Instructions (@solana/kit)", () => {
     it("should initialize the destination ATA and vault when requested", async () => {
       const [vault] = await deriveVault(mint);
       const [vaultEphemeralAta] = await deriveEphemeralAta(vault, mint);
+      const [fromEphemeralAta] = await deriveEphemeralAta(from, mint);
 
       const instructions = await transferSpl(from, to, mint, 25n, {
         visibility: "private",
@@ -1100,11 +1103,14 @@ describe("Exposed Instructions (@solana/kit)", () => {
         },
       });
 
-      expect(instructions).toHaveLength(5);
+      expect(instructions).toHaveLength(6);
       expect(instructions[2].accounts?.[1].address).toBe(vaultEphemeralAta);
       expect(instructions[2].data?.[0]).toBe(4);
-      expect(instructions[3].data?.[0]).toBe(28);
-      expect(instructions[4].data?.[0]).toBe(25);
+      expect(instructions[3].data?.[0]).toBe(0);
+      expect(instructions[3].accounts?.[0].address).toBe(fromEphemeralAta);
+      expect(instructions[4].data?.[0]).toBe(4);
+      expect(instructions[4].accounts?.[1].address).toBe(fromEphemeralAta);
+      expect(instructions[5].data?.[0]).toBe(25);
     });
 
     it("should prepend source ATA creation when initAtasIfMissing is set on base-source transfers", async () => {

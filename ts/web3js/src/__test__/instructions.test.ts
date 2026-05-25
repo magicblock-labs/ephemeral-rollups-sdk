@@ -1047,7 +1047,7 @@ describe("Exposed Instructions (web3.js)", () => {
     const validator = Keypair.generate().publicKey;
 
     it("should use the shuttle private transfer instruction for private base-to-base transfers", async () => {
-      const [queue] = deriveTransferQueue(mint, validator);
+      const [fromEphemeralAta] = deriveEphemeralAta(from, mint);
       const instructions = await transferSpl(from, to, mint, 25n, {
         visibility: "private",
         fromBalance: "base",
@@ -1061,12 +1061,18 @@ describe("Exposed Instructions (web3.js)", () => {
         },
       });
 
-      expect(instructions).toHaveLength(2);
-      expect(instructions[0].data[0]).toBe(28);
-      expect(instructions[0].keys[1].pubkey.toBase58()).toBe(queue.toBase58());
-      const data = Buffer.from(instructions[1].data);
+      expect(instructions).toHaveLength(3);
+      expect(instructions[0].data[0]).toBe(0);
+      expect(instructions[0].keys[0].pubkey.toBase58()).toBe(
+        fromEphemeralAta.toBase58(),
+      );
+      expect(instructions[1].data[0]).toBe(4);
+      expect(instructions[1].keys[1].pubkey.toBase58()).toBe(
+        fromEphemeralAta.toBase58(),
+      );
+      const data = Buffer.from(instructions[2].data);
       expect(data[0]).toBe(25);
-      expect(instructions[1].keys).toHaveLength(19);
+      expect(instructions[2].keys).toHaveLength(19);
       expect(data.readUInt32LE(1)).toBe(7);
       expect(data.readBigUInt64LE(5)).toBe(25n);
 
@@ -1098,7 +1104,7 @@ describe("Exposed Instructions (web3.js)", () => {
         },
       });
 
-      const data = Buffer.from(instructions[1].data);
+      const data = Buffer.from(instructions[2].data);
       const [suffixField] = readLengthPrefixedField(data, 14 + 80 + 1 + 32);
 
       expect(suffixField).toHaveLength(76);
@@ -1107,6 +1113,7 @@ describe("Exposed Instructions (web3.js)", () => {
     it("should initialize the destination ATA and vault when requested", async () => {
       const [vault] = deriveVault(mint);
       const [vaultEphemeralAta] = deriveEphemeralAta(vault, mint);
+      const [fromEphemeralAta] = deriveEphemeralAta(from, mint);
 
       const instructions = await transferSpl(from, to, mint, 25n, {
         visibility: "private",
@@ -1123,13 +1130,20 @@ describe("Exposed Instructions (web3.js)", () => {
         },
       });
 
-      expect(instructions).toHaveLength(5);
+      expect(instructions).toHaveLength(6);
       expect(instructions[2].keys[1].pubkey.toBase58()).toBe(
         vaultEphemeralAta.toBase58(),
       );
       expect(instructions[2].data[0]).toBe(4);
-      expect(instructions[3].data[0]).toBe(28);
-      expect(instructions[4].data[0]).toBe(25);
+      expect(instructions[3].data[0]).toBe(0);
+      expect(instructions[3].keys[0].pubkey.toBase58()).toBe(
+        fromEphemeralAta.toBase58(),
+      );
+      expect(instructions[4].data[0]).toBe(4);
+      expect(instructions[4].keys[1].pubkey.toBase58()).toBe(
+        fromEphemeralAta.toBase58(),
+      );
+      expect(instructions[5].data[0]).toBe(25);
     });
 
     it("should prepend source ATA creation when initAtasIfMissing is set on base-source transfers", async () => {

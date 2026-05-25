@@ -37,7 +37,6 @@ import {
   depositAndQueueTransferIx,
   deriveTransferQueue,
   initTransferQueueIx,
-  processPendingTransferQueueRefillIx,
 } from "./transferQueue";
 import { encryptEd25519Recipient } from "./crypto";
 import {
@@ -1691,18 +1690,10 @@ export async function transferSpl(
     instructions.push(initVaultAtaIx(payer, fromAta, from, mint));
   }
 
-  const maybeRefillInstructions = async (): Promise<Instruction[]> => {
-    if (opts.fromBalance !== "base" || validator == null) {
-      return [];
-    }
-
-    const [queue] = await deriveTransferQueue(mint, validator);
-    return [await processPendingTransferQueueRefillIx(queue)];
-  };
-
   switch (opts.visibility) {
     case "private":
       if (opts.fromBalance === "base" && opts.toBalance === "base") {
+        const [fromEphemeralAta] = await deriveEphemeralAta(from, mint);
         const [shuttleEphemeralAta] = await deriveShuttleEphemeralAta(
           from,
           mint,
@@ -1716,7 +1707,8 @@ export async function transferSpl(
 
         return [
           ...instructions,
-          ...(await maybeRefillInstructions()),
+          initEphemeralAtaIx(fromEphemeralAta, from, mint, payer),
+          await delegateIx(payer, fromEphemeralAta, validator),
           await depositAndDelegateShuttleEphemeralAtaWithMergeAndPrivateTransferIx(
             payer,
             shuttleEphemeralAta,
