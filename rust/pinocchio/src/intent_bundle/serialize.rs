@@ -137,7 +137,11 @@ impl bincode::Encode for CommitAndUndelegateSerialize<'_, '_, '_> {
             // UndelegateTypeArgs::WithBaseActions { base_actions } - variant index 1
             (1u32).encode(encoder)?;
             // base_actions: NoVec<BaseActionArgs>
-            encode_handler_slice(self.inner.post_undelegate_actions, self.indices_map, encoder)?;
+            encode_handler_slice(
+                self.inner.post_undelegate_actions,
+                self.indices_map,
+                encoder,
+            )?;
         }
 
         Ok(())
