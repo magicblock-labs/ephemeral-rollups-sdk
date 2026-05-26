@@ -50,14 +50,14 @@ export function createPhotonClient(
 /**
  * Derives the compressed derived address for a given delegated account
  * @param delegatedAccount - The delegated account address
+ * @param addressTree - The address tree address
  * @returns The compressed derived address
  */
-export function deriveCda(delegatedAccount: PublicKey) {
+export function deriveCda(delegatedAccount: PublicKey, addressTree: PublicKey) {
   const addressSeed = deriveAddressSeed([delegatedAccount.toBuffer()]);
   return deriveAddress(
     addressSeed,
-    BATCHED_MERKLE_TREE,
-    // ADRESS_TREE,
+    addressTree,
     COMPRESSED_DELEGATION_PROGRAM_ID,
   );
 }
@@ -134,7 +134,10 @@ export async function fetchInitializeRecordData(
   const addressTree = await photonClient.getAddressTreeInfoV2();
   addressTree.queue = OUTPUT_QUEUE;
 
-  const compressedDerivedAddress = deriveCda(delegatedAccount);
+  const compressedDerivedAddress = deriveCda(
+    delegatedAccount,
+    addressTree.tree,
+  );
 
   const systemAccountConfig = SystemAccountMetaConfig.new(
     new PublicKey(COMPRESSED_DELEGATION_PROGRAM_ID),
@@ -177,7 +180,7 @@ export async function fetchInitializeRecordDataBytes(
   photonClient: Rpc,
   delegatedAccount: PublicKey,
 ) {
-  let {
+  const {
     validityProof,
     packedAddressTreeInfo,
     outputStateTreeIndex,
@@ -208,14 +211,16 @@ export async function fetchDelegateCompressedData(
 
   await photonClient.getStateTreeInfos();
   photonClient.allStateTreeInfos?.push({
-    // tree: BATCHED_MERKLE_TREE,
-    tree: ADDRESS_TREE,
+    tree: BATCHED_MERKLE_TREE,
     queue: OUTPUT_QUEUE,
     treeType: TreeType.StateV2,
     nextTreeInfo: null,
   });
 
-  const compressedDerivedAddress = deriveCda(delegatedAccount);
+  const compressedDerivedAddress = deriveCda(
+    delegatedAccount,
+    addressTree.tree,
+  );
 
   const compressedDelegatedRecord = await photonClient.getCompressedAccount(
     compressedDerivedAddress.toBytes(),
@@ -265,9 +270,13 @@ export async function fetchDelegateCompressedData(
     compressedDelegatedRecord.treeInfo.queue,
   );
 
+  if (!packedTreeInfos.stateTrees) {
+    throw new Error(`Packed tree infos state trees is null`);
+  }
+
   const accountMeta: CompressedAccountMeta = {
     treeInfo: {
-      ...packedTreeInfos.stateTrees!.packedTreeInfos[0],
+      ...packedTreeInfos.stateTrees.packedTreeInfos[0],
       merkleTreePubkeyIndex: addressMerkleTreePubkeyIndex,
       queuePubkeyIndex: addressQueuePubkeyIndex,
       leafIndex: compressedDelegatedRecord.leafIndex,
