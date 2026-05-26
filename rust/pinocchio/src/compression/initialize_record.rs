@@ -77,6 +77,10 @@ impl<'a> InitializeCompressedRecord<'a> {
         const LIGHT_ACCOUNTS: usize = 8;
         const TOTAL_ACCOUNTS: usize = 2 + LIGHT_ACCOUNTS;
 
+        if self.remaining_accounts.len() < LIGHT_ACCOUNTS {
+            return Err(ProgramError::NotEnoughAccountKeys);
+        }
+
         // 2 + 8 Accounts from Light
         let ix_accounts: [InstructionAccount<'_>; TOTAL_ACCOUNTS] = core::array::from_fn(|i| {
             if i == 0 {
