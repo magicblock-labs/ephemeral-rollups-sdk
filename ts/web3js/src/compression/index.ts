@@ -25,7 +25,7 @@ export const COMPRESSED_DELEGATION_PROGRAM_ID = new PublicKey(
 export const BATCHED_MERKLE_TREE = new PublicKey(
   "bmt1LryLZUMmF7ZtqESaw7wifBXLfXHQYoE4GAmrahU",
 );
-export const ADRESS_TREE = new PublicKey(
+export const ADDRESS_TREE = new PublicKey(
   "amt2kaJA14v3urZbZvnc5v2np8jqvc4Z8zDep5wbtzx",
 );
 export const OUTPUT_QUEUE = new PublicKey(
@@ -209,7 +209,7 @@ export async function fetchDelegateCompressedData(
   await photonClient.getStateTreeInfos();
   photonClient.allStateTreeInfos?.push({
     // tree: BATCHED_MERKLE_TREE,
-    tree: ADRESS_TREE,
+    tree: ADDRESS_TREE,
     queue: OUTPUT_QUEUE,
     treeType: TreeType.StateV2,
     nextTreeInfo: null,
