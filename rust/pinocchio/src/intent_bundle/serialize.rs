@@ -89,12 +89,62 @@ impl<'acc, 'args> Deref for CommitAndUndelegateSerialize<'_, 'acc, 'args> {
 }
 
 impl bincode::Encode for CommitAndUndelegateSerialize<'_, '_, '_> {
-    #[inline(never)]
+    /// Streaming encoder that avoids materializing `CommitAndUndelegateArgs` (~1712 bytes)
+    /// on the stack, staying within the Solana sBPF 4096-byte stack-frame limit.
+    ///
+    /// Wire format is identical to `CommitAndUndelegateArgs::encode()`.
+    ///
+    /// `#[inline(always)]`: after streaming away the 1712-byte struct, this body
+    /// has effectively zero stack footprint, so inlining into the parent
+    /// `MagicIntentBundleSerialize::encode` (which itself is `#[inline(never)]`
+    /// and gets its own sBPF frame) is the right trade-off — removes a call
+    /// frame and lets the compiler optimize across the boundary.
+    #[inline(always)]
     fn encode<E: Encoder>(&self, encoder: &mut E) -> Result<(), EncodeError> {
-        self.inner // Copy — CommitAndUndelegateIntent is three fat pointers
-            .into_args(self.indices_map)
-            .map_err(|_| EncodeError::Other("CommitAndUndelegateIntent::into_args failed"))?
-            .encode(encoder)
+        // Read directly from `self.*` rather than introducing local copies; on
+        // sBPF every avoided binding is stack we don't pay for.
+
+        // ===== commit_type (enum) =====
+        if self.inner.post_commit_actions.is_empty() {
+            // CommitTypeArgs::Standalone(indices) - variant index 0
+            (0u32).encode(encoder)?;
+            // NoVec<u8>: length + elements
+            (self.inner.accounts.len() as u64).encode(encoder)?;
+            for account in self.inner.accounts {
+                get_index(self.indices_map, account.address())
+                    .ok_or(EncodeError::Other("account not in indices_map"))?
+                    .encode(encoder)?;
+            }
+        } else {
+            // CommitTypeArgs::WithBaseActions { committed_accounts, base_actions } - variant index 1
+            (1u32).encode(encoder)?;
+            // committed_accounts: NoVec<u8>
+            (self.inner.accounts.len() as u64).encode(encoder)?;
+            for account in self.inner.accounts {
+                get_index(self.indices_map, account.address())
+                    .ok_or(EncodeError::Other("account not in indices_map"))?
+                    .encode(encoder)?;
+            }
+            // base_actions: NoVec<BaseActionArgs>
+            encode_handler_slice(self.inner.post_commit_actions, self.indices_map, encoder)?;
+        }
+
+        // ===== undelegate_type (enum) =====
+        if self.inner.post_undelegate_actions.is_empty() {
+            // UndelegateTypeArgs::Standalone - variant index 0 (no data)
+            (0u32).encode(encoder)?;
+        } else {
+            // UndelegateTypeArgs::WithBaseActions { base_actions } - variant index 1
+            (1u32).encode(encoder)?;
+            // base_actions: NoVec<BaseActionArgs>
+            encode_handler_slice(
+                self.inner.post_undelegate_actions,
+                self.indices_map,
+                encoder,
+            )?;
+        }
+
+        Ok(())
     }
 }
 
