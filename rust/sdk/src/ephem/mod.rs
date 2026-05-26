@@ -475,10 +475,20 @@ impl<'info> MagicIntentBundle<'info> {
         if let Some(ref mut value) = self.commit_intent {
             value.dedup();
         }
+        if let Some(ref mut value) = self.commit_finalize_compressed_intent {
+            value.dedup();
+        }
         let cau = self.commit_and_undelegate_intent.as_mut().map(|value| {
             let seen = value.dedup();
             (seen, value)
         });
+        let cau_compressed = self
+            .commit_finalize_and_undelegate_compressed_intent
+            .as_mut()
+            .map(|value| {
+                let seen = value.dedup();
+                (seen, value)
+            });
 
         // Remove cross intent duplicates
         // Only proceed if both intents exist; otherwise no cross-intent dedup needed
@@ -492,6 +502,21 @@ impl<'info> MagicIntentBundle<'info> {
             // No commit_intent or neither intent exists - nothing to restore
             _ => return,
         };
+
+        if let (Some(mut commit), Some((cau_pubkeys, cau))) = (
+            self.commit_finalize_compressed_intent.take(),
+            cau_compressed,
+        ) {
+            commit
+                .committed_accounts_mut()
+                .retain(|el| !cau_pubkeys.contains(el.key));
+
+            if commit.committed_accounts().is_empty() {
+                cau.commit_type.merge(commit);
+            } else {
+                self.commit_finalize_compressed_intent = Some(commit);
+            }
+        }
 
         // If accounts in CommitAndUndelegate and Commit intents overlap
         // we keep them only in CommitAndUndelegate Intent and remove from Commit
