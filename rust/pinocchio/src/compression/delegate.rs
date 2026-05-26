@@ -94,6 +94,11 @@ impl<'a> DelegateCompressed<'a> {
     pub fn invoke_signed(&self, signer_seeds: &[Signer<'_, '_>]) -> ProgramResult {
         const LIGHT_ACCOUNTS: usize = 8;
         const TOTAL_ACCOUNTS: usize = 2 + LIGHT_ACCOUNTS;
+
+        if self.remaining_accounts.len() < LIGHT_ACCOUNTS {
+            return Err(ProgramError::NotEnoughAccountKeys);
+        }
+
         let ix_accounts = core::array::from_fn::<_, TOTAL_ACCOUNTS, _>(|i| {
             if i == 0 {
                 InstructionAccount::writable_signer(self.payer.address())
