@@ -77,14 +77,30 @@ impl CdpPackedAddressTreeInfo {
     }
 }
 
-pub fn build_pda_seeds<'a, const N: usize>(buf: &'a mut [u8; N], seeds: &[&'a [u8]]) -> &'a [u8] {
-    let mut offset = 4;
-    buf[0..offset].copy_from_slice(&(seeds.len() as u32).to_le_bytes());
+pub fn build_pda_seeds<'a, const N: usize>(
+    buf: &'a mut [u8; N],
+    seeds: &[&'a [u8]],
+) -> Result<&'a [u8], ProgramError> {
+    let seeds_len_u32 = u32::try_from(seeds.len()).map_err(|_| ProgramError::InvalidArgument)?;
+    let mut offset = 4usize;
+    if offset > N {
+        return Err(ProgramError::InvalidArgument);
+    }
+    buf[..4].copy_from_slice(&seeds_len_u32.to_le_bytes());
+
     for seed in seeds {
-        buf[offset..offset + 4].copy_from_slice(&(seed.len() as u32).to_le_bytes());
+        let seed_len_u32 = u32::try_from(seed.len()).map_err(|_| ProgramError::InvalidArgument)?;
+        let needed = offset
+            .checked_add(4)
+            .and_then(|v| v.checked_add(seed.len()))
+            .ok_or(ProgramError::InvalidArgument)?;
+        if needed > N {
+            return Err(ProgramError::InvalidArgument);
+        }
+        buf[offset..offset + 4].copy_from_slice(&seed_len_u32.to_le_bytes());
         offset += 4;
         buf[offset..offset + seed.len()].copy_from_slice(seed);
         offset += seed.len();
     }
-    &buf[..offset]
+    Ok(&buf[..offset])
 }

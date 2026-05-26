@@ -99,6 +99,12 @@ impl<'args> MagicIntentBundle<'_, 'args> {
         if let Some(cau) = &self.commit_and_undelegate_intent {
             cau.collect_unique_accounts(unique_accounts)?;
         }
+        if let Some(commit) = &self.commit_finalize_compressed_intent {
+            commit.collect_unique_accounts(unique_accounts)?;
+        }
+        if let Some(cau) = &self.commit_finalize_compressed_and_undelegate_intent {
+            cau.collect_unique_accounts(unique_accounts)?;
+        }
         Ok(())
     }
 
@@ -114,6 +120,14 @@ impl<'args> MagicIntentBundle<'_, 'args> {
             commit.try_collect_unique_addresses(&mut seen)?;
         }
         if let Some(cau) = &self.commit_and_undelegate_intent {
+            cau.validate()?;
+            cau.try_collect_unique_addresses(&mut seen)?;
+        }
+        if let Some(commit) = &self.commit_finalize_compressed_intent {
+            commit.validate()?;
+            commit.try_collect_unique_addresses(&mut seen)?;
+        }
+        if let Some(cau) = &self.commit_finalize_compressed_and_undelegate_intent {
             cau.validate()?;
             cau.try_collect_unique_addresses(&mut seen)?;
         }
