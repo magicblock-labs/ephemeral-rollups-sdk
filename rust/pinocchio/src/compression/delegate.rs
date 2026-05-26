@@ -36,7 +36,14 @@ impl<'a> DelegateCompressedArgs<'a> {
             1
         };
         if data.len()
-            < proof_len + 4 + 64 + self.account_data.len() + self.borsh_pda_seeds.len() + 1
+            < proof_len
+                + 4   // account_meta
+                + 64  // owner_program_id + validator
+                + 1   // bump
+                + 4   // account_data length prefix
+                + self.account_data.len()
+                + 4   // borsh_pda_seeds length prefix
+                + self.borsh_pda_seeds.len()
         {
             return Err(ProgramError::InvalidArgument);
         }
