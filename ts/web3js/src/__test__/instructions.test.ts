@@ -1023,8 +1023,8 @@ describe("Exposed Instructions (web3.js)", () => {
         tokenProgram: TOKEN_2022_PROGRAM_ID,
       });
 
-      const ataInstruction = instructions.find(
-        (ix) => ix.keys[5]?.pubkey.equals(TOKEN_2022_PROGRAM_ID),
+      const ataInstruction = instructions.find((ix) =>
+        ix.keys[5]?.pubkey.equals(TOKEN_2022_PROGRAM_ID),
       );
       const withdrawInstruction = instructions.find((ix) => ix.data[0] === 26);
 
@@ -1774,12 +1774,7 @@ describe("Exposed Instructions (web3.js)", () => {
       const owner = new PublicKey("11111111111111111111111111111113");
       const mint = new PublicKey("11111111111111111111111111111114");
       const [vault] = deriveVault(mint);
-      const instruction = withdrawSplIx(
-        owner,
-        mint,
-        1n,
-        TOKEN_2022_PROGRAM_ID,
-      );
+      const instruction = withdrawSplIx(owner, mint, 1n, TOKEN_2022_PROGRAM_ID);
 
       expect(instruction.keys[4].pubkey.toBase58()).toBe(
         deriveVaultAta(mint, vault, TOKEN_2022_PROGRAM_ID).toBase58(),
