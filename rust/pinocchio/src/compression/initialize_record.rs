@@ -106,7 +106,7 @@ impl<'a> InitializeCompressedRecord<'a> {
             }
         });
 
-        let mut data = [0u8; 8 + 129 + 4 + 1 + 32 + 1 + MAX_SEEDS * (4 + MAX_SEED_LEN)];
+        let mut data = [0u8; 8 + 129 + 4 + 1 + 32 + 1 + (4 + MAX_SEEDS * (4 + MAX_SEED_LEN))];
         data[..8].copy_from_slice(&INITIALIZE_COMPRESSED_RECORD_DISCRIMINATOR);
         let args_len = self.args.try_write_to(&mut data[8..])?;
         let total_len = 8 + args_len;
