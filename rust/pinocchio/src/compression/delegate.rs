@@ -11,6 +11,16 @@ use crate::compression::{
     MAX_ACCOUNT_DATA_SIZE,
 };
 
+pub const DELEGATE_COMPRESSED_MAX_DATA_LEN: usize = 8   // discriminator
+    + 129 // validity_proof (tag + proof)
+    + core::mem::size_of::<CdpCompressedAccountMeta>()
+    + 64  // owner + validator
+    + 4   // account_data len
+    + MAX_ACCOUNT_DATA_SIZE
+    + 4   // borsh_pda_seeds len
+    + (4 + MAX_SEEDS * (4 + MAX_SEED_LEN)) // encoded seeds payload
+    + 1; // bump
+
 pub struct DelegateCompressedArgs<'a> {
     /// The proof of the account data
     pub validity_proof: CdpValidityProof,
@@ -37,7 +47,7 @@ impl<'a> DelegateCompressedArgs<'a> {
         };
         if data.len()
             < proof_len
-                + 4   // account_meta
+                + core::mem::size_of::<CdpCompressedAccountMeta>()
                 + 64  // owner_program_id + validator
                 + 1   // bump
                 + 4   // account_data length prefix
@@ -56,8 +66,8 @@ impl<'a> DelegateCompressedArgs<'a> {
             offset += 128;
         }
 
-        data[offset..offset + 4].copy_from_slice(&self.account_meta.0);
-        offset += 4;
+        data[offset..offset + self.account_meta.0.len()].copy_from_slice(&self.account_meta.0);
+        offset += self.account_meta.0.len();
         data[offset..offset + 32].copy_from_slice(self.owner_program_id.as_ref());
         offset += 32;
         data[offset..offset + 32].copy_from_slice(self.validator.as_ref());
@@ -76,6 +86,16 @@ impl<'a> DelegateCompressedArgs<'a> {
 
         Ok(offset)
     }
+
+    pub fn try_write_instruction_data(&self, data: &mut [u8]) -> Result<usize, ProgramError> {
+        if data.len() < 8 {
+            return Err(ProgramError::InvalidArgument);
+        }
+
+        data[..8].copy_from_slice(&DELEGATE_COMPRESSED_DISCRIMINATOR);
+        let args_len = self.try_write_to(&mut data[8..])?;
+        Ok(8 + args_len)
+    }
 }
 
 pub struct DelegateCompressed<'a> {
@@ -87,11 +107,48 @@ pub struct DelegateCompressed<'a> {
 }
 
 impl<'a> DelegateCompressed<'a> {
+    /// Calculate the data length for the delegate compressed instruction
+    pub const fn data_len(seeds_len: &[u8], account_data_len: usize) -> usize {
+        let mut i = 0;
+        let mut total_seed_len = 0;
+        while i < seeds_len.len() {
+            total_seed_len += 4 + seeds_len[i] as usize;
+            i += 1;
+        }
+        8 + 129
+            + core::mem::size_of::<CdpCompressedAccountMeta>()
+            + 64
+            + 4
+            + account_data_len
+            + 4
+            + total_seed_len
+            + 1
+    }
+
+    /// Invoke the instruction with no signer seeds
+    /// Uses a default data buffer of size [DELEGATE_COMPRESSED_MAX_DATA_LEN]
     pub fn invoke(&self) -> ProgramResult {
         self.invoke_signed(&[])
     }
 
+    /// Invoke the instruction with a custom data buffer
+    pub fn invoke_with_data(&self, data: &mut [u8]) -> ProgramResult {
+        self.invoke_signed_with_data(data, &[])
+    }
+
+    /// Invoke the instruction with signer seeds.
+    /// Uses a default data buffer of size [DELEGATE_COMPRESSED_MAX_DATA_LEN]
     pub fn invoke_signed(&self, signer_seeds: &[Signer<'_, '_>]) -> ProgramResult {
+        let mut data = [0u8; DELEGATE_COMPRESSED_MAX_DATA_LEN];
+        self.invoke_signed_with_data(&mut data, signer_seeds)
+    }
+
+    /// Invoke the instruction with a custom data buffer and signer seeds
+    pub fn invoke_signed_with_data(
+        &self,
+        data: &mut [u8],
+        signer_seeds: &[Signer<'_, '_>],
+    ) -> ProgramResult {
         const LIGHT_ACCOUNTS: usize = 8;
         const TOTAL_ACCOUNTS: usize = 2 + LIGHT_ACCOUNTS;
 
@@ -123,21 +180,7 @@ impl<'a> DelegateCompressed<'a> {
             }
         });
 
-        let mut data = [0u8;
-            8   // discriminator
-            + 129 // validity_proof (tag + proof)
-            + 4   // account_meta
-            + 64  // owner + validator
-            + 4   // account_data len
-            + MAX_ACCOUNT_DATA_SIZE
-            + 4   // borsh_pda_seeds len
-            + (4 + MAX_SEEDS * (4 + MAX_SEED_LEN)) // encoded seeds payload
-            + 1   // bump
-        ];
-        data[..8].copy_from_slice(&DELEGATE_COMPRESSED_DISCRIMINATOR);
-        let args_len = self.args.try_write_to(&mut data[8..])?;
-        let total_len = 8 + args_len;
-
+        let total_len = self.args.try_write_instruction_data(data)?;
         let ix = InstructionView {
             program_id: self.compressed_delegation_program.address(),
             accounts: &ix_accounts,

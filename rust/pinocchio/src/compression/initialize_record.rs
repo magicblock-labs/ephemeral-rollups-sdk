@@ -10,6 +10,9 @@ use crate::compression::{
     CdpPackedAddressTreeInfo, CdpValidityProof, INITIALIZE_COMPRESSED_RECORD_DISCRIMINATOR,
 };
 
+pub const INITIALIZE_COMPRESSED_RECORD_MAX_DATA_LEN: usize =
+    8 + 129 + 4 + 1 + 32 + 1 + (4 + MAX_SEEDS * (4 + MAX_SEED_LEN));
+
 #[repr(C)]
 pub struct InitializeCompressedRecordArgs<'a> {
     /// The proof of the account data
@@ -58,6 +61,16 @@ impl<'a> InitializeCompressedRecordArgs<'a> {
 
         Ok(offset)
     }
+
+    pub fn try_write_instruction_data(&self, data: &mut [u8]) -> Result<usize, ProgramError> {
+        if data.len() < 8 {
+            return Err(ProgramError::InvalidArgument);
+        }
+
+        data[..8].copy_from_slice(&INITIALIZE_COMPRESSED_RECORD_DISCRIMINATOR);
+        let args_len = self.try_write_to(&mut data[8..])?;
+        Ok(8 + args_len)
+    }
 }
 
 pub struct InitializeCompressedRecord<'a> {
@@ -69,11 +82,41 @@ pub struct InitializeCompressedRecord<'a> {
 }
 
 impl<'a> InitializeCompressedRecord<'a> {
+    /// Calculate the data length for the initialize compressed record instruction
+    pub const fn data_len(seeds_len: &[u8]) -> usize {
+        let mut i = 0;
+        let mut total_seed_len = 0;
+        while i < seeds_len.len() {
+            total_seed_len += 4 + seeds_len[i] as usize;
+            i += 1;
+        }
+        8 + 129 + 4 + 1 + 32 + 1 + 4 + total_seed_len
+    }
+
+    /// Invoke the instruction with no signer seeds
+    /// Uses a default data buffer of size [INITIALIZE_COMPRESSED_RECORD_MAX_DATA_LEN]
     pub fn invoke(&self) -> ProgramResult {
         self.invoke_signed(&[])
     }
 
+    /// Invoke the instruction with a custom data buffer
+    pub fn invoke_with_data(&self, data: &mut [u8]) -> ProgramResult {
+        self.invoke_signed_with_data(data, &[])
+    }
+
+    /// Invoke the instruction with signer seeds.
+    /// Uses a default data buffer of size [INITIALIZE_COMPRESSED_RECORD_MAX_DATA_LEN]
     pub fn invoke_signed(&self, signer_seeds: &[Signer<'_, '_>]) -> ProgramResult {
+        let mut data = [0u8; INITIALIZE_COMPRESSED_RECORD_MAX_DATA_LEN];
+        self.invoke_signed_with_data(&mut data, signer_seeds)
+    }
+
+    /// Invoke the instruction with a custom data buffer and signer seeds
+    pub fn invoke_signed_with_data(
+        &self,
+        data: &mut [u8],
+        signer_seeds: &[Signer<'_, '_>],
+    ) -> ProgramResult {
         const LIGHT_ACCOUNTS: usize = 8;
         const TOTAL_ACCOUNTS: usize = 2 + LIGHT_ACCOUNTS;
 
@@ -106,11 +149,7 @@ impl<'a> InitializeCompressedRecord<'a> {
             }
         });
 
-        let mut data = [0u8; 8 + 129 + 4 + 1 + 32 + 1 + (4 + MAX_SEEDS * (4 + MAX_SEED_LEN))];
-        data[..8].copy_from_slice(&INITIALIZE_COMPRESSED_RECORD_DISCRIMINATOR);
-        let args_len = self.args.try_write_to(&mut data[8..])?;
-        let total_len = 8 + args_len;
-
+        let total_len = self.args.try_write_instruction_data(data)?;
         let ix = InstructionView {
             program_id: self.compressed_delegation_program.address(),
             accounts: &ix_accounts,
