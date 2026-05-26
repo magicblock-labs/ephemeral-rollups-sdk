@@ -123,8 +123,17 @@ impl<'a> DelegateCompressed<'a> {
             }
         });
 
-        let mut data =
-            [0u8; 8 + 129 + 64 + MAX_ACCOUNT_DATA_SIZE + 1 + MAX_SEEDS * (4 + MAX_SEED_LEN)];
+        let mut data = [0u8;
+            8   // discriminator
+            + 129 // validity_proof (tag + proof)
+            + 4   // account_meta
+            + 64  // owner + validator
+            + 4   // account_data len
+            + MAX_ACCOUNT_DATA_SIZE
+            + 4   // borsh_pda_seeds len
+            + (4 + MAX_SEEDS * (4 + MAX_SEED_LEN)) // encoded seeds payload
+            + 1   // bump
+        ];
         data[..8].copy_from_slice(&DELEGATE_COMPRESSED_DISCRIMINATOR);
         let args_len = self.args.try_write_to(&mut data[8..])?;
         let total_len = 8 + args_len;
