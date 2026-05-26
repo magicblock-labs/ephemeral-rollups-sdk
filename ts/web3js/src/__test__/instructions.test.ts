@@ -31,6 +31,7 @@ import {
   deriveShuttleAta,
   deriveShuttleEphemeralAta,
   deriveVault,
+  deriveVaultAta,
   ensureTransferQueueCrankIx,
   initEphemeralAtaIx,
   initTransferQueueIx,
@@ -51,6 +52,7 @@ import {
   MAGIC_PROGRAM_ID,
   MAGIC_CONTEXT_ID,
   PERMISSION_PROGRAM_ID,
+  TOKEN_2022_PROGRAM_ID,
 } from "../constants";
 import {
   delegateBufferPdaFromDelegatedAccountAndOwnerProgram,
@@ -881,6 +883,41 @@ describe("Exposed Instructions (web3.js)", () => {
       ).toBe(true);
     });
 
+    it("should use the token program override in idempotent flow", async () => {
+      const [vault] = deriveVault(mint);
+      const vaultAta = deriveVaultAta(mint, vault, TOKEN_2022_PROGRAM_ID);
+
+      const instructions = await delegateSpl(owner, mint, 1n, {
+        validator,
+        initVaultIfMissing: true,
+        initAtasIfMissing: true,
+        shuttleId: 7,
+        tokenProgram: TOKEN_2022_PROGRAM_ID,
+      });
+      const setupAndDelegateInstruction = instructions.find(
+        (ix) => ix.data[0] === 24,
+      );
+
+      expect(instructions[0].keys[4].pubkey.toBase58()).toBe(
+        vaultAta.toBase58(),
+      );
+      expect(instructions[0].keys[5].pubkey.toBase58()).toBe(
+        TOKEN_2022_PROGRAM_ID.toBase58(),
+      );
+      expect(instructions[1].keys[1].pubkey.toBase58()).toBe(
+        vaultAta.toBase58(),
+      );
+      expect(instructions[1].keys[5].pubkey.toBase58()).toBe(
+        TOKEN_2022_PROGRAM_ID.toBase58(),
+      );
+      expect(setupAndDelegateInstruction?.keys[15].pubkey.toBase58()).toBe(
+        TOKEN_2022_PROGRAM_ID.toBase58(),
+      );
+      expect(setupAndDelegateInstruction?.keys[18].pubkey.toBase58()).toBe(
+        vaultAta.toBase58(),
+      );
+    });
+
     it("should keep the shuttle eata writable in the zero-amount shuttle setup flow", async () => {
       const [shuttleEphemeralAta] = deriveShuttleEphemeralAta(owner, mint, 7);
       const [shuttleAta] = deriveShuttleAta(shuttleEphemeralAta, mint);
@@ -978,6 +1015,25 @@ describe("Exposed Instructions (web3.js)", () => {
       expect(instructions.find((ix) => ix.data[0] === 3)).toBeUndefined();
     });
 
+    it("should use the token program override when idempotent", async () => {
+      const instructions = await withdrawSpl(owner, mint, 1n, {
+        validator,
+        initAtasIfMissing: true,
+        shuttleId: 7,
+        tokenProgram: TOKEN_2022_PROGRAM_ID,
+      });
+
+      const ataInstruction = instructions.find((ix) =>
+        ix.keys[5]?.pubkey.equals(TOKEN_2022_PROGRAM_ID),
+      );
+      const withdrawInstruction = instructions.find((ix) => ix.data[0] === 26);
+
+      expect(ataInstruction).toBeDefined();
+      expect(withdrawInstruction?.keys[15].pubkey.toBase58()).toBe(
+        TOKEN_2022_PROGRAM_ID.toBase58(),
+      );
+    });
+
     it("should fall back to the legacy withdraw instruction when idempotent is false", async () => {
       const instructions = await withdrawSpl(owner, mint, 1n, {
         idempotent: false,
@@ -1047,7 +1103,7 @@ describe("Exposed Instructions (web3.js)", () => {
     const validator = Keypair.generate().publicKey;
 
     it("should use the shuttle private transfer instruction for private base-to-base transfers", async () => {
-      const [queue] = deriveTransferQueue(mint, validator);
+      const [fromEphemeralAta] = deriveEphemeralAta(from, mint);
       const instructions = await transferSpl(from, to, mint, 25n, {
         visibility: "private",
         fromBalance: "base",
@@ -1061,12 +1117,18 @@ describe("Exposed Instructions (web3.js)", () => {
         },
       });
 
-      expect(instructions).toHaveLength(2);
-      expect(instructions[0].data[0]).toBe(28);
-      expect(instructions[0].keys[1].pubkey.toBase58()).toBe(queue.toBase58());
-      const data = Buffer.from(instructions[1].data);
+      expect(instructions).toHaveLength(3);
+      expect(instructions[0].data[0]).toBe(0);
+      expect(instructions[0].keys[0].pubkey.toBase58()).toBe(
+        fromEphemeralAta.toBase58(),
+      );
+      expect(instructions[1].data[0]).toBe(4);
+      expect(instructions[1].keys[1].pubkey.toBase58()).toBe(
+        fromEphemeralAta.toBase58(),
+      );
+      const data = Buffer.from(instructions[2].data);
       expect(data[0]).toBe(25);
-      expect(instructions[1].keys).toHaveLength(19);
+      expect(instructions[2].keys).toHaveLength(19);
       expect(data.readUInt32LE(1)).toBe(7);
       expect(data.readBigUInt64LE(5)).toBe(25n);
 
@@ -1098,7 +1160,7 @@ describe("Exposed Instructions (web3.js)", () => {
         },
       });
 
-      const data = Buffer.from(instructions[1].data);
+      const data = Buffer.from(instructions[2].data);
       const [suffixField] = readLengthPrefixedField(data, 14 + 80 + 1 + 32);
 
       expect(suffixField).toHaveLength(76);
@@ -1107,6 +1169,7 @@ describe("Exposed Instructions (web3.js)", () => {
     it("should initialize the destination ATA and vault when requested", async () => {
       const [vault] = deriveVault(mint);
       const [vaultEphemeralAta] = deriveEphemeralAta(vault, mint);
+      const [fromEphemeralAta] = deriveEphemeralAta(from, mint);
 
       const instructions = await transferSpl(from, to, mint, 25n, {
         visibility: "private",
@@ -1123,13 +1186,60 @@ describe("Exposed Instructions (web3.js)", () => {
         },
       });
 
-      expect(instructions).toHaveLength(5);
+      expect(instructions).toHaveLength(6);
       expect(instructions[2].keys[1].pubkey.toBase58()).toBe(
         vaultEphemeralAta.toBase58(),
       );
       expect(instructions[2].data[0]).toBe(4);
-      expect(instructions[3].data[0]).toBe(28);
-      expect(instructions[4].data[0]).toBe(25);
+      expect(instructions[3].data[0]).toBe(0);
+      expect(instructions[3].keys[0].pubkey.toBase58()).toBe(
+        fromEphemeralAta.toBase58(),
+      );
+      expect(instructions[4].data[0]).toBe(4);
+      expect(instructions[4].keys[1].pubkey.toBase58()).toBe(
+        fromEphemeralAta.toBase58(),
+      );
+      expect(instructions[5].data[0]).toBe(25);
+    });
+
+    it("should use the token program override when initializing the vault", async () => {
+      const [vault] = deriveVault(mint);
+      const vaultAta = deriveVaultAta(mint, vault, TOKEN_2022_PROGRAM_ID);
+
+      const instructions = await transferSpl(from, to, mint, 25n, {
+        visibility: "private",
+        fromBalance: "base",
+        toBalance: "base",
+        validator,
+        shuttleId: 7,
+        initVaultIfMissing: true,
+        tokenProgram: TOKEN_2022_PROGRAM_ID,
+        privateTransfer: {
+          minDelayMs: 100n,
+          maxDelayMs: 300n,
+          split: 4,
+        },
+      });
+
+      expect(instructions).toHaveLength(6);
+      expect(instructions[0].keys[4].pubkey.toBase58()).toBe(
+        vaultAta.toBase58(),
+      );
+      expect(instructions[0].keys[5].pubkey.toBase58()).toBe(
+        TOKEN_2022_PROGRAM_ID.toBase58(),
+      );
+      expect(instructions[1].keys[1].pubkey.toBase58()).toBe(
+        vaultAta.toBase58(),
+      );
+      expect(instructions[1].keys[5].pubkey.toBase58()).toBe(
+        TOKEN_2022_PROGRAM_ID.toBase58(),
+      );
+      expect(instructions[5].keys[14].pubkey.toBase58()).toBe(
+        TOKEN_2022_PROGRAM_ID.toBase58(),
+      );
+      expect(instructions[5].keys[17].pubkey.toBase58()).toBe(
+        vaultAta.toBase58(),
+      );
     });
 
     it("should prepend source ATA creation when initAtasIfMissing is set on base-source transfers", async () => {
@@ -1628,6 +1738,25 @@ describe("Exposed Instructions (web3.js)", () => {
         deriveEphemeralAta(vault, mint)[0].toBase58(),
       );
     });
+
+    it("should accept a token program override", () => {
+      const vault = new PublicKey("11111111111111111111111111111113");
+      const mint = new PublicKey("11111111111111111111111111111114");
+      const payer = new PublicKey("11111111111111111111111111111115");
+      const instruction = initVaultIx(
+        vault,
+        mint,
+        payer,
+        TOKEN_2022_PROGRAM_ID,
+      );
+
+      expect(instruction.keys[4].pubkey.toBase58()).toBe(
+        deriveVaultAta(mint, vault, TOKEN_2022_PROGRAM_ID).toBase58(),
+      );
+      expect(instruction.keys[5].pubkey.toBase58()).toBe(
+        TOKEN_2022_PROGRAM_ID.toBase58(),
+      );
+    });
   });
 
   describe("withdrawSplIx (Ephemeral SPL Token Program)", () => {
@@ -1639,6 +1768,20 @@ describe("Exposed Instructions (web3.js)", () => {
       expect(instruction.data).toHaveLength(9);
       expect(instruction.data[0]).toBe(3);
       expect(Buffer.from(instruction.data).readBigUInt64LE(1)).toBe(1n);
+    });
+
+    it("should accept a token program override", () => {
+      const owner = new PublicKey("11111111111111111111111111111113");
+      const mint = new PublicKey("11111111111111111111111111111114");
+      const [vault] = deriveVault(mint);
+      const instruction = withdrawSplIx(owner, mint, 1n, TOKEN_2022_PROGRAM_ID);
+
+      expect(instruction.keys[4].pubkey.toBase58()).toBe(
+        deriveVaultAta(mint, vault, TOKEN_2022_PROGRAM_ID).toBase58(),
+      );
+      expect(instruction.keys[6].pubkey.toBase58()).toBe(
+        TOKEN_2022_PROGRAM_ID.toBase58(),
+      );
     });
   });
 

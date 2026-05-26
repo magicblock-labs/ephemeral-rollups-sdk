@@ -157,6 +157,7 @@ export function depositAndQueueTransferIx(
   split: number = 1,
   reimbursementTokenInfo: PublicKey = source,
   clientRefId?: bigint,
+  tokenProgram: PublicKey = TOKEN_PROGRAM_ID,
 ): TransactionInstruction {
   if (!Number.isInteger(split) || split <= 0 || split > 0xffff_ffff) {
     throw new Error("split must fit in u32");
@@ -193,7 +194,7 @@ export function depositAndQueueTransferIx(
       { pubkey: vaultAta, isSigner: false, isWritable: true },
       { pubkey: destination, isSigner: false, isWritable: false },
       { pubkey: owner, isSigner: true, isWritable: false },
-      { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
+      { pubkey: tokenProgram, isSigner: false, isWritable: false },
       { pubkey: reimbursementTokenInfo, isSigner: false, isWritable: true },
     ],
     data: new Uint8Array(data),
