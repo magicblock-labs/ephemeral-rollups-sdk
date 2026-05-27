@@ -130,7 +130,6 @@ export async function fetchInitializeRecordData(
   photonClient: Rpc,
   delegatedAccount: PublicKey,
 ) {
-  console.log("V2", featureFlags.isV2());
   const addressTree = await photonClient.getAddressTreeInfoV2();
   addressTree.queue = OUTPUT_QUEUE;
 

@@ -17,7 +17,6 @@ pub const DELEGATE_COMPRESSED_MAX_DATA_LEN: usize = 8   // discriminator
     + 64  // owner + validator
     + 4   // account_data len
     + MAX_ACCOUNT_DATA_SIZE
-    + 4   // borsh_pda_seeds len
     + (4 + MAX_SEEDS * (4 + MAX_SEED_LEN)) // encoded seeds payload
     + 1; // bump
 
@@ -30,12 +29,12 @@ pub struct DelegateCompressedArgs<'a> {
     pub owner_program_id: &'a Address,
     /// Validator
     pub validator: &'a Address,
+    /// Bump
+    pub bump: u8,
     /// Account data before delegation
     pub account_data: &'a [u8],
     /// PDA seeds
     pub borsh_pda_seeds: &'a [u8],
-    /// Bump
-    pub bump: u8,
 }
 
 impl<'a> DelegateCompressedArgs<'a> {
@@ -52,7 +51,6 @@ impl<'a> DelegateCompressedArgs<'a> {
                 + 1   // bump
                 + 4   // account_data length prefix
                 + self.account_data.len()
-                + 4   // borsh_pda_seeds length prefix
                 + self.borsh_pda_seeds.len()
         {
             return Err(ProgramError::InvalidArgument);
@@ -62,27 +60,43 @@ impl<'a> DelegateCompressedArgs<'a> {
         data[offset] = self.validity_proof.0.is_some() as u8;
         offset += 1;
         if let Some(proof) = self.validity_proof.0 {
-            data[offset..offset + 128].copy_from_slice(&proof);
-            offset += 128;
+            data[offset..offset + 32].copy_from_slice(&proof.a);
+            offset += 32;
+            data[offset..offset + 64].copy_from_slice(&proof.b);
+            offset += 64;
+            data[offset..offset + 32].copy_from_slice(&proof.c);
+            offset += 32;
         }
 
-        data[offset..offset + self.account_meta.0.len()].copy_from_slice(&self.account_meta.0);
-        offset += self.account_meta.0.len();
+        data[offset..offset + 2]
+            .copy_from_slice(&self.account_meta.tree_info.root_index.to_le_bytes());
+        offset += 2;
+        data[offset] = self.account_meta.tree_info.prove_by_index as u8;
+        offset += 1;
+        data[offset] = self.account_meta.tree_info.merkle_tree_pubkey_index;
+        offset += 1;
+        data[offset] = self.account_meta.tree_info.queue_pubkey_index;
+        offset += 1;
+        data[offset..offset + 4]
+            .copy_from_slice(&self.account_meta.tree_info.leaf_index.to_le_bytes());
+        offset += 4;
+        data[offset..offset + 32].copy_from_slice(&self.account_meta.address);
+        offset += 32;
+        data[offset] = self.account_meta.output_state_tree_index;
+        offset += 1;
+
         data[offset..offset + 32].copy_from_slice(self.owner_program_id.as_ref());
         offset += 32;
         data[offset..offset + 32].copy_from_slice(self.validator.as_ref());
         offset += 32;
+        data[offset] = self.bump;
+        offset += 1;
         data[offset..offset + 4].copy_from_slice(&(self.account_data.len() as u32).to_le_bytes());
         offset += 4;
         data[offset..offset + self.account_data.len()].copy_from_slice(self.account_data);
         offset += self.account_data.len();
-        data[offset..offset + 4]
-            .copy_from_slice(&(self.borsh_pda_seeds.len() as u32).to_le_bytes());
-        offset += 4;
         data[offset..offset + self.borsh_pda_seeds.len()].copy_from_slice(self.borsh_pda_seeds);
         offset += self.borsh_pda_seeds.len();
-        data[offset] = self.bump;
-        offset += 1;
 
         Ok(offset)
     }
@@ -120,7 +134,6 @@ impl<'a> DelegateCompressed<'a> {
             + 64
             + 4
             + account_data_len
-            + 4
             + total_seed_len
             + 1
     }

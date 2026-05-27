@@ -14,69 +14,7 @@ pub const EXTERNAL_UNDELEGATE_DISCRIMINATOR: [u8; 8] =
     [0xD, 0x23, 0xB0, 0x7C, 0x70, 0x68, 0xFE, 0x73];
 pub const MAX_ACCOUNT_DATA_SIZE: usize = 500;
 
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
-pub struct CdpValidityProof(pub Option<[u8; 128]>);
-
-impl CdpValidityProof {
-    pub fn parse(bytes: &[u8]) -> Result<(Self, usize), ProgramError> {
-        if bytes.is_empty() {
-            return Err(ProgramError::InvalidInstructionData);
-        }
-        if bytes[0] == 0 {
-            return Ok((Self(None), 1));
-        }
-        if bytes.len() < 129 {
-            return Err(ProgramError::InvalidInstructionData);
-        }
-        Ok((
-            Self(Some(
-                bytes[1..129]
-                    .try_into()
-                    .map_err(|_| ProgramError::InvalidInstructionData)?,
-            )),
-            129,
-        ))
-    }
-}
-
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub struct CdpCompressedAccountMeta(pub [u8; 42]);
-
-impl CdpCompressedAccountMeta {
-    pub fn parse(bytes: &[u8]) -> Result<(Self, usize), ProgramError> {
-        if bytes.len() < core::mem::size_of::<Self>() {
-            return Err(ProgramError::InvalidInstructionData);
-        }
-        Ok((
-            Self(
-                bytes[..42]
-                    .try_into()
-                    .map_err(|_| ProgramError::InvalidInstructionData)?,
-            ),
-            core::mem::size_of::<Self>(),
-        ))
-    }
-}
-
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
-pub struct CdpPackedAddressTreeInfo(pub [u8; 4]);
-
-impl CdpPackedAddressTreeInfo {
-    pub fn parse(bytes: &[u8]) -> Result<(Self, usize), ProgramError> {
-        if bytes.len() < core::mem::size_of::<Self>() {
-            return Err(ProgramError::InvalidInstructionData);
-        }
-        Ok((
-            Self(
-                bytes[..4]
-                    .try_into()
-                    .map_err(|_| ProgramError::InvalidInstructionData)?,
-            ),
-            4,
-        ))
-    }
-}
-
+/// Builds the borsh encoded PDA seeds.
 pub fn build_pda_seeds<'a, const N: usize>(
     buf: &'a mut [u8; N],
     seeds: &[&'a [u8]],
@@ -103,4 +41,169 @@ pub fn build_pda_seeds<'a, const N: usize>(
         offset += seed.len();
     }
     Ok(&buf[..offset])
+}
+
+// ------------------------------------------------------------------------------------------------
+// Reimplementations of the types from light-sdk for borsh compatibility
+// ------------------------------------------------------------------------------------------------
+
+/// Reimplements [ValidityProof] compatible with borsh 1.
+/// It is a wrapper around a [CompressedProof] [Option] that is compatible with borsh 1.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct CdpValidityProof(pub Option<CdpCompressedProof>);
+
+impl CdpValidityProof {
+    pub const WIRE_LEN: usize = 129;
+
+    pub fn parse(bytes: &[u8]) -> Result<(Self, usize), ProgramError> {
+        if bytes.is_empty() {
+            return Err(ProgramError::InvalidInstructionData);
+        }
+        if bytes[0] == 0 {
+            return Ok((Self(None), 1));
+        }
+        if bytes.len() < Self::WIRE_LEN {
+            return Err(ProgramError::InvalidInstructionData);
+        }
+        Ok((
+            Self(Some(
+                CdpCompressedProof::parse(&bytes[1..Self::WIRE_LEN])
+                    .map_err(|_| ProgramError::InvalidInstructionData)?
+                    .0,
+            )),
+            Self::WIRE_LEN,
+        ))
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct CdpCompressedProof {
+    pub a: [u8; 32],
+    pub b: [u8; 64],
+    pub c: [u8; 32],
+}
+
+impl CdpCompressedProof {
+    pub fn parse(bytes: &[u8]) -> Result<(Self, usize), ProgramError> {
+        if bytes.len() < core::mem::size_of::<Self>() {
+            return Err(ProgramError::InvalidInstructionData);
+        }
+        Ok((
+            Self {
+                a: bytes[..32]
+                    .try_into()
+                    .map_err(|_| ProgramError::InvalidInstructionData)?,
+                b: bytes[32..96]
+                    .try_into()
+                    .map_err(|_| ProgramError::InvalidInstructionData)?,
+                c: bytes[96..128]
+                    .try_into()
+                    .map_err(|_| ProgramError::InvalidInstructionData)?,
+            },
+            core::mem::size_of::<Self>(),
+        ))
+    }
+}
+
+/// Reimplements [CompressedAccountMeta] compatible with borsh 1.
+/// It is a wrapper around a [CompressedAccountMeta] that is compatible with borsh 1.
+#[derive(Clone, Copy, Debug, PartialEq, Default)]
+pub struct CdpCompressedAccountMeta {
+    pub tree_info: CdpPackedStateTreeInfo,
+    pub address: [u8; 32],
+    pub output_state_tree_index: u8,
+}
+
+impl CdpCompressedAccountMeta {
+    pub const WIRE_LEN: usize = 42;
+
+    pub fn parse(bytes: &[u8]) -> Result<(Self, usize), ProgramError> {
+        if bytes.len() < Self::WIRE_LEN {
+            return Err(ProgramError::InvalidInstructionData);
+        }
+        Ok((
+            Self {
+                tree_info: CdpPackedStateTreeInfo::parse(
+                    &bytes[..CdpPackedStateTreeInfo::WIRE_LEN],
+                )
+                .map_err(|_| ProgramError::InvalidInstructionData)?
+                .0,
+                address: bytes[9..41]
+                    .try_into()
+                    .map_err(|_| ProgramError::InvalidInstructionData)?,
+                output_state_tree_index: bytes[41],
+            },
+            Self::WIRE_LEN,
+        ))
+    }
+}
+
+/// Reimplements [PackedStateTreeInfo] compatible with borsh 1.
+/// It is a wrapper around a [PackedStateTreeInfo] that is compatible with borsh 1.
+#[derive(Clone, Copy, Debug, PartialEq, Default)]
+pub struct CdpPackedStateTreeInfo {
+    pub root_index: u16,
+    pub prove_by_index: bool,
+    pub merkle_tree_pubkey_index: u8,
+    pub queue_pubkey_index: u8,
+    pub leaf_index: u32,
+}
+
+impl CdpPackedStateTreeInfo {
+    pub const WIRE_LEN: usize = 9;
+
+    pub fn parse(bytes: &[u8]) -> Result<(Self, usize), ProgramError> {
+        if bytes.len() < Self::WIRE_LEN {
+            return Err(ProgramError::InvalidInstructionData);
+        }
+        Ok((
+            Self {
+                root_index: u16::from_le_bytes(
+                    bytes[0..2]
+                        .try_into()
+                        .map_err(|_| ProgramError::InvalidInstructionData)?,
+                ),
+                prove_by_index: bytes[2] == 1,
+                merkle_tree_pubkey_index: bytes[3],
+                queue_pubkey_index: bytes[4],
+                leaf_index: u32::from_le_bytes(
+                    bytes[5..9]
+                        .try_into()
+                        .map_err(|_| ProgramError::InvalidInstructionData)?,
+                ),
+            },
+            Self::WIRE_LEN,
+        ))
+    }
+}
+
+/// Reimplements [PackedAddressTreeInfo] compatible with borsh 1.
+/// It is a wrapper around a [PackedAddressTreeInfo] that is compatible with borsh 1.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct CdpPackedAddressTreeInfo {
+    pub address_merkle_tree_pubkey_index: u8,
+    pub address_queue_pubkey_index: u8,
+    pub root_index: u16,
+}
+
+impl CdpPackedAddressTreeInfo {
+    pub const WIRE_LEN: usize = 4;
+
+    pub fn parse(bytes: &[u8]) -> Result<(Self, usize), ProgramError> {
+        if bytes.len() < Self::WIRE_LEN {
+            return Err(ProgramError::InvalidInstructionData);
+        }
+        Ok((
+            Self {
+                address_merkle_tree_pubkey_index: bytes[0],
+                address_queue_pubkey_index: bytes[1],
+                root_index: u16::from_le_bytes(
+                    bytes[2..4]
+                        .try_into()
+                        .map_err(|_| ProgramError::InvalidInstructionData)?,
+                ),
+            },
+            Self::WIRE_LEN,
+        ))
+    }
 }

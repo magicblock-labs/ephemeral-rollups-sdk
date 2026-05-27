@@ -44,12 +44,20 @@ impl<'a> InitializeCompressedRecordArgs<'a> {
         data[offset] = self.validity_proof.0.is_some() as u8;
         offset += 1;
         if let Some(proof) = self.validity_proof.0 {
-            data[offset..offset + 128].copy_from_slice(&proof);
-            offset += 128;
+            data[offset..offset + 32].copy_from_slice(&proof.a);
+            offset += 32;
+            data[offset..offset + 64].copy_from_slice(&proof.b);
+            offset += 64;
+            data[offset..offset + 32].copy_from_slice(&proof.c);
+            offset += 32;
         }
 
-        data[offset..offset + 4].copy_from_slice(&self.address_tree_info.0);
-        offset += 4;
+        data[offset] = self.address_tree_info.address_merkle_tree_pubkey_index;
+        offset += 1;
+        data[offset] = self.address_tree_info.address_queue_pubkey_index;
+        offset += 1;
+        data[offset..offset + 2].copy_from_slice(&self.address_tree_info.root_index.to_le_bytes());
+        offset += 2;
         data[offset] = self.output_state_tree_index;
         offset += 1;
         data[offset..offset + 32].copy_from_slice(self.owner_program_id.as_ref());
@@ -83,6 +91,23 @@ pub struct InitializeCompressedRecord<'a> {
 
 impl<'a> InitializeCompressedRecord<'a> {
     /// Calculate the data length for the initialize compressed record instruction
+    ///
+    /// # Arguments
+    ///
+    /// * `seeds_len` - An array of the length of each seed
+    ///
+    /// # Returns
+    ///
+    /// The data length for the initialize compressed record instruction data array
+    ///
+    /// # Examples
+    ///
+    /// ```ignore
+    /// let seeds = ["counter", "1234567890"];
+    /// let seeds_len = [7, 10];
+    /// let data_len = InitializeCompressedRecord::data_len(&seeds_len);
+    /// InitializeCompressedRecord { .. }.invoke_with_data(&mut data)?;
+    /// ```
     pub const fn data_len(seeds_len: &[u8]) -> usize {
         let mut i = 0;
         let mut total_seed_len = 0;
