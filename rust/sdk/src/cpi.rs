@@ -140,7 +140,7 @@ fn delegate_account_inner<'a, 'info>(
     };
 
     if any_validator {
-        cpi_delegate(
+        cpi_delegate_with_any_validator(
             accounts.payer,
             accounts.pda,
             accounts.owner_program,
@@ -152,7 +152,7 @@ fn delegate_account_inner<'a, 'info>(
             delegation_args,
         )?;
     } else {
-        cpi_delegate_with_any_validator(
+        cpi_delegate(
             accounts.payer,
             accounts.pda,
             accounts.owner_program,
