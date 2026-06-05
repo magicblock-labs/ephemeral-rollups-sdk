@@ -50,6 +50,25 @@ pub fn delegate_account<'a, 'info>(
     pda_seeds: &[&[u8]],
     config: DelegateConfig,
 ) -> compat::ProgramResult {
+    delegate_account_inner(accounts, pda_seeds, config, false)
+}
+
+#[allow(clippy::needless_lifetimes)]
+pub fn delegate_account_with_any_validator<'a, 'info>(
+    accounts: DelegateAccounts<'a, 'info>,
+    pda_seeds: &[&[u8]],
+    config: DelegateConfig,
+) -> compat::ProgramResult {
+    delegate_account_inner(accounts, pda_seeds, config, true)
+}
+
+#[allow(clippy::needless_lifetimes)]
+fn delegate_account_inner<'a, 'info>(
+    accounts: DelegateAccounts<'a, 'info>,
+    pda_seeds: &[&[u8]],
+    config: DelegateConfig,
+    any_validator: bool,
+) -> compat::ProgramResult {
     let buffer_seeds: &[&[u8]] = delegate_buffer_seeds_from_delegated_account!(accounts.pda.key);
 
     let (_, delegate_account_bump) =
@@ -120,17 +139,31 @@ pub fn delegate_account<'a, 'info>(
         validator: config.validator,
     };
 
-    cpi_delegate(
-        accounts.payer,
-        accounts.pda,
-        accounts.owner_program,
-        accounts.buffer,
-        accounts.delegation_record,
-        accounts.delegation_metadata,
-        accounts.system_program,
-        pda_signer_seeds,
-        delegation_args,
-    )?;
+    if any_validator {
+        cpi_delegate(
+            accounts.payer,
+            accounts.pda,
+            accounts.owner_program,
+            accounts.buffer,
+            accounts.delegation_record,
+            accounts.delegation_metadata,
+            accounts.system_program,
+            pda_signer_seeds,
+            delegation_args,
+        )?;
+    } else {
+        cpi_delegate_with_any_validator(
+            accounts.payer,
+            accounts.pda,
+            accounts.owner_program,
+            accounts.buffer,
+            accounts.delegation_record,
+            accounts.delegation_metadata,
+            accounts.system_program,
+            pda_signer_seeds,
+            delegation_args,
+        )?;
+    }
 
     close_pda_with_system_transfer(
         accounts.buffer,
@@ -303,6 +336,60 @@ pub fn cpi_delegate<'a, 'info>(
     signers_seeds: &[&[&[u8]]],
     args: DelegateAccountArgs,
 ) -> compat::ProgramResult {
+    cpi_delegate_with_discriminator(
+        0,
+        payer,
+        delegate_account,
+        owner_program,
+        buffer,
+        delegation_record,
+        delegation_metadata,
+        system_program,
+        signers_seeds,
+        args,
+    )
+}
+
+/// CPI to the delegation program to delegate the account
+#[allow(clippy::too_many_arguments)]
+pub fn cpi_delegate_with_any_validator<'a, 'info>(
+    payer: &'a compat::AccountInfo<'info>,
+    delegate_account: &'a compat::AccountInfo<'info>,
+    owner_program: &'a compat::AccountInfo<'info>,
+    buffer: &'a compat::AccountInfo<'info>,
+    delegation_record: &'a compat::AccountInfo<'info>,
+    delegation_metadata: &'a compat::AccountInfo<'info>,
+    system_program: &'a compat::AccountInfo<'info>,
+    signers_seeds: &[&[&[u8]]],
+    args: DelegateAccountArgs,
+) -> compat::ProgramResult {
+    cpi_delegate_with_discriminator(
+        19,
+        payer,
+        delegate_account,
+        owner_program,
+        buffer,
+        delegation_record,
+        delegation_metadata,
+        system_program,
+        signers_seeds,
+        args,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+fn cpi_delegate_with_discriminator<'a, 'info>(
+    discriminator: u64,
+    payer: &'a compat::AccountInfo<'info>,
+    delegate_account: &'a compat::AccountInfo<'info>,
+    owner_program: &'a compat::AccountInfo<'info>,
+    buffer: &'a compat::AccountInfo<'info>,
+    delegation_record: &'a compat::AccountInfo<'info>,
+    delegation_metadata: &'a compat::AccountInfo<'info>,
+    system_program: &'a compat::AccountInfo<'info>,
+    signers_seeds: &[&[&[u8]]],
+    args: DelegateAccountArgs,
+) -> compat::ProgramResult {
     modernize!(
         payer,
         delegate_account,
@@ -313,7 +400,7 @@ pub fn cpi_delegate<'a, 'info>(
         system_program
     );
 
-    let mut data: Vec<u8> = vec![0u8; 8];
+    let mut data: Vec<u8> = discriminator.to_le_bytes().to_vec();
     args.serialize(&mut data)
         .map_err(|_| compat::latest::ProgramError::BorshIoError.compat())?;
 
