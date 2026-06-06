@@ -2,18 +2,19 @@ import {
   AccountRole,
   Address,
   Instruction,
-  address,
   getAddressEncoder,
   getProgramDerivedAddress,
 } from "@solana/kit";
 import { SYSTEM_PROGRAM_ADDRESS } from "@solana-program/system";
 
 import {
+  ASSOCIATED_TOKEN_PROGRAM_ID,
   DELEGATION_PROGRAM_ID,
   EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
   MAGIC_CONTEXT_ID,
   MAGIC_PROGRAM_ID,
   PERMISSION_PROGRAM_ID,
+  TOKEN_PROGRAM_ID,
 } from "../../constants";
 import {
   delegateBufferPdaFromDelegatedAccountAndOwnerProgram,
@@ -32,10 +33,6 @@ const QUEUE_SEED = new TextEncoder().encode("queue");
 const QUEUE_REFILL_STATE_SEED = new TextEncoder().encode("queue-refill");
 const RENT_PDA_SEED = new TextEncoder().encode("rent");
 const LAMPORTS_PDA_SEED = new TextEncoder().encode("lamports");
-const TOKEN_PROGRAM_ADDRESS = address(
-  "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
-);
-
 /**
  * Derive the transfer queue PDA for a mint/validator pair.
  * @param mint - The mint account address
@@ -58,6 +55,37 @@ export async function deriveTransferQueue(
   return [queue, bump];
 }
 
+export async function deriveQueueEphemeralAta(
+  mint: Address,
+  validator: Address,
+): Promise<[Address, number]> {
+  const addressEncoder = getAddressEncoder();
+  const [queue] = await deriveTransferQueue(mint, validator);
+  const [queueEphemeralAta, bump] = await getProgramDerivedAddress({
+    programAddress: EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
+    seeds: [addressEncoder.encode(queue), addressEncoder.encode(mint)],
+  });
+  return [queueEphemeralAta, bump];
+}
+
+export async function deriveQueueVaultAta(
+  mint: Address,
+  validator: Address,
+  tokenProgram: Address = TOKEN_PROGRAM_ID,
+): Promise<Address> {
+  const addressEncoder = getAddressEncoder();
+  const [queue] = await deriveTransferQueue(mint, validator);
+  const [ata] = await getProgramDerivedAddress({
+    programAddress: ASSOCIATED_TOKEN_PROGRAM_ID,
+    seeds: [
+      addressEncoder.encode(queue),
+      addressEncoder.encode(tokenProgram),
+      addressEncoder.encode(mint),
+    ],
+  });
+  return ata;
+}
+
 /**
  * Initialize the per-validator transfer queue for a mint.
  * @param payer - The payer account
@@ -73,7 +101,15 @@ export async function initTransferQueueIx(
   mint: Address,
   validator: Address,
   requestedItems?: number,
+  tokenProgram: Address = TOKEN_PROGRAM_ID,
 ): Promise<Instruction> {
+  const [queueEphemeralAta] = await deriveQueueEphemeralAta(mint, validator);
+  const queueVaultAta = await deriveQueueVaultAta(
+    mint,
+    validator,
+    tokenProgram,
+  );
+
   return {
     accounts: [
       { address: payer, role: AccountRole.WRITABLE_SIGNER },
@@ -86,6 +122,29 @@ export async function initTransferQueueIx(
       { address: validator, role: AccountRole.READONLY },
       { address: SYSTEM_PROGRAM_ADDRESS, role: AccountRole.READONLY },
       { address: PERMISSION_PROGRAM_ID, role: AccountRole.READONLY },
+      { address: queueEphemeralAta, role: AccountRole.WRITABLE },
+      { address: queueVaultAta, role: AccountRole.WRITABLE },
+      { address: tokenProgram, role: AccountRole.READONLY },
+      { address: ASSOCIATED_TOKEN_PROGRAM_ID, role: AccountRole.READONLY },
+      { address: EPHEMERAL_SPL_TOKEN_PROGRAM_ID, role: AccountRole.READONLY },
+      {
+        address: await delegateBufferPdaFromDelegatedAccountAndOwnerProgram(
+          queueEphemeralAta,
+          EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
+        ),
+        role: AccountRole.WRITABLE,
+      },
+      {
+        address:
+          await delegationRecordPdaFromDelegatedAccount(queueEphemeralAta),
+        role: AccountRole.WRITABLE,
+      },
+      {
+        address:
+          await delegationMetadataPdaFromDelegatedAccount(queueEphemeralAta),
+        role: AccountRole.WRITABLE,
+      },
+      { address: DELEGATION_PROGRAM_ID, role: AccountRole.READONLY },
     ],
     data:
       requestedItems === undefined
@@ -117,7 +176,7 @@ export function allocateTransferQueueIx(queue: Address): Instruction {
 /**
  * Deposit SPL tokens into the vault and queue one or more delayed transfers.
  * @param queue - The transfer queue PDA
- * @param vault - The mint vault PDA
+ * @param vault - The vault authority PDA (global vault or transfer queue)
  * @param mint - The mint account
  * @param source - The sender token account
  * @param vaultAta - The vault token account
@@ -145,6 +204,7 @@ export function depositAndQueueTransferIx(
   split: number = 1,
   reimbursementTokenInfo: Address = source,
   clientRefId?: bigint,
+  tokenProgram: Address = TOKEN_PROGRAM_ID,
 ): Instruction {
   if (!Number.isInteger(split) || split <= 0 || split > 0xffff_ffff) {
     throw new Error("split must fit in u32");
@@ -181,7 +241,7 @@ export function depositAndQueueTransferIx(
       { address: vaultAta, role: AccountRole.WRITABLE },
       { address: destination, role: AccountRole.READONLY },
       { address: owner, role: AccountRole.READONLY_SIGNER },
-      { address: TOKEN_PROGRAM_ADDRESS, role: AccountRole.READONLY },
+      { address: tokenProgram, role: AccountRole.READONLY },
       { address: reimbursementTokenInfo, role: AccountRole.WRITABLE },
     ],
     data: new Uint8Array(data),

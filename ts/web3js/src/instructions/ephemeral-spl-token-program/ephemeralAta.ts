@@ -22,6 +22,7 @@ import {
 } from "../../pda.js";
 import {
   depositAndQueueTransferIx,
+  deriveQueueVaultAta,
   deriveTransferQueue,
   initTransferQueueIx,
   toTransactionInstruction,
@@ -1704,7 +1705,14 @@ export async function delegateSplWithPrivateTransfer(
   if (initTransferQueueIfMissing) {
     instructions.push(
       toTransactionInstruction(
-        initTransferQueueIx(payer, queue, mint, validator),
+        initTransferQueueIx(
+          payer,
+          queue,
+          mint,
+          validator,
+          undefined,
+          tokenProgram,
+        ),
       ),
     );
   }
@@ -1771,8 +1779,6 @@ export async function transferSpl(
   const exactOut = opts.privateTransfer?.exactOut ?? true;
   const clientRefId = opts.privateTransfer?.clientRefId;
 
-  console.log("opts: ", opts);
-
   const fromAta = getAssociatedTokenAddressSync(
     mint,
     from,
@@ -1792,10 +1798,25 @@ export async function transferSpl(
           }
 
           const [queue] = deriveTransferQueue(mint, validator);
-          const [vault] = deriveVault(mint);
-          const vaultAta = deriveVaultAta(mint, vault, tokenProgram);
+          const vault = queue;
+          const vaultAta = deriveQueueVaultAta(mint, validator, tokenProgram);
+          const setupInstructions = initVaultIfMissing
+            ? [
+                toTransactionInstruction(
+                  initTransferQueueIx(
+                    payer,
+                    queue,
+                    mint,
+                    validator,
+                    undefined,
+                    tokenProgram,
+                  ),
+                ),
+              ]
+            : [];
 
           return [
+            ...setupInstructions,
             toTransactionInstruction(
               depositAndQueueTransferIx(
                 queue,
@@ -1861,6 +1882,34 @@ export async function transferSpl(
       initVaultIx(vault, mint, payer, tokenProgram),
       initVaultAtaIx(payer, vaultAta, vault, mint, tokenProgram),
       delegateEphemeralAtaIx(payer, vaultEphemeralAta, validator),
+    );
+  }
+
+  if (
+    initVaultIfMissing &&
+    opts.visibility === "private" &&
+    opts.fromBalance === "base" &&
+    opts.toBalance === "base"
+  ) {
+    if (validator == null) {
+      throw new Error(
+        "validator is required for private base-to-base transfers",
+      );
+    }
+
+    const [queue] = deriveTransferQueue(mint, validator);
+
+    instructions.push(
+      toTransactionInstruction(
+        initTransferQueueIx(
+          payer,
+          queue,
+          mint,
+          validator,
+          undefined,
+          tokenProgram,
+        ),
+      ),
     );
   }
 
