@@ -35,6 +35,7 @@ import {
 } from "../../pda";
 import {
   depositAndQueueTransferIx,
+  deriveQueueVaultAta,
   deriveTransferQueue,
   initTransferQueueIx,
 } from "./transferQueue";
@@ -1635,10 +1636,14 @@ export async function transferSpl(
           }
 
           const [queue] = await deriveTransferQueue(mint, validator);
-          const [vault] = await deriveVault(mint);
-          const vaultAta = await deriveVaultAta(mint, vault);
+          const vault = queue;
+          const vaultAta = await deriveQueueVaultAta(mint, validator);
+          const setupInstructions = initVaultIfMissing
+            ? [await initTransferQueueIx(payer, queue, mint, validator)]
+            : [];
 
           return [
+            ...setupInstructions,
             depositAndQueueTransferIx(
               queue,
               vault,
@@ -1684,6 +1689,22 @@ export async function transferSpl(
       initVaultAtaIx(payer, vaultAta, vault, mint),
       await delegateIx(payer, vaultEphemeralAta, validator),
     );
+  }
+
+  if (
+    initVaultIfMissing &&
+    opts.visibility === "private" &&
+    opts.fromBalance === "base" &&
+    opts.toBalance === "base"
+  ) {
+    if (validator == null) {
+      throw new Error(
+        "validator is required for private base-to-base transfers",
+      );
+    }
+
+    const [queue] = await deriveTransferQueue(mint, validator);
+    instructions.push(await initTransferQueueIx(payer, queue, mint, validator));
   }
 
   if (opts.fromBalance === "base" && initAtasIfMissing) {

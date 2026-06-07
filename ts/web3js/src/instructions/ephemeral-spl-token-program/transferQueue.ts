@@ -6,6 +6,7 @@ import {
 } from "@solana/web3.js";
 
 import {
+  ASSOCIATED_TOKEN_PROGRAM_ID,
   DELEGATION_PROGRAM_ID,
   EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
   MAGIC_CONTEXT_ID,
@@ -67,6 +68,30 @@ export function deriveTransferQueue(
   );
 }
 
+export function deriveQueueEphemeralAta(
+  mint: PublicKey,
+  validator: PublicKey,
+): [PublicKey, number] {
+  const [queue] = deriveTransferQueue(mint, validator);
+  return PublicKey.findProgramAddressSync(
+    [queue.toBuffer(), mint.toBuffer()],
+    EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
+  );
+}
+
+export function deriveQueueVaultAta(
+  mint: PublicKey,
+  validator: PublicKey,
+  tokenProgram: PublicKey = TOKEN_PROGRAM_ID,
+): PublicKey {
+  const [queue] = deriveTransferQueue(mint, validator);
+  const [ata] = PublicKey.findProgramAddressSync(
+    [queue.toBuffer(), tokenProgram.toBuffer(), mint.toBuffer()],
+    ASSOCIATED_TOKEN_PROGRAM_ID,
+  );
+  return ata;
+}
+
 /**
  * Initialize the per-validator transfer queue for a mint.
  * @param payer - The payer account
@@ -82,7 +107,11 @@ export function initTransferQueueIx(
   mint: PublicKey,
   validator: PublicKey,
   requestedItems?: number,
+  tokenProgram: PublicKey = TOKEN_PROGRAM_ID,
 ): TransactionInstruction {
+  const [queueEphemeralAta] = deriveQueueEphemeralAta(mint, validator);
+  const queueVaultAta = deriveQueueVaultAta(mint, validator, tokenProgram);
+
   return toTransactionInstruction({
     accounts: [
       { pubkey: payer, isSigner: true, isWritable: true },
@@ -96,6 +125,38 @@ export function initTransferQueueIx(
       { pubkey: validator, isSigner: false, isWritable: false },
       { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
       { pubkey: PERMISSION_PROGRAM_ID, isSigner: false, isWritable: false },
+      { pubkey: queueEphemeralAta, isSigner: false, isWritable: true },
+      { pubkey: queueVaultAta, isSigner: false, isWritable: true },
+      { pubkey: tokenProgram, isSigner: false, isWritable: false },
+      {
+        pubkey: ASSOCIATED_TOKEN_PROGRAM_ID,
+        isSigner: false,
+        isWritable: false,
+      },
+      {
+        pubkey: EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
+        isSigner: false,
+        isWritable: false,
+      },
+      {
+        pubkey: delegateBufferPdaFromDelegatedAccountAndOwnerProgram(
+          queueEphemeralAta,
+          EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
+        ),
+        isSigner: false,
+        isWritable: true,
+      },
+      {
+        pubkey: delegationRecordPdaFromDelegatedAccount(queueEphemeralAta),
+        isSigner: false,
+        isWritable: true,
+      },
+      {
+        pubkey: delegationMetadataPdaFromDelegatedAccount(queueEphemeralAta),
+        isSigner: false,
+        isWritable: true,
+      },
+      { pubkey: DELEGATION_PROGRAM_ID, isSigner: false, isWritable: false },
     ],
     data:
       requestedItems === undefined
@@ -129,7 +190,7 @@ export function allocateTransferQueueIx(
 /**
  * Deposit SPL tokens into the vault and queue one or more delayed transfers.
  * @param queue - The transfer queue PDA
- * @param vault - The mint vault PDA
+ * @param vault - The vault authority PDA (global vault or transfer queue)
  * @param mint - The mint account
  * @param source - The sender token account
  * @param vaultAta - The vault token account
