@@ -21,8 +21,8 @@ impl<'a> UndelegateEphemeralAta<'a> {
             program_id: ESPL_TOKEN_PROGRAM_ID,
             accounts: vec![
                 compat::AccountMeta::new_readonly(*self.payer.key, true),
-                compat::AccountMeta::new(*self.user_ata.key, false),
-                compat::AccountMeta::new_readonly(*self.eata.key, false),
+                compat::AccountMeta::new_readonly(*self.user_ata.key, false),
+                compat::AccountMeta::new(*self.eata.key, false),
                 compat::AccountMeta::new(*self.magic_context.key, false),
                 compat::AccountMeta::new_readonly(*self.magic_program.key, false),
             ],

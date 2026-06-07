@@ -21,8 +21,8 @@ impl UndelegateEphemeralAtaBuilder {
             program_id: ESPL_TOKEN_PROGRAM_ID,
             accounts: vec![
                 compat::AccountMeta::new_readonly(self.payer, true),
-                compat::AccountMeta::new(user_ata, false),
-                compat::AccountMeta::new_readonly(eata, false),
+                compat::AccountMeta::new_readonly(user_ata, false),
+                compat::AccountMeta::new(eata, false),
                 compat::AccountMeta::new(MAGIC_CONTEXT_ID, false),
                 compat::AccountMeta::new_readonly(MAGIC_PROGRAM_ID, false),
             ],

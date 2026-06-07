@@ -699,19 +699,19 @@ mod tests {
         assert_eq!(instruction.accounts[0].pubkey, payer);
         assert!(!instruction.accounts[0].is_writable);
         assert!(instruction.accounts[0].is_signer);
-        // user_ata (writable, not signer)
+        // user_ata (readonly, not signer)
         assert_eq!(
             instruction.accounts[1].pubkey,
             get_associated_token_address(&user, &mint)
         );
-        assert!(instruction.accounts[1].is_writable);
+        assert!(!instruction.accounts[1].is_writable);
         assert!(!instruction.accounts[1].is_signer);
-        // eata (readonly, not signer)
+        // eata (writable, not signer)
         assert_eq!(
             instruction.accounts[2].pubkey,
             EphemeralAta::find_pda(&user, &mint).0
         );
-        assert!(!instruction.accounts[2].is_writable);
+        assert!(instruction.accounts[2].is_writable);
         assert!(!instruction.accounts[2].is_signer);
         // MAGIC_CONTEXT_ID (writable, not signer)
         assert_eq!(instruction.accounts[3].pubkey, MAGIC_CONTEXT_ID);

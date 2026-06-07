@@ -41,6 +41,7 @@ import {
   processPendingTransferQueueRefillIx,
   schedulePrivateTransferIx,
   transferSpl,
+  undelegateEphemeralAtaIx,
   undelegateAndCloseShuttleEphemeralAtaIx,
   withdrawSplIx,
   withdrawSpl,
@@ -1606,6 +1607,52 @@ describe("Exposed Instructions (@solana/kit)", () => {
       );
 
       expect(Array.from(instruction.data ?? [])).toEqual([7]);
+    });
+  });
+
+  describe("undelegateEphemeralAtaIx (Ephemeral SPL Token Program)", () => {
+    it("should serialize the undelegate eATA accounts", () => {
+      const ata = address("11111111111111111111111111111113");
+      const ephemeralAta = address("11111111111111111111111111111114");
+      const instruction = undelegateEphemeralAtaIx(
+        mockAddress,
+        ata,
+        ephemeralAta,
+      );
+
+      expect(instruction.programAddress).toBe(EPHEMERAL_SPL_TOKEN_PROGRAM_ID);
+      expect(instruction.accounts).toHaveLength(5);
+      expect(instruction.accounts?.[0]).toEqual(
+        expect.objectContaining({
+          address: mockAddress,
+          role: AccountRole.READONLY_SIGNER,
+        }),
+      );
+      expect(instruction.accounts?.[1]).toEqual(
+        expect.objectContaining({
+          address: ata,
+          role: AccountRole.READONLY,
+        }),
+      );
+      expect(instruction.accounts?.[2]).toEqual(
+        expect.objectContaining({
+          address: ephemeralAta,
+          role: AccountRole.WRITABLE,
+        }),
+      );
+      expect(instruction.accounts?.[3]).toEqual(
+        expect.objectContaining({
+          address: MAGIC_CONTEXT_ID,
+          role: AccountRole.WRITABLE,
+        }),
+      );
+      expect(instruction.accounts?.[4]).toEqual(
+        expect.objectContaining({
+          address: MAGIC_PROGRAM_ID,
+          role: AccountRole.READONLY,
+        }),
+      );
+      expect(Array.from(instruction.data ?? [])).toEqual([5]);
     });
   });
 

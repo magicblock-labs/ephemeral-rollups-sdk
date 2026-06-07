@@ -547,6 +547,31 @@ export async function delegateIx(
 }
 
 /**
+ * Undelegate ephemeral ATA instruction
+ * @param payer - The payer account
+ * @param ata - The base-chain ATA account
+ * @param ephemeralAta - The ephemeral ATA state account
+ * @returns The undelegate instruction
+ */
+export function undelegateEphemeralAtaIx(
+  payer: Address,
+  ata: Address,
+  ephemeralAta: Address,
+): Instruction {
+  return {
+    accounts: [
+      { address: payer, role: AccountRole.READONLY_SIGNER },
+      { address: ata, role: AccountRole.READONLY },
+      { address: ephemeralAta, role: AccountRole.WRITABLE },
+      { address: MAGIC_CONTEXT_ID, role: AccountRole.WRITABLE },
+      { address: MAGIC_PROGRAM_ID, role: AccountRole.READONLY },
+    ],
+    data: new Uint8Array([5]),
+    programAddress: EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
+  };
+}
+
+/**
  * Initialize shuttle ephemeral ATA + wallet ATA
  * @param payer - The payer account
  * @param shuttleEphemeralAta - The shuttle metadata account

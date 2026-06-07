@@ -605,6 +605,31 @@ export function delegateEphemeralAtaIx(
 }
 
 /**
+ * Undelegate ephemeral ATA instruction
+ * @param payer - The payer account
+ * @param ata - The base-chain ATA account
+ * @param ephemeralAta - The ephemeral ATA state account
+ * @returns The undelegate instruction
+ */
+export function undelegateEphemeralAtaIx(
+  payer: PublicKey,
+  ata: PublicKey,
+  ephemeralAta: PublicKey,
+): TransactionInstruction {
+  return new TransactionInstruction({
+    programId: EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
+    keys: [
+      { pubkey: payer, isSigner: true, isWritable: false },
+      { pubkey: ata, isSigner: false, isWritable: false },
+      { pubkey: ephemeralAta, isSigner: false, isWritable: true },
+      { pubkey: MAGIC_CONTEXT_ID, isSigner: false, isWritable: true },
+      { pubkey: MAGIC_PROGRAM_ID, isSigner: false, isWritable: false },
+    ],
+    data: Buffer.from([5]),
+  });
+}
+
+/**
  * Initialize shuttle ephemeral ATA + wallet ATA
  * @param payer - The payer account
  * @param shuttleEphemeralAta - The shuttle metadata account

@@ -41,6 +41,7 @@ import {
   processPendingTransferQueueRefillIx,
   schedulePrivateTransferIx,
   transferSpl,
+  undelegateEphemeralAtaIx,
   undelegateAndCloseShuttleEphemeralAtaIx,
   withdrawSplIx,
   withdrawSpl,
@@ -1595,6 +1596,52 @@ describe("Exposed Instructions (web3.js)", () => {
       );
       expect(instruction.keys[5].isWritable).toBe(true);
       expect(Array.from(instruction.data)).toEqual([14, 3]);
+    });
+  });
+
+  describe("undelegateEphemeralAtaIx (Ephemeral SPL Token Program)", () => {
+    it("should serialize the undelegate eATA accounts", () => {
+      const ata = new PublicKey("11111111111111111111111111111113");
+      const ephemeralAta = new PublicKey("11111111111111111111111111111114");
+      const instruction = undelegateEphemeralAtaIx(
+        mockPublicKey,
+        ata,
+        ephemeralAta,
+      );
+
+      expect(instruction.programId.toBase58()).toBe(
+        EPHEMERAL_SPL_TOKEN_PROGRAM_ID.toBase58(),
+      );
+      expect(instruction.keys).toHaveLength(5);
+      expect(instruction.keys[0]).toEqual(
+        expect.objectContaining({
+          pubkey: mockPublicKey,
+          isSigner: true,
+          isWritable: false,
+        }),
+      );
+      expect(instruction.keys[1]).toEqual(
+        expect.objectContaining({
+          pubkey: ata,
+          isSigner: false,
+          isWritable: false,
+        }),
+      );
+      expect(instruction.keys[2]).toEqual(
+        expect.objectContaining({
+          pubkey: ephemeralAta,
+          isSigner: false,
+          isWritable: true,
+        }),
+      );
+      expect(instruction.keys[3].pubkey.toBase58()).toBe(
+        MAGIC_CONTEXT_ID.toBase58(),
+      );
+      expect(instruction.keys[3].isWritable).toBe(true);
+      expect(instruction.keys[4].pubkey.toBase58()).toBe(
+        MAGIC_PROGRAM_ID.toBase58(),
+      );
+      expect(Array.from(instruction.data)).toEqual([5]);
     });
   });
 
