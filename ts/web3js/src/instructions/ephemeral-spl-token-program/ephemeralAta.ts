@@ -1444,6 +1444,20 @@ export interface TransferSplOptions {
   privateTransfer?: TransferSplPrivateOptions;
 }
 
+export interface StealthTransferSplOptions {
+  payer?: PublicKey;
+  validator: PublicKey;
+  tokenProgram?: PublicKey;
+  initAtasIfMissing?: boolean;
+  initVaultIfMissing?: boolean;
+  shuttleId?: number;
+  minDelayMs?: bigint;
+  maxDelayMs?: bigint;
+  split?: number;
+  exactOut?: boolean;
+  clientRefId?: bigint;
+}
+
 function randomShuttleId(): number {
   const cryptoObj = (globalThis as any)?.crypto;
   if (cryptoObj?.getRandomValues !== undefined) {
@@ -1452,6 +1466,107 @@ function randomShuttleId(): number {
     return buf[0];
   }
   return Math.floor(Math.random() * 0x1_0000_0000);
+}
+
+export async function stealthTransferSpl(
+  from: PublicKey,
+  stealthPool: PublicKey,
+  mint: PublicKey,
+  amount: bigint,
+  opts: StealthTransferSplOptions,
+): Promise<TransactionInstruction[]> {
+  const payer = opts.payer ?? from;
+  const validator = opts.validator;
+  const tokenProgram = opts.tokenProgram ?? TOKEN_PROGRAM_ID;
+  const initAtasIfMissing = opts.initAtasIfMissing ?? false;
+  const initVaultIfMissing = opts.initVaultIfMissing ?? false;
+  const shuttleId = opts.shuttleId ?? randomShuttleId();
+  const minDelayMs = opts.minDelayMs ?? 0n;
+  const maxDelayMs = opts.maxDelayMs ?? minDelayMs;
+  const split = opts.split ?? 1;
+  const exactOut = opts.exactOut ?? true;
+  const clientRefId = opts.clientRefId;
+  const instructions: TransactionInstruction[] = [];
+  const fromAta = getAssociatedTokenAddressSync(
+    mint,
+    from,
+    false,
+    tokenProgram,
+  );
+
+  if (initVaultIfMissing) {
+    const [vault] = deriveVault(mint);
+    const [vaultEphemeralAta] = deriveEphemeralAta(vault, mint);
+    const vaultAta = deriveVaultAta(mint, vault, tokenProgram);
+    const [queue] = deriveTransferQueue(mint, validator);
+
+    instructions.push(
+      initVaultIx(vault, mint, payer, tokenProgram),
+      initVaultAtaIx(payer, vaultAta, vault, mint, tokenProgram),
+      delegateEphemeralAtaIx(payer, vaultEphemeralAta, validator),
+      toTransactionInstruction(
+        initTransferQueueIx(
+          payer,
+          queue,
+          mint,
+          validator,
+          undefined,
+          tokenProgram,
+        ),
+      ),
+    );
+  }
+
+  if (initAtasIfMissing) {
+    instructions.push(
+      createAssociatedTokenAccountIdempotentInstruction(
+        payer,
+        fromAta,
+        from,
+        mint,
+        tokenProgram,
+      ),
+    );
+  }
+
+  const [fromEphemeralAta] = deriveEphemeralAta(from, mint);
+  const [shuttleEphemeralAta] = deriveShuttleEphemeralAta(
+    from,
+    mint,
+    shuttleId,
+  );
+  const [shuttleAta] = deriveShuttleAta(shuttleEphemeralAta, mint);
+  const shuttleWalletAta = deriveShuttleWalletAta(
+    mint,
+    shuttleEphemeralAta,
+    tokenProgram,
+  );
+
+  instructions.push(
+    initEphemeralAtaIx(fromEphemeralAta, from, mint, payer),
+    delegateEphemeralAtaIx(payer, fromEphemeralAta, validator),
+    depositAndDelegateShuttleEphemeralAtaWithMergeAndPrivateTransferIx(
+      payer,
+      shuttleEphemeralAta,
+      shuttleAta,
+      from,
+      fromAta,
+      stealthPool,
+      shuttleWalletAta,
+      mint,
+      shuttleId,
+      amount,
+      exactOut,
+      minDelayMs,
+      maxDelayMs,
+      split,
+      validator,
+      clientRefId,
+      tokenProgram,
+    ),
+  );
+
+  return instructions;
 }
 
 async function buildDelegateSplInstructions(

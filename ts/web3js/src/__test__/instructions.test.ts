@@ -43,6 +43,7 @@ import {
   lamportsDelegatedTransferIx,
   processPendingTransferQueueRefillIx,
   schedulePrivateTransferIx,
+  stealthTransferSpl,
   transferSpl,
   undelegateAndCloseShuttleEphemeralAtaIx,
   withdrawSplIx,
@@ -1126,6 +1127,44 @@ describe("Exposed Instructions (web3.js)", () => {
     const to = Keypair.generate().publicKey;
     const mint = Keypair.generate().publicKey;
     const validator = Keypair.generate().publicKey;
+
+    it("should build base-to-base stealth transfers to off-curve pool PDAs", async () => {
+      const [stealthPool] = PublicKey.findProgramAddressSync(
+        [Buffer.from("stealth_pool"), mint.toBuffer()],
+        EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
+      );
+      const [fromEphemeralAta] = deriveEphemeralAta(from, mint);
+
+      expect(PublicKey.isOnCurve(stealthPool.toBuffer())).toBe(false);
+
+      const instructions = await stealthTransferSpl(from, stealthPool, mint, 25n, {
+        validator,
+        shuttleId: 7,
+        minDelayMs: 100n,
+        maxDelayMs: 300n,
+        split: 4,
+      });
+
+      expect(instructions).toHaveLength(3);
+      expect(instructions[0].data[0]).toBe(0);
+      expect(instructions[0].keys[0].pubkey.toBase58()).toBe(
+        fromEphemeralAta.toBase58(),
+      );
+      expect(instructions[1].data[0]).toBe(4);
+      expect(instructions[2].data[0]).toBe(25);
+      expect(instructions[2].keys).toHaveLength(19);
+
+      const data = Buffer.from(instructions[2].data);
+      expect(data.readUInt32LE(1)).toBe(7);
+      expect(data.readBigUInt64LE(5)).toBe(25n);
+
+      const [suffixField, endOffset] = readLengthPrefixedField(
+        data,
+        14 + 80 + 1 + 32,
+      );
+      expect(suffixField).toHaveLength(68);
+      expect(endOffset).toBe(data.length);
+    });
 
     it("should use the shuttle private transfer instruction for private base-to-base transfers", async () => {
       const [fromEphemeralAta] = deriveEphemeralAta(from, mint);
