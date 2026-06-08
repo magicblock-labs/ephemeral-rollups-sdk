@@ -1453,6 +1453,7 @@ dependencies = [
  "ephemeral-rollups-sdk-attribute-delegate",
  "ephemeral-rollups-sdk-attribute-ephemeral",
  "ephemeral-rollups-sdk-attribute-ephemeral-accounts",
+ "ephemeral-rollups-sdk-attribute-vrf",
  "five8 0.2.1",
  "getrandom 0.2.16",
  "magicblock-delegation-program-api",
@@ -1472,6 +1473,8 @@ dependencies = [
  "solana-program-memory 3.1.0",
  "solana-pubkey 3.0.0",
  "solana-sdk 2.3.1",
+ "solana-sdk-ids 2.2.1",
+ "solana-sdk-ids 3.1.0",
  "solana-system-interface 2.0.0",
  "solana-sysvar 3.1.1",
  "spl-associated-token-account-interface",
@@ -1515,6 +1518,15 @@ dependencies = [
 
 [[package]]
 name = "ephemeral-rollups-sdk-attribute-ephemeral-accounts"
+version = "0.14.4"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 1.0.109",
+]
+
+[[package]]
+name = "ephemeral-rollups-sdk-attribute-vrf"
 version = "0.14.4"
 dependencies = [
  "proc-macro2",
