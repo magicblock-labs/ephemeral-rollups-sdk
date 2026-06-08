@@ -12,6 +12,7 @@ pub mod seeds;
 pub mod spl;
 pub mod types;
 pub mod utils;
+pub mod vrf;
 
 use pinocchio::Address;
 
