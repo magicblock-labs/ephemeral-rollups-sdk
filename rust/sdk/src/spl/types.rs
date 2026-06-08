@@ -151,6 +151,23 @@ pub fn find_transfer_queue(
     )
 }
 
+pub fn find_transfer_queue_ephemeral_ata(
+    mint: &compat::Pubkey,
+    validator: &compat::Pubkey,
+) -> (compat::Pubkey, u8) {
+    let (queue, _queue_bump) = find_transfer_queue(mint, validator);
+    compat::Pubkey::find_program_address(&[queue.as_ref(), mint.as_ref()], &ESPL_TOKEN_PROGRAM_ID)
+}
+
+pub fn find_transfer_queue_vault_ata(
+    mint: &compat::Pubkey,
+    validator: &compat::Pubkey,
+    token_program: &compat::Pubkey,
+) -> compat::Pubkey {
+    let (queue, _queue_bump) = find_transfer_queue(mint, validator);
+    find_associated_token_address_with_bump(&queue, mint, token_program).0
+}
+
 pub fn find_transfer_queue_refill_state(queue: &compat::Pubkey) -> (compat::Pubkey, u8) {
     compat::Pubkey::find_program_address(&[b"queue-refill", queue.as_ref()], &ESPL_TOKEN_PROGRAM_ID)
 }

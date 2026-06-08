@@ -35,8 +35,9 @@ mod tests {
             },
             find_hydra_crank_pda, find_lamports_pda, find_rent_pda, find_shuttle_ata,
             find_shuttle_ephemeral_ata, find_shuttle_wallet_ata, find_stash_pda,
-            find_transfer_queue, find_transfer_queue_refill_state, find_vault_ata, EphemeralAta,
-            EphemeralSplDiscriminator, GlobalVault,
+            find_transfer_queue, find_transfer_queue_ephemeral_ata,
+            find_transfer_queue_refill_state, find_transfer_queue_vault_ata, find_vault_ata,
+            EphemeralAta, EphemeralSplDiscriminator, GlobalVault,
         },
     };
     use magicblock_magic_program_api::Pubkey;
@@ -151,6 +152,16 @@ mod tests {
         let validator = Pubkey::new_unique();
         let (queue, _queue_bump) = find_transfer_queue(&mint, &validator);
         let (queue_permission, _permission_bump) = Permission::find_pda(&queue);
+        let (queue_ephemeral_ata, _queue_eata_bump) =
+            find_transfer_queue_ephemeral_ata(&mint, &validator);
+        let queue_vault_ata = find_transfer_queue_vault_ata(&mint, &validator, &TOKEN_PROGRAM_ID);
+        let delegation_buffer = delegate_buffer_pda_from_delegated_account_and_owner_program(
+            &queue_ephemeral_ata,
+            &ESPL_TOKEN_PROGRAM_ID,
+        );
+        let delegation_record = delegation_record_pda_from_delegated_account(&queue_ephemeral_ata);
+        let delegation_metadata =
+            delegation_metadata_pda_from_delegated_account(&queue_ephemeral_ata);
 
         let instruction = InitializeTransferQueueBuilder {
             payer,
@@ -161,7 +172,7 @@ mod tests {
         .instruction();
 
         assert_eq!(instruction.program_id, ESPL_TOKEN_PROGRAM_ID);
-        assert_eq!(instruction.accounts.len(), 7);
+        assert_eq!(instruction.accounts.len(), 16);
         assert_eq!(instruction.accounts[0].pubkey, payer);
         assert_eq!(instruction.accounts[1].pubkey, queue);
         assert_eq!(instruction.accounts[2].pubkey, queue_permission);
@@ -169,6 +180,15 @@ mod tests {
         assert_eq!(instruction.accounts[4].pubkey, validator);
         assert_eq!(instruction.accounts[5].pubkey, system_program::id());
         assert_eq!(instruction.accounts[6].pubkey, PERMISSION_PROGRAM_ID);
+        assert_eq!(instruction.accounts[7].pubkey, queue_ephemeral_ata);
+        assert_eq!(instruction.accounts[8].pubkey, queue_vault_ata);
+        assert_eq!(instruction.accounts[9].pubkey, TOKEN_PROGRAM_ID);
+        assert_eq!(instruction.accounts[10].pubkey, ASSOCIATED_TOKEN_PROGRAM_ID);
+        assert_eq!(instruction.accounts[11].pubkey, ESPL_TOKEN_PROGRAM_ID);
+        assert_eq!(instruction.accounts[12].pubkey, delegation_buffer);
+        assert_eq!(instruction.accounts[13].pubkey, delegation_record);
+        assert_eq!(instruction.accounts[14].pubkey, delegation_metadata);
+        assert_eq!(instruction.accounts[15].pubkey, DELEGATION_PROGRAM_ID);
         assert_eq!(
             instruction.data[0],
             EphemeralSplDiscriminator::InitializeTransferQueue as u8
