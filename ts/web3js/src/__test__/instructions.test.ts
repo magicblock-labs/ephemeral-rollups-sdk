@@ -817,7 +817,7 @@ describe("Exposed Instructions (web3.js)", () => {
     const mint = new PublicKey("11111111111111111111111111111114");
     const validator = new PublicKey("11111111111111111111111111111115");
 
-    it("should delegate the vault eata when initializing the vault in legacy flow", async () => {
+    it("should not delegate the vault eata when initializing the vault in legacy flow", async () => {
       const [vault] = deriveVault(mint);
       const [vaultEphemeralAta] = deriveEphemeralAta(vault, mint);
 
@@ -828,18 +828,15 @@ describe("Exposed Instructions (web3.js)", () => {
         idempotent: false,
       });
 
-      expect(instructions[3].keys[1].pubkey.toBase58()).toBe(
-        vaultEphemeralAta.toBase58(),
-      );
-      expect(instructions[3].data[0]).toBe(4);
       expect(
-        Buffer.from(instructions[3].data.subarray(1)).equals(
-          validator.toBuffer(),
+        instructions.find(
+          (ix) =>
+            ix.data[0] === 4 && ix.keys[1]?.pubkey.equals(vaultEphemeralAta),
         ),
-      ).toBe(true);
+      ).toBeUndefined();
     });
 
-    it("should delegate the vault eata when initializing the vault in idempotent flow", async () => {
+    it("should not delegate the vault eata when initializing the vault in idempotent flow", async () => {
       const [vault] = deriveVault(mint);
       const [vaultEphemeralAta] = deriveEphemeralAta(vault, mint);
 
@@ -849,15 +846,12 @@ describe("Exposed Instructions (web3.js)", () => {
         shuttleId: 7,
       });
 
-      expect(instructions[2].keys[1].pubkey.toBase58()).toBe(
-        vaultEphemeralAta.toBase58(),
-      );
-      expect(instructions[2].data[0]).toBe(4);
       expect(
-        Buffer.from(instructions[2].data.subarray(1)).equals(
-          validator.toBuffer(),
+        instructions.find(
+          (ix) =>
+            ix.data[0] === 4 && ix.keys[1]?.pubkey.equals(vaultEphemeralAta),
         ),
-      ).toBe(true);
+      ).toBeUndefined();
     });
 
     it("should use setup_and_delegate_shuttle_with_merge in idempotent flow when amount is nonzero", async () => {

@@ -786,7 +786,7 @@ describe("Exposed Instructions (@solana/kit)", () => {
     const mint = address("11111111111111111111111111111114");
     const validator = address("11111111111111111111111111111115");
 
-    it("should delegate the vault eata when initializing the vault in legacy flow", async () => {
+    it("should not delegate the vault eata when initializing the vault in legacy flow", async () => {
       const [vault] = await deriveVault(mint);
       const [vaultEphemeralAta] = await deriveEphemeralAta(vault, mint);
 
@@ -797,14 +797,16 @@ describe("Exposed Instructions (@solana/kit)", () => {
         idempotent: false,
       });
 
-      expect(instructions[3].accounts?.[1].address).toBe(vaultEphemeralAta);
-      expect(instructions[3].data?.[0]).toBe(4);
-      expect(Array.from(instructions[3].data?.subarray(1) ?? [])).toEqual(
-        Array.from(addressEncoder.encode(validator)),
-      );
+      expect(
+        instructions.find(
+          (ix) =>
+            ix.data?.[0] === 4 &&
+            ix.accounts?.[1].address === vaultEphemeralAta,
+        ),
+      ).toBeUndefined();
     });
 
-    it("should delegate the vault eata when initializing the vault in idempotent flow", async () => {
+    it("should not delegate the vault eata when initializing the vault in idempotent flow", async () => {
       const [vault] = await deriveVault(mint);
       const [vaultEphemeralAta] = await deriveEphemeralAta(vault, mint);
 
@@ -814,11 +816,13 @@ describe("Exposed Instructions (@solana/kit)", () => {
         shuttleId: 7,
       });
 
-      expect(instructions[2].accounts?.[1].address).toBe(vaultEphemeralAta);
-      expect(instructions[2].data?.[0]).toBe(4);
-      expect(Array.from(instructions[2].data?.subarray(1) ?? [])).toEqual(
-        Array.from(addressEncoder.encode(validator)),
-      );
+      expect(
+        instructions.find(
+          (ix) =>
+            ix.data?.[0] === 4 &&
+            ix.accounts?.[1].address === vaultEphemeralAta,
+        ),
+      ).toBeUndefined();
     });
 
     it("should use setup_and_delegate_shuttle_with_merge across the idempotent shuttle flow", async () => {

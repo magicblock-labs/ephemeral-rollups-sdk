@@ -1379,7 +1379,6 @@ async function buildDelegateSplInstructions(
     instructions.push(
       initVaultIx(vault, mint, payer, vaultEphemeralAta, vaultAta),
       initVaultAtaIx(payer, vaultAta, vault, mint),
-      await delegateIx(payer, vaultEphemeralAta, validator),
     );
   }
 
@@ -1442,7 +1441,6 @@ async function buildIdempotentDelegateSplInstructions(
     instructions.push(
       initVaultIx(vault, mint, payer, vaultEphemeralAta, vaultAta),
       initVaultAtaIx(payer, vaultAta, vault, mint),
-      await delegateIx(payer, vaultEphemeralAta, validator),
     );
   }
 
