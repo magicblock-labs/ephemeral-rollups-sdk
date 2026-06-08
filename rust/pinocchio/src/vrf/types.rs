@@ -161,9 +161,7 @@ mod tests {
     ) -> Vec<u8> {
         let p_metas: Vec<InstructionAccount> = metas
             .iter()
-            .map(|(k, is_signer, is_writable)| {
-                InstructionAccount::new(k, *is_writable, *is_signer)
-            })
+            .map(|(k, is_signer, is_writable)| InstructionAccount::new(k, *is_writable, *is_signer))
             .collect();
         let req = RequestRandomness {
             high_priority: discriminator == REQUEST_RANDOMNESS_DISCRIMINATOR,
@@ -325,7 +323,8 @@ mod tests {
                 callback_args: &args,
             };
             let mut buf = vec![0u8; req.serialized_size()];
-            req.serialize_into(&mut buf, REQUEST_REGULAR_RANDOMNESS_DISCRIMINATOR).unwrap();
+            req.serialize_into(&mut buf, REQUEST_REGULAR_RANDOMNESS_DISCRIMINATOR)
+                .unwrap();
             buf
         };
 
