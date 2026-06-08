@@ -25,22 +25,13 @@ readme = "README.md"
 keywords = ["solana", "crypto", "delegation", "ephemeral-rollups", "magicblock"]
 
 [workspace.dependencies]
-<<<<<<< dode/pinocchio-vrf
-ephemeral-rollups-sdk = { path = "sdk", version = "=0.14.4" }
-ephemeral-rollups-sdk-attribute-ephemeral = { path = "ephemeral", version = "=0.14.4" }
-ephemeral-rollups-sdk-attribute-ephemeral-accounts = { path = "ephemeral-accounts-attribute", version = "=0.14.4" }
-ephemeral-rollups-sdk-attribute-delegate = { path = "delegate", version = "=0.14.4" }
-ephemeral-rollups-sdk-attribute-commit = { path = "commit-attribute", version = "=0.14.4" }
-ephemeral-rollups-sdk-attribute-action = { path = "action-attribute", version = "=0.14.4" }
-ephemeral-rollups-sdk-attribute-vrf = { path = "vrf", version = "=0.14.4" }
-=======
 ephemeral-rollups-sdk = { path = "sdk", version = "=0.15.0" }
 ephemeral-rollups-sdk-attribute-ephemeral = { path = "ephemeral", version = "=0.15.0" }
 ephemeral-rollups-sdk-attribute-ephemeral-accounts = { path = "ephemeral-accounts-attribute", version = "=0.15.0" }
 ephemeral-rollups-sdk-attribute-delegate = { path = "delegate", version = "=0.15.0" }
 ephemeral-rollups-sdk-attribute-commit = { path = "commit-attribute", version = "=0.15.0" }
 ephemeral-rollups-sdk-attribute-action = { path = "action-attribute", version = "=0.15.0" }
->>>>>>> main
+ephemeral-rollups-sdk-attribute-vrf = { path = "vrf", version = "=0.15.0" }
 
 # Magicblock
 magicblock-delegation-program-api = { version = "3.0.0", default-features = false }

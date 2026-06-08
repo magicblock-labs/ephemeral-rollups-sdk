@@ -1527,7 +1527,7 @@ dependencies = [
 
 [[package]]
 name = "ephemeral-rollups-sdk-attribute-vrf"
-version = "0.14.4"
+version = "0.15.0"
 dependencies = [
  "proc-macro2",
  "quote",
