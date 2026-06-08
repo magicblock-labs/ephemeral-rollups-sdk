@@ -105,6 +105,7 @@ pub fn random_i64(bytes: &[u8; 32]) -> i64 {
 /// # Returns
 ///
 /// A random boolean value (true or false) derived from the input bytes
+#[allow(clippy::manual_is_multiple_of)]
 pub fn random_bool(bytes: &[u8; 32]) -> bool {
     (bytes[31] % 2) == 0
 }
