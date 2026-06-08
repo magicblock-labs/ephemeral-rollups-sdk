@@ -1669,7 +1669,6 @@ export async function delegateSplWithPrivateTransfer(
 
   const [ephemeralAta] = deriveEphemeralAta(owner, mint);
   const [vault] = deriveVault(mint);
-  const [vaultEphemeralAta] = deriveEphemeralAta(vault, mint);
   const vaultAta = deriveVaultAta(mint, vault, tokenProgram);
   const [queue] = deriveTransferQueue(mint, validator);
   const ownerAta = getAssociatedTokenAddressSync(
@@ -1694,7 +1693,6 @@ export async function delegateSplWithPrivateTransfer(
     instructions.push(
       initVaultIx(vault, mint, payer, tokenProgram),
       initVaultAtaIx(payer, vaultAta, vault, mint, tokenProgram),
-      delegateEphemeralAtaIx(payer, vaultEphemeralAta, validator),
     );
   }
 
@@ -1871,13 +1869,11 @@ export async function transferSpl(
 
   if (initVaultIfMissing) {
     const [vault] = deriveVault(mint);
-    const [vaultEphemeralAta] = deriveEphemeralAta(vault, mint);
     const vaultAta = deriveVaultAta(mint, vault, tokenProgram);
 
     instructions.push(
       initVaultIx(vault, mint, payer, tokenProgram),
       initVaultAtaIx(payer, vaultAta, vault, mint, tokenProgram),
-      delegateEphemeralAtaIx(payer, vaultEphemeralAta, validator),
     );
   }
 

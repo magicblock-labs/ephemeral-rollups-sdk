@@ -172,6 +172,23 @@ pub fn find_transfer_queue_refill_state(queue: &compat::Pubkey) -> (compat::Pubk
     compat::Pubkey::find_program_address(&[b"queue-refill", queue.as_ref()], &ESPL_TOKEN_PROGRAM_ID)
 }
 
+pub fn find_transfer_group_receipt(
+    queue: &compat::Pubkey,
+    source: &compat::Pubkey,
+    group_id: u32,
+) -> (compat::Pubkey, u8) {
+    let group_id_bytes = group_id.to_le_bytes();
+    compat::Pubkey::find_program_address(
+        &[
+            b"group-receipt",
+            queue.as_ref(),
+            source.as_ref(),
+            &group_id_bytes,
+        ],
+        &ESPL_TOKEN_PROGRAM_ID,
+    )
+}
+
 pub fn find_hydra_crank_pda(stash_pda: &compat::Pubkey, shuttle_id: u32) -> (compat::Pubkey, u8) {
     compat::Pubkey::find_program_address(
         &[b"crank", &hydra_seed(stash_pda, shuttle_id)],

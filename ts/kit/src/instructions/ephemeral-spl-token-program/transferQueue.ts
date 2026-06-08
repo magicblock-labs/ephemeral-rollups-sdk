@@ -10,6 +10,7 @@ import { SYSTEM_PROGRAM_ADDRESS } from "@solana-program/system";
 import {
   ASSOCIATED_TOKEN_PROGRAM_ID,
   DELEGATION_PROGRAM_ID,
+  EPHEMERAL_VAULT_ID,
   EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
   MAGIC_CONTEXT_ID,
   MAGIC_PROGRAM_ID,
@@ -31,6 +32,7 @@ const ALLOCATE_TRANSFER_QUEUE_DISCRIMINATOR = 27;
 const PROCESS_PENDING_TRANSFER_QUEUE_REFILL_DISCRIMINATOR = 28;
 const QUEUE_SEED = new TextEncoder().encode("queue");
 const QUEUE_REFILL_STATE_SEED = new TextEncoder().encode("queue-refill");
+const GROUP_RECEIPT_SEED = new TextEncoder().encode("group-receipt");
 const RENT_PDA_SEED = new TextEncoder().encode("rent");
 const LAMPORTS_PDA_SEED = new TextEncoder().encode("lamports");
 /**
@@ -84,6 +86,46 @@ export async function deriveQueueVaultAta(
     ],
   });
   return ata;
+}
+
+export async function deriveGroupReceipt(
+  queue: Address,
+  source: Address,
+  groupId: number,
+): Promise<[Address, number]> {
+  if (!Number.isInteger(groupId) || groupId <= 0 || groupId > 0x00ff_ffff) {
+    throw new Error("groupId must be an integer between 1 and 16777215");
+  }
+
+  const addressEncoder = getAddressEncoder();
+  const groupIdBytes = new Uint8Array(u32le(groupId));
+  const [groupReceipt, bump] = await getProgramDerivedAddress({
+    programAddress: EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
+    seeds: [
+      GROUP_RECEIPT_SEED,
+      addressEncoder.encode(queue),
+      addressEncoder.encode(source),
+      groupIdBytes,
+    ],
+  });
+  return [groupReceipt, bump];
+}
+
+function randomTransferGroupId(): number {
+  const cryptoObj = (globalThis as any)?.crypto;
+  let groupId = 0;
+
+  while (groupId === 0) {
+    if (cryptoObj?.getRandomValues !== undefined) {
+      const bytes = new Uint8Array(3);
+      cryptoObj.getRandomValues(bytes);
+      groupId = bytes[0] | (bytes[1] << 8) | (bytes[2] << 16);
+    } else {
+      groupId = Math.floor(Math.random() * 0x0100_0000);
+    }
+  }
+
+  return groupId;
 }
 
 /**
@@ -190,7 +232,7 @@ export function allocateTransferQueueIx(queue: Address): Instruction {
  * @param clientRefId - Optional client-provided reference ID attached to each queued split
  * @returns The deposit-and-queue-transfer instruction
  */
-export function depositAndQueueTransferIx(
+export async function depositAndQueueTransferIx(
   queue: Address,
   vault: Address,
   mint: Address,
@@ -205,7 +247,7 @@ export function depositAndQueueTransferIx(
   reimbursementTokenInfo: Address = source,
   clientRefId?: bigint,
   tokenProgram: Address = TOKEN_PROGRAM_ID,
-): Instruction {
+): Promise<Instruction> {
   if (!Number.isInteger(split) || split <= 0 || split > 0xffff_ffff) {
     throw new Error("split must fit in u32");
   }
@@ -221,9 +263,15 @@ export function depositAndQueueTransferIx(
     throw new Error("maxDelayMs must be greater than or equal to minDelayMs");
   }
 
+  const groupId = randomTransferGroupId();
+  const groupIdBytes = u32le(groupId);
+  const [groupReceipt] = await deriveGroupReceipt(queue, owner, groupId);
   const data = [
     DEPOSIT_AND_QUEUE_TRANSFER_DISCRIMINATOR,
     ...u64le(amount),
+    groupIdBytes[0],
+    groupIdBytes[1],
+    groupIdBytes[2],
     ...u64le(minDelayMs),
     ...u64le(maxDelayMs),
     ...u32le(split),
@@ -243,6 +291,9 @@ export function depositAndQueueTransferIx(
       { address: owner, role: AccountRole.READONLY_SIGNER },
       { address: tokenProgram, role: AccountRole.READONLY },
       { address: reimbursementTokenInfo, role: AccountRole.WRITABLE },
+      { address: groupReceipt, role: AccountRole.WRITABLE },
+      { address: EPHEMERAL_VAULT_ID, role: AccountRole.WRITABLE },
+      { address: MAGIC_PROGRAM_ID, role: AccountRole.READONLY },
     ],
     data: new Uint8Array(data),
     programAddress: EPHEMERAL_SPL_TOKEN_PROGRAM_ID,

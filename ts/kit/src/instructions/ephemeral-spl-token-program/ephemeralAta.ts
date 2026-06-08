@@ -1562,7 +1562,6 @@ export async function delegateSplWithPrivateTransfer(
     instructions.push(
       initVaultIx(vault, mint, payer, vaultEphemeralAta, vaultAta),
       initVaultAtaIx(payer, vaultAta, vault, mint),
-      await delegateIx(payer, vaultEphemeralAta, validator),
     );
   }
 
@@ -1642,7 +1641,7 @@ export async function transferSpl(
 
           return [
             ...setupInstructions,
-            depositAndQueueTransferIx(
+            await depositAndQueueTransferIx(
               queue,
               vault,
               mint,
@@ -1685,7 +1684,6 @@ export async function transferSpl(
     instructions.push(
       initVaultIx(vault, mint, payer, vaultEphemeralAta, vaultAta),
       initVaultAtaIx(payer, vaultAta, vault, mint),
-      await delegateIx(payer, vaultEphemeralAta, validator),
     );
   }
 
