@@ -152,6 +152,7 @@ jobs:
           publish_crate delegate/Cargo.toml
           publish_crate commit-attribute/Cargo.toml
           publish_crate action-attribute/Cargo.toml
+          publish_crate vrf-attribute/Cargo.toml
 
           if [ "${DRY_RUN}" != "true" ]; then
             publish_crate sdk/Cargo.toml
