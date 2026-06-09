@@ -1128,6 +1128,14 @@ describe("Exposed Instructions (web3.js)", () => {
     const mint = Keypair.generate().publicKey;
     const validator = Keypair.generate().publicKey;
 
+    it("should reject on-curve stealth pool addresses", async () => {
+      expect(PublicKey.isOnCurve(to.toBuffer())).toBe(true);
+
+      await expect(
+        stealthTransferSpl(from, to, mint, 25n, { validator }),
+      ).rejects.toThrow("stealthPool must be an off-curve PDA");
+    });
+
     it("should build base-to-base stealth transfers to off-curve pool PDAs", async () => {
       const [stealthPool] = PublicKey.findProgramAddressSync(
         [Buffer.from("stealth_pool"), mint.toBuffer()],

@@ -1475,6 +1475,10 @@ export async function stealthTransferSpl(
   amount: bigint,
   opts: StealthTransferSplOptions,
 ): Promise<TransactionInstruction[]> {
+  if (PublicKey.isOnCurve(stealthPool.toBuffer())) {
+    throw new Error("stealthPool must be an off-curve PDA");
+  }
+
   const payer = opts.payer ?? from;
   const validator = opts.validator;
   const tokenProgram = opts.tokenProgram ?? TOKEN_PROGRAM_ID;
