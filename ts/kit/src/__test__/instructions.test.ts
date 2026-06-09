@@ -1210,7 +1210,7 @@ describe("Exposed Instructions (@solana/kit)", () => {
       expect(instructions[2].data?.[0]).toBe(24);
     });
 
-    it("should initialize and delegate the receiver eata for private base-to-ephemeral transfers when requested", async () => {
+    it("should initialize permission and delegate the receiver eata for private base-to-ephemeral transfers when requested", async () => {
       const [toEphemeralAta] = await deriveEphemeralAta(to, mint);
 
       const instructions = await transferSpl(from, to, mint, 25n, {
@@ -1222,14 +1222,16 @@ describe("Exposed Instructions (@solana/kit)", () => {
         initIfMissing: true,
       });
 
-      expect(instructions).toHaveLength(4);
+      expect(instructions).toHaveLength(5);
       expect(instructions[0].data?.[0]).toBe(1);
       expect(instructions[0].accounts?.[2].address).toBe(to);
       expect(instructions[1].data?.[0]).toBe(0);
       expect(instructions[1].accounts?.[0].address).toBe(toEphemeralAta);
-      expect(instructions[2].data?.[0]).toBe(4);
-      expect(instructions[2].accounts?.[1].address).toBe(toEphemeralAta);
-      expect(instructions[3].data?.[0]).toBe(24);
+      expect(instructions[2].data?.[0]).toBe(6);
+      expect(instructions[2].accounts?.[0].address).toBe(toEphemeralAta);
+      expect(instructions[3].data?.[0]).toBe(4);
+      expect(instructions[3].accounts?.[1].address).toBe(toEphemeralAta);
+      expect(instructions[4].data?.[0]).toBe(24);
     });
 
     it("should ignore initAtasIfMissing on ephemeral-source transfers", async () => {
@@ -1465,9 +1467,22 @@ describe("Exposed Instructions (@solana/kit)", () => {
         mockAddress,
         groupId,
       );
+      const addressEncoder = getAddressEncoder();
+      const groupIdSeed = Buffer.alloc(4);
+      groupIdSeed.writeUInt32LE(groupId, 0);
+      const [expectedGroupReceipt] = await getProgramDerivedAddress({
+        programAddress: EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
+        seeds: [
+          Buffer.from("group-receipt"),
+          addressEncoder.encode(queue),
+          addressEncoder.encode(mockAddress),
+          groupIdSeed,
+        ],
+      });
 
       expect(instruction.accounts).toHaveLength(12);
       expect(groupId).not.toBe(0);
+      expect(groupReceipt).toBe(expectedGroupReceipt);
       expect(instruction.accounts?.[8].address).toBe(source);
       expect(instruction.accounts?.[8].role).toBe(AccountRole.WRITABLE);
       expect(instruction.accounts?.[9].address).toBe(groupReceipt);

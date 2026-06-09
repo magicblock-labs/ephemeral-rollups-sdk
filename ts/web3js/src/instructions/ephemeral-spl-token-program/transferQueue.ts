@@ -103,8 +103,8 @@ export function deriveGroupReceipt(
     throw new Error("groupId must be an integer between 1 and 16777215");
   }
 
-  const groupIdBytes = Buffer.alloc(3);
-  groupIdBytes.writeUIntLE(groupId, 0, 3);
+  const groupIdBytes = Buffer.alloc(4);
+  groupIdBytes.writeUInt32LE(groupId, 0);
 
   return PublicKey.findProgramAddressSync(
     [GROUP_RECEIPT_SEED, queue.toBuffer(), source.toBuffer(), groupIdBytes],
