@@ -14,8 +14,9 @@ mod tests {
     use ephemeral_rollups_sdk::{
         access_control::structs::Permission,
         consts::{
-            ASSOCIATED_TOKEN_PROGRAM_ID, ESPL_TOKEN_PROGRAM_ID, HYDRA_PROGRAM_ID, MAGIC_CONTEXT_ID,
-            MAGIC_PROGRAM_ID, PERMISSION_PROGRAM_ID, TOKEN_PROGRAM_ID,
+            ASSOCIATED_TOKEN_PROGRAM_ID, EPHEMERAL_VAULT_ID, ESPL_TOKEN_PROGRAM_ID,
+            HYDRA_PROGRAM_ID, MAGIC_CONTEXT_ID, MAGIC_PROGRAM_ID, PERMISSION_PROGRAM_ID,
+            TOKEN_PROGRAM_ID,
         },
         spl::{
             builders::{
@@ -35,7 +36,7 @@ mod tests {
             },
             find_hydra_crank_pda, find_lamports_pda, find_rent_pda, find_shuttle_ata,
             find_shuttle_ephemeral_ata, find_shuttle_wallet_ata, find_stash_pda,
-            find_transfer_queue, find_transfer_queue_ephemeral_ata,
+            find_transfer_group_receipt, find_transfer_queue, find_transfer_queue_ephemeral_ata,
             find_transfer_queue_refill_state, find_transfer_queue_vault_ata, find_vault_ata,
             EphemeralAta, EphemeralSplDiscriminator, GlobalVault,
         },
@@ -238,9 +239,14 @@ mod tests {
         }
         .instruction()
         .unwrap();
+        let group_id = u32::from(instruction.data[9])
+            | (u32::from(instruction.data[10]) << 8)
+            | (u32::from(instruction.data[11]) << 16);
+        let (group_receipt, _group_receipt_bump) =
+            find_transfer_group_receipt(&queue, &owner, group_id);
 
         assert_eq!(instruction.program_id, ESPL_TOKEN_PROGRAM_ID);
-        assert_eq!(instruction.accounts.len(), 9);
+        assert_eq!(instruction.accounts.len(), 12);
         assert_eq!(instruction.accounts[0].pubkey, queue);
         assert_eq!(instruction.accounts[1].pubkey, vault);
         assert_eq!(instruction.accounts[2].pubkey, mint);
@@ -250,6 +256,9 @@ mod tests {
         assert_eq!(instruction.accounts[6].pubkey, owner);
         assert_eq!(instruction.accounts[7].pubkey, TOKEN_PROGRAM_ID);
         assert_eq!(instruction.accounts[8].pubkey, source);
+        assert_eq!(instruction.accounts[9].pubkey, group_receipt);
+        assert_eq!(instruction.accounts[10].pubkey, EPHEMERAL_VAULT_ID);
+        assert_eq!(instruction.accounts[11].pubkey, MAGIC_PROGRAM_ID);
         assert_eq!(
             instruction.data[0],
             EphemeralSplDiscriminator::DepositAndQueueTransfer as u8
@@ -258,16 +267,17 @@ mod tests {
             u64::from_le_bytes(instruction.data[1..9].try_into().unwrap()),
             25
         );
+        assert_ne!(group_id, 0);
         assert_eq!(
-            u64::from_le_bytes(instruction.data[9..17].try_into().unwrap()),
+            u64::from_le_bytes(instruction.data[12..20].try_into().unwrap()),
             100
         );
         assert_eq!(
-            u64::from_le_bytes(instruction.data[17..25].try_into().unwrap()),
+            u64::from_le_bytes(instruction.data[20..28].try_into().unwrap()),
             300
         );
         assert_eq!(
-            u32::from_le_bytes(instruction.data[25..29].try_into().unwrap()),
+            u32::from_le_bytes(instruction.data[28..32].try_into().unwrap()),
             4
         );
     }
@@ -319,9 +329,15 @@ mod tests {
         .instruction()
         .unwrap();
 
-        assert_eq!(instruction.data.len(), 37);
+        assert_eq!(instruction.data.len(), 40);
+        assert_ne!(
+            u32::from(instruction.data[9])
+                | (u32::from(instruction.data[10]) << 8)
+                | (u32::from(instruction.data[11]) << 16),
+            0
+        );
         assert_eq!(
-            u64::from_le_bytes(instruction.data[29..37].try_into().unwrap()),
+            u64::from_le_bytes(instruction.data[32..40].try_into().unwrap()),
             client_ref_id
         );
     }

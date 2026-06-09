@@ -8,6 +8,7 @@ import {
 import {
   ASSOCIATED_TOKEN_PROGRAM_ID,
   DELEGATION_PROGRAM_ID,
+  EPHEMERAL_VAULT_ID,
   EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
   MAGIC_CONTEXT_ID,
   MAGIC_PROGRAM_ID,
@@ -23,6 +24,7 @@ import {
 
 const TRANSFER_QUEUE_SEED = Buffer.from("queue");
 const QUEUE_REFILL_STATE_SEED = Buffer.from("queue-refill");
+const GROUP_RECEIPT_SEED = Buffer.from("group-receipt");
 const RENT_PDA_SEED = Buffer.from("rent");
 const LAMPORTS_PDA_SEED = Buffer.from("lamports");
 const INITIALIZE_TRANSFER_QUEUE_DISCRIMINATOR = 12;
@@ -90,6 +92,41 @@ export function deriveQueueVaultAta(
     ASSOCIATED_TOKEN_PROGRAM_ID,
   );
   return ata;
+}
+
+export function deriveGroupReceipt(
+  queue: PublicKey,
+  source: PublicKey,
+  groupId: number,
+): [PublicKey, number] {
+  if (!Number.isInteger(groupId) || groupId <= 0 || groupId > 0x00ff_ffff) {
+    throw new Error("groupId must be an integer between 1 and 16777215");
+  }
+
+  const groupIdBytes = Buffer.alloc(3);
+  groupIdBytes.writeUIntLE(groupId, 0, 3);
+
+  return PublicKey.findProgramAddressSync(
+    [GROUP_RECEIPT_SEED, queue.toBuffer(), source.toBuffer(), groupIdBytes],
+    EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
+  );
+}
+
+function randomTransferGroupId(): number {
+  const cryptoObj = (globalThis as any)?.crypto;
+  let groupId = 0;
+
+  while (groupId === 0) {
+    if (cryptoObj?.getRandomValues !== undefined) {
+      const bytes = new Uint8Array(3);
+      cryptoObj.getRandomValues(bytes);
+      groupId = bytes[0] | (bytes[1] << 8) | (bytes[2] << 16);
+    } else {
+      groupId = Math.floor(Math.random() * 0x0100_0000);
+    }
+  }
+
+  return groupId;
 }
 
 /**
@@ -235,9 +272,16 @@ export function depositAndQueueTransferIx(
     throw new Error("maxDelayMs must be greater than or equal to minDelayMs");
   }
 
+  const groupId = randomTransferGroupId();
+  const groupIdBytes = Buffer.alloc(4);
+  groupIdBytes.writeUInt32LE(groupId, 0);
+  const [groupReceipt] = deriveGroupReceipt(queue, owner, groupId);
   const data = [
     DEPOSIT_AND_QUEUE_TRANSFER_DISCRIMINATOR,
     ...u64le(amount),
+    groupIdBytes[0],
+    groupIdBytes[1],
+    groupIdBytes[2],
     ...u64le(minDelayMs),
     ...u64le(maxDelayMs),
     ...u32le(split),
@@ -257,6 +301,9 @@ export function depositAndQueueTransferIx(
       { pubkey: owner, isSigner: true, isWritable: false },
       { pubkey: tokenProgram, isSigner: false, isWritable: false },
       { pubkey: reimbursementTokenInfo, isSigner: false, isWritable: true },
+      { pubkey: groupReceipt, isSigner: false, isWritable: true },
+      { pubkey: EPHEMERAL_VAULT_ID, isSigner: false, isWritable: true },
+      { pubkey: MAGIC_PROGRAM_ID, isSigner: false, isWritable: false },
     ],
     data: new Uint8Array(data),
     programAddress: EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
