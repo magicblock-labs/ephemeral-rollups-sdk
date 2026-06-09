@@ -1137,13 +1137,19 @@ describe("Exposed Instructions (web3.js)", () => {
 
       expect(PublicKey.isOnCurve(stealthPool.toBuffer())).toBe(false);
 
-      const instructions = await stealthTransferSpl(from, stealthPool, mint, 25n, {
-        validator,
-        shuttleId: 7,
-        minDelayMs: 100n,
-        maxDelayMs: 300n,
-        split: 4,
-      });
+      const instructions = await stealthTransferSpl(
+        from,
+        stealthPool,
+        mint,
+        25n,
+        {
+          validator,
+          shuttleId: 7,
+          minDelayMs: 100n,
+          maxDelayMs: 300n,
+          split: 4,
+        },
+      );
 
       expect(instructions).toHaveLength(3);
       expect(instructions[0].data[0]).toBe(0);
