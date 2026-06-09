@@ -177,13 +177,14 @@ pub fn find_transfer_group_receipt(
     source: &compat::Pubkey,
     group_id: u32,
 ) -> (compat::Pubkey, u8) {
+    assert!(group_id <= 0x00FF_FFFF, "group_id must fit in 24 bits");
     let group_id_bytes = group_id.to_le_bytes();
     compat::Pubkey::find_program_address(
         &[
             b"group-receipt",
             queue.as_ref(),
             source.as_ref(),
-            &group_id_bytes,
+            &group_id_bytes[..3],
         ],
         &ESPL_TOKEN_PROGRAM_ID,
     )
@@ -200,6 +201,41 @@ fn hydra_seed(stash_pda: &compat::Pubkey, shuttle_id: u32) -> [u8; 32] {
     let mut seed = stash_pda.to_bytes();
     seed[..4].copy_from_slice(&shuttle_id.to_le_bytes());
     seed
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_find_transfer_group_receipt_uses_24_bit_group_id_seed() {
+        let queue = compat::Pubkey::new_from_array([1; 32]);
+        let source = compat::Pubkey::new_from_array([2; 32]);
+        let group_id: u32 = 0x00FF_FFFF;
+        let group_id_bytes = group_id.to_le_bytes();
+
+        let receipt = find_transfer_group_receipt(&queue, &source, group_id);
+        let expected = compat::Pubkey::find_program_address(
+            &[
+                b"group-receipt",
+                queue.as_ref(),
+                source.as_ref(),
+                &group_id_bytes[..3],
+            ],
+            &ESPL_TOKEN_PROGRAM_ID,
+        );
+
+        assert_eq!(receipt, expected);
+    }
+
+    #[test]
+    #[should_panic(expected = "group_id must fit in 24 bits")]
+    fn test_find_transfer_group_receipt_rejects_non_24_bit_group_id() {
+        let queue = compat::Pubkey::new_from_array([1; 32]);
+        let source = compat::Pubkey::new_from_array([2; 32]);
+
+        find_transfer_group_receipt(&queue, &source, 0x0100_0000);
+    }
 }
 
 pub(crate) fn find_associated_token_address_with_bump(

@@ -98,7 +98,7 @@ export async function deriveGroupReceipt(
   }
 
   const addressEncoder = getAddressEncoder();
-  const groupIdBytes = new Uint8Array(u32le(groupId));
+  const groupIdBytes = new Uint8Array(u32le(groupId).slice(0, 3));
   const [groupReceipt, bump] = await getProgramDerivedAddress({
     programAddress: EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
     seeds: [
