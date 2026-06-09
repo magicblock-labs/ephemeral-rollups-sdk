@@ -1333,7 +1333,7 @@ describe("Exposed Instructions (web3.js)", () => {
       expect(instructions[2].data[0]).toBe(24);
     });
 
-    it("should initialize and delegate the receiver eata for private base-to-ephemeral transfers when requested", async () => {
+    it("should initialize permission and delegate the receiver eata for private base-to-ephemeral transfers when requested", async () => {
       const [toEphemeralAta] = deriveEphemeralAta(to, mint);
 
       const instructions = await transferSpl(from, to, mint, 25n, {
@@ -1345,18 +1345,22 @@ describe("Exposed Instructions (web3.js)", () => {
         initIfMissing: true,
       });
 
-      expect(instructions).toHaveLength(4);
+      expect(instructions).toHaveLength(5);
       expect(instructions[0].data[0]).toBe(1);
       expect(instructions[0].keys[2].pubkey.toBase58()).toBe(to.toBase58());
       expect(instructions[1].data[0]).toBe(0);
       expect(instructions[1].keys[0].pubkey.toBase58()).toBe(
         toEphemeralAta.toBase58(),
       );
-      expect(instructions[2].data[0]).toBe(4);
-      expect(instructions[2].keys[1].pubkey.toBase58()).toBe(
+      expect(instructions[2].data[0]).toBe(6);
+      expect(instructions[2].keys[0].pubkey.toBase58()).toBe(
         toEphemeralAta.toBase58(),
       );
-      expect(instructions[3].data[0]).toBe(24);
+      expect(instructions[3].data[0]).toBe(4);
+      expect(instructions[3].keys[1].pubkey.toBase58()).toBe(
+        toEphemeralAta.toBase58(),
+      );
+      expect(instructions[4].data[0]).toBe(24);
     });
 
     it("should ignore initAtasIfMissing on ephemeral-source transfers", async () => {
@@ -1547,10 +1551,22 @@ describe("Exposed Instructions (web3.js)", () => {
       );
       const groupId = Buffer.from(instruction.data).readUIntLE(9, 3);
       const [groupReceipt] = deriveGroupReceipt(queue, mockPublicKey, groupId);
+      const groupIdSeed = Buffer.alloc(4);
+      groupIdSeed.writeUInt32LE(groupId, 0);
+      const [expectedGroupReceipt] = PublicKey.findProgramAddressSync(
+        [
+          Buffer.from("group-receipt"),
+          queue.toBuffer(),
+          mockPublicKey.toBuffer(),
+          groupIdSeed,
+        ],
+        EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
+      );
 
       expect(instruction).toBeInstanceOf(TransactionInstruction);
       expect(instruction.keys).toHaveLength(12);
       expect(groupId).not.toBe(0);
+      expect(groupReceipt.toBase58()).toBe(expectedGroupReceipt.toBase58());
       expect(instruction.keys[8].pubkey.toBase58()).toBe(source.toBase58());
       expect(instruction.keys[8].isWritable).toBe(true);
       expect(instruction.keys[9].pubkey.toBase58()).toBe(

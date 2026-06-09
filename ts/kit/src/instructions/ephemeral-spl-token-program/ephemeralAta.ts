@@ -1753,6 +1753,7 @@ export async function transferSpl(
           instructions.push(
             initVaultAtaIx(payer, toAta, to, mint),
             initEphemeralAtaIx(toEphemeralAta, to, mint, payer),
+            await createEataPermissionIx(toEphemeralAta, payer),
             await delegateIx(payer, toEphemeralAta, validator),
           );
         }

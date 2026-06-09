@@ -1972,6 +1972,7 @@ export async function transferSpl(
               tokenProgram,
             ),
             initEphemeralAtaIx(toEphemeralAta, to, mint, payer),
+            createEataPermissionIx(toEphemeralAta, payer),
             delegateEphemeralAtaIx(payer, toEphemeralAta, validator),
           );
         }
