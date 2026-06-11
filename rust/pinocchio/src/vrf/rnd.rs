@@ -15,17 +15,17 @@ pub fn random_u8(bytes: &[u8; 32]) -> u8 {
 /// below an evenly-divisible threshold. If none is found it falls back to the last
 /// byte (slightly biased, but a rare case).
 pub fn random_u8_with_range(bytes: &[u8; 32], min_value: u8, max_value: u8) -> u8 {
-    let range = (max_value - min_value + 1) as u16;
-    let threshold = (256 / range * range) as u8;
+    let range = max_value as u16 - min_value as u16 + 1;
+    let threshold = 256 / range * range;
 
     // Try to find a byte that, when mapped, gives an unbiased result
     for &b in bytes.iter().rev() {
-        if b < threshold {
-            return min_value + (b % range as u8);
+        if (b as u16) < threshold {
+            return (min_value as u16 + (b as u16 % range)) as u8;
         }
     }
     // Fallback (slight bias, but rare fallback case)
-    min_value + (bytes[31] % range as u8)
+    (min_value as u16 + (bytes[31] as u16 % range)) as u8
 }
 
 /// Generates a random `u32` value from a 32-byte random seed.
