@@ -24,7 +24,7 @@ pub struct RequestRandomness<'a> {
     /// Caller-provided seed mixed into the randomness derivation.
     pub caller_seed: [u8; 32],
     /// Program that owns the callback instruction invoked once randomness is fulfilled.
-    pub callback_program_id: Address,
+    pub callback_program_id: &'a Address,
     /// Discriminator of the callback instruction.
     pub callback_discriminator: &'a [u8],
     /// Extra account metas forwarded to the callback instruction.
@@ -168,7 +168,7 @@ mod tests {
         let req = RequestRandomness {
             high_priority: discriminator == REQUEST_HIGH_PRIORITY_SCOPED_RANDOMNESS_DISCRIMINATOR,
             caller_seed,
-            callback_program_id: Address::new_from_array(callback_program),
+            callback_program_id: &Address::new_from_array(callback_program),
             callback_discriminator: disc,
             callback_accounts_metas: &p_metas,
             callback_args: args,
@@ -364,7 +364,7 @@ mod tests {
         let req = RequestRandomness {
             high_priority: true,
             caller_seed: [0u8; 32],
-            callback_program_id: Address::new_from_array([0u8; 32]),
+            callback_program_id: &Address::new_from_array([0u8; 32]),
             callback_discriminator: &[1, 2, 3],
             callback_accounts_metas: &[],
             callback_args: &[],
@@ -390,7 +390,7 @@ mod tests {
             let req = RequestRandomness {
                 high_priority: false,
                 caller_seed,
-                callback_program_id: Address::new_from_array(callback_program),
+                callback_program_id: &Address::new_from_array(callback_program),
                 callback_discriminator: &disc,
                 callback_accounts_metas: &[meta],
                 callback_args: &args,

@@ -51,7 +51,6 @@ pub fn random_i64(bytes: &[u8; 32]) -> i64 {
 }
 
 /// Generates a random boolean value from a 32-byte random seed.
-#[allow(clippy::manual_is_multiple_of)]
 pub fn random_bool(bytes: &[u8; 32]) -> bool {
     (bytes[31] % 2) == 0
 }

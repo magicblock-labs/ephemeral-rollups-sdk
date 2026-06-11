@@ -195,7 +195,7 @@ mod tests {
         let request = RequestRandomness {
             high_priority: true,
             caller_seed,
-            callback_program_id: Address::new_from_array(callback_program),
+            callback_program_id: &Address::new_from_array(callback_program),
             callback_discriminator: &disc,
             callback_accounts_metas: &[],
             callback_args: &args,
