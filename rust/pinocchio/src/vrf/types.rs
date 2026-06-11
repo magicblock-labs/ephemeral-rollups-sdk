@@ -138,7 +138,8 @@ mod tests {
     use alloc::vec::Vec;
 
     use ephemeral_vrf_sdk::instructions::{
-        create_request_randomness_ix, create_request_regular_randomness_ix, RequestRandomnessParams,
+        create_request_high_priority_scoped_randomness_ix, create_request_scoped_randomness_ix,
+        RequestRandomnessParams,
     };
     use ephemeral_vrf_sdk::types::SerializableAccountMeta as SdkMeta;
     use pinocchio::Address;
@@ -146,7 +147,8 @@ mod tests {
 
     use super::*;
     use crate::vrf::consts::{
-        REQUEST_RANDOMNESS_DISCRIMINATOR, REQUEST_REGULAR_RANDOMNESS_DISCRIMINATOR,
+        REQUEST_HIGH_PRIORITY_SCOPED_RANDOMNESS_DISCRIMINATOR,
+        REQUEST_SCOPED_RANDOMNESS_DISCRIMINATOR,
     };
 
     type MetaTuple = (Address, bool, bool);
@@ -164,7 +166,7 @@ mod tests {
             .map(|(k, is_signer, is_writable)| InstructionAccount::new(k, *is_writable, *is_signer))
             .collect();
         let req = RequestRandomness {
-            high_priority: discriminator == REQUEST_RANDOMNESS_DISCRIMINATOR,
+            high_priority: discriminator == REQUEST_HIGH_PRIORITY_SCOPED_RANDOMNESS_DISCRIMINATOR,
             caller_seed,
             callback_program_id: Address::new_from_array(callback_program),
             callback_discriminator: disc,
@@ -223,9 +225,9 @@ mod tests {
             &disc,
             &metas,
             &args,
-            REQUEST_RANDOMNESS_DISCRIMINATOR,
+            REQUEST_SCOPED_RANDOMNESS_DISCRIMINATOR,
         );
-        let ix = create_request_randomness_ix(canonical(
+        let ix = create_request_scoped_randomness_ix(canonical(
             caller_seed,
             callback_program,
             &disc,
@@ -234,7 +236,10 @@ mod tests {
         ));
         assert_eq!(ours, ix.data);
         // First byte is the ephemeral discriminator.
-        assert_eq!(ours[0..8], REQUEST_RANDOMNESS_DISCRIMINATOR.to_le_bytes());
+        assert_eq!(
+            ours[0..8],
+            REQUEST_SCOPED_RANDOMNESS_DISCRIMINATOR.to_le_bytes()
+        );
     }
 
     #[test]
@@ -251,9 +256,9 @@ mod tests {
             &disc,
             &metas,
             &args,
-            REQUEST_REGULAR_RANDOMNESS_DISCRIMINATOR,
+            REQUEST_SCOPED_RANDOMNESS_DISCRIMINATOR,
         );
-        let ix = create_request_regular_randomness_ix(canonical(
+        let ix = create_request_scoped_randomness_ix(canonical(
             caller_seed,
             callback_program,
             &disc,
@@ -263,7 +268,70 @@ mod tests {
         assert_eq!(ours, ix.data);
         assert_eq!(
             ours[0..8],
-            REQUEST_REGULAR_RANDOMNESS_DISCRIMINATOR.to_le_bytes()
+            REQUEST_SCOPED_RANDOMNESS_DISCRIMINATOR.to_le_bytes()
+        );
+    }
+
+    #[test]
+    fn matches_canonical_scoped_randomness() {
+        let caller_seed = [3u8; 32];
+        let callback_program = [4u8; 32];
+        let disc = [7u8, 6, 5];
+        let metas: [MetaTuple; 1] = [(Address::new_from_array([8u8; 32]), false, true)];
+        let args = [2u8, 3];
+
+        let ours = serialize(
+            caller_seed,
+            callback_program,
+            &disc,
+            &metas,
+            &args,
+            REQUEST_SCOPED_RANDOMNESS_DISCRIMINATOR,
+        );
+        let ix = create_request_scoped_randomness_ix(canonical(
+            caller_seed,
+            callback_program,
+            &disc,
+            &metas,
+            &args,
+        ));
+        assert_eq!(ours, ix.data);
+        assert_eq!(
+            ours[0..8],
+            REQUEST_SCOPED_RANDOMNESS_DISCRIMINATOR.to_le_bytes()
+        );
+    }
+
+    #[test]
+    fn matches_canonical_high_priority_scoped_randomness() {
+        let caller_seed = [12u8; 32];
+        let callback_program = [13u8; 32];
+        let disc = [1u8, 1, 2, 3, 5, 8, 13, 21];
+        let metas: [MetaTuple; 2] = [
+            (Address::new_from_array([14u8; 32]), true, true),
+            (Address::new_from_array([15u8; 32]), false, false),
+        ];
+        let args = [34u8, 55];
+
+        let ours = serialize(
+            caller_seed,
+            callback_program,
+            &disc,
+            &metas,
+            &args,
+            REQUEST_HIGH_PRIORITY_SCOPED_RANDOMNESS_DISCRIMINATOR,
+        );
+        let ix = create_request_high_priority_scoped_randomness_ix(canonical(
+            caller_seed,
+            callback_program,
+            &disc,
+            &metas,
+            &args,
+        ));
+        assert_eq!(ours, ix.data);
+        assert_eq!(
+            ours[0..8],
+            REQUEST_HIGH_PRIORITY_SCOPED_RANDOMNESS_DISCRIMINATOR.to_le_bytes()
         );
     }
 
@@ -279,10 +347,15 @@ mod tests {
             &disc,
             &[],
             &[],
-            REQUEST_RANDOMNESS_DISCRIMINATOR,
+            REQUEST_SCOPED_RANDOMNESS_DISCRIMINATOR,
         );
-        let ix =
-            create_request_randomness_ix(canonical(caller_seed, callback_program, &disc, &[], &[]));
+        let ix = create_request_scoped_randomness_ix(canonical(
+            caller_seed,
+            callback_program,
+            &disc,
+            &[],
+            &[],
+        ));
         assert_eq!(ours, ix.data);
     }
 
@@ -323,12 +396,12 @@ mod tests {
                 callback_args: &args,
             };
             let mut buf = vec![0u8; req.serialized_size()];
-            req.serialize_into(&mut buf, REQUEST_REGULAR_RANDOMNESS_DISCRIMINATOR)
+            req.serialize_into(&mut buf, REQUEST_SCOPED_RANDOMNESS_DISCRIMINATOR)
                 .unwrap();
             buf
         };
 
-        let ix = create_request_regular_randomness_ix(canonical(
+        let ix = create_request_scoped_randomness_ix(canonical(
             caller_seed,
             callback_program,
             &disc,

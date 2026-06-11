@@ -29,8 +29,8 @@ pub const VRF_PROGRAM_IDENTITY: Address =
 /// Seed of the identity PDA.
 pub const IDENTITY_SEED: &[u8] = b"identity";
 
-pub const REQUEST_RANDOMNESS_DISCRIMINATOR: u64 = 3;
-pub const REQUEST_REGULAR_RANDOMNESS_DISCRIMINATOR: u64 = 8;
+pub const REQUEST_SCOPED_RANDOMNESS_DISCRIMINATOR: u64 = 10;
+pub const REQUEST_HIGH_PRIORITY_SCOPED_RANDOMNESS_DISCRIMINATOR: u64 = 11;
 
 #[cfg(test)]
 mod tests {

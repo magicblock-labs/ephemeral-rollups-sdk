@@ -7,7 +7,7 @@ use pinocchio::{
 };
 
 use crate::vrf::consts::{
-    REQUEST_RANDOMNESS_DISCRIMINATOR, REQUEST_REGULAR_RANDOMNESS_DISCRIMINATOR,
+    REQUEST_HIGH_PRIORITY_SCOPED_RANDOMNESS_DISCRIMINATOR, REQUEST_SCOPED_RANDOMNESS_DISCRIMINATOR,
 };
 use crate::vrf::types::RequestRandomness;
 
@@ -44,6 +44,15 @@ impl<'a> RequestRandomnessCpi<'a> {
         self.request.serialized_size()
     }
 
+    #[inline(always)]
+    fn discriminator(&self) -> u64 {
+        if self.request.high_priority {
+            REQUEST_HIGH_PRIORITY_SCOPED_RANDOMNESS_DISCRIMINATOR
+        } else {
+            REQUEST_SCOPED_RANDOMNESS_DISCRIMINATOR
+        }
+    }
+
     /// Build the [`InstructionView`] for this request, writing the account metas
     /// into the provided buffer. `data` must be the already-serialized
     /// instruction data (see [`RequestRandomness::serialize_into`]).
@@ -54,14 +63,7 @@ impl<'a> RequestRandomnessCpi<'a> {
     ) -> InstructionView<'b, 'b, 'b, 'b> {
         let data_len = self
             .request
-            .serialize_into(
-                data,
-                if self.request.high_priority {
-                    REQUEST_RANDOMNESS_DISCRIMINATOR
-                } else {
-                    REQUEST_REGULAR_RANDOMNESS_DISCRIMINATOR
-                },
-            )
+            .serialize_into(data, self.discriminator())
             .expect("Failed to serialize request randomness");
 
         unsafe {
@@ -124,7 +126,9 @@ mod tests {
     use alloc::vec;
     use alloc::vec::Vec;
 
-    use ephemeral_vrf_sdk::instructions::{create_request_randomness_ix, RequestRandomnessParams};
+    use ephemeral_vrf_sdk::instructions::{
+        create_request_scoped_randomness_ix, RequestRandomnessParams,
+    };
     use pinocchio::account::RuntimeAccount;
     use pinocchio::Address;
     use solana_program::pubkey::Pubkey;
@@ -158,7 +162,7 @@ mod tests {
 
         // Build the canonical instruction first; it is the source of truth for the
         // program-identity, system-program and slot-hashes account keys.
-        let ix = create_request_randomness_ix(RequestRandomnessParams {
+        let ix = create_request_scoped_randomness_ix(RequestRandomnessParams {
             payer: Pubkey::new_from_array(payer_key),
             oracle_queue: Pubkey::new_from_array(oracle_key),
             callback_program_id: Pubkey::new_from_array(callback_program),
