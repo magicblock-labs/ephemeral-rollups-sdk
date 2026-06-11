@@ -38,9 +38,6 @@ mod tests {
 
     use super::*;
 
-    // Note: `DEFAULT_EPHEMERAL_TEST_QUEUE` and `DEFAULT_TEST_QUEUE` are not present
-    // in the published `ephemeral_vrf_sdk` 0.3.0 (they were added upstream after the
-    // release), so they are intentionally not cross-checked here.
     #[test]
     fn ids_match_sdk() {
         assert_eq!(VRF_PROGRAM_ID.as_ref(), sdk::VRF_PROGRAM_ID.as_ref());
@@ -52,6 +49,14 @@ mod tests {
         assert_eq!(
             VRF_PROGRAM_IDENTITY.as_ref(),
             sdk::VRF_PROGRAM_IDENTITY.as_ref()
+        );
+        assert_eq!(
+            DEFAULT_EPHEMERAL_TEST_QUEUE.as_ref(),
+            sdk::DEFAULT_EPHEMERAL_TEST_QUEUE.as_ref()
+        );
+        assert_eq!(
+            DEFAULT_TEST_QUEUE.as_ref(),
+            sdk::DEFAULT_TEST_QUEUE.as_ref()
         );
         assert_eq!(IDENTITY_SEED, sdk::IDENTITY);
     }

@@ -8,7 +8,6 @@ members = [
 	"pinocchio",
 	"resolver",
 	"sdk",
-	"vrf-attribute",
 ]
 
 resolver = "2"
@@ -31,7 +30,8 @@ ephemeral-rollups-sdk-attribute-ephemeral-accounts = { path = "ephemeral-account
 ephemeral-rollups-sdk-attribute-delegate = { path = "delegate", version = "=0.15.0" }
 ephemeral-rollups-sdk-attribute-commit = { path = "commit-attribute", version = "=0.15.0" }
 ephemeral-rollups-sdk-attribute-action = { path = "action-attribute", version = "=0.15.0" }
-ephemeral-rollups-sdk-attribute-vrf = { path = "vrf-attribute", version = "=0.15.0" }
+ephemeral-vrf-sdk = { version = "0.4.0", default-features = false }
+ephemeral-vrf-sdk-vrf-macro = { version = "0.4.0", default-features = false }
 
 # Magicblock
 magicblock-delegation-program-api = { version = "3.0.0", default-features = false }
