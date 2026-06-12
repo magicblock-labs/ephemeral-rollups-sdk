@@ -25,11 +25,20 @@ default = ["solana-system-interface"]
 
 # anchor 1.0 support (CANNOT be combined with backward-compat) 
 anchor = ["anchor-modern"]
-anchor-modern = ["anchor-support", "anchor-lang-current"]
+anchor-modern = [
+    "anchor-support",
+    "anchor-lang-current",
+    "ephemeral-vrf-sdk/anchor-modern",
+]
 anchor-debug = ["anchor-lang-current/anchor-debug"]
 
 # anchor >=0.28.0, <1.0 support (backward-compat is implied)
-anchor-compat = ["anchor-support", "backward-compat", "anchor-lang-compat"]
+anchor-compat = [
+    "anchor-support",
+    "backward-compat",
+    "anchor-lang-compat",
+    "ephemeral-vrf-sdk/anchor-compat",
+]
 anchor-compat-debug = ["anchor-lang-compat/anchor-debug"]
 
 # access-control support (can be combined with [anchor-compat | anchor | backward-compat]) 
@@ -51,8 +60,12 @@ backward-compat = [
     "ephemeral-rollups-sdk-attribute-delegate/backward-compat",
     "ephemeral-rollups-sdk-attribute-ephemeral/backward-compat",
     "ephemeral-rollups-sdk-attribute-ephemeral-accounts/backward-compat",
+    "ephemeral-vrf-sdk-vrf-macro/backward-compat",
+    "ephemeral-vrf-sdk/backward-compat",
 ]
 
+# Activate this feature to use the vrf macro without having to import the ephemeral-vrf-sdk crate.
+vrf = ["ephemeral-vrf-sdk-vrf-macro/rollups"]
 crank = []
 modular-sdk = [
     "solana-account",
@@ -81,6 +94,8 @@ ephemeral-rollups-sdk-attribute-ephemeral = { workspace = true }
 ephemeral-rollups-sdk-attribute-ephemeral-accounts = { workspace = true }
 ephemeral-rollups-sdk-attribute-commit = { workspace = true }
 ephemeral-rollups-sdk-attribute-action = { workspace = true }
+ephemeral-vrf-sdk = { workspace = true }
+ephemeral-vrf-sdk-vrf-macro = { workspace = true }
 solana-program = { workspace = true }
 solana-address = { workspace = true }
 solana-account = { workspace = true, optional = true }
