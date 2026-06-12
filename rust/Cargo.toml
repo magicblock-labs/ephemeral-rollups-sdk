@@ -13,7 +13,7 @@ members = [
 resolver = "2"
 
 [workspace.package]
-version = "0.15.3"
+version = "0.15.4"
 authors = ["Magicblock Labs <dev@magicblock.gg>"]
 edition = "2021"
 license = "MIT"
@@ -24,18 +24,19 @@ readme = "README.md"
 keywords = ["solana", "crypto", "delegation", "ephemeral-rollups", "magicblock"]
 
 [workspace.dependencies]
-ephemeral-rollups-sdk = { path = "sdk", version = "=0.15.3" }
-ephemeral-rollups-sdk-attribute-ephemeral = { path = "ephemeral", version = "=0.15.3" }
-ephemeral-rollups-sdk-attribute-ephemeral-accounts = { path = "ephemeral-accounts-attribute", version = "=0.15.3" }
-ephemeral-rollups-sdk-attribute-delegate = { path = "delegate", version = "=0.15.3" }
-ephemeral-rollups-sdk-attribute-commit = { path = "commit-attribute", version = "=0.15.3" }
-ephemeral-rollups-sdk-attribute-action = { path = "action-attribute", version = "=0.15.3" }
-ephemeral-vrf-sdk = { version = "0.4.1", default-features = false }
-ephemeral-vrf-sdk-vrf-macro = { version = "0.4.1", default-features = false }
+ephemeral-rollups-sdk = { path = "sdk", version = "=0.15.4" }
+ephemeral-rollups-sdk-attribute-ephemeral = { path = "ephemeral", version = "=0.15.4" }
+ephemeral-rollups-sdk-attribute-ephemeral-accounts = { path = "ephemeral-accounts-attribute", version = "=0.15.4" }
+ephemeral-rollups-sdk-attribute-delegate = { path = "delegate", version = "=0.15.4" }
+ephemeral-rollups-sdk-attribute-commit = { path = "commit-attribute", version = "=0.15.4" }
+ephemeral-rollups-sdk-attribute-action = { path = "action-attribute", version = "=0.15.4" }
+
 
 # Magicblock
 magicblock-delegation-program-api = { version = "3.0.0", default-features = false }
 magicblock-magic-program-api = { version = "0.10.1", default-features = false }
+ephemeral-vrf-sdk = { version = "0.4.1", default-features = false }
+ephemeral-vrf-sdk-vrf-macro = { version = "0.4.1", default-features = false }
 
 ## External crates
 anchor-lang-compat = { package = "anchor-lang", version = ">=0.28.0, <1.0.0" }
