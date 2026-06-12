@@ -1583,7 +1583,7 @@ dependencies = [
 
 [[package]]
 name = "ephemeral-vrf-sdk"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "anchor-lang 0.32.1",
  "anchor-lang 1.0.2",
@@ -1598,7 +1598,7 @@ dependencies = [
 
 [[package]]
 name = "ephemeral-vrf-sdk-vrf-macro"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "proc-macro2",
  "quote",
