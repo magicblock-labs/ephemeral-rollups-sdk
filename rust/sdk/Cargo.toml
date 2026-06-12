@@ -62,7 +62,6 @@ backward-compat = [
     "ephemeral-rollups-sdk-attribute-ephemeral-accounts/backward-compat",
     "ephemeral-vrf-sdk-vrf-macro/backward-compat",
     "ephemeral-vrf-sdk/backward-compat",
-    "solana-sdk-ids-compat",
 ]
 
 # Activate this feature to use the vrf macro without having to import the ephemeral-vrf-sdk crate.
@@ -106,7 +105,6 @@ solana-instruction = { workspace = true, optional = true }
 solana-pubkey = { workspace = true, optional = true }
 solana-program-error = { workspace = true, optional = true }
 solana-program-memory = { workspace = true, optional = true }
-solana-sdk-ids = { workspace = true }
 solana-system-interface = { workspace = true, optional = true }
 solana-sysvar = { workspace = true, optional = true }
 spl-associated-token-account-interface = { workspace = true, optional = true }
@@ -119,7 +117,6 @@ thiserror = { workspace = true, optional = true }
 solana-account-info-compat = { workspace = true }
 solana-program-error-compat = { workspace = true }
 solana-program-compat = { workspace = true }
-solana-sdk-ids-compat = { workspace = true, optional = true }
 
 # Fix for older toolchain
 base64ct = { workspace = true }

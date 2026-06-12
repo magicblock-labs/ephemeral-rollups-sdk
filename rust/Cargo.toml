@@ -89,7 +89,6 @@ solana-cpi = { version = "3.0" }
 solana-pubkey = { version = "3.0" }
 solana-program-error = { version = "3.0" }
 solana-program-memory = { version = "3.0" }
-solana-sdk-ids = { version = "3.0" }
 solana-system-interface = { version = "2.0.0", features = ["bincode"] }
 solana-instruction = "3.1.0"
 solana-sysvar = { version = "3.1" }
@@ -99,7 +98,6 @@ spl-associated-token-account-interface = { version = "1.0.0" }
 solana-account-info-compat = { package = "solana-account-info", version = "2.0" }
 solana-program-error-compat = { package = "solana-program-error", version = "2.0" }
 solana-program-compat = { package = "solana-program", version = ">=1.16, <3", default-features = false }
-solana-sdk-ids-compat = { package = "solana-sdk-ids", version = "2.0" }
 
 # solana alias
 sdk = { package = "solana-sdk", version = ">=1.16, <3" }
