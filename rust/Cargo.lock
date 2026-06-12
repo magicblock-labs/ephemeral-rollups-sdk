@@ -1584,6 +1584,8 @@ dependencies = [
 [[package]]
 name = "ephemeral-vrf-sdk"
 version = "0.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "77f3741c733907c10e0d0b32f9aa485c20a73e0b1e7e673a0ac38185fb2a6c11"
 dependencies = [
  "anchor-lang 0.32.1",
  "anchor-lang 1.0.2",
@@ -1599,6 +1601,8 @@ dependencies = [
 [[package]]
 name = "ephemeral-vrf-sdk-vrf-macro"
 version = "0.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a7b8b3fe3863a27d4c0f32da7b3cfeff179772fd4124d6c9fdcb9d4ab23cd602"
 dependencies = [
  "proc-macro2",
  "quote",
