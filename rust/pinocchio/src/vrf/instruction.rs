@@ -193,7 +193,7 @@ mod tests {
         let vrf_view = unsafe { AccountView::new_unchecked(&mut vrf as *mut RuntimeAccount) };
 
         let request = RequestRandomness {
-            high_priority: true,
+            high_priority: false,
             caller_seed,
             callback_program_id: &Address::new_from_array(callback_program),
             callback_discriminator: &disc,
