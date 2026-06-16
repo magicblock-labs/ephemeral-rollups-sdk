@@ -43,7 +43,6 @@ import {
   lamportsDelegatedTransferIx,
   processPendingTransferQueueRefillIx,
   schedulePrivateTransferIx,
-  stealthTransferSpl,
   transferSpl,
   undelegateAndCloseShuttleEphemeralAtaIx,
   withdrawSplIx,
@@ -981,6 +980,7 @@ describe("Exposed Instructions (web3.js)", () => {
       const data = Buffer.from(privateTransferInstruction.data);
       expect(data.readUInt32LE(1)).toBe(7);
       expect(data.readBigUInt64LE(5)).toBe(1n);
+      expect(data[13]).toBe(0);
 
       const destinationField = data.subarray(14, 14 + 80);
       const validatorField = data.subarray(14 + 80 + 1, 14 + 80 + 1 + 32);
@@ -1128,14 +1128,6 @@ describe("Exposed Instructions (web3.js)", () => {
     const mint = Keypair.generate().publicKey;
     const validator = Keypair.generate().publicKey;
 
-    it("should reject on-curve stealth pool addresses", async () => {
-      expect(PublicKey.isOnCurve(to.toBuffer())).toBe(true);
-
-      await expect(
-        stealthTransferSpl(from, to, mint, 25n, { validator }),
-      ).rejects.toThrow("stealthPool must be an off-curve PDA");
-    });
-
     it("should build base-to-base stealth transfers to off-curve pool PDAs", async () => {
       const [stealthPool] = PublicKey.findProgramAddressSync(
         [Buffer.from("stealth_pool"), mint.toBuffer()],
@@ -1145,19 +1137,18 @@ describe("Exposed Instructions (web3.js)", () => {
 
       expect(PublicKey.isOnCurve(stealthPool.toBuffer())).toBe(false);
 
-      const instructions = await stealthTransferSpl(
-        from,
-        stealthPool,
-        mint,
-        25n,
-        {
-          validator,
-          shuttleId: 7,
+      const instructions = await transferSpl(from, stealthPool, mint, 25n, {
+        visibility: "private",
+        fromBalance: "base",
+        toBalance: "base",
+        validator,
+        shuttleId: 7,
+        privateTransfer: {
           minDelayMs: 100n,
           maxDelayMs: 300n,
           split: 4,
         },
-      );
+      });
 
       expect(instructions).toHaveLength(3);
       expect(instructions[0].data[0]).toBe(0);
