@@ -27,6 +27,7 @@ mod backward_compat {
     pub use solana_account_info_compat::AccountInfo;
     pub use solana_program_compat::instruction::{AccountMeta, Instruction};
     pub use solana_program_error_compat::{ProgramError, ProgramResult};
+    pub use solana_sdk_ids_compat::{system_program, sysvar::slot_hashes};
 }
 
 pub(crate) mod latest {
@@ -40,6 +41,7 @@ pub(crate) mod latest {
     pub use solana_program::entrypoint_deprecated::ProgramResult;
     pub use solana_program::instruction::{AccountMeta, Instruction};
     pub use solana_program::program_error::ProgramError;
+    pub use solana_sdk_ids::{system_program, sysvar::slot_hashes};
 }
 
 mod as_modern;

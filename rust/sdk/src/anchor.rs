@@ -3,7 +3,7 @@ pub use ephemeral_rollups_sdk_attribute_commit::commit;
 pub use ephemeral_rollups_sdk_attribute_delegate::delegate;
 pub use ephemeral_rollups_sdk_attribute_ephemeral::ephemeral;
 pub use ephemeral_rollups_sdk_attribute_ephemeral_accounts::ephemeral_accounts;
-pub use ephemeral_vrf_sdk_vrf_macro::{vrf, vrf_callback};
+pub use ephemeral_rollups_sdk_attribute_vrf::{vrf, vrf_callback};
 
 use crate::compat::anchor_lang;
 
@@ -20,5 +20,13 @@ pub struct MagicProgram;
 impl anchor_lang::Id for MagicProgram {
     fn id() -> anchor_lang::prelude::Pubkey {
         crate::consts::MAGIC_PROGRAM_ID.to_bytes().into()
+    }
+}
+
+pub struct VrfProgram;
+
+impl anchor_lang::Id for VrfProgram {
+    fn id() -> anchor_lang::prelude::Pubkey {
+        crate::vrf::consts::VRF_PROGRAM_ID.to_bytes().into()
     }
 }

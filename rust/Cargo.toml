@@ -8,6 +8,7 @@ members = [
 	"pinocchio",
 	"resolver",
 	"sdk",
+	"vrf-attribute",
 ]
 
 resolver = "2"
@@ -30,7 +31,7 @@ ephemeral-rollups-sdk-attribute-ephemeral-accounts = { path = "ephemeral-account
 ephemeral-rollups-sdk-attribute-delegate = { path = "delegate", version = "=0.15.4" }
 ephemeral-rollups-sdk-attribute-commit = { path = "commit-attribute", version = "=0.15.4" }
 ephemeral-rollups-sdk-attribute-action = { path = "action-attribute", version = "=0.15.4" }
-
+ephemeral-rollups-sdk-attribute-vrf = { path = "vrf-attribute", version = "=0.15.4" }
 
 # Magicblock
 magicblock-delegation-program-api = { version = "3.0.0", default-features = false }
@@ -92,6 +93,7 @@ solana-program-error = { version = "3.0" }
 solana-program-memory = { version = "3.0" }
 solana-system-interface = { version = "2.0.0", features = ["bincode"] }
 solana-instruction = "3.1.0"
+solana-sdk-ids = { version = "3.0" }
 solana-sysvar = { version = "3.1" }
 spl-associated-token-account-interface = { version = "1.0.0" }
 
@@ -99,6 +101,7 @@ spl-associated-token-account-interface = { version = "1.0.0" }
 solana-account-info-compat = { package = "solana-account-info", version = "2.0" }
 solana-program-error-compat = { package = "solana-program-error", version = "2.0" }
 solana-program-compat = { package = "solana-program", version = ">=1.16, <3", default-features = false }
+solana-sdk-ids-compat = { package = "solana-sdk-ids", version = "2.0" }
 
 # solana alias
 sdk = { package = "solana-sdk", version = ">=1.16, <3" }
