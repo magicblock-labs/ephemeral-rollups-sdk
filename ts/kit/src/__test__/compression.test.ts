@@ -74,7 +74,7 @@ describe("compression byte converters", () => {
   });
 
   it("convertCompressedAccountMetaToBytes rejects null address", () => {
-    const accountMeta = {
+    const accountMeta: CompressedAccountMeta = {
       treeInfo: {
         rootIndex: 0,
         proveByIndex: false,
@@ -85,7 +85,7 @@ describe("compression byte converters", () => {
       address: null,
       outputStateTreeIndex: 0,
       lamports: null,
-    } as CompressedAccountMeta;
+    };
 
     expect(() => convertCompressedAccountMetaToBytes(accountMeta)).toThrow(
       "Compressed account meta address is null",

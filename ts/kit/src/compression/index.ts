@@ -249,9 +249,10 @@ export async function fetchDelegateCompressedData(
   const addressTree = { ...addressTreeInfo, queue: toPublicKey(OUTPUT_QUEUE) };
 
   await photonClient.getStateTreeInfos();
-  const alreadyHasTree = photonClient.allStateTreeInfos?.some((info) =>
-    info.tree.equals(toPublicKey(BATCHED_MERKLE_TREE)),
-  );
+  const alreadyHasTree =
+    photonClient.allStateTreeInfos?.some((info) =>
+      info.tree.equals(toPublicKey(BATCHED_MERKLE_TREE)),
+    ) ?? false;
   if (!alreadyHasTree) {
     photonClient.allStateTreeInfos?.push({
       tree: toPublicKey(BATCHED_MERKLE_TREE),
