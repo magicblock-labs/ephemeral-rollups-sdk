@@ -25,6 +25,6 @@ MagicIntentBundleBuilder::new(payer, magic_context, magic_program)
 ```bash
 cd examples/intent-bundle-pinocchio && cargo build-sbf && cd -
 examples/scripts/start-validators.sh examples/intent-bundle-pinocchio/target/deploy
-cd examples/intent-bundle-pinocchio && npm install && npm test && cd -
+cd examples/intent-bundle-pinocchio && yarn install && yarn test && cd -
 examples/scripts/stop-validators.sh
 ```

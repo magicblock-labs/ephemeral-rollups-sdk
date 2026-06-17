@@ -19,6 +19,6 @@ close it — asserting the permission PDA appears, persists, and is removed.
 
 ```bash
 examples/scripts/start-validators.sh        # only the base layer is needed here
-cd examples/access-control && npm install && npm test && cd -
+cd examples/access-control && yarn install && yarn test && cd -
 examples/scripts/stop-validators.sh
 ```

@@ -7,13 +7,13 @@ flavours:
 - `@magicblock-labs/ephemeral-rollups-sdk` (`@solana/web3.js`)
 - `@magicblock-labs/ephemeral-rollups-kit` (`@solana/kit`)
 
-Each example is self-contained (its own Cargo manifest and npm package, consuming
+Each example is self-contained (its own Cargo manifest and Yarn package, consuming
 the in-repo crates/SDKs via path/`file:` deps) and is exercised end-to-end against a
 real local validator stack. CI runs **one runner per example**.
 
 ## The local validator stack
 
-`npm install -g @magicblock-labs/ephemeral-validator@latest` provides the binaries.
+`yarn global add @magicblock-labs/ephemeral-validator@latest` provides the binaries.
 `examples/scripts/start-validators.sh [PROGRAMS_DIR]` boots:
 
 | Service | Role | RPC / WS |
@@ -34,7 +34,7 @@ query-filtering-service (`2999`). The router requires a JWT obtained with the SD
 ```bash
 cd examples/<example> && cargo build-sbf && cd -
 examples/scripts/start-validators.sh examples/<example>/target/deploy
-cd examples/<example> && npm install && npm test && cd -
+cd examples/<example> && yarn install && yarn test && cd -
 examples/scripts/stop-validators.sh
 ```
 

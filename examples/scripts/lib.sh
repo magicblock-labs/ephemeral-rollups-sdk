@@ -46,3 +46,52 @@ wait_for_rpc() {
   done
   log "${name} is up"
 }
+
+# Free the ephemeral-validator listen ports (best-effort).
+clean_er_ports() {
+  local port p
+  for port in "${ER_RPC_PORT}" "${ER_WS_PORT}"; do
+    for p in $(lsof -ti "tcp:${port}" 2>/dev/null || true); do
+      log "freeing port ${port} (pid ${p})"
+      kill -9 "$p" 2>/dev/null || true
+    done
+  done
+}
+
+rpc_ready() {
+  curl -s --connect-timeout 2 --max-time 2 -X POST "$1" \
+    -H 'Content-Type: application/json' \
+    -d '{"jsonrpc":"2.0","id":1,"method":"getVersion"}' 2>/dev/null | grep -q '"result"'
+}
+
+# Wait for ephemeral-validator RPC, detecting crashes and the "half-dead" case
+# where the log says ready but getVersion never answers.
+wait_for_er() {
+  local logfile="$1" pid="$2" timeout="${3:-90}"
+  local i=0 log_ready_at=-1
+  log "waiting for ephemeral validator at ${ER_RPC_URL} ..."
+  while true; do
+    if rpc_ready "${ER_RPC_URL}"; then
+      log "ephemeral validator is up"
+      return 0
+    fi
+    if ! kill -0 "$pid" 2>/dev/null; then
+      err "ephemeral validator exited before becoming ready"
+      return 1
+    fi
+    if grep -q 'Ready for connections' "$logfile" 2>/dev/null; then
+      if [ "$log_ready_at" -lt 0 ]; then
+        log_ready_at=$i
+      elif [ $((i - log_ready_at)) -ge 10 ]; then
+        err "ephemeral validator looks half-dead (log ready but RPC silent for 5s)"
+        return 1
+      fi
+    fi
+    i=$((i + 1))
+    if [ "$i" -ge "$((timeout * 2))" ]; then
+      err "ephemeral validator did not become ready within ${timeout}s"
+      return 1
+    fi
+    sleep 0.5
+  done
+}

@@ -11,7 +11,7 @@ kill_tree() {
   kill "-${sig}" "-${pid}" 2>/dev/null || kill "-${sig}" "${pid}" 2>/dev/null || true
 }
 
-for svc in qfs er base; do
+for svc in qfs er base vrf; do
   pidfile="${ER_RUN_DIR}/${svc}.pid"
   [ -f "$pidfile" ] || continue
   pid="$(cat "$pidfile")"
@@ -23,4 +23,5 @@ for svc in qfs er base; do
   fi
   rm -f "$pidfile"
 done
+clean_er_ports
 log "stack stopped"

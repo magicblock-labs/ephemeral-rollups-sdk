@@ -1,12 +1,12 @@
 [package]
-name = "vrf-anchor"
+name = "ephemeral-accounts-anchor"
 version = "0.1.0"
 edition = "2021"
 license = "MIT"
 publish = false
 
 [lib]
-name = "vrf_anchor"
+name = "ephemeral_accounts_anchor"
 crate-type = ["cdylib", "lib"]
 
 [features]
@@ -25,9 +25,6 @@ anchor-lang = ">=0.28.0, <1.0.0"
 ephemeral-rollups-sdk = { path = "../../rust/sdk", default-features = false, features = [
     "anchor-compat",
     "solana-system-interface",
-] }
-ephemeral-vrf-sdk = { version = "=0.4.1", default-features = false, features = [
-    "anchor-compat",
 ] }
 
 # Detach from any parent workspace; this example is self-contained.

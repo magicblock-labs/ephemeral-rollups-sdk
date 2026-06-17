@@ -31,7 +31,7 @@ Prerequisites: Rust + Solana CLI (with `cargo build-sbf`), Node, and the validat
 binaries:
 
 ```bash
-npm install -g @magicblock-labs/ephemeral-validator@latest
+yarn global add @magicblock-labs/ephemeral-validator@latest
 ```
 
 Then, from the repo root:
@@ -45,7 +45,7 @@ cd examples/counter-pinocchio && cargo build-sbf && cd -
 examples/scripts/start-validators.sh examples/counter-pinocchio/target/deploy
 
 # 3. run both test suites
-cd examples/counter-pinocchio && npm install && npm test && cd -
+cd examples/counter-pinocchio && yarn install && yarn test && cd -
 
 # 4. tear the stack down
 examples/scripts/stop-validators.sh

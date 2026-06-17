@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Boot the local MagicBlock stack: base + ephemeral validator + query-filtering-service.
 #
-# Requires the binaries from `npm install -g @magicblock-labs/ephemeral-validator@latest`
+# Requires the binaries from `yarn global add @magicblock-labs/ephemeral-validator@latest`
 # (mb-test-validator, ephemeral-validator, query-filtering-service) on PATH.
 #
 # Optional first argument: a directory of extra SBF programs to load onto the base
@@ -53,8 +53,10 @@ spawn() {
   if [ -n "$SETSID_BIN" ]; then
     "$SETSID_BIN" "$@" > "$logfile" 2>&1 < /dev/null &
   else
-    perl -e 'use POSIX qw(setsid); setsid(); open(STDIN, "</dev/null"); exec @ARGV or die $!;' \
-      "$@" > "$logfile" 2>&1 &
+    # macOS lacks setsid(1); detach from the launching shell's job control.
+    nohup perl -e 'use POSIX qw(setsid); setsid(); open(STDIN, "</dev/null"); exec @ARGV or die $!;' \
+      "$@" > "$logfile" 2>&1 < /dev/null &
+    disown >/dev/null 2>&1 || true
   fi
   echo "$!" > "${ER_RUN_DIR}/${name}.pid"
 }
@@ -69,6 +71,14 @@ spawn base "${ER_RUN_DIR}/base.log" \
   ${base_extra_args[@]+"${base_extra_args[@]}"}
 wait_for_rpc "${BASE_RPC_URL}" "base validator" 90
 
+# Give the base layer a moment to settle before the ER connects. Without this,
+# the first ephemeral-validator attempt often hangs until the retry loop's sleep.
+ER_BASE_SETTLE_SECS="${ER_BASE_SETTLE_SECS:-3}"
+if [ "$ER_BASE_SETTLE_SECS" -gt 0 ]; then
+  log "waiting ${ER_BASE_SETTLE_SECS}s for base validator to settle"
+  sleep "$ER_BASE_SETTLE_SECS"
+fi
+
 # --- ephemeral rollup validator ---------------------------------------------------
 # The ephemeral-validator occasionally comes up "half-dead" (bound to its port but
 # not serving RPC), so retry a few times: kill the attempt, free the ports, respawn.
@@ -77,16 +87,17 @@ kill_er_attempt() {
   if [ -n "$pid" ]; then
     kill -KILL "-${pid}" 2>/dev/null || kill -KILL "${pid}" 2>/dev/null || true
   fi
-  local port p
-  for port in "${ER_RPC_PORT}" "${ER_WS_PORT}"; do
-    for p in $(lsof -ti "tcp:${port}" 2>/dev/null || true); do kill -9 "$p" 2>/dev/null || true; done
-  done
+  clean_er_ports
+  rm -rf "${ER_RUN_DIR}/er-storage"
 }
+
+clean_er_ports
 
 er_ready=false
 for attempt in 1 2 3; do
   log "starting ephemeral-validator on ${ER_RPC_URL} (remotes -> ${BASE_RPC_URL}) [attempt ${attempt}]"
-  spawn er "${ER_RUN_DIR}/er.log" \
+  er_log="${ER_RUN_DIR}/er-attempt-${attempt}.log"
+  spawn er "$er_log" \
     ephemeral-validator \
     --remotes "${BASE_RPC_URL}" \
     --listen "127.0.0.1:${ER_RPC_PORT}" \
@@ -94,7 +105,9 @@ for attempt in 1 2 3; do
     --no-tui \
     --reset \
     --storage "${ER_RUN_DIR}/er-storage"
-  if wait_for_rpc "${ER_RPC_URL}" "ephemeral validator" 45; then
+  ln -sf "$(basename "$er_log")" "${ER_RUN_DIR}/er.log"
+  er_pid="$(cat "${ER_RUN_DIR}/er.pid")"
+  if wait_for_er "$er_log" "$er_pid" 90; then
     er_ready=true
     break
   fi

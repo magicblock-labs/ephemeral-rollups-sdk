@@ -26,7 +26,7 @@ which must run subscribed to the layer where the request lands — here the base
 ```bash
 cd examples/vrf-anchor && cargo build-sbf && cd -
 START_VRF_ORACLE=1 examples/scripts/start-validators.sh examples/vrf-anchor/target/deploy
-cd examples/vrf-anchor && npm install && npm test && cd -
+cd examples/vrf-anchor && yarn install && yarn test && cd -
 examples/scripts/stop-validators.sh
 ```
 

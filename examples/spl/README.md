@@ -17,6 +17,6 @@ client; the ephemeral-ATA instructions come from the ER SDKs.
 
 ```bash
 examples/scripts/start-validators.sh        # only the base layer is needed here
-cd examples/spl && npm install && npm test && cd -
+cd examples/spl && yarn install && yarn test && cd -
 examples/scripts/stop-validators.sh
 ```

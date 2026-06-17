@@ -31,6 +31,7 @@ jobs:
           - vrf-anchor
           - intent-bundle-pinocchio
           - spl
+          - ephemeral-accounts-anchor
     steps:
       - uses: actions/checkout@v4
 
@@ -38,6 +39,14 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.node_version }}
+          cache: yarn
+          cache-dependency-path: |
+            ts/web3js/yarn.lock
+            ts/kit/yarn.lock
+            examples/${{ matrix.example }}/yarn.lock
+
+      - name: Install Yarn
+        run: npm install -g yarn@1.22.22
 
       - name: Install Rust
         run: rustup toolchain install ${{ env.rust_version }} --profile minimal
@@ -58,12 +67,14 @@ jobs:
           solana-keygen new --silent --no-bip39-passphrase
 
       - name: Install MagicBlock validators
-        run: npm install -g @magicblock-labs/ephemeral-validator@latest
+        run: |
+          yarn global add @magicblock-labs/ephemeral-validator@latest
+          echo "$(yarn global bin)" >> "$GITHUB_PATH"
 
       - name: Build local TypeScript SDKs
         run: |
           for pkg in ts/web3js ts/kit; do
-            (cd "$pkg" && npm install && npm run build)
+            (cd "$pkg" && yarn install --frozen-lockfile && yarn build)
           done
 
       - name: Build example program (if any)
@@ -82,8 +93,8 @@ jobs:
       - name: Run tests
         working-directory: examples/${{ matrix.example }}
         run: |
-          npm install
-          npm test
+          yarn install --frozen-lockfile
+          yarn test
 
       - name: Stop local validator stack
         if: always()
