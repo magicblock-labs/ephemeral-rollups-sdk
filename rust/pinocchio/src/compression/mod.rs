@@ -165,7 +165,7 @@ impl CdpPackedStateTreeInfo {
                         .try_into()
                         .map_err(|_| ProgramError::InvalidInstructionData)?,
                 ),
-                prove_by_index: match bytes[0] {
+                prove_by_index: match bytes[2] {
                     0 => false,
                     1 => true,
                     _ => return Err(ProgramError::InvalidInstructionData),
