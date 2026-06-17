@@ -27,6 +27,7 @@ pub const VRF_PROGRAM_IDENTITY: Pubkey =
 pub const IDENTITY: &[u8] = b"identity";
 
 /// Scoped, per-callback-program VRF identity PDA: `PDA([IDENTITY, callback_program_id], vrf)`.
+/// It's used by the VRF program to sign the callback instruction.
 ///
 /// Bound to a specific callback program. This is the default identity new consumers validate
 /// in their callback's accounts, e.g.:

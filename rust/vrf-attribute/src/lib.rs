@@ -102,6 +102,7 @@ pub fn vrf(_attr: TokenStream, item: TokenStream) -> TokenStream {
                         payer.clone(),
                         self.program_identity.to_account_info(),
                         self.oracle_queue.to_account_info(),
+                        self.system_program.to_account_info(),
                         self.slot_hashes.to_account_info(),
                     ],
                     &[&[ephemeral_rollups_sdk::vrf::consts::IDENTITY, &[bump.1]]],
