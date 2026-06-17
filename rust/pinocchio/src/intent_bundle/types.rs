@@ -37,6 +37,10 @@ pub(in crate::intent_bundle) struct MagicIntentBundle<'acc, 'args> {
     pub(in crate::intent_bundle) commit_intent: Option<CommitIntent<'acc, 'args>>,
     pub(in crate::intent_bundle) commit_and_undelegate_intent:
         Option<CommitAndUndelegateIntent<'acc, 'args>>,
+    pub(in crate::intent_bundle) commit_finalize_compressed_intent:
+        Option<CommitIntent<'acc, 'args>>,
+    pub(in crate::intent_bundle) commit_finalize_compressed_and_undelegate_intent:
+        Option<CommitAndUndelegateIntent<'acc, 'args>>,
 }
 
 impl<'args> MagicIntentBundle<'_, 'args> {
@@ -56,6 +60,14 @@ impl<'args> MagicIntentBundle<'_, 'args> {
             .commit_and_undelegate_intent
             .map(|c| c.into_args(indices_map))
             .transpose()?;
+        let commit_finalize_compressed = self
+            .commit_finalize_compressed_intent
+            .map(|c| c.into_args(indices_map))
+            .transpose()?;
+        let commit_finalize_compressed_and_undelegate = self
+            .commit_finalize_compressed_and_undelegate_intent
+            .map(|c| c.into_args(indices_map))
+            .transpose()?;
         let mut standalone_actions = NoVec::<BaseActionArgs<'args>, MAX_ACTIONS_NUM>::new();
         for ch in self.standalone_actions {
             standalone_actions.try_push(ch.args(indices_map)?)?;
@@ -66,6 +78,8 @@ impl<'args> MagicIntentBundle<'_, 'args> {
             commit_and_undelegate,
             commit_finalize: None,
             commit_finalize_and_undelegate: None,
+            commit_finalize_compressed,
+            commit_finalize_compressed_and_undelegate,
             standalone_actions,
         })
     }
@@ -85,6 +99,12 @@ impl<'args> MagicIntentBundle<'_, 'args> {
         if let Some(cau) = &self.commit_and_undelegate_intent {
             cau.collect_unique_accounts(unique_accounts)?;
         }
+        if let Some(commit) = &self.commit_finalize_compressed_intent {
+            commit.collect_unique_accounts(unique_accounts)?;
+        }
+        if let Some(cau) = &self.commit_finalize_compressed_and_undelegate_intent {
+            cau.collect_unique_accounts(unique_accounts)?;
+        }
         Ok(())
     }
 
@@ -100,6 +120,14 @@ impl<'args> MagicIntentBundle<'_, 'args> {
             commit.try_collect_unique_addresses(&mut seen)?;
         }
         if let Some(cau) = &self.commit_and_undelegate_intent {
+            cau.validate()?;
+            cau.try_collect_unique_addresses(&mut seen)?;
+        }
+        if let Some(commit) = &self.commit_finalize_compressed_intent {
+            commit.validate()?;
+            commit.try_collect_unique_addresses(&mut seen)?;
+        }
+        if let Some(cau) = &self.commit_finalize_compressed_and_undelegate_intent {
             cau.validate()?;
             cau.try_collect_unique_addresses(&mut seen)?;
         }
