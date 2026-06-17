@@ -27,6 +27,7 @@ jobs:
         example:
           - counter-anchor
           - counter-pinocchio
+          - access-control
     steps:
       - uses: actions/checkout@v4
 
@@ -62,11 +63,12 @@ jobs:
             (cd "$pkg" && npm install && npm run build)
           done
 
-      - name: Build example program
+      - name: Build example program (if any)
         working-directory: examples/${{ matrix.example }}
         env:
           RUSTUP_TOOLCHAIN: ${{ env.rust_version }}
-        run: cargo build-sbf
+        run: |
+          if [ -f Cargo.toml ]; then cargo build-sbf; else echo "no program to build"; fi
 
       - name: Start local validator stack
         run: examples/scripts/start-validators.sh examples/${{ matrix.example }}/target/deploy
