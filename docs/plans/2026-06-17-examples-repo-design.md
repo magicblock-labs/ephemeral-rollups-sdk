@@ -134,6 +134,37 @@ helper is exercised implicitly by the SPL example's transfer-queue crank.
 
 Total: 13 example directories → 13 CI runners.
 
+## Remaining-feature implementation notes (turnkey roadmap)
+
+Each follows the counter pattern: program (anchor + pinocchio) + `web3js.test.ts` +
+`kit.test.ts` + a matrix entry in `examples.yml`. Build with `cargo build-sbf`; restart
+the stack to test a rebuilt program (preloaded `--bpf-program` binaries are
+non-upgradeable). Reuse the counter's `_shared.ts`, `send` (skip-preflight), auth-token
+flow, and per-payer PDA seeding.
+
+- **delegate-with-actions** — Anchor: `cpi::delegate_account_with_actions` +
+  `dlp_api::args::{DelegateWithActionsArgs, PostDelegationActions}`; account struct uses
+  `#[action]` (injects `escrow_auth` / `escrow`). Pinocchio: enable the
+  `delegation-actions` feature on `ephemeral-rollups-pinocchio`, use
+  `instruction::delegate_with_actions`. Demonstrate a post-delegation action (e.g. a CPI
+  scheduled to run on commit).
+- **ephemeral-accounts** — Anchor `#[ephemeral_accounts]` with `eph` / `sponsor`
+  field markers (gas-sponsored ephemeral balances). TS: `topUpEphemeralBalance` /
+  `closeEphemeralBalance` + `escrowPdaFromEscrowAuthority`.
+- **access-control** — uses the preloaded permission program
+  (`ACLseoPoyC3cBqoUtkbjZ4aDrkurZW86v19pXz2XQnp1`), `sdk::access_control` (feature
+  `access-control`). TS: the `permission-program` instructions
+  (`createPermission`/`update`/`delegate`/`commit`/`undelegate`/`close`) +
+  `permissionPdaFromAccount`.
+- **spl** — ephemeral ATAs via `sdk::spl` builders (feature `spl`) against the
+  preloaded ephemeral SPL token program (`SPLxh1…`). TS: the
+  `ephemeral-spl-token-program` instructions (init/delegate ATA, deposit, withdraw).
+- **vrf** — Anchor `#[vrf]` / `#[vrf_callback]` (`ephemeral-vrf-sdk`); request randomness
+  and handle the callback. Requires running the `vrf-oracle` binary alongside the stack
+  (add it to `start-validators.sh` for this example).
+- **intent-bundle** — Pinocchio `intent_bundle` (commit / commit-and-undelegate
+  bundling); Anchor analogue via `ephem` intent builders.
+
 ## Per-example program shape (flagship: counter)
 
 **Anchor** (`counter-anchor`): a module annotated `#[ephemeral]` with instructions
