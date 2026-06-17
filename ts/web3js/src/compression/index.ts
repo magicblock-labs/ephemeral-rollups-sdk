@@ -142,7 +142,7 @@ export async function fetchInitializeRecordData(
     new PublicKey(COMPRESSED_DELEGATION_PROGRAM_ID),
   );
   const remainingAccounts =
-    PackedAccounts.newWithSystemAccountsV2(systemAccountConfig);
+    PackedAccounts.newWithSystemAccounts(systemAccountConfig);
 
   // Try to get the proof of a new address
   const result = await photonClient.getValidityProofV2(
@@ -209,12 +209,17 @@ export async function fetchDelegateCompressedData(
   const addressTree = { ...addressTreeInfo, queue: OUTPUT_QUEUE };
 
   await photonClient.getStateTreeInfos();
-  photonClient.allStateTreeInfos?.push({
-    tree: BATCHED_MERKLE_TREE,
-    queue: OUTPUT_QUEUE,
-    treeType: TreeType.StateV2,
-    nextTreeInfo: null,
-  });
+  const alreadyHasTree = photonClient.allStateTreeInfos?.some((info) =>
+    info.tree.equals(BATCHED_MERKLE_TREE),
+  );
+  if (!alreadyHasTree) {
+    photonClient.allStateTreeInfos?.push({
+      tree: BATCHED_MERKLE_TREE,
+      queue: OUTPUT_QUEUE,
+      treeType: TreeType.StateV2,
+      nextTreeInfo: null,
+    });
+  }
 
   const compressedDerivedAddress = deriveCda(
     delegatedAccount,

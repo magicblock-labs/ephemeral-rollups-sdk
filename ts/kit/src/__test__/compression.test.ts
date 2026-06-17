@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import type { CompressedAccountMeta, PackedAddressTreeInfo } from "@lightprotocol/stateless.js";
+import type {
+  CompressedAccountMeta,
+  PackedAddressTreeInfo,
+} from "@lightprotocol/stateless.js";
 import {
   convertCompressedAccountMetaToBytes,
   convertOutputStateTreeIndexToBytes,
@@ -57,6 +60,8 @@ describe("compression byte converters", () => {
 
     const bytes = convertCompressedAccountMetaToBytes(accountMeta);
     expect(bytes.length).toBe(42);
+    expect(bytes[0]).toBe(0xcd); // rootIndex low byte
+    expect(bytes[1]).toBe(0xab); // rootIndex high byte
     expect(bytes[2]).toBe(1);
     expect(bytes[3]).toBe(3);
     expect(bytes[4]).toBe(4);

@@ -22,7 +22,10 @@ import {
   getAddressEncoder,
   address,
 } from "@solana/kit";
-import { PublicKey, type AccountMeta as Web3AccountMeta } from "@solana/web3.js";
+import {
+  PublicKey,
+  type AccountMeta as Web3AccountMeta,
+} from "@solana/web3.js";
 
 // Ensure we use V2
 featureFlags.version = VERSION.V2;
@@ -177,7 +180,7 @@ export async function fetchInitializeRecordData(
     toPublicKey(COMPRESSED_DELEGATION_PROGRAM_ID),
   );
   const remainingAccounts =
-    PackedAccounts.newWithSystemAccountsV2(systemAccountConfig);
+    PackedAccounts.newWithSystemAccounts(systemAccountConfig);
 
   // Try to get the proof of a new address
   const result = await photonClient.getValidityProofV2(
@@ -246,12 +249,17 @@ export async function fetchDelegateCompressedData(
   const addressTree = { ...addressTreeInfo, queue: toPublicKey(OUTPUT_QUEUE) };
 
   await photonClient.getStateTreeInfos();
-  photonClient.allStateTreeInfos?.push({
-    tree: toPublicKey(BATCHED_MERKLE_TREE),
-    queue: toPublicKey(OUTPUT_QUEUE),
-    treeType: TreeType.StateV2,
-    nextTreeInfo: null,
-  });
+  const alreadyHasTree = photonClient.allStateTreeInfos?.some((info) =>
+    info.tree.equals(toPublicKey(BATCHED_MERKLE_TREE)),
+  );
+  if (!alreadyHasTree) {
+    photonClient.allStateTreeInfos?.push({
+      tree: toPublicKey(BATCHED_MERKLE_TREE),
+      queue: toPublicKey(OUTPUT_QUEUE),
+      treeType: TreeType.StateV2,
+      nextTreeInfo: null,
+    });
+  }
 
   const compressedDerivedAddress = deriveCda(
     delegatedAccount,
