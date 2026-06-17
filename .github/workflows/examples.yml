@@ -29,6 +29,7 @@ jobs:
           - counter-pinocchio
           - access-control
           - vrf-anchor
+          - intent-bundle-pinocchio
     steps:
       - uses: actions/checkout@v4
 
