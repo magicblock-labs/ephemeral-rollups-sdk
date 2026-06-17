@@ -130,8 +130,8 @@ export async function fetchInitializeRecordData(
   photonClient: Rpc,
   delegatedAccount: PublicKey,
 ) {
-  const addressTree = await photonClient.getAddressTreeInfoV2();
-  addressTree.queue = OUTPUT_QUEUE;
+  const addressTreeInfo = await photonClient.getAddressTreeInfoV2();
+  const addressTree = { ...addressTreeInfo, queue: OUTPUT_QUEUE };
 
   const compressedDerivedAddress = deriveCda(
     delegatedAccount,
@@ -205,8 +205,8 @@ export async function fetchDelegateCompressedData(
   photonClient: Rpc,
   delegatedAccount: PublicKey,
 ) {
-  const addressTree = await photonClient.getAddressTreeInfoV2();
-  addressTree.queue = OUTPUT_QUEUE;
+  const addressTreeInfo = await photonClient.getAddressTreeInfoV2();
+  const addressTree = { ...addressTreeInfo, queue: OUTPUT_QUEUE };
 
   await photonClient.getStateTreeInfos();
   photonClient.allStateTreeInfos?.push({
@@ -231,7 +231,7 @@ export async function fetchDelegateCompressedData(
     [
       {
         hash: compressedDelegatedRecord.hash,
-        treeInfo: addressTree,
+        treeInfo: compressedDelegatedRecord.treeInfo,
         leafIndex: compressedDelegatedRecord.leafIndex,
         proveByIndex: compressedDelegatedRecord.proveByIndex,
       },
