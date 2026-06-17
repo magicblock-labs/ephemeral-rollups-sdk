@@ -30,6 +30,25 @@ export ER_RUN_DIR="${ER_RUN_DIR:-/tmp/er-examples-stack}"
 log() { printf '\033[36m[stack]\033[0m %s\n' "$*" >&2; }
 err() { printf '\033[31m[stack]\033[0m %s\n' "$*" >&2; }
 
+# Print all validator log files (used when startup fails in CI or locally).
+print_validator_logs() {
+  if [ ! -d "${ER_RUN_DIR}" ]; then
+    err "no validator run dir at ${ER_RUN_DIR}"
+    return 0
+  fi
+
+  err "validator logs in ${ER_RUN_DIR}:"
+  shopt -s nullglob
+  local f
+  for f in "${ER_RUN_DIR}"/*.log; do
+    printf '\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n' >&2
+    err "$(basename "$f"):"
+    printf '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n' >&2
+    cat "$f" >&2 || true
+  done
+  shopt -u nullglob
+}
+
 # Poll a Solana RPC endpoint until it answers getVersion (or time out).
 wait_for_rpc() {
   local url="$1" name="$2" timeout="${3:-60}" i=0

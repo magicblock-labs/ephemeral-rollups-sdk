@@ -14,6 +14,14 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=lib.sh
 source "${SCRIPT_DIR}/lib.sh"
 
+on_exit() {
+  local code=$?
+  if [ "$code" -ne 0 ]; then
+    print_validator_logs
+  fi
+}
+trap on_exit EXIT
+
 EXTRA_PROGRAMS_DIR="${1:-}"
 
 mkdir -p "${ER_RUN_DIR}"
@@ -116,7 +124,7 @@ for attempt in 1 2 3; do
   sleep 3
 done
 if [ "$er_ready" != true ]; then
-  err "ephemeral validator failed to start after 3 attempts; see ${ER_RUN_DIR}/er.log"
+  err "ephemeral validator failed to start after 3 attempts"
   exit 1
 fi
 
@@ -142,7 +150,7 @@ if [ "${START_VRF_ORACLE:-0}" = "1" ]; then
   spawn vrf "${ER_RUN_DIR}/vrf.log" vrf-oracle
   sleep 3
   if ! kill -0 "$(cat "${ER_RUN_DIR}/vrf.pid")" 2>/dev/null; then
-    err "vrf-oracle failed to start; see ${ER_RUN_DIR}/vrf.log"
+    err "vrf-oracle failed to start"
     exit 1
   fi
   log "vrf-oracle running"

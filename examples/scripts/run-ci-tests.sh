@@ -143,7 +143,10 @@ run_example() {
   fi
 
   log "starting validator stack (START_VRF_ORACLE=${start_vrf})"
-  START_VRF_ORACLE="$start_vrf" "${SCRIPT_DIR}/start-validators.sh" "$deploy_dir"
+  if ! START_VRF_ORACLE="$start_vrf" "${SCRIPT_DIR}/start-validators.sh" "$deploy_dir"; then
+    err "${example} validator stack failed to start"
+    return 1
+  fi
 
   local test_status=0
   log "running yarn test in ${example_dir}"
