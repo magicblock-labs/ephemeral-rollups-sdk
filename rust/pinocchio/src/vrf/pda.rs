@@ -48,8 +48,9 @@ mod tests {
         for salt in [0u8, 1, 42, 200] {
             let callback_program = Address::new_from_array([salt; 32]);
             let (pda, bump) = scoped_vrf_identity(&callback_program);
-            let expected =
-                ephemeral_vrf_sdk::consts::scoped_vrf_identity(&Pubkey::new_from_array([salt; 32]));
+            let expected = ephemeral_rollups_sdk::vrf::consts::scoped_vrf_identity(
+                &Pubkey::new_from_array([salt; 32]),
+            );
             let (expected_pda, expected_bump) = Pubkey::find_program_address(
                 &[IDENTITY_SEED, Pubkey::new_from_array([salt; 32]).as_ref()],
                 &Pubkey::new_from_array(VRF_PROGRAM_ID.to_bytes()),

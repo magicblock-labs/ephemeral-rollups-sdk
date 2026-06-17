@@ -1483,7 +1483,6 @@ dependencies = [
  "bincode 1.3.3",
  "bincode 2.0.1",
  "ephemeral-rollups-sdk",
- "ephemeral-vrf-sdk",
  "magicblock-delegation-program-api",
  "magicblock-magic-program-api",
  "pinocchio 0.10.2",
@@ -1582,30 +1581,7 @@ dependencies = [
 
 [[package]]
 name = "ephemeral-rollups-sdk-attribute-vrf"
-version = "0.15.4"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 1.0.109",
-]
-
-[[package]]
-name = "ephemeral-vrf-sdk"
-version = "0.4.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "77f3741c733907c10e0d0b32f9aa485c20a73e0b1e7e673a0ac38185fb2a6c11"
-dependencies = [
- "borsh 1.6.1",
- "ephemeral-vrf-sdk-vrf-macro",
- "solana-program 3.0.0",
- "solana-system-interface 3.2.0",
-]
-
-[[package]]
-name = "ephemeral-vrf-sdk-vrf-macro"
-version = "0.4.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a7b8b3fe3863a27d4c0f32da7b3cfeff179772fd4124d6c9fdcb9d4ab23cd602"
+version = "0.15.5"
 dependencies = [
  "proc-macro2",
  "quote",

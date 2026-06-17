@@ -137,11 +137,11 @@ mod tests {
     use alloc::vec;
     use alloc::vec::Vec;
 
-    use ephemeral_vrf_sdk::instructions::{
+    use ephemeral_rollups_sdk::vrf::instructions::{
         create_request_high_priority_scoped_randomness_ix, create_request_scoped_randomness_ix,
         RequestRandomnessParams,
     };
-    use ephemeral_vrf_sdk::types::SerializableAccountMeta as SdkMeta;
+    use ephemeral_rollups_sdk::vrf::types::SerializableAccountMeta as SdkMeta;
     use pinocchio::Address;
     use solana_program::pubkey::Pubkey;
 

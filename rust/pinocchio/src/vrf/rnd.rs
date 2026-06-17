@@ -58,7 +58,7 @@ pub fn random_bool(bytes: &[u8; 32]) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use ephemeral_vrf_sdk::rnd as sdk;
+    use ephemeral_rollups_sdk::vrf::rnd as sdk;
 
     use super::*;
 
