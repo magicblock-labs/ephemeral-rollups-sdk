@@ -6,15 +6,31 @@
 
 ### Progress (updated 2026-06-17)
 
-- ✅ Validator orchestration (`examples/scripts/`) — base + ER + query-filtering-service,
-  validated end-to-end. Key findings baked in: the ER must be delegated to the local
-  validator identity; the router needs a JWT (`getAuthToken` → `?token=`); ER txns skip
-  preflight; daemons run in their own session (setsid/perl) and the ER start is retried.
-- ✅ `counter-anchor` — full lifecycle, web3.js + kit tests green against the live stack.
-- ✅ `counter-pinocchio` — same, via the `ephemeral-rollups-pinocchio` helpers.
-- ✅ `.github/workflows/examples.yml` — one runner per example (matrix: both counters).
-- ⏳ Remaining feature examples (actions, ephemeral-accounts, access-control, spl, vrf,
-  intent-bundle) follow the proven counter pattern — see the matrix below.
+Validator orchestration (`examples/scripts/`) is validated end-to-end. Key findings baked
+in: the ER only writes accounts delegated to the local validator identity; the router
+needs a JWT (`getAuthToken` → `?token=`); ER txns skip preflight; daemons run in their own
+session (setsid/perl) and the ER start is retried; the optional `vrf-oracle` starts when
+`START_VRF_ORACLE=1`. `.github/workflows/examples.yml` runs one runner per example.
+
+Done and green (web3.js + kit tests against the live stack), all in the CI matrix:
+
+- ✅ `counter-anchor` — full lifecycle (`#[ephemeral]`/`#[delegate]`/`#[commit]`).
+- ✅ `counter-pinocchio` — same lifecycle via the `ephemeral-rollups-pinocchio` helpers.
+- ✅ `access-control` — permission program create/update/close (client-driven).
+- ✅ `vrf-anchor` — `#[vrf]`/`#[vrf_callback]` randomness fulfilled by `vrf-oracle`.
+- ✅ `intent-bundle-pinocchio` — commit / commit-and-undelegate via `MagicIntentBundleBuilder`.
+
+Remaining (each needs focused work + on-chain setup; reference implementations live in the
+local `magicblock-engine-examples` repo):
+
+- ⏳ `spl` — ephemeral ATAs. Heaviest: needs an SPL mint, the global vault, vault ATA and
+  rent PDA initialized, then deposit/withdraw. Ref: `spl-tokens`.
+- ⏳ `ephemeral-accounts` — `#[ephemeral_accounts]` (`eph`/`sponsor`). Needs the
+  `EPHEMERAL_VAULT_ID` rent vault funded on the ER; runs on the rollup. Ref:
+  `ephemeral-account-chats`.
+- ⏳ `delegate-with-actions` — `#[action]` + `delegate_account_with_actions`; the
+  `PostDelegationActions` API (signers/non-signers, encrypted pubkeys, call handlers) is
+  advanced. Ref: `magic-actions`.
 
 ## Goal
 
