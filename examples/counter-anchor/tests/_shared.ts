@@ -8,6 +8,8 @@ const here = dirname(fileURLToPath(import.meta.url));
 
 /** Base layer (mb-test-validator) RPC. */
 export const BASE_RPC_URL = process.env.BASE_RPC_URL ?? "http://127.0.0.1:8899";
+/** Base layer WebSocket (solana-test-validator serves WS on rpc-port + 1). */
+export const BASE_WS_URL = process.env.BASE_WS_URL ?? "ws://127.0.0.1:8900";
 /** Rollup endpoint: the query-filtering-service in front of the ER. */
 export const ROUTER_RPC_URL =
   process.env.ROUTER_RPC_URL ?? "http://127.0.0.1:2999";
@@ -24,6 +26,15 @@ export const ER_VALIDATOR_IDENTITY =
 
 /** Seed of the counter PDA (matches `COUNTER_SEED` in the program). */
 export const COUNTER_SEED = Buffer.from("counter");
+
+// Well-known program ids (string form, for use with @solana/kit `address()`).
+export const DELEGATION_PROGRAM_ID_STR =
+  "DELeGGvXpWV2fqJUhqcF5ZSYMS4JTLjteaAMARRSaeSh";
+export const MAGIC_PROGRAM_ID_STR =
+  "Magic11111111111111111111111111111111111111";
+export const MAGIC_CONTEXT_ID_STR =
+  "MagicContext1111111111111111111111111111111";
+export const SYSTEM_PROGRAM_ID_STR = "11111111111111111111111111111111";
 
 /** Program id, read from the committed program keypair so it always matches the build. */
 export const PROGRAM_ID_BYTES: Uint8Array = (() => {

@@ -1,0 +1,89 @@
+name: Examples
+
+on:
+  push:
+    branches:
+      - "main"
+  pull_request:
+    branches:
+      - "main"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  rust_version: 1.93.1
+  node_version: 23
+  solana_version: v3.1.10
+
+jobs:
+  example:
+    name: ${{ matrix.example }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        example:
+          - counter-anchor
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.node_version }}
+
+      - name: Install Rust
+        run: rustup toolchain install ${{ env.rust_version }} --profile minimal
+
+      - name: Cache Rust
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: examples/${{ matrix.example }}
+
+      - name: Setup Solana
+        run: |
+          sh -c "$(curl -sSfL https://release.anza.xyz/${{ env.solana_version }}/install)"
+          echo "$HOME/.local/share/solana/install/active_release/bin" >> "$GITHUB_PATH"
+
+      - name: Verify Solana
+        run: |
+          solana --version
+          solana-keygen new --silent --no-bip39-passphrase
+
+      - name: Install MagicBlock validators
+        run: npm install -g @magicblock-labs/ephemeral-validator@latest
+
+      - name: Build local TypeScript SDKs
+        run: |
+          for pkg in ts/web3js ts/kit; do
+            (cd "$pkg" && npm install && npm run build)
+          done
+
+      - name: Build example program
+        working-directory: examples/${{ matrix.example }}
+        env:
+          RUSTUP_TOOLCHAIN: ${{ env.rust_version }}
+        run: cargo build-sbf
+
+      - name: Start local validator stack
+        run: examples/scripts/start-validators.sh examples/${{ matrix.example }}/target/deploy
+
+      - name: Run tests
+        working-directory: examples/${{ matrix.example }}
+        run: |
+          npm install
+          npm test
+
+      - name: Stop local validator stack
+        if: always()
+        run: examples/scripts/stop-validators.sh
+
+      - name: Upload validator logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: validator-logs-${{ matrix.example }}
+          path: /tmp/er-examples-stack/*.log
+          if-no-files-found: ignore

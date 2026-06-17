@@ -34,7 +34,8 @@ err() { printf '\033[31m[stack]\033[0m %s\n' "$*" >&2; }
 wait_for_rpc() {
   local url="$1" name="$2" timeout="${3:-60}" i=0
   log "waiting for ${name} at ${url} ..."
-  until curl -s -X POST "$url" -H 'Content-Type: application/json' \
+  until curl -s --connect-timeout 2 --max-time 2 -X POST "$url" \
+      -H 'Content-Type: application/json' \
       -d '{"jsonrpc":"2.0","id":1,"method":"getVersion"}' 2>/dev/null | grep -q '"result"'; do
     i=$((i + 1))
     if [ "$i" -ge "$((timeout * 2))" ]; then
