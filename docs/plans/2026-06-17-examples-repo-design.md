@@ -2,7 +2,19 @@
 
 **Date:** 2026-06-17
 **Branch:** `dode/examples`
-**Status:** Approved scope, implementation in progress
+**Status:** Implementation in progress
+
+### Progress (updated 2026-06-17)
+
+- ✅ Validator orchestration (`examples/scripts/`) — base + ER + query-filtering-service,
+  validated end-to-end. Key findings baked in: the ER must be delegated to the local
+  validator identity; the router needs a JWT (`getAuthToken` → `?token=`); ER txns skip
+  preflight; daemons run in their own session (setsid/perl) and the ER start is retried.
+- ✅ `counter-anchor` — full lifecycle, web3.js + kit tests green against the live stack.
+- ✅ `counter-pinocchio` — same, via the `ephemeral-rollups-pinocchio` helpers.
+- ✅ `.github/workflows/examples.yml` — one runner per example (matrix: both counters).
+- ⏳ Remaining feature examples (actions, ephemeral-accounts, access-control, spl, vrf,
+  intent-bundle) follow the proven counter pattern — see the matrix below.
 
 ## Goal
 
