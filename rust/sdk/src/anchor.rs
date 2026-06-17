@@ -23,8 +23,10 @@ impl anchor_lang::Id for MagicProgram {
     }
 }
 
+#[cfg(feature = "vrf")]
 pub struct VrfProgram;
 
+#[cfg(feature = "vrf")]
 impl anchor_lang::Id for VrfProgram {
     fn id() -> anchor_lang::prelude::Pubkey {
         crate::vrf::consts::VRF_PROGRAM_ID.to_bytes().into()

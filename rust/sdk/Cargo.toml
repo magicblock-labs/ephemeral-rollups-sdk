@@ -67,6 +67,8 @@ modular-sdk = [
     "solana-system-interface",
 ]
 
+vrf = []
+
 # =========== internal features ===========
 anchor-support = []
 #anchor-compat-idl-build = ["anchor-compat", "anchor-lang-compat/idl-build"]

@@ -5,12 +5,19 @@ use crate::vrf::types::{RequestRandomness, SerializableAccountMeta};
 /// Parameters for creating a request randomness instruction
 #[derive(Default)]
 pub struct RequestRandomnessParams {
+    /// The account that will pay for the request.
     pub payer: Pubkey,
+    /// The queue to use for the request.
     pub oracle_queue: Pubkey,
+    /// The program that will be called when the request is fulfilled.
     pub callback_program_id: Pubkey,
+    /// The discriminator for the callback program.
     pub callback_discriminator: Vec<u8>,
+    /// The accounts that will be passed to the callback program.
     pub accounts_metas: Option<Vec<SerializableAccountMeta>>,
+    /// The seed for the request.
     pub caller_seed: [u8; 32],
+    /// The arguments for the callback program.
     pub callback_args: Option<Vec<u8>>,
 }
 
