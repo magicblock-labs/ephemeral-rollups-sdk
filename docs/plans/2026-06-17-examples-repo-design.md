@@ -20,17 +20,26 @@ Done and green (web3.js + kit tests against the live stack), all in the CI matri
 - ✅ `vrf-anchor` — `#[vrf]`/`#[vrf_callback]` randomness fulfilled by `vrf-oracle`.
 - ✅ `intent-bundle-pinocchio` — commit / commit-and-undelegate via `MagicIntentBundleBuilder`.
 
-Remaining (each needs focused work + on-chain setup; reference implementations live in the
-local `magicblock-engine-examples` repo):
+Also done and green:
 
-- ⏳ `spl` — ephemeral ATAs. Heaviest: needs an SPL mint, the global vault, vault ATA and
-  rent PDA initialized, then deposit/withdraw. Ref: `spl-tokens`.
-- ⏳ `ephemeral-accounts` — `#[ephemeral_accounts]` (`eph`/`sponsor`). Needs the
-  `EPHEMERAL_VAULT_ID` rent vault funded on the ER; runs on the rollup. Ref:
-  `ephemeral-account-chats`.
+- ✅ `spl` — ephemeral SPL token ATAs (set up mint, init vault, init ephemeral ATA,
+  deposit). Client-driven; web3.js uses `@solana/spl-token`, kit uses the kit SDK builders
+  (kit's SPL API is shuttle-based: `initVaultIx` takes the derived vault/ephemeral ATAs and
+  the deposit is `transferToVaultIx`).
+
+Remaining (each is an advanced anchor macro with a specific on-chain prerequisite, learned
+by spiking each):
+
+- ⏳ `ephemeral-accounts` — `#[ephemeral_accounts]` (`eph`/`sponsor`). The macro works
+  on-chain (the magic program creates the gas-sponsored account on the ER), **but** the
+  sponsor is debited rent and the ER rejects modifying a non-delegated fee payer
+  (`InvalidAccountForFee`: "Feepayer … modified without being delegated"). The validatable
+  shape is a **PDA sponsor that is first delegated to the ER** (so its modification is
+  allowed) plus a separate gasless fee payer — i.e. it composes the delegation flow with
+  the macro. Ref: `ephemeral-account-chats`.
 - ⏳ `delegate-with-actions` — `#[action]` + `delegate_account_with_actions`; the
   `PostDelegationActions` API (signers/non-signers, encrypted pubkeys, call handlers) is
-  advanced. Ref: `magic-actions`.
+  advanced and has no in-repo reference. Ref: `magic-actions`.
 
 ## Goal
 

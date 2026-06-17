@@ -47,6 +47,7 @@ examples/scripts/stop-validators.sh
 | [`access-control`](access-control) | client (SDK) | permission program: create / update / close a permission |
 | [`vrf-anchor`](vrf-anchor) | Anchor | verifiable randomness: `#[vrf]` request + `#[vrf_callback]`, fulfilled by `vrf-oracle` |
 | [`intent-bundle-pinocchio`](intent-bundle-pinocchio) | Pinocchio | commit / commit-and-undelegate via `MagicIntentBundleBuilder` |
+| [`spl`](spl) | client (SDK) | ephemeral SPL token ATA: init vault, init ephemeral ATA, deposit tokens |
 
 ### Notes that apply to every example
 
