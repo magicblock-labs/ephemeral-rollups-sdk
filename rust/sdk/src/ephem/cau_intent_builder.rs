@@ -94,6 +94,8 @@ impl<'info> CommitAndUndelegateIntentBuilder<'info> {
         )
     }
 
+    /// Sets the intent to be compressed. Chainable.
+    /// Only works if the account was compressed when delegated.
     pub fn compressed(mut self) -> Self {
         self.is_compressed = true;
         self
