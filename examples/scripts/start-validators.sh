@@ -118,6 +118,23 @@ spawn qfs "${ER_RUN_DIR}/qfs.log" \
   --add-cors-headers
 wait_for_rpc "${ROUTER_RPC_URL}" "query-filtering-service" 60
 
+# --- VRF oracle (optional; the vrf example needs it) ------------------------------
+# Set START_VRF_ORACLE=1 to run a vrf-oracle subscribed to the base layer, which
+# fulfils randomness requests by calling back the requesting program.
+if [ "${START_VRF_ORACLE:-0}" = "1" ]; then
+  log "starting vrf-oracle (subscribed to ${BASE_RPC_URL})"
+  export VRF_ORACLE_SKIP_PREFLIGHT=true
+  export RPC_URL="${BASE_RPC_URL}"
+  export WEBSOCKET_URL="ws://127.0.0.1:${BASE_WS_PORT}"
+  spawn vrf "${ER_RUN_DIR}/vrf.log" vrf-oracle
+  sleep 3
+  if ! kill -0 "$(cat "${ER_RUN_DIR}/vrf.pid")" 2>/dev/null; then
+    err "vrf-oracle failed to start; see ${ER_RUN_DIR}/vrf.log"
+    exit 1
+  fi
+  log "vrf-oracle running"
+fi
+
 log "stack ready:"
 log "  BASE_RPC_URL=${BASE_RPC_URL}"
 log "  ROUTER_RPC_URL=${ROUTER_RPC_URL}   (rollup endpoint)"

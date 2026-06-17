@@ -28,6 +28,7 @@ jobs:
           - counter-anchor
           - counter-pinocchio
           - access-control
+          - vrf-anchor
     steps:
       - uses: actions/checkout@v4
 
@@ -71,6 +72,9 @@ jobs:
           if [ -f Cargo.toml ]; then cargo build-sbf; else echo "no program to build"; fi
 
       - name: Start local validator stack
+        env:
+          # vrf examples additionally need the VRF oracle.
+          START_VRF_ORACLE: ${{ startsWith(matrix.example, 'vrf') && '1' || '0' }}
         run: examples/scripts/start-validators.sh examples/${{ matrix.example }}/target/deploy
 
       - name: Run tests
