@@ -1,0 +1,23 @@
+{
+  "name": "spl-example",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Ephemeral SPL token (ephemeral ATA) example",
+  "scripts": {
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@magicblock-labs/ephemeral-rollups-kit": "file:../../ts/kit",
+    "@magicblock-labs/ephemeral-rollups-sdk": "file:../../ts/web3js",
+    "@noble/hashes": "^1.4.0",
+    "@solana/kit": "^4.0.0",
+    "@solana/web3.js": "^1.98.0",
+    "tweetnacl": "^1.0.3",
+    "@solana/spl-token": "^0.4.9"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.0",
+    "vitest": "^3.2.4"
+  }
+}

@@ -30,6 +30,7 @@ jobs:
           - access-control
           - vrf-anchor
           - intent-bundle-pinocchio
+          - spl
     steps:
       - uses: actions/checkout@v4
 
