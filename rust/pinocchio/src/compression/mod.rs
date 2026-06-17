@@ -59,8 +59,10 @@ impl CdpValidityProof {
         if bytes.is_empty() {
             return Err(ProgramError::InvalidInstructionData);
         }
-        if bytes[0] == 0 {
-            return Ok((Self(None), 1));
+        match bytes[0] {
+            0 => return Ok((Self(None), 1)),
+            1 => {}
+            _ => return Err(ProgramError::InvalidInstructionData),
         }
         if bytes.len() < Self::WIRE_LEN {
             return Err(ProgramError::InvalidInstructionData);
@@ -163,7 +165,11 @@ impl CdpPackedStateTreeInfo {
                         .try_into()
                         .map_err(|_| ProgramError::InvalidInstructionData)?,
                 ),
-                prove_by_index: bytes[2] == 1,
+                prove_by_index: match bytes[0] {
+                    0 => false,
+                    1 => true,
+                    _ => return Err(ProgramError::InvalidInstructionData),
+                },
                 merkle_tree_pubkey_index: bytes[3],
                 queue_pubkey_index: bytes[4],
                 leaf_index: u32::from_le_bytes(
