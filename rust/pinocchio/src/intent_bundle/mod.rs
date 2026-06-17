@@ -104,6 +104,8 @@ impl<'acc, 'args> MagicIntentBundleBuilder<'acc, 'args> {
             standalone_actions: _,
             commit_intent,
             commit_and_undelegate_intent,
+            commit_finalize_compressed_intent,
+            commit_finalize_compressed_and_undelegate_intent,
         } = self.intent_bundle;
 
         MagicIntentBundleBuilder {
@@ -115,6 +117,8 @@ impl<'acc, 'args> MagicIntentBundleBuilder<'acc, 'args> {
                 standalone_actions: actions,
                 commit_intent,
                 commit_and_undelegate_intent,
+                commit_finalize_compressed_intent,
+                commit_finalize_compressed_and_undelegate_intent,
             },
         }
     }
