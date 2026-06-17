@@ -1,0 +1,28 @@
+[package]
+name = "counter-anchor"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+publish = false
+
+[lib]
+name = "counter_anchor"
+crate-type = ["cdylib", "lib"]
+
+[features]
+default = []
+cpi = ["no-entrypoint"]
+no-entrypoint = []
+no-idl = []
+no-log-ix-name = []
+idl-build = ["anchor-lang/idl-build"]
+
+[dependencies]
+anchor-lang = ">=0.28.0, <1.0.0"
+ephemeral-rollups-sdk = { path = "../../rust/sdk", default-features = false, features = [
+    "anchor-compat",
+    "solana-system-interface",
+] }
+
+# Detach from any parent workspace; this example is self-contained.
+[workspace]
