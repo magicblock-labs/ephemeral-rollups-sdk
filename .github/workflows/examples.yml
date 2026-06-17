@@ -26,6 +26,7 @@ jobs:
       matrix:
         example:
           - counter-anchor
+          - counter-pinocchio
     steps:
       - uses: actions/checkout@v4
 
