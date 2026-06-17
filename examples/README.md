@@ -44,6 +44,9 @@ examples/scripts/stop-validators.sh
 |---|---|---|
 | [`counter-anchor`](counter-anchor) | Anchor | delegate → run-on-ER → commit → commit-and-undelegate (`#[ephemeral]`/`#[delegate]`/`#[commit]`) |
 | [`counter-pinocchio`](counter-pinocchio) | Pinocchio | the same lifecycle via the `ephemeral-rollups-pinocchio` helpers |
+| [`access-control`](access-control) | client (SDK) | permission program: create / update / close a permission |
+| [`vrf-anchor`](vrf-anchor) | Anchor | verifiable randomness: `#[vrf]` request + `#[vrf_callback]`, fulfilled by `vrf-oracle` |
+| [`intent-bundle-pinocchio`](intent-bundle-pinocchio) | Pinocchio | commit / commit-and-undelegate via `MagicIntentBundleBuilder` |
 
 ### Notes that apply to every example
 
