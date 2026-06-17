@@ -13,7 +13,7 @@ use crate::compression::{
 
 pub const DELEGATE_COMPRESSED_MAX_DATA_LEN: usize = 8   // discriminator
     + 129 // validity_proof (tag + proof)
-    + core::mem::size_of::<CdpCompressedAccountMeta>()
+    + CdpCompressedAccountMeta::WIRE_LEN
     + 64  // owner + validator
     + 4   // account_data len
     + MAX_ACCOUNT_DATA_SIZE
@@ -46,7 +46,7 @@ impl<'a> DelegateCompressedArgs<'a> {
         };
         if data.len()
             < proof_len
-                + core::mem::size_of::<CdpCompressedAccountMeta>()
+                + CdpCompressedAccountMeta::WIRE_LEN
                 + 64  // owner_program_id + validator
                 + 1   // bump
                 + 4   // account_data length prefix
@@ -130,7 +130,7 @@ impl<'a> DelegateCompressed<'a> {
             i += 1;
         }
         8 + 129
-            + core::mem::size_of::<CdpCompressedAccountMeta>()
+            + CdpCompressedAccountMeta::WIRE_LEN
             + 64
             + 4
             + account_data_len
