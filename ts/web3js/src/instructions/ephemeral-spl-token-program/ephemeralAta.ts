@@ -1773,13 +1773,10 @@ export async function transferSpl(
   const exactOut = opts.privateTransfer?.exactOut ?? true;
   const clientRefId = opts.privateTransfer?.clientRefId;
 
-  const fromAta = getAssociatedTokenAddressSync(
-    mint,
-    from,
-    false,
-    tokenProgram,
-  );
-  const toAta = getAssociatedTokenAddressSync(mint, to, false, tokenProgram);
+  const fromAta = () =>
+    getAssociatedTokenAddressSync(mint, from, false, tokenProgram);
+  const toAta = () =>
+    getAssociatedTokenAddressSync(mint, to, false, tokenProgram);
 
   if (opts.fromBalance === "ephemeral") {
     switch (opts.visibility) {
@@ -1816,7 +1813,7 @@ export async function transferSpl(
                 queue,
                 vault,
                 mint,
-                fromAta,
+                fromAta(),
                 vaultAta,
                 to,
                 from,
@@ -1835,8 +1832,8 @@ export async function transferSpl(
         if (opts.toBalance === "ephemeral") {
           return [
             createTransferInstruction(
-              fromAta,
-              toAta,
+              fromAta(),
+              toAta(),
               from,
               amount,
               [],
@@ -1851,8 +1848,8 @@ export async function transferSpl(
         if (opts.toBalance === "ephemeral") {
           return [
             createTransferInstruction(
-              fromAta,
-              toAta,
+              fromAta(),
+              toAta(),
               from,
               amount,
               [],
@@ -1909,7 +1906,7 @@ export async function transferSpl(
     instructions.push(
       createAssociatedTokenAccountIdempotentInstruction(
         payer,
-        fromAta,
+        fromAta(),
         from,
         mint,
         tokenProgram,
@@ -1942,7 +1939,7 @@ export async function transferSpl(
             shuttleEphemeralAta,
             shuttleAta,
             from,
-            fromAta,
+            fromAta(),
             to,
             shuttleWalletAta,
             mint,
@@ -1966,7 +1963,7 @@ export async function transferSpl(
           instructions.push(
             createAssociatedTokenAccountIdempotentInstruction(
               payer,
-              toAta,
+              toAta(),
               to,
               mint,
               tokenProgram,
@@ -1996,8 +1993,8 @@ export async function transferSpl(
             shuttleEphemeralAta,
             shuttleAta,
             from,
-            fromAta,
-            toAta,
+            fromAta(),
+            toAta(),
             shuttleWalletAta,
             mint,
             shuttleId,
@@ -2016,8 +2013,8 @@ export async function transferSpl(
         return [
           ...instructions,
           createTransferInstruction(
-            fromAta,
-            toAta,
+            fromAta(),
+            toAta(),
             from,
             amount,
             [],
