@@ -491,6 +491,34 @@ impl<'info> MagicIntentBundle<'info> {
             });
 
         // Remove cross intent duplicates
+        match (
+            self.commit_finalize_compressed_intent.take(),
+            cau_compressed,
+        ) {
+            (Some(mut commit), Some((cau_pubkeys, cau))) => {
+                // If accounts in CommitAndUndelegate and Commit intents overlap
+                // we keep them only in CommitAndUndelegate Intent and remove from Commit
+                commit
+                    .committed_accounts_mut()
+                    .retain(|el| !cau_pubkeys.contains(el.key));
+
+                // if after dedup Commit intent becomes empty
+                // 1. remove it from bundle
+                // 2. if it has action - move them in CommitAndUndelegate intent
+                if commit.committed_accounts().is_empty() {
+                    cau.commit_type.merge(commit);
+                } else {
+                    self.commit_finalize_compressed_intent = Some(commit);
+                }
+            }
+            // No compressed cross-intent dedup needed
+            (None, _) => {}
+            // In case only one Intent exists, put commit_intent back if it was taken
+            (Some(commit), None) => {
+                self.commit_finalize_compressed_intent = Some(commit);
+            }
+        }
+
         // Only proceed if both intents exist; otherwise no cross-intent dedup needed
         let (mut commit, cau, cau_pubkeys) = match (self.commit_intent.take(), cau) {
             (Some(commit), Some((cau_pubkeys, cau))) => (commit, cau, cau_pubkeys),
@@ -502,21 +530,6 @@ impl<'info> MagicIntentBundle<'info> {
             // No commit_intent or neither intent exists - nothing to restore
             _ => return,
         };
-
-        if let (Some(mut commit), Some((cau_pubkeys, cau))) = (
-            self.commit_finalize_compressed_intent.take(),
-            cau_compressed,
-        ) {
-            commit
-                .committed_accounts_mut()
-                .retain(|el| !cau_pubkeys.contains(el.key));
-
-            if commit.committed_accounts().is_empty() {
-                cau.commit_type.merge(commit);
-            } else {
-                self.commit_finalize_compressed_intent = Some(commit);
-            }
-        }
 
         // If accounts in CommitAndUndelegate and Commit intents overlap
         // we keep them only in CommitAndUndelegate Intent and remove from Commit
@@ -1671,5 +1684,70 @@ mod tests {
             "cau undelegate action"
         );
         assert_eq!(action_index(&add_callback_ixs[3].1), 3, "standalone action");
+    }
+
+    #[test]
+    fn test_compressed_intent_overlap_resolution() {
+        let shared_key = compat::Pubkey::new_unique();
+        let mut shared_acc1 = TestAccount::with_key(shared_key);
+        let mut shared_acc2 = TestAccount::with_key(shared_key);
+        let mut unique_acc = TestAccount::new();
+        let owner = compat::Pubkey::new_unique();
+
+        let shared_info1 = create_mock_account_info(
+            &shared_acc1.key,
+            &mut shared_acc1.lamports,
+            &mut shared_acc1.data,
+            &owner,
+            false,
+            true,
+        );
+        let shared_info2 = create_mock_account_info(
+            &shared_acc2.key,
+            &mut shared_acc2.lamports,
+            &mut shared_acc2.data,
+            &owner,
+            false,
+            true,
+        );
+        let unique_info = create_mock_account_info(
+            &unique_acc.key,
+            &mut unique_acc.lamports,
+            &mut unique_acc.data,
+            &owner,
+            false,
+            true,
+        );
+
+        let mut bundle = MagicIntentBundle::default();
+
+        // Add shared + unique account to compressed commit
+        bundle.add_intent(MagicIntent::CommitFinalizeCompressed(
+            CommitType::Standalone(vec![shared_info1, unique_info]),
+        ));
+
+        // Add shared account to compressed commit+undelegate
+        bundle.add_intent(MagicIntent::CommitFinalizeAndUndelegateCompressed(
+            CommitAndUndelegate {
+                commit_type: CommitType::Standalone(vec![shared_info2]),
+                undelegate_type: UndelegateType::Standalone,
+            },
+        ));
+
+        bundle.normalize();
+
+        // Compressed commit should only have the unique account
+        let commit = bundle
+            .commit_finalize_compressed_intent
+            .expect("compressed commit should exist");
+        assert_eq!(commit.committed_accounts().len(), 1);
+        assert_eq!(*commit.committed_accounts()[0].key, unique_acc.key);
+
+        // Compressed C+U should have the shared account
+        let cau = bundle
+            .commit_finalize_and_undelegate_compressed_intent
+            .expect("compressed cau should exist");
+        assert_eq!(cau.commit_type.committed_accounts().len(), 1);
+        assert_eq!(*cau.commit_type.committed_accounts()[0].key, shared_key);
     }
 }
