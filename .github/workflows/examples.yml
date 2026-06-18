@@ -1,0 +1,124 @@
+name: Examples
+
+permissions:
+  contents: read
+
+on:
+  push:
+    branches:
+      - "main"
+  pull_request:
+    branches:
+      - "main"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  rust_version: 1.93.1
+  node_version: 23
+  solana_version: v3.1.10
+
+jobs:
+  example:
+    name: ${{ matrix.example }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        example:
+          - counter-anchor
+          - counter-pinocchio
+          - access-control
+          - vrf-anchor
+          - intent-bundle-pinocchio
+          - spl
+          - ephemeral-accounts-anchor
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.node_version }}
+          cache: yarn
+          cache-dependency-path: |
+            ts/web3js/yarn.lock
+            ts/kit/yarn.lock
+            examples/${{ matrix.example }}/yarn.lock
+
+      - name: Install Yarn
+        run: npm install -g yarn@1.22.22
+
+      - name: Install Rust
+        run: rustup toolchain install ${{ env.rust_version }} --profile minimal
+
+      - name: Cache Rust
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: examples/${{ matrix.example }}
+
+      - name: Setup Solana
+        run: |
+          sh -c "$(curl -sSfL https://release.anza.xyz/${{ env.solana_version }}/install)"
+          echo "$HOME/.local/share/solana/install/active_release/bin" >> "$GITHUB_PATH"
+
+      - name: Verify Solana
+        run: |
+          solana --version
+          solana-keygen new --silent --no-bip39-passphrase
+
+      - name: Install MagicBlock validators
+        run: |
+          yarn global add @magicblock-labs/ephemeral-validator@latest
+          echo "$(yarn global bin)" >> "$GITHUB_PATH"
+
+      - name: Build local TypeScript SDKs
+        run: |
+          for pkg in ts/web3js ts/kit; do
+            (cd "$pkg" && yarn install --frozen-lockfile && yarn build)
+          done
+
+      - name: Lint example
+        run: examples/scripts/lint.sh ${{ matrix.example }}
+
+      - name: Build example program (if any)
+        working-directory: examples/${{ matrix.example }}
+        env:
+          RUSTUP_TOOLCHAIN: ${{ env.rust_version }}
+        run: |
+          if [ -f Cargo.toml ]; then
+            ../../examples/scripts/build-program.sh .
+          else
+            echo "no program to build"
+          fi
+
+      - name: Start local validator stack
+        env:
+          # vrf examples additionally need the VRF oracle.
+          START_VRF_ORACLE: ${{ startsWith(matrix.example, 'vrf') && '1' || '0' }}
+        run: |
+          # ephemeral-validator needs ~1M open files; GHA defaults to 65536.
+          sudo prlimit --pid $$ --nofile=1000000:1000000
+          examples/scripts/start-validators.sh examples/${{ matrix.example }}/target/deploy
+
+      - name: Run tests
+        working-directory: examples/${{ matrix.example }}
+        run: |
+          yarn install --frozen-lockfile
+          yarn test
+
+      - name: Stop local validator stack
+        if: always()
+        run: examples/scripts/stop-validators.sh
+
+      - name: Upload validator logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: validator-logs-${{ matrix.example }}
+          path: /tmp/er-examples-stack/*.log
+          if-no-files-found: ignore

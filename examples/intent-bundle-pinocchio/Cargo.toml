@@ -1,0 +1,22 @@
+[package]
+name = "intent-bundle-pinocchio"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+publish = false
+
+[lib]
+name = "intent_bundle_pinocchio"
+crate-type = ["cdylib", "lib"]
+
+[features]
+default = []
+no-entrypoint = []
+
+[dependencies]
+pinocchio = "0.10"
+pinocchio-system = "0.5"
+ephemeral-rollups-pinocchio = { path = "../../rust/pinocchio" }
+
+# Detach from any parent workspace; this example is self-contained.
+[workspace]
