@@ -1,0 +1,21 @@
+[package]
+name = "ephemeral-rollups-sdk-attribute-vrf"
+description = "ephemeral-rollups-sdk-attribute-vrf"
+version = { workspace = true }
+authors = { workspace = true }
+repository = { workspace = true }
+homepage = { workspace = true }
+edition = { workspace = true }
+license = "MIT"
+
+[features]
+default = []
+backward-compat = []
+
+[lib]
+proc-macro = true
+
+[dependencies]
+proc-macro2 = "1.0.95"
+syn = { version = "1.0.60", features = ["full"] }
+quote = "1.0"

@@ -58,6 +58,7 @@ build
 build_no_default "solana-system-interface"
 
 build "backward-compat"
+build "vrf,backward-compat"
 
 build "modular-sdk"
 build "modular-sdk,backward-compat"
@@ -66,14 +67,17 @@ build "modular-sdk,access-control,backward-compat"
 build "modular-sdk,spl"
 build "modular-sdk,spl,access-control"
 build "modular-sdk,spl,access-control,backward-compat"
+build "modular-sdk,vrf"
 
 build "anchor"
 build "anchor,anchor-debug"
 build "anchor,access-control"
 build "anchor,access-control,anchor-debug"
+build "anchor,vrf"
 
 build "anchor-compat"
 build "anchor-compat,access-control"
+build "anchor-compat,vrf"
 
 ## anchor-lang-compat/anchor-debug currently fails inside anchor-lang 0.32 
 ## because of a bug in 0.32 itself, specially at this ##  line:
@@ -107,6 +111,8 @@ build "anchor,spl,access-control"
 build "anchor,spl,access-control,anchor-debug"
 build "anchor-compat,spl"
 build "anchor-compat,spl,access-control"
+
+build "vrf"
 
 ##
 ## anchor-compat,anchor-compat-debug wont work. see the elaborated comment above in this file.

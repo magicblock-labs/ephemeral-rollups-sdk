@@ -126,7 +126,7 @@ mod tests {
     use alloc::vec;
     use alloc::vec::Vec;
 
-    use ephemeral_vrf_sdk::instructions::{
+    use ephemeral_rollups_sdk::vrf::instructions::{
         create_request_scoped_randomness_ix, RequestRandomnessParams,
     };
     use pinocchio::account::RuntimeAccount;

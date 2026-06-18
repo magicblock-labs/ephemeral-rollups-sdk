@@ -25,20 +25,11 @@ default = ["solana-system-interface"]
 
 # anchor 1.0 support (CANNOT be combined with backward-compat) 
 anchor = ["anchor-modern"]
-anchor-modern = [
-    "anchor-support",
-    "anchor-lang-current",
-    "ephemeral-vrf-sdk/anchor-modern",
-]
+anchor-modern = ["anchor-support", "anchor-lang-current"]
 anchor-debug = ["anchor-lang-current/anchor-debug"]
 
 # anchor >=0.28.0, <1.0 support (backward-compat is implied)
-anchor-compat = [
-    "anchor-support",
-    "backward-compat",
-    "anchor-lang-compat",
-    "ephemeral-vrf-sdk/anchor-compat",
-]
+anchor-compat = ["anchor-support", "backward-compat", "anchor-lang-compat"]
 anchor-compat-debug = ["anchor-lang-compat/anchor-debug"]
 
 # access-control support (can be combined with [anchor-compat | anchor | backward-compat]) 
@@ -60,12 +51,9 @@ backward-compat = [
     "ephemeral-rollups-sdk-attribute-delegate/backward-compat",
     "ephemeral-rollups-sdk-attribute-ephemeral/backward-compat",
     "ephemeral-rollups-sdk-attribute-ephemeral-accounts/backward-compat",
-    "ephemeral-vrf-sdk-vrf-macro/backward-compat",
-    "ephemeral-vrf-sdk/backward-compat",
+    "ephemeral-rollups-sdk-attribute-vrf/backward-compat",
 ]
 
-# Activate this feature to use the vrf macro without having to import the ephemeral-vrf-sdk crate.
-vrf = ["ephemeral-vrf-sdk-vrf-macro/rollups"]
 crank = []
 modular-sdk = [
     "solana-account",
@@ -78,6 +66,8 @@ modular-sdk = [
     "solana-sysvar",
     "solana-system-interface",
 ]
+
+vrf = []
 
 # =========== internal features ===========
 anchor-support = []
@@ -94,8 +84,7 @@ ephemeral-rollups-sdk-attribute-ephemeral = { workspace = true }
 ephemeral-rollups-sdk-attribute-ephemeral-accounts = { workspace = true }
 ephemeral-rollups-sdk-attribute-commit = { workspace = true }
 ephemeral-rollups-sdk-attribute-action = { workspace = true }
-ephemeral-vrf-sdk = { workspace = true }
-ephemeral-vrf-sdk-vrf-macro = { workspace = true }
+ephemeral-rollups-sdk-attribute-vrf = { workspace = true }
 solana-program = { workspace = true }
 solana-address = { workspace = true }
 solana-account = { workspace = true, optional = true }
@@ -105,6 +94,7 @@ solana-instruction = { workspace = true, optional = true }
 solana-pubkey = { workspace = true, optional = true }
 solana-program-error = { workspace = true, optional = true }
 solana-program-memory = { workspace = true, optional = true }
+solana-sdk-ids = { workspace = true }
 solana-system-interface = { workspace = true, optional = true }
 solana-sysvar = { workspace = true, optional = true }
 spl-associated-token-account-interface = { workspace = true, optional = true }
@@ -117,6 +107,7 @@ thiserror = { workspace = true, optional = true }
 solana-account-info-compat = { workspace = true }
 solana-program-error-compat = { workspace = true }
 solana-program-compat = { workspace = true }
+solana-sdk-ids-compat = { workspace = true }
 
 # Fix for older toolchain
 base64ct = { workspace = true }

@@ -19,6 +19,7 @@ pub mod ephem;
 pub mod ephemeral_accounts;
 pub mod types;
 pub mod utils;
+#[cfg(feature = "vrf")]
 pub mod vrf;
 
 pub mod compat;

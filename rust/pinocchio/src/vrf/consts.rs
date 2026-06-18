@@ -34,7 +34,7 @@ pub const REQUEST_HIGH_PRIORITY_SCOPED_RANDOMNESS_DISCRIMINATOR: u64 = 11;
 
 #[cfg(test)]
 mod tests {
-    use ephemeral_vrf_sdk::consts as sdk;
+    use ephemeral_rollups_sdk::vrf::consts as sdk;
 
     use super::*;
 
