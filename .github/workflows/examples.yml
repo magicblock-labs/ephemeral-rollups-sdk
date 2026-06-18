@@ -83,7 +83,7 @@ jobs:
           done
 
       - name: Lint example
-        run: examples/scripts/lint.sh
+        run: examples/scripts/lint.sh ${{ matrix.example }}
 
       - name: Build example program (if any)
         working-directory: examples/${{ matrix.example }}
