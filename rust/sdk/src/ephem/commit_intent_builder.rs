@@ -14,7 +14,6 @@ pub struct CommitIntentBuilder<'info> {
     pub(in crate::ephem) accounts: Vec<compat::AccountInfo<'info>>,
     pub(in crate::ephem) actions: Vec<CallHandler<'info>>,
     pub(in crate::ephem) callbacks: Vec<Option<ActionCallback>>,
-    pub(in crate::ephem) is_compressed: bool,
 }
 
 impl<'info> CommitIntentBuilder<'info> {
@@ -49,13 +48,6 @@ impl<'info> CommitIntentBuilder<'info> {
             parent
         })
     }
-
-    /// Sets the intent to be compressed. Chainable.
-    /// Only works if the account was compressed when delegated.
-    pub fn compressed(mut self) -> Self {
-        self.is_compressed = true;
-        self
-    }
 }
 
 impl<'info> FoldableIntentBuilder<'info> for CommitIntentBuilder<'info> {
@@ -65,7 +57,6 @@ impl<'info> FoldableIntentBuilder<'info> for CommitIntentBuilder<'info> {
             accounts,
             actions,
             callbacks,
-            is_compressed,
         } = self;
         let commit = if actions.is_empty() {
             CommitType::Standalone(accounts)
@@ -76,13 +67,7 @@ impl<'info> FoldableIntentBuilder<'info> for CommitIntentBuilder<'info> {
                 callbacks,
             }
         };
-        if is_compressed {
-            parent
-                .intent_bundle
-                .add_intent(MagicIntent::CommitFinalizeCompressed(commit));
-        } else {
-            parent.intent_bundle.add_intent(MagicIntent::Commit(commit));
-        }
+        parent.intent_bundle.add_intent(MagicIntent::Commit(commit));
         parent
     }
 }
