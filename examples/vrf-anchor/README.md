@@ -2,7 +2,7 @@
 
 A minimal **Anchor** example of verifiable randomness (VRF):
 
-```
+```text
 initialize → request (asks the oracle queue) → consume (oracle callback writes a random 1..=100)
 ```
 

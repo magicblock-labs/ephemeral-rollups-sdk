@@ -16,10 +16,10 @@ real local validator stack. CI runs **one runner per example**.
 `yarn global add @magicblock-labs/ephemeral-validator@latest` provides the binaries.
 `examples/scripts/start-validators.sh [PROGRAMS_DIR]` boots:
 
-| Service | Role | RPC / WS |
-|---|---|---|
-| `mb-test-validator` | base L1 (delegation, magic, VRF, ACL, SPL programs preloaded) | 8899 / 8900 |
-| `ephemeral-validator` | the rollup (`--remotes` → base) | 7799 / 7800 |
+| Service                   | Role                                                            | RPC / WS    |
+| ------------------------- | --------------------------------------------------------------- | ----------- |
+| `mb-test-validator`       | base L1 (delegation, magic, VRF, ACL, SPL programs preloaded)   | 8899 / 8900 |
+| `ephemeral-validator`     | the rollup (`--remotes` → base)                                 | 7799 / 7800 |
 | `query-filtering-service` | security proxy in front of the ER; the client's rollup endpoint | 2999 / 3000 |
 
 `start-validators.sh` optionally preloads SBF programs from a directory (e.g. an
@@ -40,14 +40,15 @@ examples/scripts/stop-validators.sh
 
 ## Examples
 
-| Example | Framework | Demonstrates |
-|---|---|---|
-| [`counter-anchor`](counter-anchor) | Anchor | delegate → run-on-ER → commit → commit-and-undelegate (`#[ephemeral]`/`#[delegate]`/`#[commit]`) |
-| [`counter-pinocchio`](counter-pinocchio) | Pinocchio | the same lifecycle via the `ephemeral-rollups-pinocchio` helpers |
-| [`access-control`](access-control) | client (SDK) | permission program: create / update / close a permission |
-| [`vrf-anchor`](vrf-anchor) | Anchor | verifiable randomness: `#[vrf]` request + `#[vrf_callback]`, fulfilled by `vrf-oracle` |
-| [`intent-bundle-pinocchio`](intent-bundle-pinocchio) | Pinocchio | commit / commit-and-undelegate via `MagicIntentBundleBuilder` |
-| [`spl`](spl) | client (SDK) | ephemeral SPL token ATA: init vault, init ephemeral ATA, deposit tokens |
+| Example                                              | Framework    | Demonstrates                                                                                     |
+| ---------------------------------------------------- | ------------ | ------------------------------------------------------------------------------------------------ |
+| [`counter-anchor`](counter-anchor)                   | Anchor       | delegate → run-on-ER → commit → commit-and-undelegate (`#[ephemeral]`/`#[delegate]`/`#[commit]`) |
+| [`counter-pinocchio`](counter-pinocchio)             | Pinocchio    | the same lifecycle via the `ephemeral-rollups-pinocchio` helpers                                 |
+| [`access-control`](access-control)                   | client (SDK) | permission program: create / update / close a permission                                         |
+| [`vrf-anchor`](vrf-anchor)                           | Anchor       | verifiable randomness: `#[vrf]` request + `#[vrf_callback]`, fulfilled by `vrf-oracle`           |
+| [`intent-bundle-pinocchio`](intent-bundle-pinocchio) | Pinocchio    | commit / commit-and-undelegate via `MagicIntentBundleBuilder`                                    |
+| [`spl`](spl)                                         | client (SDK) | ephemeral SPL token ATA: init vault, init ephemeral ATA, deposit tokens                          |
+| [`ephemeral-accounts`](spl)                          | Anchor       | creation of ephemeral accounts with anchor macro                                                 |
 
 ### Notes that apply to every example
 

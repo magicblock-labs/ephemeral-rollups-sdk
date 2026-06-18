@@ -152,9 +152,6 @@ describe("ephemeral-accounts-anchor (web3.js)", () => {
 
     // 3. create the gas-sponsored ephemeral account on the ER (fee payer = wallet,
     //    sponsor = delegated treasury)
-    await waitFor(
-      async () => (await ephemeral.getAccountInfo(TREASURY)) !== null,
-    );
     const SIZE = 32;
     await send(
       ephemeral,

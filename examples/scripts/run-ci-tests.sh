@@ -28,6 +28,7 @@ CI_EXAMPLES=(
   vrf-anchor
   intent-bundle-pinocchio
   spl
+  ephemeral-accounts-anchor
 )
 
 SKIP_SDK_BUILD=0
@@ -118,6 +119,16 @@ needs_vrf_oracle() {
 run_example() {
   local example="$1"
   local example_dir="${REPO_ROOT}/examples/${example}"
+  local test_status=0
+  local stack_started=0
+
+  cleanup_stack() {
+    if [ "$stack_started" = 1 ]; then
+      log "stopping validator stack"
+      "${SCRIPT_DIR}/stop-validators.sh" || true
+    fi
+  }
+  trap cleanup_stack RETURN
 
   if [ ! -d "$example_dir" ]; then
     err "unknown example: ${example}"
@@ -128,10 +139,13 @@ run_example() {
 
   if [ -f "${example_dir}/Cargo.toml" ]; then
     log "building SBF program"
-    (
+    if ! (
       cd "$example_dir"
       RUSTUP_TOOLCHAIN="${RUST_VERSION}" cargo build-sbf
-    )
+    ); then
+      err "${example} build failed"
+      return 1
+    fi
   else
     log "no Cargo.toml; skipping program build"
   fi
@@ -148,16 +162,12 @@ run_example() {
     return 1
   fi
 
-  local test_status=0
   log "running yarn test in ${example_dir}"
   if ! (cd "$example_dir" && yarn install --frozen-lockfile && yarn test); then
     test_status=1
     err "${example} tests failed"
     err "validator logs: ${ER_RUN_DIR}/{base,er,qfs,vrf}.log"
   fi
-
-  log "stopping validator stack"
-  "${SCRIPT_DIR}/stop-validators.sh" || true
 
   return "$test_status"
 }

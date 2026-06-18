@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Minimal Anchor counter demonstrating the Ephemeral Rollups lifecycle",
+  "description": "Minimal Anchor example demonstrating the Ephemeral Rollups lifecycle",
   "prettier": "../.prettierrc.json",
   "scripts": {
     "lint": "prettier --check .",

@@ -14,7 +14,7 @@ import {
   setTransactionMessageLifetimeUsingBlockhash,
   AccountRole,
   type Address,
-  type IInstruction,
+  type Instruction,
   type KeyPairSigner,
 } from "@solana/kit";
 import {
@@ -59,7 +59,7 @@ function meta(addr: Address, role: AccountRole) {
   return { address: addr, role };
 }
 
-async function send(conn: Connection, ix: IInstruction) {
+async function send(conn: Connection, ix: Instruction) {
   const { value: blockhash } = await conn.rpc.getLatestBlockhash().send();
   const tx = pipe(
     createTransactionMessage({ version: 0 }),
@@ -73,9 +73,12 @@ async function send(conn: Connection, ix: IInstruction) {
   await waitFor(async () => {
     const { value } = await conn.rpc.getSignatureStatuses([sig]).send();
     const s = value[0];
+    if (!s) return false;
+    if (s.err)
+      throw new Error(`transaction ${sig} failed: ${JSON.stringify(s.err)}`);
     return (
-      s?.confirmationStatus === "confirmed" ||
-      s?.confirmationStatus === "finalized"
+      s.confirmationStatus === "confirmed" ||
+      s.confirmationStatus === "finalized"
     );
   });
   return sig;
@@ -170,7 +173,7 @@ describe("ephemeral-accounts-anchor (kit)", () => {
       ],
       data: concat(
         new Uint8Array(ixDiscriminator("delegate_treasury")),
-        addressEncoder.encode(address(ER_VALIDATOR_IDENTITY)),
+        new Uint8Array(addressEncoder.encode(address(ER_VALIDATOR_IDENTITY))),
       ),
     });
 
