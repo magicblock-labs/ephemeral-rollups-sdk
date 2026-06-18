@@ -23,5 +23,5 @@ for svc in qfs er base vrf; do
   fi
   rm -f "$pidfile"
 done
-clean_er_ports
+clean_stack_ports
 log "stack stopped"

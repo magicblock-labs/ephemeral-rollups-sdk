@@ -74,7 +74,11 @@ async function send(conn: Connection, instruction: IInstruction) {
     (m) => appendTransactionMessageInstruction(instruction, m),
   );
   const sig = await conn.sendTransaction(tx, [signer.keyPair], { skipPreflight: true });
-  await conn.confirmTransaction(sig);
+  await waitFor(async () => {
+    const { value } = await conn.rpc.getSignatureStatuses([sig]).send();
+    const s = value[0];
+    return s?.confirmationStatus === "confirmed" || s?.confirmationStatus === "finalized";
+  });
   return sig;
 }
 

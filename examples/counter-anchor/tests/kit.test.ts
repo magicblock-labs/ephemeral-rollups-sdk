@@ -80,21 +80,40 @@ async function send(conn: Connection, instruction: IInstruction) {
     (m) => setTransactionMessageLifetimeUsingBlockhash(blockhash, m),
     (m) => appendTransactionMessageInstruction(instruction, m),
   );
-  // ER transactions use a non-delegated fee payer; skip preflight.
-  const sig = await conn.sendTransaction(tx, [signer.keyPair], { skipPreflight: true });
-  await conn.confirmTransaction(sig);
+  // Poll signature status — WS-based confirmTransaction times out through QFS/ER.
+  const sig = await conn.sendTransaction(tx, [signer.keyPair], {
+    skipPreflight: true,
+  });
+  await waitFor(async () => {
+    const { value } = await conn.rpc.getSignatureStatuses([sig]).send();
+    const s = value[0];
+    return (
+      s?.confirmationStatus === "confirmed" ||
+      s?.confirmationStatus === "finalized"
+    );
+  });
   return sig;
 }
 
-async function getCount(conn: Connection, addr: Address): Promise<bigint | null> {
-  const { value } = await conn.rpc.getAccountInfo(addr, { encoding: "base64" }).send();
+async function getCount(
+  conn: Connection,
+  addr: Address,
+): Promise<bigint | null> {
+  const { value } = await conn.rpc
+    .getAccountInfo(addr, { encoding: "base64" })
+    .send();
   if (!value) return null;
   const data = new Uint8Array(base64.encode(value.data[0]));
   return decodeCount(data);
 }
 
-async function getOwner(conn: Connection, addr: Address): Promise<string | null> {
-  const { value } = await conn.rpc.getAccountInfo(addr, { encoding: "base64" }).send();
+async function getOwner(
+  conn: Connection,
+  addr: Address,
+): Promise<string | null> {
+  const { value } = await conn.rpc
+    .getAccountInfo(addr, { encoding: "base64" })
+    .send();
   return value ? value.owner : null;
 }
 
@@ -113,11 +132,16 @@ describe("counter-anchor (kit)", () => {
     await waitFor(async () => {
       const { value } = await base.rpc.getSignatureStatuses([airdrop]).send();
       const s = value[0];
-      return s?.confirmationStatus === "confirmed" || s?.confirmationStatus === "finalized";
+      return (
+        s?.confirmationStatus === "confirmed" ||
+        s?.confirmationStatus === "finalized"
+      );
     });
 
-    const { token } = await getAuthToken(ROUTER_RPC_URL, signer.address, async (msg) =>
-      signBytes(signer.keyPair.privateKey, msg),
+    const { token } = await getAuthToken(
+      ROUTER_RPC_URL,
+      signer.address,
+      async (msg) => signBytes(signer.keyPair.privateKey, msg),
     );
     ephemeral = await Connection.create(
       `${ROUTER_RPC_URL}?token=${token}`,
@@ -153,7 +177,8 @@ describe("counter-anchor (kit)", () => {
       PROGRAM_ID,
     );
     const record = await delegationRecordPdaFromDelegatedAccount(COUNTER_PDA);
-    const metadata = await delegationMetadataPdaFromDelegatedAccount(COUNTER_PDA);
+    const metadata =
+      await delegationMetadataPdaFromDelegatedAccount(COUNTER_PDA);
     await send(
       base,
       ix(
@@ -174,7 +199,9 @@ describe("counter-anchor (kit)", () => {
     expect(await getOwner(base, COUNTER_PDA)).toBe(DELEGATION_PROGRAM_ID);
 
     // 4. increment on the ER
-    const erCount0 = await waitFor(async () => await getCount(ephemeral, COUNTER_PDA));
+    const erCount0 = await waitFor(
+      async () => await getCount(ephemeral, COUNTER_PDA),
+    );
     await send(
       ephemeral,
       ix("increment", [

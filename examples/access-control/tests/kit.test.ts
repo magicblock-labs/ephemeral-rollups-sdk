@@ -37,7 +37,12 @@ async function send(instruction: Instruction) {
     (m) => appendTransactionMessageInstruction(instruction, m),
   );
   const sig = await base.sendTransaction(tx, [payer.keyPair]);
-  await base.confirmTransaction(sig);
+  for (;;) {
+    const { value } = await base.rpc.getSignatureStatuses([sig]).send();
+    const s = value[0];
+    if (s?.confirmationStatus === "confirmed" || s?.confirmationStatus === "finalized") break;
+    await new Promise((r) => setTimeout(r, 500));
+  }
   return sig;
 }
 

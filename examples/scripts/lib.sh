@@ -69,17 +69,19 @@ wait_for_rpc() {
 
 # getVersion can succeed before the bank produces slots; the ER then fails to bootstrap.
 wait_for_slot_production() {
-  local url="$1" name="$2" timeout="${3:-120}" pid="${4:-}" i slot
+  local url="$1" name="$2" timeout="${3:-120}" i slot
+  local max_fresh_slot="${FRESH_LEDGER_MAX_SLOT:-1000}"
   log "waiting for ${name} slot production (up to ${timeout}s) ..."
   for ((i = 1; i <= timeout; i++)); do
-    if [ -n "$pid" ] && ! kill -0 "$pid" 2>/dev/null; then
-      err "${name} exited before producing slots"
-      return 1
-    fi
+    # pipefail + set -e: a not-yet-listening curl must not abort the wait loop.
     slot="$(curl -s --max-time 1 -X POST -H 'content-type: application/json' \
       -d '{"jsonrpc":"2.0","method":"getSlot","params":[{"commitment":"processed"}],"id":1}' \
-      "$url" 2>/dev/null | sed -nE 's/.*"result":([0-9]+).*/\1/p')"
+      "$url" 2>/dev/null | sed -nE 's/.*"result":([0-9]+).*/\1/p' || true)"
     if [ -n "$slot" ] && [ "$slot" -gt 0 ]; then
+      if [ "$slot" -gt "$max_fresh_slot" ]; then
+        err "${name} slot=${slot} looks stale (expected a fresh --reset ledger; is another validator on ${url}?)"
+        return 1
+      fi
       log "${name} is producing slots (slot=${slot})"
       return 0
     fi
@@ -87,6 +89,25 @@ wait_for_slot_production() {
   done
   err "${name} did not produce slots within ${timeout}s"
   return 1
+}
+
+# Kill anything still bound to the stack ports and orphaned validator processes.
+# mb-test-validator wraps solana-test-validator; killing only the wrapper pid often
+# leaves the child running and the next --reset start talks to the stale chain.
+clean_stack_ports() {
+  local port p
+  for port in "${BASE_RPC_PORT}" "${BASE_WS_PORT}" "${ER_RPC_PORT}" "${ER_WS_PORT}" \
+              "${ROUTER_RPC_PORT}" "${ROUTER_WS_PORT}"; do
+    for p in $(lsof -ti "tcp:${port}" 2>/dev/null || true); do
+      log "freeing port ${port} (pid ${p})"
+      kill -9 "$p" 2>/dev/null || true
+    done
+  done
+  pkill -f "solana-test-validator" 2>/dev/null || true
+  pkill -f "mb-test-validator" 2>/dev/null || true
+  pkill -f "ephemeral-validator" 2>/dev/null || true
+  pkill -f "query-filtering-service" 2>/dev/null || true
+  pkill -f "vrf-oracle" 2>/dev/null || true
 }
 
 # Free the ephemeral-validator listen ports (best-effort).

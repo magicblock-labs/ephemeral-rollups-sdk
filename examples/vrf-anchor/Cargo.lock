@@ -780,7 +780,7 @@ dependencies = [
 
 [[package]]
 name = "ephemeral-rollups-sdk"
-version = "0.15.4"
+version = "0.15.5"
 dependencies = [
  "anchor-lang",
  "base64ct",
@@ -807,7 +807,7 @@ dependencies = [
 
 [[package]]
 name = "ephemeral-rollups-sdk-attribute-action"
-version = "0.15.4"
+version = "0.15.5"
 dependencies = [
  "quote",
  "syn 1.0.109",
@@ -815,7 +815,7 @@ dependencies = [
 
 [[package]]
 name = "ephemeral-rollups-sdk-attribute-commit"
-version = "0.15.4"
+version = "0.15.5"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -824,7 +824,7 @@ dependencies = [
 
 [[package]]
 name = "ephemeral-rollups-sdk-attribute-delegate"
-version = "0.15.4"
+version = "0.15.5"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -833,7 +833,7 @@ dependencies = [
 
 [[package]]
 name = "ephemeral-rollups-sdk-attribute-ephemeral"
-version = "0.15.4"
+version = "0.15.5"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -842,7 +842,7 @@ dependencies = [
 
 [[package]]
 name = "ephemeral-rollups-sdk-attribute-ephemeral-accounts"
-version = "0.15.4"
+version = "0.15.5"
 dependencies = [
  "proc-macro2",
  "quote",

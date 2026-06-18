@@ -25,7 +25,10 @@ trap on_exit EXIT
 EXTRA_PROGRAMS_DIR="${1:-}"
 
 mkdir -p "${ER_RUN_DIR}"
-rm -f "${ER_RUN_DIR}"/*.pid
+rm -f "${ER_RUN_DIR}"/*.pid "${ER_RUN_DIR}"/*.log
+clean_stack_ports
+sleep 1
+rm -rf "${ER_RUN_DIR}/base-ledger"
 
 # --- Build the list of extra programs to preload on the base layer ----------------
 base_extra_args=()
@@ -77,8 +80,7 @@ spawn base "${ER_RUN_DIR}/base.log" \
   --rpc-port "${BASE_RPC_PORT}" \
   --ledger "${ER_RUN_DIR}/base-ledger" \
   ${base_extra_args[@]+"${base_extra_args[@]}"}
-base_pid="$(cat "${ER_RUN_DIR}/base.pid")"
-wait_for_slot_production "${BASE_RPC_URL}" "base validator" 120 "$base_pid"
+wait_for_slot_production "${BASE_RPC_URL}" "base validator" 120
 
 # --- ephemeral rollup validator ---------------------------------------------------
 # The ephemeral-validator occasionally comes up "half-dead" (bound to its port but
