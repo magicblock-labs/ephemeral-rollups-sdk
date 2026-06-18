@@ -2,7 +2,7 @@
 
 A minimal **Pinocchio** program demonstrating the full Ephemeral Rollups lifecycle:
 
-```
+```text
 initialize (base) → increment (base) → delegate → increment (ER) → commit → commit_and_undelegate
 ```
 

@@ -16,7 +16,7 @@ import {
   signBytes,
   AccountRole,
   type Address,
-  type IInstruction,
+  type Instruction,
   type KeyPairSigner,
 } from "@solana/kit";
 import {
@@ -64,11 +64,11 @@ function meta(addr: Address, role: AccountRole) {
 function ix(
   accounts: ReturnType<typeof meta>[],
   data: Uint8Array,
-): IInstruction {
+): Instruction {
   return { programAddress: PROGRAM_ID, accounts, data };
 }
 
-async function send(conn: Connection, instruction: IInstruction) {
+async function send(conn: Connection, instruction: Instruction) {
   const { value: blockhash } = await conn.rpc.getLatestBlockhash().send();
   const tx = pipe(
     createTransactionMessage({ version: 0 }),
