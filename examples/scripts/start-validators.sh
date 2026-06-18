@@ -77,15 +77,8 @@ spawn base "${ER_RUN_DIR}/base.log" \
   --rpc-port "${BASE_RPC_PORT}" \
   --ledger "${ER_RUN_DIR}/base-ledger" \
   ${base_extra_args[@]+"${base_extra_args[@]}"}
-wait_for_rpc "${BASE_RPC_URL}" "base validator" 90
-
-# Give the base layer a moment to settle before the ER connects. Without this,
-# the first ephemeral-validator attempt often hangs until the retry loop's sleep.
-ER_BASE_SETTLE_SECS="${ER_BASE_SETTLE_SECS:-3}"
-if [ "$ER_BASE_SETTLE_SECS" -gt 0 ]; then
-  log "waiting ${ER_BASE_SETTLE_SECS}s for base validator to settle"
-  sleep "$ER_BASE_SETTLE_SECS"
-fi
+base_pid="$(cat "${ER_RUN_DIR}/base.pid")"
+wait_for_slot_production "${BASE_RPC_URL}" "base validator" 120 "$base_pid"
 
 # --- ephemeral rollup validator ---------------------------------------------------
 # The ephemeral-validator occasionally comes up "half-dead" (bound to its port but
@@ -106,8 +99,10 @@ for attempt in 1 2 3; do
   log "starting ephemeral-validator on ${ER_RPC_URL} (remotes -> ${BASE_RPC_URL}) [attempt ${attempt}]"
   er_log="${ER_RUN_DIR}/er-attempt-${attempt}.log"
   spawn er "$er_log" \
+    env RUST_LOG="${RUST_LOG:-info}" \
     ephemeral-validator \
     --remotes "${BASE_RPC_URL}" \
+    --remotes "${BASE_WS_URL}" \
     --listen "127.0.0.1:${ER_RPC_PORT}" \
     --lifecycle ephemeral \
     --no-tui \

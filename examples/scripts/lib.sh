@@ -20,6 +20,7 @@ export ROUTER_RPC_PORT="${ROUTER_RPC_PORT:-2999}"
 export ROUTER_WS_PORT="${ROUTER_WS_PORT:-3000}"
 
 export BASE_RPC_URL="http://127.0.0.1:${BASE_RPC_PORT}"
+export BASE_WS_URL="ws://127.0.0.1:${BASE_WS_PORT}"
 export ER_RPC_URL="http://127.0.0.1:${ER_RPC_PORT}"
 export ROUTER_RPC_URL="http://127.0.0.1:${ROUTER_RPC_PORT}"
 export ROUTER_WS_URL="ws://127.0.0.1:${ROUTER_WS_PORT}"
@@ -64,6 +65,28 @@ wait_for_rpc() {
     sleep 0.5
   done
   log "${name} is up"
+}
+
+# getVersion can succeed before the bank produces slots; the ER then fails to bootstrap.
+wait_for_slot_production() {
+  local url="$1" name="$2" timeout="${3:-120}" pid="${4:-}" i slot
+  log "waiting for ${name} slot production (up to ${timeout}s) ..."
+  for ((i = 1; i <= timeout; i++)); do
+    if [ -n "$pid" ] && ! kill -0 "$pid" 2>/dev/null; then
+      err "${name} exited before producing slots"
+      return 1
+    fi
+    slot="$(curl -s --max-time 1 -X POST -H 'content-type: application/json' \
+      -d '{"jsonrpc":"2.0","method":"getSlot","params":[{"commitment":"processed"}],"id":1}' \
+      "$url" 2>/dev/null | sed -nE 's/.*"result":([0-9]+).*/\1/p')"
+    if [ -n "$slot" ] && [ "$slot" -gt 0 ]; then
+      log "${name} is producing slots (slot=${slot})"
+      return 0
+    fi
+    sleep 1
+  done
+  err "${name} did not produce slots within ${timeout}s"
+  return 1
 }
 
 # Free the ephemeral-validator listen ports (best-effort).
