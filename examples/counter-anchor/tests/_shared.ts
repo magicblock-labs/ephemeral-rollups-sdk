@@ -62,7 +62,7 @@ export function decodeCount(data: Uint8Array): bigint {
   return view.getBigUint64(0, true);
 }
 
-/** Poll `fn` until it returns a truthy value or the timeout elapses. */
+/** Poll `fn` until it returns a value other than undefined/null/false or the timeout elapses. */
 export async function waitFor<T>(
   fn: () => Promise<T | undefined | null | false>,
   { timeoutMs = 60_000, intervalMs = 1_000 } = {},
@@ -70,7 +70,8 @@ export async function waitFor<T>(
   const deadline = Date.now() + timeoutMs;
   for (;;) {
     const result = await fn();
-    if (result) return result;
+    if (result !== undefined && result !== null && result !== false)
+      return result;
     if (Date.now() > deadline) throw new Error("waitFor: timed out");
     await new Promise((r) => setTimeout(r, intervalMs));
   }
