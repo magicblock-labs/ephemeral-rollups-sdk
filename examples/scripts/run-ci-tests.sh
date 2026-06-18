@@ -141,7 +141,7 @@ run_example() {
     log "building SBF program"
     if ! (
       cd "$example_dir"
-      RUSTUP_TOOLCHAIN="${RUST_VERSION}" cargo build-sbf
+      RUSTUP_TOOLCHAIN="${RUST_VERSION}" "${SCRIPT_DIR}/build-program.sh" .
     ); then
       err "${example} build failed"
       return 1

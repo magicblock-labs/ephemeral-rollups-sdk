@@ -92,10 +92,10 @@ fn increment(accounts: &[AccountView]) -> ProgramResult {
     let [_payer, counter, ..] = accounts else {
         return Err(ProgramError::NotEnoughAccountKeys);
     };
+    let mut d = counter.try_borrow_mut()?;
     if d.len() < 8 {
         return Err(ProgramError::InvalidAccountData);
     }
-    let mut d = counter.try_borrow_mut()?;
     let mut v = u64::from_le_bytes(
         d[..8]
             .try_into()

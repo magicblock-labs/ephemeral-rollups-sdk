@@ -788,7 +788,7 @@ dependencies = [
 
 [[package]]
 name = "ephemeral-rollups-sdk"
-version = "0.15.4"
+version = "0.15.5"
 dependencies = [
  "anchor-lang",
  "base64ct",
@@ -815,7 +815,7 @@ dependencies = [
 
 [[package]]
 name = "ephemeral-rollups-sdk-attribute-action"
-version = "0.15.4"
+version = "0.15.5"
 dependencies = [
  "quote",
  "syn 1.0.109",
@@ -823,7 +823,7 @@ dependencies = [
 
 [[package]]
 name = "ephemeral-rollups-sdk-attribute-commit"
-version = "0.15.4"
+version = "0.15.5"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -832,7 +832,7 @@ dependencies = [
 
 [[package]]
 name = "ephemeral-rollups-sdk-attribute-delegate"
-version = "0.15.4"
+version = "0.15.5"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -841,7 +841,7 @@ dependencies = [
 
 [[package]]
 name = "ephemeral-rollups-sdk-attribute-ephemeral"
-version = "0.15.4"
+version = "0.15.5"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -850,7 +850,7 @@ dependencies = [
 
 [[package]]
 name = "ephemeral-rollups-sdk-attribute-ephemeral-accounts"
-version = "0.15.4"
+version = "0.15.5"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1267,9 +1267,8 @@ dependencies = [
 
 [[package]]
 name = "magicblock-magic-program-api"
-version = "0.10.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1dc8fba0307c90b91b70c9ed06d4242d6c4159f331b2f05bf8f875c2a94e0e98"
+version = "0.11.1"
+source = "git+https://github.com/magicblock-labs/magicblock-validator.git?rev=c7094f01294c48d6bcfc1b8c1ea6474b09e9f596#c7094f01294c48d6bcfc1b8c1ea6474b09e9f596"
 dependencies = [
  "bincode",
  "const-crypto",

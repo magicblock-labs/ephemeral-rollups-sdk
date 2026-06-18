@@ -90,7 +90,11 @@ jobs:
         env:
           RUSTUP_TOOLCHAIN: ${{ env.rust_version }}
         run: |
-          if [ -f Cargo.toml ]; then cargo build-sbf; else echo "no program to build"; fi
+          if [ -f Cargo.toml ]; then
+            ../../examples/scripts/build-program.sh .
+          else
+            echo "no program to build"
+          fi
 
       - name: Start local validator stack
         env:
