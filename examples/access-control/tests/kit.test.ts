@@ -66,14 +66,20 @@ describe("access-control (kit)", () => {
     const airdrop = await base.rpc
       .requestAirdrop(payer.address, lamports(2_000_000_000n))
       .send();
+    const deadlineMs = Date.now() + 30_000;
     for (;;) {
       const { value } = await base.rpc.getSignatureStatuses([airdrop]).send();
       const s = value[0];
+      if (s?.err) throw new Error(`Airdrop failed: ${JSON.stringify(s.err)}`);
       if (
         s?.confirmationStatus === "confirmed" ||
         s?.confirmationStatus === "finalized"
       )
         break;
+      if (Date.now() > deadlineMs)
+        throw new Error(
+          `Timed out waiting for airdrop confirmation: ${airdrop}`,
+        );
       await new Promise((r) => setTimeout(r, 500));
     }
   });
