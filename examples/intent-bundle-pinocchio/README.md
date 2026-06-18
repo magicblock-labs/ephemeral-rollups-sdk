@@ -14,11 +14,11 @@ MagicIntentBundleBuilder::new(payer, magic_context, magic_program)
     .build_and_invoke(&mut data_buf)?;
 ```
 
-| Path | What |
-|------|------|
-| `src/lib.rs` | the program (tag-dispatched; commit paths use the bundle builder) |
-| `tests/web3js.test.ts` | `@solana/web3.js` + `@magicblock-labs/ephemeral-rollups-sdk` |
-| `tests/kit.test.ts` | `@solana/kit` + `@magicblock-labs/ephemeral-rollups-kit` |
+| Path                   | What                                                              |
+| ---------------------- | ----------------------------------------------------------------- |
+| `src/lib.rs`           | the program (tag-dispatched; commit paths use the bundle builder) |
+| `tests/web3js.test.ts` | `@solana/web3.js` + `@magicblock-labs/ephemeral-rollups-sdk`      |
+| `tests/kit.test.ts`    | `@solana/kit` + `@magicblock-labs/ephemeral-rollups-kit`          |
 
 ## Running
 

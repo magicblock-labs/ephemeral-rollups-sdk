@@ -40,14 +40,22 @@ async function send(instruction: Instruction) {
   for (;;) {
     const { value } = await base.rpc.getSignatureStatuses([sig]).send();
     const s = value[0];
-    if (s?.confirmationStatus === "confirmed" || s?.confirmationStatus === "finalized") break;
+    if (
+      s?.confirmationStatus === "confirmed" ||
+      s?.confirmationStatus === "finalized"
+    )
+      break;
     await new Promise((r) => setTimeout(r, 500));
   }
   return sig;
 }
 
-async function exists(addr: Awaited<ReturnType<typeof permissionPdaFromAccount>>) {
-  const { value } = await base.rpc.getAccountInfo(addr, { encoding: "base64" }).send();
+async function exists(
+  addr: Awaited<ReturnType<typeof permissionPdaFromAccount>>,
+) {
+  const { value } = await base.rpc
+    .getAccountInfo(addr, { encoding: "base64" })
+    .send();
   return value;
 }
 
@@ -55,11 +63,17 @@ describe("access-control (kit)", () => {
   beforeAll(async () => {
     payer = await generateKeyPairSigner();
     base = await Connection.create(BASE_RPC_URL, BASE_WS_URL);
-    const airdrop = await base.rpc.requestAirdrop(payer.address, lamports(2_000_000_000n)).send();
+    const airdrop = await base.rpc
+      .requestAirdrop(payer.address, lamports(2_000_000_000n))
+      .send();
     for (;;) {
       const { value } = await base.rpc.getSignatureStatuses([airdrop]).send();
       const s = value[0];
-      if (s?.confirmationStatus === "confirmed" || s?.confirmationStatus === "finalized") break;
+      if (
+        s?.confirmationStatus === "confirmed" ||
+        s?.confirmationStatus === "finalized"
+      )
+        break;
       await new Promise((r) => setTimeout(r, 500));
     }
   });
@@ -80,7 +94,10 @@ describe("access-control (kit)", () => {
     const member = (await generateKeyPairSigner()).address;
     await send(
       await createUpdatePermissionInstruction(
-        { authority: [payer.address, true], permissionedAccount: [payer.address, false] },
+        {
+          authority: [payer.address, true],
+          permissionedAccount: [payer.address, false],
+        },
         {
           members: [
             { pubkey: payer.address, flags: AUTHORITY_FLAG },

@@ -4,10 +4,7 @@
 // @solana/kit v4-compatible SPL-token client; the ephemeral-ATA feature under test is
 // exercised entirely through the kit SDK.
 import { describe, it, expect, beforeAll } from "vitest";
-import {
-  Connection as Web3Connection,
-  Keypair,
-} from "@solana/web3.js";
+import { Connection as Web3Connection, Keypair } from "@solana/web3.js";
 import {
   createMint,
   getOrCreateAssociatedTokenAccount,
@@ -59,7 +56,11 @@ async function send(ixs: Instruction[]) {
   for (;;) {
     const { value } = await kit.rpc.getSignatureStatuses([sig]).send();
     const s = value[0];
-    if (s?.confirmationStatus === "confirmed" || s?.confirmationStatus === "finalized") break;
+    if (
+      s?.confirmationStatus === "confirmed" ||
+      s?.confirmationStatus === "finalized"
+    )
+      break;
     await new Promise((r) => setTimeout(r, 500));
   }
   return sig;
@@ -78,7 +79,12 @@ describe("spl (kit)", () => {
     // mint setup via @solana/spl-token
     const mintPk = await createMint(web3, payerKp, payerKp.publicKey, null, 0);
     const sourceAtaPk = (
-      await getOrCreateAssociatedTokenAccount(web3, payerKp, mintPk, payerKp.publicKey)
+      await getOrCreateAssociatedTokenAccount(
+        web3,
+        payerKp,
+        mintPk,
+        payerKp.publicKey,
+      )
     ).address;
     await mintTo(web3, payerKp, mintPk, sourceAtaPk, payerKp, 1000);
 
@@ -98,7 +104,15 @@ describe("spl (kit)", () => {
     ]);
 
     await send([
-      transferToVaultIx(ephemeralAta, vault, mint, sourceAta, vaultAta, payer.address, 250n),
+      transferToVaultIx(
+        ephemeralAta,
+        vault,
+        mint,
+        sourceAta,
+        vaultAta,
+        payer.address,
+        250n,
+      ),
     ]);
 
     const { value } = await kit.rpc

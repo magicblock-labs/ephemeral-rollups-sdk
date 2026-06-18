@@ -7,16 +7,20 @@ const here = dirname(fileURLToPath(import.meta.url));
 
 export const BASE_RPC_URL = process.env.BASE_RPC_URL ?? "http://127.0.0.1:8899";
 export const BASE_WS_URL = process.env.BASE_WS_URL ?? "ws://127.0.0.1:8900";
-export const ROUTER_RPC_URL = process.env.ROUTER_RPC_URL ?? "http://127.0.0.1:2999";
+export const ROUTER_RPC_URL =
+  process.env.ROUTER_RPC_URL ?? "http://127.0.0.1:2999";
 export const ROUTER_WS_URL = process.env.ROUTER_WS_URL ?? "ws://127.0.0.1:3000";
 
 export const ER_VALIDATOR_IDENTITY =
-  process.env.ER_VALIDATOR_IDENTITY ?? "mAGicPQYBMvcYveUZA5F5UNNwyHvfYh5xkLS2Fr1mev";
+  process.env.ER_VALIDATOR_IDENTITY ??
+  "mAGicPQYBMvcYveUZA5F5UNNwyHvfYh5xkLS2Fr1mev";
 
 export const TREASURY_SEED = Buffer.from("treasury");
 export const GAME_SEED = Buffer.from("game");
-export const EPHEMERAL_VAULT_ID_STR = "MagicVau1t999999999999999999999999999999999";
-export const MAGIC_PROGRAM_ID_STR = "Magic11111111111111111111111111111111111111";
+export const EPHEMERAL_VAULT_ID_STR =
+  "MagicVau1t999999999999999999999999999999999";
+export const MAGIC_PROGRAM_ID_STR =
+  "Magic11111111111111111111111111111111111111";
 export const SYSTEM_PROGRAM_ID_STR = "11111111111111111111111111111111";
 
 export const PROGRAM_ID_BYTES: Uint8Array = (() => {

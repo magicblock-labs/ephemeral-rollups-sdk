@@ -26,7 +26,10 @@ const PROGRAM_ID = new PublicKey(PROGRAM_ID_BYTES);
 const VRF_PROGRAM_ID = new PublicKey(VRF_PROGRAM_ID_STR);
 const ORACLE_QUEUE = new PublicKey(DEFAULT_TEST_QUEUE_STR);
 const SLOT_HASHES = new PublicKey(SLOT_HASHES_STR);
-const [PROGRAM_IDENTITY] = PublicKey.findProgramAddressSync([VRF_IDENTITY_SEED], PROGRAM_ID);
+const [PROGRAM_IDENTITY] = PublicKey.findProgramAddressSync(
+  [VRF_IDENTITY_SEED],
+  PROGRAM_ID,
+);
 
 const base = new Connection(BASE_RPC_URL, "confirmed");
 const payer = Keypair.generate();
@@ -43,7 +46,10 @@ async function send(ixs: TransactionInstruction[]) {
   tx.feePayer = payer.publicKey;
   tx.sign(payer);
   const sig = await base.sendRawTransaction(tx.serialize());
-  await base.confirmTransaction({ signature: sig, blockhash, lastValidBlockHeight }, "confirmed");
+  await base.confirmTransaction(
+    { signature: sig, blockhash, lastValidBlockHeight },
+    "confirmed",
+  );
   return sig;
 }
 
@@ -62,7 +68,11 @@ describe("vrf-anchor (web3.js)", () => {
         keys: [
           { pubkey: payer.publicKey, isSigner: true, isWritable: true },
           { pubkey: RANDOM_PDA, isSigner: false, isWritable: true },
-          { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+          {
+            pubkey: SystemProgram.programId,
+            isSigner: false,
+            isWritable: false,
+          },
         ],
         data: ixDiscriminator("initialize"),
       }),
@@ -80,7 +90,11 @@ describe("vrf-anchor (web3.js)", () => {
           { pubkey: PROGRAM_IDENTITY, isSigner: false, isWritable: false },
           { pubkey: VRF_PROGRAM_ID, isSigner: false, isWritable: false },
           { pubkey: SLOT_HASHES, isSigner: false, isWritable: false },
-          { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+          {
+            pubkey: SystemProgram.programId,
+            isSigner: false,
+            isWritable: false,
+          },
         ],
         data: Buffer.concat([ixDiscriminator("request"), Buffer.from([7])]),
       }),

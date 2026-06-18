@@ -65,13 +65,18 @@ async function send(instruction: IInstruction) {
   await waitFor(async () => {
     const { value } = await base.rpc.getSignatureStatuses([sig]).send();
     const s = value[0];
-    return s?.confirmationStatus === "confirmed" || s?.confirmationStatus === "finalized";
+    return (
+      s?.confirmationStatus === "confirmed" ||
+      s?.confirmationStatus === "finalized"
+    );
   });
   return sig;
 }
 
 async function getValue(): Promise<number | null> {
-  const { value } = await base.rpc.getAccountInfo(RANDOM_PDA, { encoding: "base64" }).send();
+  const { value } = await base.rpc
+    .getAccountInfo(RANDOM_PDA, { encoding: "base64" })
+    .send();
   if (!value) return null;
   return decodeValue(new Uint8Array(base64.encode(value.data[0])));
 }
@@ -88,11 +93,16 @@ describe("vrf-anchor (kit)", () => {
       seeds: [VRF_IDENTITY_SEED],
     });
     base = await Connection.create(BASE_RPC_URL, BASE_WS_URL);
-    const airdrop = await base.rpc.requestAirdrop(payer.address, lamports(5_000_000_000n)).send();
+    const airdrop = await base.rpc
+      .requestAirdrop(payer.address, lamports(5_000_000_000n))
+      .send();
     await waitFor(async () => {
       const { value } = await base.rpc.getSignatureStatuses([airdrop]).send();
       const s = value[0];
-      return s?.confirmationStatus === "confirmed" || s?.confirmationStatus === "finalized";
+      return (
+        s?.confirmationStatus === "confirmed" ||
+        s?.confirmationStatus === "finalized"
+      );
     });
   });
 

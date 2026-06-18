@@ -5,7 +5,12 @@
 // vault, create an ephemeral ATA, and deposit SPL tokens into it so they can be used on
 // the rollup. Client-driven (no custom program).
 import { describe, it, expect, beforeAll } from "vitest";
-import { Connection, Keypair, Transaction, TransactionInstruction } from "@solana/web3.js";
+import {
+  Connection,
+  Keypair,
+  Transaction,
+  TransactionInstruction,
+} from "@solana/web3.js";
 import {
   createMint,
   getOrCreateAssociatedTokenAccount,
@@ -37,7 +42,10 @@ async function send(ixs: TransactionInstruction[]) {
   tx.feePayer = payer.publicKey;
   tx.sign(payer);
   const sig = await base.sendRawTransaction(tx.serialize());
-  await base.confirmTransaction({ signature: sig, blockhash, lastValidBlockHeight }, "confirmed");
+  await base.confirmTransaction(
+    { signature: sig, blockhash, lastValidBlockHeight },
+    "confirmed",
+  );
   return sig;
 }
 
@@ -52,7 +60,12 @@ describe("spl (web3.js)", () => {
     // mint setup
     const mint = await createMint(base, payer, payer.publicKey, null, 0);
     const sourceAta = (
-      await getOrCreateAssociatedTokenAccount(base, payer, mint, payer.publicKey)
+      await getOrCreateAssociatedTokenAccount(
+        base,
+        payer,
+        mint,
+        payer.publicKey,
+      )
     ).address;
     await mintTo(base, payer, mint, sourceAta, payer, 1000);
 

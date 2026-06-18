@@ -42,7 +42,9 @@ import {
 
 const addressEncoder = getAddressEncoder();
 const PROGRAM_ID = getAddressDecoder().decode(PROGRAM_ID_BYTES);
-const DELEGATION_PROGRAM_ID = address("DELeGGvXpWV2fqJUhqcF5ZSYMS4JTLjteaAMARRSaeSh");
+const DELEGATION_PROGRAM_ID = address(
+  "DELeGGvXpWV2fqJUhqcF5ZSYMS4JTLjteaAMARRSaeSh",
+);
 const VAULT = address(EPHEMERAL_VAULT_ID_STR);
 const MAGIC_PROGRAM_ID = address(MAGIC_PROGRAM_ID_STR);
 const SYSTEM_PROGRAM_ID = address(SYSTEM_PROGRAM_ID_STR);
@@ -65,11 +67,16 @@ async function send(conn: Connection, ix: IInstruction) {
     (m) => setTransactionMessageLifetimeUsingBlockhash(blockhash, m),
     (m) => appendTransactionMessageInstruction(ix, m),
   );
-  const sig = await conn.sendTransaction(tx, [payer.keyPair], { skipPreflight: true });
+  const sig = await conn.sendTransaction(tx, [payer.keyPair], {
+    skipPreflight: true,
+  });
   await waitFor(async () => {
     const { value } = await conn.rpc.getSignatureStatuses([sig]).send();
     const s = value[0];
-    return s?.confirmationStatus === "confirmed" || s?.confirmationStatus === "finalized";
+    return (
+      s?.confirmationStatus === "confirmed" ||
+      s?.confirmationStatus === "finalized"
+    );
   });
   return sig;
 }
@@ -106,14 +113,22 @@ describe("ephemeral-accounts-anchor (kit)", () => {
       seeds: [GAME_SEED, addressEncoder.encode(payer.address)],
     });
     base = await Connection.create(BASE_RPC_URL, BASE_WS_URL);
-    const airdrop = await base.rpc.requestAirdrop(payer.address, lamports(5_000_000_000n)).send();
+    const airdrop = await base.rpc
+      .requestAirdrop(payer.address, lamports(5_000_000_000n))
+      .send();
     await waitFor(async () => {
       const { value } = await base.rpc.getSignatureStatuses([airdrop]).send();
       const s = value[0];
-      return s?.confirmationStatus === "confirmed" || s?.confirmationStatus === "finalized";
+      return (
+        s?.confirmationStatus === "confirmed" ||
+        s?.confirmationStatus === "finalized"
+      );
     });
-    const { token } = await getAuthToken(ROUTER_RPC_URL, payer.address, async (msg) =>
-      (await import("@solana/kit")).signBytes(payer.keyPair.privateKey, msg),
+    const { token } = await getAuthToken(
+      ROUTER_RPC_URL,
+      payer.address,
+      async (msg) =>
+        (await import("@solana/kit")).signBytes(payer.keyPair.privateKey, msg),
     );
     ephemeral = await Connection.create(
       `${ROUTER_RPC_URL}?token=${token}`,
@@ -129,10 +144,16 @@ describe("ephemeral-accounts-anchor (kit)", () => {
         meta(TREASURY, AccountRole.WRITABLE),
         meta(SYSTEM_PROGRAM_ID, AccountRole.READONLY),
       ],
-      data: concat(new Uint8Array(ixDiscriminator("init_treasury")), u64(100_000_000n)),
+      data: concat(
+        new Uint8Array(ixDiscriminator("init_treasury")),
+        u64(100_000_000n),
+      ),
     });
 
-    const buffer = await delegateBufferPdaFromDelegatedAccountAndOwnerProgram(TREASURY, PROGRAM_ID);
+    const buffer = await delegateBufferPdaFromDelegatedAccountAndOwnerProgram(
+      TREASURY,
+      PROGRAM_ID,
+    );
     const record = await delegationRecordPdaFromDelegatedAccount(TREASURY);
     const metadata = await delegationMetadataPdaFromDelegatedAccount(TREASURY);
     await send(base, {
@@ -154,7 +175,9 @@ describe("ephemeral-accounts-anchor (kit)", () => {
     });
 
     await waitFor(async () => {
-      const { value } = await ephemeral.rpc.getAccountInfo(TREASURY, { encoding: "base64" }).send();
+      const { value } = await ephemeral.rpc
+        .getAccountInfo(TREASURY, { encoding: "base64" })
+        .send();
       return value !== null;
     });
 
@@ -172,7 +195,9 @@ describe("ephemeral-accounts-anchor (kit)", () => {
     });
 
     const game = await waitFor(async () => {
-      const { value } = await ephemeral.rpc.getAccountInfo(GAME, { encoding: "base64" }).send();
+      const { value } = await ephemeral.rpc
+        .getAccountInfo(GAME, { encoding: "base64" })
+        .send();
       return value ?? false;
     });
     expect(Buffer.from(game.data[0], "base64").length).toBe(SIZE);

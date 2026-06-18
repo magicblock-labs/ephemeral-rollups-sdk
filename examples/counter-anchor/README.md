@@ -16,13 +16,13 @@ isolated account.
 
 ## Layout
 
-| Path | What |
-|------|------|
-| `src/lib.rs` | the program |
-| `program-keypair.json` | fixed program id (so `declare_id!` matches the deployed binary) |
+| Path                   | What                                                                              |
+| ---------------------- | --------------------------------------------------------------------------------- |
+| `src/lib.rs`           | the program                                                                       |
+| `program-keypair.json` | fixed program id (so `declare_id!` matches the deployed binary)                   |
 | `tests/web3js.test.ts` | lifecycle test using `@solana/web3.js` + `@magicblock-labs/ephemeral-rollups-sdk` |
-| `tests/kit.test.ts` | lifecycle test using `@solana/kit` + `@magicblock-labs/ephemeral-rollups-kit` |
-| `tests/_shared.ts` | framework-agnostic helpers (endpoints, discriminators, decoding) |
+| `tests/kit.test.ts`    | lifecycle test using `@solana/kit` + `@magicblock-labs/ephemeral-rollups-kit`     |
+| `tests/_shared.ts`     | framework-agnostic helpers (endpoints, discriminators, decoding)                  |
 
 ## Running locally
 

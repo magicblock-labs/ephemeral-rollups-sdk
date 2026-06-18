@@ -61,7 +61,10 @@ function meta(addr: Address, role: AccountRole) {
   return { address: addr, role };
 }
 
-function ix(accounts: ReturnType<typeof meta>[], data: Uint8Array): IInstruction {
+function ix(
+  accounts: ReturnType<typeof meta>[],
+  data: Uint8Array,
+): IInstruction {
   return { programAddress: PROGRAM_ID, accounts, data };
 }
 
@@ -73,23 +76,32 @@ async function send(conn: Connection, instruction: IInstruction) {
     (m) => setTransactionMessageLifetimeUsingBlockhash(blockhash, m),
     (m) => appendTransactionMessageInstruction(instruction, m),
   );
-  const sig = await conn.sendTransaction(tx, [signer.keyPair], { skipPreflight: true });
+  const sig = await conn.sendTransaction(tx, [signer.keyPair], {
+    skipPreflight: true,
+  });
   await waitFor(async () => {
     const { value } = await conn.rpc.getSignatureStatuses([sig]).send();
     const s = value[0];
-    return s?.confirmationStatus === "confirmed" || s?.confirmationStatus === "finalized";
+    return (
+      s?.confirmationStatus === "confirmed" ||
+      s?.confirmationStatus === "finalized"
+    );
   });
   return sig;
 }
 
 async function getCount(conn: Connection): Promise<bigint | null> {
-  const { value } = await conn.rpc.getAccountInfo(COUNTER_PDA, { encoding: "base64" }).send();
+  const { value } = await conn.rpc
+    .getAccountInfo(COUNTER_PDA, { encoding: "base64" })
+    .send();
   if (!value) return null;
   return decodeCount(new Uint8Array(base64.encode(value.data[0])));
 }
 
 async function getOwner(conn: Connection): Promise<string | null> {
-  const { value } = await conn.rpc.getAccountInfo(COUNTER_PDA, { encoding: "base64" }).send();
+  const { value } = await conn.rpc
+    .getAccountInfo(COUNTER_PDA, { encoding: "base64" })
+    .send();
   return value ? value.owner : null;
 }
 
@@ -115,11 +127,16 @@ describe("counter-pinocchio (kit)", () => {
     await waitFor(async () => {
       const { value } = await base.rpc.getSignatureStatuses([airdrop]).send();
       const s = value[0];
-      return s?.confirmationStatus === "confirmed" || s?.confirmationStatus === "finalized";
+      return (
+        s?.confirmationStatus === "confirmed" ||
+        s?.confirmationStatus === "finalized"
+      );
     });
 
-    const { token } = await getAuthToken(ROUTER_RPC_URL, signer.address, async (msg) =>
-      signBytes(signer.keyPair.privateKey, msg),
+    const { token } = await getAuthToken(
+      ROUTER_RPC_URL,
+      signer.address,
+      async (msg) => signBytes(signer.keyPair.privateKey, msg),
     );
     ephemeral = await Connection.create(
       `${ROUTER_RPC_URL}?token=${token}`,
@@ -132,20 +149,31 @@ describe("counter-pinocchio (kit)", () => {
     await send(
       base,
       ix(
-        [payerMeta(), counterMeta(), meta(SYSTEM_PROGRAM_ID, AccountRole.READONLY)],
+        [
+          payerMeta(),
+          counterMeta(),
+          meta(SYSTEM_PROGRAM_ID, AccountRole.READONLY),
+        ],
         new Uint8Array([TAG.initialize, COUNTER_BUMP]),
       ),
     );
     expect(await getCount(base)).toBe(0n);
 
     // 2. increment on base
-    await send(base, ix([payerMeta(), counterMeta()], new Uint8Array([TAG.increment])));
+    await send(
+      base,
+      ix([payerMeta(), counterMeta()], new Uint8Array([TAG.increment])),
+    );
     expect(await getCount(base)).toBe(1n);
 
     // 3. delegate the PDA
-    const buffer = await delegateBufferPdaFromDelegatedAccountAndOwnerProgram(COUNTER_PDA, PROGRAM_ID);
+    const buffer = await delegateBufferPdaFromDelegatedAccountAndOwnerProgram(
+      COUNTER_PDA,
+      PROGRAM_ID,
+    );
     const record = await delegationRecordPdaFromDelegatedAccount(COUNTER_PDA);
-    const metadata = await delegationMetadataPdaFromDelegatedAccount(COUNTER_PDA);
+    const metadata =
+      await delegationMetadataPdaFromDelegatedAccount(COUNTER_PDA);
     const delegateData = new Uint8Array(2 + 32);
     delegateData[0] = TAG.delegate;
     delegateData[1] = COUNTER_BUMP;
@@ -170,7 +198,10 @@ describe("counter-pinocchio (kit)", () => {
 
     // 4. increment on the ER
     const erCount0 = await waitFor(async () => await getCount(ephemeral));
-    await send(ephemeral, ix([payerMeta(), counterMeta()], new Uint8Array([TAG.increment])));
+    await send(
+      ephemeral,
+      ix([payerMeta(), counterMeta()], new Uint8Array([TAG.increment])),
+    );
     const erCount1 = await waitFor(async () => {
       const c = await getCount(ephemeral);
       return c === erCount0 + 1n ? c : false;

@@ -55,8 +55,13 @@ async function send(conn: Connection, instruction: TransactionInstruction) {
   tx.lastValidBlockHeight = lastValidBlockHeight;
   tx.feePayer = payer.publicKey;
   tx.sign(payer);
-  const sig = await conn.sendRawTransaction(tx.serialize(), { skipPreflight: true });
-  await conn.confirmTransaction({ signature: sig, blockhash, lastValidBlockHeight }, "confirmed");
+  const sig = await conn.sendRawTransaction(tx.serialize(), {
+    skipPreflight: true,
+  });
+  await conn.confirmTransaction(
+    { signature: sig, blockhash, lastValidBlockHeight },
+    "confirmed",
+  );
   return sig;
 }
 
@@ -74,8 +79,10 @@ describe("counter-pinocchio (web3.js)", () => {
     const bh = await base.getLatestBlockhash();
     await base.confirmTransaction({ signature: sig, ...bh }, "confirmed");
 
-    const { token } = await getAuthToken(ROUTER_RPC_URL, payer.publicKey, async (msg) =>
-      nacl.sign.detached(msg, payer.secretKey),
+    const { token } = await getAuthToken(
+      ROUTER_RPC_URL,
+      payer.publicKey,
+      async (msg) => nacl.sign.detached(msg, payer.secretKey),
     );
     ephemeral = new Connection(`${ROUTER_RPC_URL}?token=${token}`, {
       wsEndpoint: `${ROUTER_WS_URL}?token=${token}`,
@@ -91,7 +98,11 @@ describe("counter-pinocchio (web3.js)", () => {
         [
           payerMeta,
           counterMeta,
-          { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+          {
+            pubkey: SystemProgram.programId,
+            isSigner: false,
+            isWritable: false,
+          },
         ],
         Buffer.from([TAG.initialize, COUNTER_BUMP]),
       ),
@@ -99,11 +110,17 @@ describe("counter-pinocchio (web3.js)", () => {
     expect(await getCount(base)).toBe(0n);
 
     // 2. increment on base
-    await send(base, ix([payerMeta, counterMeta], Buffer.from([TAG.increment])));
+    await send(
+      base,
+      ix([payerMeta, counterMeta], Buffer.from([TAG.increment])),
+    );
     expect(await getCount(base)).toBe(1n);
 
     // 3. delegate the PDA
-    const buffer = delegateBufferPdaFromDelegatedAccountAndOwnerProgram(COUNTER_PDA, PROGRAM_ID);
+    const buffer = delegateBufferPdaFromDelegatedAccountAndOwnerProgram(
+      COUNTER_PDA,
+      PROGRAM_ID,
+    );
     const record = delegationRecordPdaFromDelegatedAccount(COUNTER_PDA);
     const metadata = delegationMetadataPdaFromDelegatedAccount(COUNTER_PDA);
     await send(
@@ -116,7 +133,11 @@ describe("counter-pinocchio (web3.js)", () => {
           { pubkey: buffer, isSigner: false, isWritable: true },
           { pubkey: record, isSigner: false, isWritable: true },
           { pubkey: metadata, isSigner: false, isWritable: true },
-          { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+          {
+            pubkey: SystemProgram.programId,
+            isSigner: false,
+            isWritable: false,
+          },
           { pubkey: DELEGATION_PROGRAM_ID, isSigner: false, isWritable: false },
         ],
         Buffer.concat([
@@ -130,7 +151,10 @@ describe("counter-pinocchio (web3.js)", () => {
 
     // 4. increment on the ER
     const erCount0 = await waitFor(async () => await getCount(ephemeral));
-    await send(ephemeral, ix([payerMeta, counterMeta], Buffer.from([TAG.increment])));
+    await send(
+      ephemeral,
+      ix([payerMeta, counterMeta], Buffer.from([TAG.increment])),
+    );
     const erCount1 = await waitFor(async () => {
       const c = await getCount(ephemeral);
       return c === erCount0 + 1n ? c : false;

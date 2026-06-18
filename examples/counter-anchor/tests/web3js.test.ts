@@ -66,8 +66,13 @@ async function send(conn: Connection, instruction: TransactionInstruction) {
   tx.sign(payer);
   // ER transactions use a non-delegated fee payer, which the ER's preflight
   // verification rejects even though execution succeeds; skip preflight.
-  const sig = await conn.sendRawTransaction(tx.serialize(), { skipPreflight: true });
-  await conn.confirmTransaction({ signature: sig, blockhash, lastValidBlockHeight }, "confirmed");
+  const sig = await conn.sendRawTransaction(tx.serialize(), {
+    skipPreflight: true,
+  });
+  await conn.confirmTransaction(
+    { signature: sig, blockhash, lastValidBlockHeight },
+    "confirmed",
+  );
   return sig;
 }
 
@@ -107,29 +112,41 @@ describe("counter-anchor (web3.js)", () => {
     expect(await getCount(base)).toBe(0n);
 
     // 2. increment on base
-    await send(base, ix("increment", [
+    await send(
+      base,
+      ix("increment", [
         { pubkey: payer.publicKey, isSigner: true, isWritable: true },
         { pubkey: COUNTER_PDA, isSigner: false, isWritable: true },
-      ]));
+      ]),
+    );
     expect(await getCount(base)).toBe(1n);
 
     // 3. delegate the PDA
-    const buffer = delegateBufferPdaFromDelegatedAccountAndOwnerProgram(COUNTER_PDA, PROGRAM_ID);
+    const buffer = delegateBufferPdaFromDelegatedAccountAndOwnerProgram(
+      COUNTER_PDA,
+      PROGRAM_ID,
+    );
     const record = delegationRecordPdaFromDelegatedAccount(COUNTER_PDA);
     const metadata = delegationMetadataPdaFromDelegatedAccount(COUNTER_PDA);
     await send(
       base,
-      ix("delegate", [
-        { pubkey: payer.publicKey, isSigner: true, isWritable: true },
-        { pubkey: buffer, isSigner: false, isWritable: true },
-        { pubkey: record, isSigner: false, isWritable: true },
-        { pubkey: metadata, isSigner: false, isWritable: true },
-        { pubkey: COUNTER_PDA, isSigner: false, isWritable: true },
-        { pubkey: PROGRAM_ID, isSigner: false, isWritable: false },
-        { pubkey: DELEGATION_PROGRAM_ID, isSigner: false, isWritable: false },
-        { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
-      ],
-      Buffer.from(new PublicKey(ER_VALIDATOR_IDENTITY).toBytes()),
+      ix(
+        "delegate",
+        [
+          { pubkey: payer.publicKey, isSigner: true, isWritable: true },
+          { pubkey: buffer, isSigner: false, isWritable: true },
+          { pubkey: record, isSigner: false, isWritable: true },
+          { pubkey: metadata, isSigner: false, isWritable: true },
+          { pubkey: COUNTER_PDA, isSigner: false, isWritable: true },
+          { pubkey: PROGRAM_ID, isSigner: false, isWritable: false },
+          { pubkey: DELEGATION_PROGRAM_ID, isSigner: false, isWritable: false },
+          {
+            pubkey: SystemProgram.programId,
+            isSigner: false,
+            isWritable: false,
+          },
+        ],
+        Buffer.from(new PublicKey(ER_VALIDATOR_IDENTITY).toBytes()),
       ),
     );
     const delegated = await base.getAccountInfo(COUNTER_PDA);
@@ -137,10 +154,13 @@ describe("counter-anchor (web3.js)", () => {
 
     // 4. increment on the ER (clones the account on first reference)
     const erCount0 = await waitFor(async () => await getCount(ephemeral));
-    await send(ephemeral, ix("increment", [
+    await send(
+      ephemeral,
+      ix("increment", [
         { pubkey: payer.publicKey, isSigner: true, isWritable: true },
         { pubkey: COUNTER_PDA, isSigner: false, isWritable: true },
-      ]));
+      ]),
+    );
     const erCount1 = await waitFor(async () => {
       const c = await getCount(ephemeral);
       return c === erCount0 + 1n ? c : false;

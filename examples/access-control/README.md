@@ -10,10 +10,10 @@ program, and both TypeScript SDKs expose the same builders. The tests create a
 permission (with the payer as the sole authority member), update its member set, and
 close it — asserting the permission PDA appears, persists, and is removed.
 
-| Path | What |
-|------|------|
+| Path                   | What                                                         |
+| ---------------------- | ------------------------------------------------------------ |
 | `tests/web3js.test.ts` | `@solana/web3.js` + `@magicblock-labs/ephemeral-rollups-sdk` |
-| `tests/kit.test.ts` | `@solana/kit` + `@magicblock-labs/ephemeral-rollups-kit` |
+| `tests/kit.test.ts`    | `@solana/kit` + `@magicblock-labs/ephemeral-rollups-kit`     |
 
 ## Running
 

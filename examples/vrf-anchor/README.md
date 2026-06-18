@@ -15,11 +15,11 @@ The randomness request is fulfilled by the `vrf-oracle` (from the validator pack
 which must run subscribed to the layer where the request lands — here the base layer.
 `start-validators.sh` starts it when `START_VRF_ORACLE=1`.
 
-| Path | What |
-|------|------|
-| `src/lib.rs` | the program (`initialize` / `request` / `consume` callback) |
+| Path                   | What                                                         |
+| ---------------------- | ------------------------------------------------------------ |
+| `src/lib.rs`           | the program (`initialize` / `request` / `consume` callback)  |
 | `tests/web3js.test.ts` | `@solana/web3.js` + `@magicblock-labs/ephemeral-rollups-sdk` |
-| `tests/kit.test.ts` | `@solana/kit` + `@magicblock-labs/ephemeral-rollups-kit` |
+| `tests/kit.test.ts`    | `@solana/kit` + `@magicblock-labs/ephemeral-rollups-kit`     |
 
 ## Running
 

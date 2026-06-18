@@ -13,7 +13,8 @@ export const RANDOM_SEED = Buffer.from("random");
 
 // Well-known VRF addresses (stable; preloaded by mb-test-validator).
 export const VRF_PROGRAM_ID_STR = "Vrf1RNUjXmQGjmQrQLvJHs9SNkvDJEsRVFPkfSQUwGz";
-export const DEFAULT_TEST_QUEUE_STR = "GKE6d7iv8kCBrsxr78W3xVdjGLLLJnxsGiuzrsZCGEvb";
+export const DEFAULT_TEST_QUEUE_STR =
+  "GKE6d7iv8kCBrsxr78W3xVdjGLLLJnxsGiuzrsZCGEvb";
 export const SLOT_HASHES_STR = "SysvarS1otHashes111111111111111111111111111";
 export const SYSTEM_PROGRAM_ID_STR = "11111111111111111111111111111111";
 /** Seed of the per-program VRF identity PDA (`["identity"]` under the program). */

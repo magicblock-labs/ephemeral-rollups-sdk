@@ -46,7 +46,11 @@ const [GAME] = PublicKey.findProgramAddressSync(
   PROGRAM_ID,
 );
 
-async function send(conn: Connection, ix: TransactionInstruction, skipPreflight = false) {
+async function send(
+  conn: Connection,
+  ix: TransactionInstruction,
+  skipPreflight = false,
+) {
   const tx = new Transaction().add(ix);
   const { blockhash, lastValidBlockHeight } = await conn.getLatestBlockhash();
   tx.recentBlockhash = blockhash;
@@ -54,7 +58,10 @@ async function send(conn: Connection, ix: TransactionInstruction, skipPreflight 
   tx.feePayer = payer.publicKey;
   tx.sign(payer);
   const sig = await conn.sendRawTransaction(tx.serialize(), { skipPreflight });
-  await conn.confirmTransaction({ signature: sig, blockhash, lastValidBlockHeight }, "confirmed");
+  await conn.confirmTransaction(
+    { signature: sig, blockhash, lastValidBlockHeight },
+    "confirmed",
+  );
   return sig;
 }
 
@@ -75,8 +82,10 @@ describe("ephemeral-accounts-anchor (web3.js)", () => {
     const bh = await base.getLatestBlockhash();
     await base.confirmTransaction({ signature: sig, ...bh }, "confirmed");
 
-    const { token } = await getAuthToken(ROUTER_RPC_URL, payer.publicKey, async (msg) =>
-      nacl.sign.detached(msg, payer.secretKey),
+    const { token } = await getAuthToken(
+      ROUTER_RPC_URL,
+      payer.publicKey,
+      async (msg) => nacl.sign.detached(msg, payer.secretKey),
     );
     ephemeral = new Connection(`${ROUTER_RPC_URL}?token=${token}`, {
       wsEndpoint: `${ROUTER_WS_URL}?token=${token}`,
@@ -93,14 +102,24 @@ describe("ephemeral-accounts-anchor (web3.js)", () => {
         keys: [
           { pubkey: payer.publicKey, isSigner: true, isWritable: true },
           { pubkey: TREASURY, isSigner: false, isWritable: true },
-          { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+          {
+            pubkey: SystemProgram.programId,
+            isSigner: false,
+            isWritable: false,
+          },
         ],
-        data: Buffer.concat([ixDiscriminator("init_treasury"), u64(100_000_000n)]),
+        data: Buffer.concat([
+          ixDiscriminator("init_treasury"),
+          u64(100_000_000n),
+        ]),
       }),
     );
 
     // 2. delegate the treasury to the ER
-    const buffer = delegateBufferPdaFromDelegatedAccountAndOwnerProgram(TREASURY, PROGRAM_ID);
+    const buffer = delegateBufferPdaFromDelegatedAccountAndOwnerProgram(
+      TREASURY,
+      PROGRAM_ID,
+    );
     const record = delegationRecordPdaFromDelegatedAccount(TREASURY);
     const metadata = delegationMetadataPdaFromDelegatedAccount(TREASURY);
     await send(
@@ -115,7 +134,11 @@ describe("ephemeral-accounts-anchor (web3.js)", () => {
           { pubkey: TREASURY, isSigner: false, isWritable: true },
           { pubkey: PROGRAM_ID, isSigner: false, isWritable: false },
           { pubkey: DELEGATION_PROGRAM_ID, isSigner: false, isWritable: false },
-          { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+          {
+            pubkey: SystemProgram.programId,
+            isSigner: false,
+            isWritable: false,
+          },
         ],
         data: Buffer.concat([
           ixDiscriminator("delegate_treasury"),
@@ -129,7 +152,9 @@ describe("ephemeral-accounts-anchor (web3.js)", () => {
 
     // 3. create the gas-sponsored ephemeral account on the ER (fee payer = wallet,
     //    sponsor = delegated treasury)
-    await waitFor(async () => (await ephemeral.getAccountInfo(TREASURY)) !== null);
+    await waitFor(
+      async () => (await ephemeral.getAccountInfo(TREASURY)) !== null,
+    );
     const SIZE = 32;
     await send(
       ephemeral,
@@ -147,7 +172,9 @@ describe("ephemeral-accounts-anchor (web3.js)", () => {
       true,
     );
 
-    const game = await waitFor(async () => await ephemeral.getAccountInfo(GAME));
+    const game = await waitFor(
+      async () => await ephemeral.getAccountInfo(GAME),
+    );
     expect(game.data.length).toBe(SIZE);
     expect(game.owner.toBase58()).toBe(PROGRAM_ID.toBase58());
   });

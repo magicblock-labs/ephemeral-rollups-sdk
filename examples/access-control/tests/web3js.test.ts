@@ -6,7 +6,12 @@
 // this example is client-driven (no custom program). It creates, updates and closes
 // a permission account.
 import { describe, it, expect, beforeAll } from "vitest";
-import { Connection, Keypair, Transaction, TransactionInstruction } from "@solana/web3.js";
+import {
+  Connection,
+  Keypair,
+  Transaction,
+  TransactionInstruction,
+} from "@solana/web3.js";
 import {
   PERMISSION_PROGRAM_ID,
   permissionPdaFromAccount,
@@ -28,7 +33,10 @@ async function send(instruction: TransactionInstruction) {
   tx.feePayer = payer.publicKey;
   tx.sign(payer);
   const sig = await base.sendRawTransaction(tx.serialize());
-  await base.confirmTransaction({ signature: sig, blockhash, lastValidBlockHeight }, "confirmed");
+  await base.confirmTransaction(
+    { signature: sig, blockhash, lastValidBlockHeight },
+    "confirmed",
+  );
   return sig;
 }
 
@@ -57,7 +65,10 @@ describe("access-control (web3.js)", () => {
     const member = Keypair.generate().publicKey;
     await send(
       createUpdatePermissionInstruction(
-        { authority: [payer.publicKey, true], permissionedAccount: [payer.publicKey, false] },
+        {
+          authority: [payer.publicKey, true],
+          permissionedAccount: [payer.publicKey, false],
+        },
         {
           members: [
             { pubkey: payer.publicKey, flags: AUTHORITY_FLAG },
