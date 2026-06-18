@@ -418,6 +418,12 @@ impl<'info> MagicIntentBundle<'info> {
                 .commit_finalize_and_undelegate_intent
                 .map(|c| c.into_args(indices_map)),
 
+            standalone_actions: self
+                .standalone_actions
+                .into_iter()
+                .map(|ch| ch.into_args(indices_map))
+                .collect::<Vec<_>>(),
+
             commit_finalize_compressed: self
                 .commit_finalize_compressed_intent
                 .map(|c| c.into_args(indices_map)),
@@ -425,12 +431,6 @@ impl<'info> MagicIntentBundle<'info> {
             commit_finalize_compressed_and_undelegate: self
                 .commit_finalize_and_undelegate_compressed_intent
                 .map(|c| c.into_args(indices_map)),
-
-            standalone_actions: self
-                .standalone_actions
-                .into_iter()
-                .map(|ch| ch.into_args(indices_map))
-                .collect::<Vec<_>>(),
         }
     }
 

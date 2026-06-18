@@ -126,9 +126,9 @@ pub struct MagicIntentBundleArgs<'args> {
     pub commit_finalize: Option<()>,
     /// Not yet implemented; always `None`. Reserved for wire-format compatibility.
     pub commit_finalize_and_undelegate: Option<()>,
+    pub standalone_actions: NoVec<BaseActionArgs<'args>, MAX_ACTIONS_NUM>,
     pub commit_finalize_compressed: Option<CommitTypeArgs<'args>>,
     pub commit_finalize_compressed_and_undelegate: Option<CommitAndUndelegateArgs<'args>>,
-    pub standalone_actions: NoVec<BaseActionArgs<'args>, MAX_ACTIONS_NUM>,
 }
 
 #[cfg(test)]
@@ -138,6 +138,14 @@ mod tests {
     use alloc::vec::Vec;
 
     use super::*;
+    use legacy_magicblock_magic_program_api::args::{
+        ActionArgs as LegacyActionArgs, BaseActionArgs as LegacyBaseActionArgs,
+        CommitAndUndelegateArgs as LegacyCommitAndUndelegateArgs,
+        CommitTypeArgs as LegacyCommitTypeArgs,
+        MagicIntentBundleArgs as LegacyMagicIntentBundleArgs,
+        ShortAccountMeta as LegacyShortAccountMeta, UndelegateTypeArgs as LegacyUndelegateTypeArgs,
+    };
+    use legacy_magicblock_magic_program_api::Pubkey as LegacyPubkey;
     use magicblock_magic_program_api::args as sdk;
     use magicblock_magic_program_api::instruction::MagicBlockInstruction;
     use magicblock_magic_program_api::Pubkey;
@@ -147,8 +155,99 @@ mod tests {
         Pubkey::new_from_array([seed; 32])
     }
 
+    fn make_legacy_pubkey(seed: u8) -> LegacyPubkey {
+        LegacyPubkey::new_from_array([seed; 32])
+    }
+
     fn make_address(seed: u8) -> Address {
         Address::new_from_array([seed; 32])
+    }
+
+    fn from_legacy_base_action_args(args: LegacyBaseActionArgs) -> sdk::BaseActionArgs {
+        sdk::BaseActionArgs {
+            args: sdk::ActionArgs {
+                escrow_index: args.args.escrow_index,
+                data: args.args.data,
+            },
+            compute_units: args.compute_units,
+            escrow_authority: args.escrow_authority,
+            destination_program: args.destination_program,
+            accounts: args
+                .accounts
+                .into_iter()
+                .map(|meta| sdk::ShortAccountMeta {
+                    pubkey: meta.pubkey,
+                    is_writable: meta.is_writable,
+                })
+                .collect(),
+        }
+    }
+
+    fn from_legacy_commit_type_args(args: LegacyCommitTypeArgs) -> sdk::CommitTypeArgs {
+        match args {
+            LegacyCommitTypeArgs::Standalone(accounts) => sdk::CommitTypeArgs::Standalone(accounts),
+            LegacyCommitTypeArgs::WithBaseActions {
+                committed_accounts,
+                base_actions,
+            } => sdk::CommitTypeArgs::WithBaseActions {
+                committed_accounts,
+                base_actions: base_actions
+                    .into_iter()
+                    .map(from_legacy_base_action_args)
+                    .collect(),
+            },
+        }
+    }
+
+    fn from_legacy_undelegate_type_args(args: LegacyUndelegateTypeArgs) -> sdk::UndelegateTypeArgs {
+        match args {
+            LegacyUndelegateTypeArgs::Standalone => sdk::UndelegateTypeArgs::Standalone,
+            LegacyUndelegateTypeArgs::WithBaseActions { base_actions } => {
+                sdk::UndelegateTypeArgs::WithBaseActions {
+                    base_actions: base_actions
+                        .into_iter()
+                        .map(from_legacy_base_action_args)
+                        .collect(),
+                }
+            }
+        }
+    }
+
+    fn from_legacy_commit_and_undelegate_args(
+        args: LegacyCommitAndUndelegateArgs,
+    ) -> sdk::CommitAndUndelegateArgs {
+        sdk::CommitAndUndelegateArgs {
+            commit_type: from_legacy_commit_type_args(args.commit_type),
+            undelegate_type: from_legacy_undelegate_type_args(args.undelegate_type),
+        }
+    }
+
+    fn current_from_legacy_bundle(
+        legacy: &LegacyMagicIntentBundleArgs,
+    ) -> sdk::MagicIntentBundleArgs {
+        sdk::MagicIntentBundleArgs {
+            commit: legacy.commit.clone().map(from_legacy_commit_type_args),
+            commit_and_undelegate: legacy
+                .commit_and_undelegate
+                .clone()
+                .map(from_legacy_commit_and_undelegate_args),
+            commit_finalize: legacy
+                .commit_finalize
+                .clone()
+                .map(from_legacy_commit_type_args),
+            commit_finalize_and_undelegate: legacy
+                .commit_finalize_and_undelegate
+                .clone()
+                .map(from_legacy_commit_and_undelegate_args),
+            standalone_actions: legacy
+                .standalone_actions
+                .clone()
+                .into_iter()
+                .map(from_legacy_base_action_args)
+                .collect(),
+            commit_finalize_compressed: None,
+            commit_finalize_compressed_and_undelegate: None,
+        }
     }
 
     /// Test ActionArgs serialization compatibility
@@ -371,8 +470,6 @@ mod tests {
             }),
             commit_finalize: None,
             commit_finalize_and_undelegate: None,
-            commit_finalize_compressed: None,
-            commit_finalize_compressed_and_undelegate: None,
             standalone_actions: vec![sdk::BaseActionArgs {
                 args: sdk::ActionArgs {
                     escrow_index: 0,
@@ -386,6 +483,8 @@ mod tests {
                     is_writable: true,
                 }],
             }],
+            commit_finalize_compressed: None,
+            commit_finalize_compressed_and_undelegate: None,
         };
         let sdk_bytes = bincode1::serialize(&sdk_bundle).unwrap();
 
@@ -425,9 +524,9 @@ mod tests {
             }),
             commit_finalize: None,
             commit_finalize_and_undelegate: None,
+            standalone_actions: pino_standalone,
             commit_finalize_compressed: None,
             commit_finalize_compressed_and_undelegate: None,
-            standalone_actions: pino_standalone,
         };
         let mut pino_buf = [0u8; 1024];
         let pino_len =
@@ -450,9 +549,9 @@ mod tests {
             commit_and_undelegate: None,
             commit_finalize: None,
             commit_finalize_and_undelegate: None,
+            standalone_actions: vec![],
             commit_finalize_compressed: None,
             commit_finalize_compressed_and_undelegate: None,
-            standalone_actions: vec![],
         };
         let sdk_bytes = bincode1::serialize(&sdk_bundle).unwrap();
 
@@ -462,9 +561,9 @@ mod tests {
             commit_and_undelegate: None,
             commit_finalize: None,
             commit_finalize_and_undelegate: None,
+            standalone_actions: NoVec::new(),
             commit_finalize_compressed: None,
             commit_finalize_compressed_and_undelegate: None,
-            standalone_actions: NoVec::new(),
         };
         let mut pino_buf = [0u8; 256];
         let pino_len =
@@ -476,6 +575,54 @@ mod tests {
             &sdk_bytes[..],
             "Empty MagicIntentBundleArgs mismatch"
         );
+    }
+
+    /// Wire-format regression: compressed fields must trail `standalone_actions`.
+    ///
+    /// Legacy bundles are serialized with `magicblock-magic-program-api` v0.10.1 and
+    /// must deserialize into the current schema with compressed fields defaulted.
+    #[test]
+    fn test_magic_intent_bundle_args_legacy_wire_prefix() {
+        let standalone = vec![LegacyBaseActionArgs {
+            args: LegacyActionArgs {
+                escrow_index: 0,
+                data: vec![0xFF, 0xFE],
+            },
+            compute_units: 300_000,
+            escrow_authority: 7,
+            destination_program: make_legacy_pubkey(0x99),
+            accounts: vec![LegacyShortAccountMeta {
+                pubkey: make_legacy_pubkey(0x88),
+                is_writable: true,
+            }],
+        }];
+
+        let legacy = LegacyMagicIntentBundleArgs {
+            commit: Some(LegacyCommitTypeArgs::Standalone(vec![2, 3])),
+            commit_and_undelegate: None,
+            commit_finalize: None,
+            commit_finalize_and_undelegate: None,
+            standalone_actions: standalone,
+        };
+        let legacy_bytes = bincode1::serialize(&legacy).unwrap();
+
+        let current = current_from_legacy_bundle(&legacy);
+        let current_bytes = bincode1::serialize(&current).unwrap();
+
+        assert_eq!(
+            current_bytes.len(),
+            legacy_bytes.len() + 2,
+            "expected two trailing None bytes for appended compressed fields"
+        );
+        assert_eq!(
+            &current_bytes[..legacy_bytes.len()],
+            &legacy_bytes[..],
+            "standalone_actions wire prefix must match legacy layout"
+        );
+        assert_eq!(&current_bytes[legacy_bytes.len()..], &[0, 0]);
+
+        let decoded: sdk::MagicIntentBundleArgs = bincode1::deserialize(&legacy_bytes).unwrap();
+        assert_eq!(decoded, current);
     }
 
     /// Wire-format compatibility for `AddActionCallback` instruction.

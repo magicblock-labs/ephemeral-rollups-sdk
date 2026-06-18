@@ -161,10 +161,10 @@ pub(super) struct MagicIntentBundleSerialize<'i, 'acc, 'args> {
     commit_finalize: Option<()>,
     /// Not yet implemented; always `None`. Reserved for wire-format compatibility.
     commit_finalize_and_undelegate: Option<()>,
+    standalone_actions: &'args [CallHandler<'args>],
     commit_finalize_compressed: Option<CommitSerialize<'i, 'acc, 'args>>,
     commit_finalize_compressed_and_undelegate:
         Option<CommitAndUndelegateSerialize<'i, 'acc, 'args>>,
-    standalone_actions: &'args [CallHandler<'args>],
 }
 
 impl<'i, 'acc, 'args> MagicIntentBundleSerialize<'i, 'acc, 'args> {
@@ -181,13 +181,13 @@ impl<'i, 'acc, 'args> MagicIntentBundleSerialize<'i, 'acc, 'args> {
                 .map(|c| CommitAndUndelegateSerialize::new(c, indices_map)),
             commit_finalize: None,
             commit_finalize_and_undelegate: None,
+            standalone_actions: bundle.standalone_actions,
             commit_finalize_compressed: bundle
                 .commit_finalize_compressed_intent
                 .map(|c| CommitSerialize::new(c, indices_map)),
             commit_finalize_compressed_and_undelegate: bundle
                 .commit_finalize_compressed_and_undelegate_intent
                 .map(|c| CommitAndUndelegateSerialize::new(c, indices_map)),
-            standalone_actions: bundle.standalone_actions,
             indices_map,
         }
     }
@@ -336,10 +336,9 @@ impl bincode::Encode for MagicIntentBundleSerialize<'_, '_, '_> {
         self.commit_and_undelegate.encode(encoder)?;
         self.commit_finalize.encode(encoder)?;
         self.commit_finalize_and_undelegate.encode(encoder)?;
+        encode_handler_slice(self.standalone_actions, self.indices_map, encoder)?;
         self.commit_finalize_compressed.encode(encoder)?;
-        self.commit_finalize_compressed_and_undelegate
-            .encode(encoder)?;
-        encode_handler_slice(self.standalone_actions, self.indices_map, encoder)
+        self.commit_finalize_compressed_and_undelegate.encode(encoder)
     }
 }
 

@@ -78,9 +78,9 @@ impl<'args> MagicIntentBundle<'_, 'args> {
             commit_and_undelegate,
             commit_finalize: None,
             commit_finalize_and_undelegate: None,
+            standalone_actions,
             commit_finalize_compressed,
             commit_finalize_compressed_and_undelegate,
-            standalone_actions,
         })
     }
 
