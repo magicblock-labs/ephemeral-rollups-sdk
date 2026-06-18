@@ -38,6 +38,10 @@ pub enum MagicIntent<'info> {
     CommitFinalize(CommitType<'info>),
     /// CommitFinalize accounts and undelegate them, optionally with post-commit and post-undelegate actions.
     CommitFinalizeAndUndelegate(CommitAndUndelegate<'info>),
+    /// CommitFinalizeCompressed accounts to base layer, optionally with post-commit actions.
+    CommitFinalizeCompressed(CommitType<'info>),
+    /// CommitFinalizeCompressed accounts and undelegate them, optionally with post-commit and post-undelegate actions.
+    CommitFinalizeAndUndelegateCompressed(CommitAndUndelegate<'info>),
 }
 
 /// The result of [`MagicIntentBundleBuilder::build`].
@@ -120,6 +124,7 @@ impl<'info> MagicIntentBundleBuilder<'info> {
             accounts: accounts.to_vec(),
             actions: vec![],
             callbacks: vec![],
+            is_compressed: false,
         }
     }
 
@@ -140,6 +145,7 @@ impl<'info> MagicIntentBundleBuilder<'info> {
             post_commit_callbacks: vec![],
             post_undelegate_actions: vec![],
             post_undelegate_callbacks: vec![],
+            is_compressed: false,
         }
     }
 
@@ -297,6 +303,8 @@ struct MagicIntentBundle<'info> {
     commit_and_undelegate_intent: Option<CommitAndUndelegate<'info>>,
     commit_finalize_intent: Option<CommitType<'info>>,
     commit_finalize_and_undelegate_intent: Option<CommitAndUndelegate<'info>>,
+    commit_finalize_compressed_intent: Option<CommitType<'info>>,
+    commit_finalize_and_undelegate_compressed_intent: Option<CommitAndUndelegate<'info>>,
 }
 
 impl<'info> MagicIntentBundle<'info> {
@@ -338,6 +346,24 @@ impl<'info> MagicIntentBundle<'info> {
                     self.commit_finalize_and_undelegate_intent = Some(value);
                 }
             }
+            MagicIntent::CommitFinalizeCompressed(value) => {
+                if let Some(ref mut commit_finalize_compressed_intent) =
+                    self.commit_finalize_compressed_intent
+                {
+                    commit_finalize_compressed_intent.merge(value);
+                } else {
+                    self.commit_finalize_compressed_intent = Some(value);
+                }
+            }
+            MagicIntent::CommitFinalizeAndUndelegateCompressed(value) => {
+                if let Some(ref mut commit_finalize_and_undelegate_compressed_intent) =
+                    self.commit_finalize_and_undelegate_compressed_intent
+                {
+                    commit_finalize_and_undelegate_compressed_intent.merge(value);
+                } else {
+                    self.commit_finalize_and_undelegate_compressed_intent = Some(value);
+                }
+            }
         }
     }
 
@@ -355,6 +381,12 @@ impl<'info> MagicIntentBundle<'info> {
             .iter_mut()
             .for_each(|c| c.extract_callbacks(&mut idx, &mut out));
         self.commit_finalize_and_undelegate_intent
+            .iter_mut()
+            .for_each(|cau| cau.extract_callbacks(&mut idx, &mut out));
+        self.commit_finalize_compressed_intent
+            .iter_mut()
+            .for_each(|c| c.extract_callbacks(&mut idx, &mut out));
+        self.commit_finalize_and_undelegate_compressed_intent
             .iter_mut()
             .for_each(|cau| cau.extract_callbacks(&mut idx, &mut out));
         self.standalone_callbacks
@@ -386,6 +418,14 @@ impl<'info> MagicIntentBundle<'info> {
                 .commit_finalize_and_undelegate_intent
                 .map(|c| c.into_args(indices_map)),
 
+            commit_finalize_compressed: self
+                .commit_finalize_compressed_intent
+                .map(|c| c.into_args(indices_map)),
+
+            commit_finalize_compressed_and_undelegate: self
+                .commit_finalize_and_undelegate_compressed_intent
+                .map(|c| c.into_args(indices_map)),
+
             standalone_actions: self
                 .standalone_actions
                 .into_iter()
@@ -411,6 +451,14 @@ impl<'info> MagicIntentBundle<'info> {
         if let Some(cau_finalize) = &self.commit_finalize_and_undelegate_intent {
             cau_finalize.collect_accounts(all_accounts);
         }
+        if let Some(commit_finalize_compressed) = &self.commit_finalize_compressed_intent {
+            commit_finalize_compressed.collect_accounts(all_accounts);
+        }
+        if let Some(cau_finalize_compressed) =
+            &self.commit_finalize_and_undelegate_compressed_intent
+        {
+            cau_finalize_compressed.collect_accounts(all_accounts);
+        }
     }
 
     /// Normalizes the bundle into a valid, canonical form.
@@ -427,12 +475,50 @@ impl<'info> MagicIntentBundle<'info> {
         if let Some(ref mut value) = self.commit_intent {
             value.dedup();
         }
+        if let Some(ref mut value) = self.commit_finalize_compressed_intent {
+            value.dedup();
+        }
         let cau = self.commit_and_undelegate_intent.as_mut().map(|value| {
             let seen = value.dedup();
             (seen, value)
         });
+        let cau_compressed = self
+            .commit_finalize_and_undelegate_compressed_intent
+            .as_mut()
+            .map(|value| {
+                let seen = value.dedup();
+                (seen, value)
+            });
 
         // Remove cross intent duplicates
+        match (
+            self.commit_finalize_compressed_intent.take(),
+            cau_compressed,
+        ) {
+            (Some(mut commit), Some((cau_pubkeys, cau))) => {
+                // If accounts in CommitAndUndelegate and Commit intents overlap
+                // we keep them only in CommitAndUndelegate Intent and remove from Commit
+                commit
+                    .committed_accounts_mut()
+                    .retain(|el| !cau_pubkeys.contains(el.key));
+
+                // if after dedup Commit intent becomes empty
+                // 1. remove it from bundle
+                // 2. if it has action - move them in CommitAndUndelegate intent
+                if commit.committed_accounts().is_empty() {
+                    cau.commit_type.merge(commit);
+                } else {
+                    self.commit_finalize_compressed_intent = Some(commit);
+                }
+            }
+            // No compressed cross-intent dedup needed
+            (None, _) => {}
+            // In case only one Intent exists, put commit_intent back if it was taken
+            (Some(commit), None) => {
+                self.commit_finalize_compressed_intent = Some(commit);
+            }
+        }
+
         // Only proceed if both intents exist; otherwise no cross-intent dedup needed
         let (mut commit, cau, cau_pubkeys) = match (self.commit_intent.take(), cau) {
             (Some(commit), Some((cau_pubkeys, cau))) => (commit, cau, cau_pubkeys),
@@ -677,6 +763,46 @@ mod tests {
         assert_eq!(*accounts[2].key, acc1.key);
         assert_eq!(*accounts[3].key, acc2.key);
         assert_eq!(ix.program_id, prog_key);
+    }
+
+    #[test]
+    fn test_fluent_compressed_commit_standalone_collects_accounts() {
+        let owner = compat::Pubkey::new_unique();
+        let mut payer = TestAccount::new();
+        let mut magic_ctx = TestAccount::new();
+        let mut magic_prog = TestAccount::new();
+        let mut acc1 = TestAccount::new();
+
+        let (builder, _) = create_test_builder(&mut payer, &mut magic_ctx, &mut magic_prog, &owner);
+        let info1 = create_mock_account_info(
+            &acc1.key,
+            &mut acc1.lamports,
+            &mut acc1.data,
+            &owner,
+            false,
+            true,
+        );
+
+        let (accounts, ix) = builder
+            .commit(&[info1])
+            .compressed()
+            .build()
+            .schedule_intent_ix;
+
+        assert_eq!(accounts.len(), 3);
+        assert_eq!(*accounts[2].key, acc1.key);
+
+        let MagicBlockInstruction::ScheduleIntentBundle(args) =
+            bincode::deserialize(&ix.data).unwrap()
+        else {
+            panic!("expected ScheduleIntentBundle");
+        };
+        let commit_finalize_compressed =
+            args.commit_finalize_compressed.expect("compressed intent");
+        assert_eq!(
+            commit_finalize_compressed.committed_accounts_indices(),
+            &vec![2]
+        );
     }
 
     #[test]
@@ -1558,5 +1684,70 @@ mod tests {
             "cau undelegate action"
         );
         assert_eq!(action_index(&add_callback_ixs[3].1), 3, "standalone action");
+    }
+
+    #[test]
+    fn test_compressed_intent_overlap_resolution() {
+        let shared_key = compat::Pubkey::new_unique();
+        let mut shared_acc1 = TestAccount::with_key(shared_key);
+        let mut shared_acc2 = TestAccount::with_key(shared_key);
+        let mut unique_acc = TestAccount::new();
+        let owner = compat::Pubkey::new_unique();
+
+        let shared_info1 = create_mock_account_info(
+            &shared_acc1.key,
+            &mut shared_acc1.lamports,
+            &mut shared_acc1.data,
+            &owner,
+            false,
+            true,
+        );
+        let shared_info2 = create_mock_account_info(
+            &shared_acc2.key,
+            &mut shared_acc2.lamports,
+            &mut shared_acc2.data,
+            &owner,
+            false,
+            true,
+        );
+        let unique_info = create_mock_account_info(
+            &unique_acc.key,
+            &mut unique_acc.lamports,
+            &mut unique_acc.data,
+            &owner,
+            false,
+            true,
+        );
+
+        let mut bundle = MagicIntentBundle::default();
+
+        // Add shared + unique account to compressed commit
+        bundle.add_intent(MagicIntent::CommitFinalizeCompressed(
+            CommitType::Standalone(vec![shared_info1, unique_info]),
+        ));
+
+        // Add shared account to compressed commit+undelegate
+        bundle.add_intent(MagicIntent::CommitFinalizeAndUndelegateCompressed(
+            CommitAndUndelegate {
+                commit_type: CommitType::Standalone(vec![shared_info2]),
+                undelegate_type: UndelegateType::Standalone,
+            },
+        ));
+
+        bundle.normalize();
+
+        // Compressed commit should only have the unique account
+        let commit = bundle
+            .commit_finalize_compressed_intent
+            .expect("compressed commit should exist");
+        assert_eq!(commit.committed_accounts().len(), 1);
+        assert_eq!(*commit.committed_accounts()[0].key, unique_acc.key);
+
+        // Compressed C+U should have the shared account
+        let cau = bundle
+            .commit_finalize_and_undelegate_compressed_intent
+            .expect("compressed cau should exist");
+        assert_eq!(cau.commit_type.committed_accounts().len(), 1);
+        assert_eq!(*cau.commit_type.committed_accounts()[0].key, shared_key);
     }
 }

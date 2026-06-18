@@ -126,6 +126,8 @@ pub struct MagicIntentBundleArgs<'args> {
     pub commit_finalize: Option<()>,
     /// Not yet implemented; always `None`. Reserved for wire-format compatibility.
     pub commit_finalize_and_undelegate: Option<()>,
+    pub commit_finalize_compressed: Option<CommitTypeArgs<'args>>,
+    pub commit_finalize_compressed_and_undelegate: Option<CommitAndUndelegateArgs<'args>>,
     pub standalone_actions: NoVec<BaseActionArgs<'args>, MAX_ACTIONS_NUM>,
 }
 
@@ -369,6 +371,8 @@ mod tests {
             }),
             commit_finalize: None,
             commit_finalize_and_undelegate: None,
+            commit_finalize_compressed: None,
+            commit_finalize_compressed_and_undelegate: None,
             standalone_actions: vec![sdk::BaseActionArgs {
                 args: sdk::ActionArgs {
                     escrow_index: 0,
@@ -421,6 +425,8 @@ mod tests {
             }),
             commit_finalize: None,
             commit_finalize_and_undelegate: None,
+            commit_finalize_compressed: None,
+            commit_finalize_compressed_and_undelegate: None,
             standalone_actions: pino_standalone,
         };
         let mut pino_buf = [0u8; 1024];
@@ -444,6 +450,8 @@ mod tests {
             commit_and_undelegate: None,
             commit_finalize: None,
             commit_finalize_and_undelegate: None,
+            commit_finalize_compressed: None,
+            commit_finalize_compressed_and_undelegate: None,
             standalone_actions: vec![],
         };
         let sdk_bytes = bincode1::serialize(&sdk_bundle).unwrap();
@@ -454,6 +462,8 @@ mod tests {
             commit_and_undelegate: None,
             commit_finalize: None,
             commit_finalize_and_undelegate: None,
+            commit_finalize_compressed: None,
+            commit_finalize_compressed_and_undelegate: None,
             standalone_actions: NoVec::new(),
         };
         let mut pino_buf = [0u8; 256];
