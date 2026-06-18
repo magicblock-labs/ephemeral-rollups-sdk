@@ -96,7 +96,10 @@ jobs:
         env:
           # vrf examples additionally need the VRF oracle.
           START_VRF_ORACLE: ${{ startsWith(matrix.example, 'vrf') && '1' || '0' }}
-        run: examples/scripts/start-validators.sh examples/${{ matrix.example }}/target/deploy
+        run: |
+          # ephemeral-validator needs ~1M open files; GHA defaults to 65536.
+          sudo prlimit --pid $$ --nofile=1000000:1000000
+          examples/scripts/start-validators.sh examples/${{ matrix.example }}/target/deploy
 
       - name: Run tests
         working-directory: examples/${{ matrix.example }}
