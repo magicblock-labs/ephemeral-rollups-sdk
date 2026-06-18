@@ -3,7 +3,6 @@
 extern crate alloc;
 
 pub mod acl;
-pub mod compression;
 pub mod consts;
 pub mod crank;
 pub mod ephemeral_accounts;

@@ -34,7 +34,7 @@ ephemeral-rollups-sdk-attribute-action = { path = "action-attribute", version = 
 
 # Magicblock
 magicblock-delegation-program-api = { version = "3.0.0", default-features = false }
-magicblock-magic-program-api = { git = "https://github.com/magicblock-labs/magicblock-validator.git", rev = "c7094f01294c48d6bcfc1b8c1ea6474b09e9f596", default-features = false }
+magicblock-magic-program-api = { version = "0.10.1", default-features = false }
 ephemeral-vrf-sdk = { version = "0.4.1", default-features = false }
 ephemeral-vrf-sdk-vrf-macro = { version = "0.4.1", default-features = false }
 
