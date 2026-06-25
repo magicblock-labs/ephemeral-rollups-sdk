@@ -1,4 +1,5 @@
 import { AccountRole, Signature, TransactionMessage } from "@solana/kit";
+import { postRouterRpc, RouterRpcError } from "./router-rpc";
 
 /**
  * Extracts all writable accounts from a transaction message.
@@ -26,32 +27,25 @@ export function getWritableAccounts(
 }
 
 /**
- * Checks whether a given Solana RPC endpoint supports router methods.
- *
- * @param clusterUrlHttp - The HTTP endpoint to test.
- * @returns `true` if router support is detected, otherwise `false`.
+ * Result is latched by Connection; transient probe failures must propagate, not collapse to `false`.
+ * Also matches `/method not found/i` to classify providers like Helius that use `-32603` for this case.
  */
 export async function isRouter(clusterUrlHttp: string): Promise<boolean> {
-  const response = await fetch(clusterUrlHttp, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      jsonrpc: "2.0",
-      id: 1,
-      method: "getBlockhashForAccounts",
-      params: [[]],
-    }),
-  });
-
-  const { result } = (await response.json()) as {
-    result: { blockhash: string; lastValidBlockHeight: number };
-  };
-
-  return (
-    result != null &&
-    typeof result.blockhash === "string" &&
-    result.blockhash.length > 0
-  );
+  try {
+    const result = await postRouterRpc<{
+      blockhash: string;
+      lastValidBlockHeight: number;
+    }>(clusterUrlHttp, "getBlockhashForAccounts", [[]]);
+    return typeof result.blockhash === "string" && result.blockhash.length > 0;
+  } catch (err) {
+    if (
+      err instanceof RouterRpcError &&
+      (err.code === -32601 || /method not found/i.test(err.message))
+    ) {
+      return false;
+    }
+    throw err;
+  }
 }
 
 /**
