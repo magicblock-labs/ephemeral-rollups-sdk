@@ -1,3 +1,5 @@
+#![allow(deprecated)]
+
 use magicblock_magic_program_api::{args::ScheduleTaskArgs, instruction::MagicBlockInstruction};
 use solana_program::{
     instruction::{AccountMeta, Instruction},
@@ -6,6 +8,9 @@ use solana_program::{
 
 use crate::compat::{self, AsModern, Compat, Modern};
 
+#[deprecated(
+    note = "Use `ephemeral_rollups_sdk::crank::hydra::ephemeral::create::CreateCrankCpi` instead"
+)]
 pub struct ScheduleCrankCpi<'a> {
     pub payer: &'a compat::AccountInfo<'a>,
     pub magic_program: &'a compat::AccountInfo<'a>,
@@ -59,6 +64,9 @@ impl<'a> ScheduleCrankCpi<'a> {
     }
 }
 
+#[deprecated(
+    note = "Use `ephemeral_rollups_sdk::crank::hydra::ephemeral::cancel::CancelCrankCpi` instead"
+)]
 pub struct CancelCrankCpi<'a> {
     pub authority: &'a compat::AccountInfo<'a>,
     pub task_context: &'a compat::AccountInfo<'a>,
