@@ -12,7 +12,7 @@ edition = { workspace = true }
 readme = "README.md"
 
 [features]
-default = ["solana-system-interface"]
+default = ["solana-system-interface", "crank"]
 
 # =============== modern ===============
 # 
@@ -66,7 +66,7 @@ backward-compat = [
 
 # Activate this feature to use the vrf macro without having to import the ephemeral-vrf-sdk crate.
 vrf = ["ephemeral-vrf-sdk-vrf-macro/rollups"]
-crank = []
+crank = ["hydra-api"]
 modular-sdk = [
     "solana-account",
     "solana-account-info",
@@ -96,6 +96,7 @@ ephemeral-rollups-sdk-attribute-commit = { workspace = true }
 ephemeral-rollups-sdk-attribute-action = { workspace = true }
 ephemeral-vrf-sdk = { workspace = true }
 ephemeral-vrf-sdk-vrf-macro = { workspace = true }
+hydra-api = { workspace = true, optional = true, features = ["cpi-native"] }
 solana-program = { workspace = true }
 solana-address = { workspace = true }
 solana-account = { workspace = true, optional = true }

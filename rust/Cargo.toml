@@ -31,12 +31,12 @@ ephemeral-rollups-sdk-attribute-delegate = { path = "delegate", version = "=0.15
 ephemeral-rollups-sdk-attribute-commit = { path = "commit-attribute", version = "=0.15.5" }
 ephemeral-rollups-sdk-attribute-action = { path = "action-attribute", version = "=0.15.5" }
 
-
 # Magicblock
 magicblock-delegation-program-api = { version = "3.0.0", default-features = false }
 magicblock-magic-program-api = { version = "0.10.1", default-features = false }
 ephemeral-vrf-sdk = { version = "0.4.1", default-features = false }
 ephemeral-vrf-sdk-vrf-macro = { version = "0.4.1", default-features = false }
+hydra-api = { git = "https://github.com/magicblock-labs/hydra.git", rev = "1fc908645a9a1d072c3fc5c6f2fac7c4b8bd4c73" }
 
 ## External crates
 anchor-lang-compat = { package = "anchor-lang", version = ">=0.28.0, <1.0.0" }
