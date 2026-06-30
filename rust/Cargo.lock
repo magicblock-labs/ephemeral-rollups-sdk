@@ -1484,6 +1484,7 @@ dependencies = [
  "bincode 2.0.1",
  "ephemeral-rollups-sdk",
  "ephemeral-vrf-sdk",
+ "hydra-api",
  "magicblock-delegation-program-api",
  "magicblock-magic-program-api",
  "pinocchio 0.10.2",
@@ -2137,7 +2138,7 @@ dependencies = [
 [[package]]
 name = "hydra-api"
 version = "0.1.1"
-source = "git+https://github.com/magicblock-labs/hydra.git?rev=1fc908645a9a1d072c3fc5c6f2fac7c4b8bd4c73#1fc908645a9a1d072c3fc5c6f2fac7c4b8bd4c73"
+source = "git+https://github.com/magicblock-labs/hydra.git?rev=4f9e3c44e9e2e4feab66e6e7903099e095c74db3#4f9e3c44e9e2e4feab66e6e7903099e095c74db3"
 dependencies = [
  "ephemeral-rollups-pinocchio 0.15.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "pinocchio 0.10.2",

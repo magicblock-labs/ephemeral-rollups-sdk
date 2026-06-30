@@ -36,7 +36,8 @@ magicblock-delegation-program-api = { version = "3.0.0", default-features = fals
 magicblock-magic-program-api = { version = "0.10.1", default-features = false }
 ephemeral-vrf-sdk = { version = "0.4.1", default-features = false }
 ephemeral-vrf-sdk-vrf-macro = { version = "0.4.1", default-features = false }
-hydra-api = { git = "https://github.com/magicblock-labs/hydra.git", rev = "1fc908645a9a1d072c3fc5c6f2fac7c4b8bd4c73" }
+# TODO: Use master once merged
+hydra-api = { git = "https://github.com/magicblock-labs/hydra.git", rev = "4f9e3c44e9e2e4feab66e6e7903099e095c74db3" }
 
 ## External crates
 anchor-lang-compat = { package = "anchor-lang", version = ">=0.28.0, <1.0.0" }

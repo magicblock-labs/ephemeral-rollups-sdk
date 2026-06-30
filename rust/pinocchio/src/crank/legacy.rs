@@ -1,3 +1,5 @@
+#![allow(deprecated)]
+
 use core::mem::MaybeUninit;
 
 use pinocchio::{
@@ -138,6 +140,9 @@ impl<'a> ScheduleCrankArgs<'a> {
     }
 }
 
+#[deprecated(
+    note = "Use `ephemeral_rollups_pinocchio::crank::hydra::ephemeral::create::create` instead"
+)]
 pub struct ScheduleCrankCpi<'a> {
     pub payer: AccountView,
     pub magic_program: AccountView,
@@ -275,6 +280,7 @@ impl<'a> ScheduleCrankCpi<'a> {
     }
 }
 
+#[deprecated(note = "Use `ephemeral_rollups_pinocchio::crank::hydra::ephemeral::create` instead")]
 pub struct ScheduleCrankCpiBuilder<'a> {
     payer: AccountView,
     magic_program: AccountView,
@@ -372,6 +378,7 @@ impl<'a> ScheduleCrankCpiBuilder<'a> {
     }
 }
 
+#[deprecated(note = "Use `ephemeral_rollups_pinocchio::crank::hydra::ephemeral::cancel` instead")]
 pub struct CancelCrankCpi {
     pub authority: AccountView,
     pub task_context: AccountView,
