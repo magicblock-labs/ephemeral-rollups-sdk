@@ -1484,6 +1484,7 @@ dependencies = [
  "bincode 2.0.1",
  "ephemeral-rollups-sdk",
  "ephemeral-vrf-sdk",
+ "hydra-api",
  "magicblock-delegation-program-api",
  "magicblock-magic-program-api",
  "pinocchio 0.11.2",
