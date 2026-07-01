@@ -159,6 +159,11 @@ name = "spl_test"
 path = "../tests/spl_test.rs"
 required-features = ["spl", "access-control", "modular-sdk"]
 
+[[test]]
+name = "ephemeral_accounts"
+path = "../tests/ephemeral_accounts.rs"
+required-features = ["anchor"]
+
 [dev-dependencies]
 bincode = { workspace = true }
 sdk = { workspace = true }
