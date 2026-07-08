@@ -12,8 +12,8 @@ import {
 import {
   createCommitInstruction,
   createCommitAndUndelegateInstruction,
-  createRentPendingAtaInstruction,
   isRentPendingTokenAccount,
+  rentPendingAtaAddress,
   RENT_PENDING_ATA_CLOSE_AUTHORITY,
 } from "../instructions/magic-program";
 import {
@@ -675,8 +675,8 @@ describe("Exposed Instructions (@solana/kit)", () => {
     });
   });
 
-  describe("createRentPendingAta instruction (Magic Program)", () => {
-    it("should create a CreateRentPendingAta instruction with required parameters", async () => {
+  describe("rent-pending ATA helpers (Magic Program)", () => {
+    it("should derive the canonical ATA address", async () => {
       const walletOwner = address("11111111111111111111111111111113");
       const mint = address("11111111111111111111111111111114");
       const [ata] = await getProgramDerivedAddress({
@@ -687,42 +687,9 @@ describe("Exposed Instructions (@solana/kit)", () => {
           addressEncoder.encode(mint),
         ],
       });
-      const instruction = await createRentPendingAtaInstruction(
-        mockAddress,
-        walletOwner,
-        mint,
-      );
+      const derivedAta = await rentPendingAtaAddress(walletOwner, mint);
 
-      expect(instruction.accounts).toHaveLength(4);
-      expect(instruction.programAddress).toBe(MAGIC_PROGRAM_ID);
-      expect(instruction.accounts?.[0].address).toBe(mockAddress);
-      expect(instruction.accounts?.[0].role).toBe(
-        AccountRole.WRITABLE_SIGNER,
-      );
-      expect(instruction.accounts?.[1].address).toBe(ata);
-      expect(instruction.accounts?.[1].role).toBe(AccountRole.WRITABLE);
-      expect(instruction.accounts?.[2].address).toBe(mint);
-      expect(instruction.accounts?.[3].address).toBe(TOKEN_PROGRAM_ID);
-      expect(instruction.accounts?.[3].role).toBe(AccountRole.READONLY);
-    });
-
-    it("should encode the discriminator and addresses", async () => {
-      const walletOwner = address("11111111111111111111111111111113");
-      const mint = address("11111111111111111111111111111114");
-      const instruction = await createRentPendingAtaInstruction(
-        mockAddress,
-        walletOwner,
-        mint,
-      );
-      const data = instruction.data as Uint8Array;
-
-      expect(data.length).toBe(100);
-      expect(new DataView(data.buffer).getUint32(0, true)).toBe(15);
-      expect(data.slice(4, 36)).toEqual(addressEncoder.encode(walletOwner));
-      expect(data.slice(36, 68)).toEqual(addressEncoder.encode(mint));
-      expect(data.slice(68, 100)).toEqual(
-        addressEncoder.encode(TOKEN_PROGRAM_ID),
-      );
+      expect(derivedAta).toBe(ata);
     });
 
     it("should detect rent-pending token accounts", () => {
