@@ -14,6 +14,9 @@ import {
 import {
   createCommitInstruction,
   createCommitAndUndelegateInstruction,
+  createRentPendingAtaInstruction,
+  isRentPendingTokenAccount,
+  RENT_PENDING_ATA_CLOSE_AUTHORITY,
 } from "../instructions/magic-program";
 import {
   allocateTransferQueueIx,
@@ -694,6 +697,72 @@ describe("Exposed Instructions (web3.js)", () => {
           account.toBase58(),
         );
       });
+    });
+  });
+
+  describe("createRentPendingAta instruction (Magic Program)", () => {
+    it("should create a CreateRentPendingAta instruction with required parameters", () => {
+      const walletOwner = new PublicKey("11111111111111111111111111111113");
+      const mint = new PublicKey("11111111111111111111111111111114");
+      const [ata] = PublicKey.findProgramAddressSync(
+        [
+          walletOwner.toBuffer(),
+          TOKEN_PROGRAM_ID.toBuffer(),
+          mint.toBuffer(),
+        ],
+        new PublicKey("ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"),
+      );
+      const instruction = createRentPendingAtaInstruction(
+        mockPublicKey,
+        walletOwner,
+        mint,
+      );
+
+      expect(instruction.keys).toHaveLength(4);
+      expect(instruction.programId.toBase58()).toBe(
+        MAGIC_PROGRAM_ID.toBase58(),
+      );
+      expect(instruction.keys[0].pubkey.toBase58()).toBe(
+        mockPublicKey.toBase58(),
+      );
+      expect(instruction.keys[0].isSigner).toBe(true);
+      expect(instruction.keys[0].isWritable).toBe(true);
+      expect(instruction.keys[1].pubkey.toBase58()).toBe(ata.toBase58());
+      expect(instruction.keys[1].isWritable).toBe(true);
+      expect(instruction.keys[2].pubkey.toBase58()).toBe(mint.toBase58());
+      expect(instruction.keys[3].pubkey.toBase58()).toBe(
+        TOKEN_PROGRAM_ID.toBase58(),
+      );
+      expect(instruction.keys[3].isWritable).toBe(false);
+    });
+
+    it("should encode the discriminator and addresses", () => {
+      const walletOwner = new PublicKey("11111111111111111111111111111113");
+      const mint = new PublicKey("11111111111111111111111111111114");
+      const instruction = createRentPendingAtaInstruction(
+        mockPublicKey,
+        walletOwner,
+        mint,
+      );
+
+      expect(instruction.data.length).toBe(100);
+      expect(instruction.data.readUInt32LE(0)).toBe(15);
+      expect(instruction.data.subarray(4, 36)).toEqual(walletOwner.toBuffer());
+      expect(instruction.data.subarray(36, 68)).toEqual(mint.toBuffer());
+      expect(instruction.data.subarray(68, 100)).toEqual(
+        TOKEN_PROGRAM_ID.toBuffer(),
+      );
+    });
+
+    it("should detect rent-pending token accounts", () => {
+      const data = Buffer.alloc(165);
+      data.writeUInt32LE(1, 129);
+      RENT_PENDING_ATA_CLOSE_AUTHORITY.toBuffer().copy(data, 133);
+
+      expect(isRentPendingTokenAccount(data)).toBe(true);
+      data.writeUInt32LE(0, 129);
+      expect(isRentPendingTokenAccount(data)).toBe(false);
+      expect(isRentPendingTokenAccount(Buffer.alloc(164))).toBe(false);
     });
   });
 
