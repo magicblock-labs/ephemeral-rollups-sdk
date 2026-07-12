@@ -10,7 +10,7 @@ pub use crate::ephem::deprecated::v1::{
 };
 use crate::{
     compat::{self, AsModern, Compat, Modern},
-    consts::ASSOCIATED_TOKEN_PROGRAM_ID,
+    consts::{ASSOCIATED_TOKEN_PROGRAM_ID, MAGIC_PROGRAM_ID, TOKEN_PROGRAM_ID},
 };
 pub use cau_intent_builder::{CommitAndUndelegateIntentBuilder, FoldableCauIntentBuilder};
 pub use commit_intent_builder::{CommitIntentBuilder, FoldableCommitIntentBuilder};
@@ -29,6 +29,8 @@ pub mod deprecated;
 pub const RENT_PENDING_ATA_CLOSE_AUTHORITY: compat::Pubkey =
     compat::Pubkey::from_str_const("SysvarRent111111111111111111111111111111111");
 
+const CREATE_RENT_PENDING_ATA_DISCRIMINATOR: u32 = 15;
+const CREATE_RENT_PENDING_ATA_DATA_LEN: usize = 100;
 const TOKEN_ACCOUNT_CLOSE_AUTHORITY_OFFSET: usize = 129;
 const TOKEN_ACCOUNT_CLOSE_AUTHORITY_PUBKEY_OFFSET: usize = 133;
 const TOKEN_ACCOUNT_LEN: usize = 165;
@@ -43,6 +45,45 @@ pub fn rent_pending_ata_address(
         &ASSOCIATED_TOKEN_PROGRAM_ID,
     )
     .0
+}
+
+/// Creates a rent-pending ATA through the Magic Program.
+///
+/// Requires a validator that supports rent-pending ATA materialization.
+pub fn create_rent_pending_ata_ix(
+    payer: compat::Pubkey,
+    wallet_owner: compat::Pubkey,
+    mint: compat::Pubkey,
+) -> compat::Instruction {
+    create_rent_pending_ata_ix_with_token_program(payer, wallet_owner, mint, TOKEN_PROGRAM_ID)
+}
+
+/// Creates a rent-pending ATA for the supplied token program.
+///
+/// Requires a validator that supports rent-pending ATA materialization.
+pub fn create_rent_pending_ata_ix_with_token_program(
+    payer: compat::Pubkey,
+    wallet_owner: compat::Pubkey,
+    mint: compat::Pubkey,
+    token_program: compat::Pubkey,
+) -> compat::Instruction {
+    let ata = rent_pending_ata_address(&wallet_owner, &mint, &token_program);
+    let mut data = Vec::with_capacity(CREATE_RENT_PENDING_ATA_DATA_LEN);
+    data.extend_from_slice(&CREATE_RENT_PENDING_ATA_DISCRIMINATOR.to_le_bytes());
+    data.extend_from_slice(wallet_owner.as_ref());
+    data.extend_from_slice(mint.as_ref());
+    data.extend_from_slice(token_program.as_ref());
+
+    compat::Instruction {
+        program_id: MAGIC_PROGRAM_ID,
+        accounts: vec![
+            compat::AccountMeta::new_readonly(payer, true),
+            compat::AccountMeta::new(ata, false),
+            compat::AccountMeta::new_readonly(mint, false),
+            compat::AccountMeta::new_readonly(token_program, false),
+        ],
+        data,
+    }
 }
 
 pub fn is_rent_pending_token_account(data: &[u8]) -> bool {
@@ -732,6 +773,35 @@ mod tests {
         .0;
 
         assert_eq!(ata, expected_ata);
+    }
+
+    #[test]
+    fn test_create_rent_pending_ata_ix() {
+        let payer = compat::Pubkey::new_unique();
+        let wallet_owner = compat::Pubkey::new_unique();
+        let mint = compat::Pubkey::new_unique();
+        let expected_ata = rent_pending_ata_address(&wallet_owner, &mint, &TOKEN_PROGRAM_ID);
+
+        let ix = create_rent_pending_ata_ix(payer, wallet_owner, mint);
+
+        assert_eq!(ix.program_id, MAGIC_PROGRAM_ID);
+        assert_eq!(ix.accounts.len(), 4);
+        assert_eq!(ix.accounts[0].pubkey, payer);
+        assert!(ix.accounts[0].is_signer);
+        assert!(!ix.accounts[0].is_writable);
+        assert_eq!(ix.accounts[1].pubkey, expected_ata);
+        assert!(ix.accounts[1].is_writable);
+        assert_eq!(ix.accounts[2].pubkey, mint);
+        assert_eq!(ix.accounts[3].pubkey, TOKEN_PROGRAM_ID);
+
+        assert_eq!(ix.data.len(), CREATE_RENT_PENDING_ATA_DATA_LEN);
+        assert_eq!(
+            u32::from_le_bytes(ix.data[0..4].try_into().unwrap()),
+            CREATE_RENT_PENDING_ATA_DISCRIMINATOR
+        );
+        assert_eq!(&ix.data[4..36], wallet_owner.as_ref());
+        assert_eq!(&ix.data[36..68], mint.as_ref());
+        assert_eq!(&ix.data[68..100], TOKEN_PROGRAM_ID.as_ref());
     }
 
     #[test]

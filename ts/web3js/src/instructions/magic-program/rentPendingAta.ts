@@ -1,5 +1,13 @@
-import { PublicKey, SYSVAR_RENT_PUBKEY } from "@solana/web3.js";
-import { ASSOCIATED_TOKEN_PROGRAM_ID, TOKEN_PROGRAM_ID } from "../../constants";
+import {
+  PublicKey,
+  SYSVAR_RENT_PUBKEY,
+  TransactionInstruction,
+} from "@solana/web3.js";
+import {
+  ASSOCIATED_TOKEN_PROGRAM_ID,
+  MAGIC_PROGRAM_ID,
+  TOKEN_PROGRAM_ID,
+} from "../../constants";
 
 /**
  * Sentinel close authority marking a token account as a rent-pending ATA.
@@ -28,6 +36,44 @@ export function rentPendingAtaAddress(
   );
 
   return ata;
+}
+
+/**
+ * Creates a rent-pending ATA through the Magic Program.
+ *
+ * The instruction is idempotent for an existing matching rent-pending or
+ * projected ATA. The ATA must end the transaction with a positive token
+ * balance. Requires a validator that supports rent-pending ATA materialization.
+ *
+ * @param payer - Payer/sponsor account (must sign; the wallet owner does not sign)
+ * @param walletOwner - The wallet that will own the ATA
+ * @param mint - The token mint
+ * @param tokenProgram - The token program (TOKEN_PROGRAM_ID or TOKEN_2022_PROGRAM_ID)
+ * @returns TransactionInstruction
+ */
+export function createRentPendingAtaInstruction(
+  payer: PublicKey,
+  walletOwner: PublicKey,
+  mint: PublicKey,
+  tokenProgram: PublicKey = TOKEN_PROGRAM_ID,
+): TransactionInstruction {
+  const ata = rentPendingAtaAddress(walletOwner, mint, tokenProgram);
+  const data = Buffer.alloc(100);
+  data.writeUInt32LE(15, 0);
+  walletOwner.toBuffer().copy(data, 4);
+  mint.toBuffer().copy(data, 36);
+  tokenProgram.toBuffer().copy(data, 68);
+
+  return new TransactionInstruction({
+    keys: [
+      { pubkey: payer, isSigner: true, isWritable: false },
+      { pubkey: ata, isSigner: false, isWritable: true },
+      { pubkey: mint, isSigner: false, isWritable: false },
+      { pubkey: tokenProgram, isSigner: false, isWritable: false },
+    ],
+    programId: MAGIC_PROGRAM_ID,
+    data,
+  });
 }
 
 /**

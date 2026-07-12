@@ -3,8 +3,14 @@ import {
   Address,
   getAddressEncoder,
   getProgramDerivedAddress,
+  Instruction,
 } from "@solana/kit";
-import { ASSOCIATED_TOKEN_PROGRAM_ID, TOKEN_PROGRAM_ID } from "../../constants";
+import { AccountRole } from "@solana/instructions";
+import {
+  ASSOCIATED_TOKEN_PROGRAM_ID,
+  MAGIC_PROGRAM_ID,
+  TOKEN_PROGRAM_ID,
+} from "../../constants";
 
 /**
  * Sentinel close authority marking a token account as a rent-pending ATA.
@@ -40,6 +46,45 @@ export async function rentPendingAtaAddress(
   });
 
   return ata;
+}
+
+/**
+ * Creates a rent-pending ATA through the Magic Program.
+ *
+ * The instruction is idempotent for an existing matching rent-pending or
+ * projected ATA. The ATA must end the transaction with a positive token
+ * balance. Requires a validator that supports rent-pending ATA materialization.
+ *
+ * @param payer - Payer/sponsor account (must sign; the wallet owner does not sign)
+ * @param walletOwner - The wallet that will own the ATA
+ * @param mint - The token mint
+ * @param tokenProgram - The token program (TOKEN_PROGRAM_ID or TOKEN_2022_PROGRAM_ID)
+ * @returns Instruction
+ */
+export async function createRentPendingAtaInstruction(
+  payer: Address,
+  walletOwner: Address,
+  mint: Address,
+  tokenProgram: Address = TOKEN_PROGRAM_ID,
+): Promise<Instruction> {
+  const addressEncoder = getAddressEncoder();
+  const ata = await rentPendingAtaAddress(walletOwner, mint, tokenProgram);
+  const data = new Uint8Array(100);
+  new DataView(data.buffer).setUint32(0, 15, true);
+  data.set(addressEncoder.encode(walletOwner), 4);
+  data.set(addressEncoder.encode(mint), 36);
+  data.set(addressEncoder.encode(tokenProgram), 68);
+
+  return {
+    accounts: [
+      { address: payer, role: AccountRole.READONLY_SIGNER },
+      { address: ata, role: AccountRole.WRITABLE },
+      { address: mint, role: AccountRole.READONLY },
+      { address: tokenProgram, role: AccountRole.READONLY },
+    ],
+    programAddress: MAGIC_PROGRAM_ID,
+    data,
+  };
 }
 
 /**

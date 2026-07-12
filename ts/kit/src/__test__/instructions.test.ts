@@ -12,6 +12,7 @@ import {
 import {
   createCommitInstruction,
   createCommitAndUndelegateInstruction,
+  createRentPendingAtaInstruction,
   isRentPendingTokenAccount,
   rentPendingAtaAddress,
   RENT_PENDING_ATA_CLOSE_AUTHORITY,
@@ -676,6 +677,31 @@ describe("Exposed Instructions (@solana/kit)", () => {
   });
 
   describe("rent-pending ATA helpers (Magic Program)", () => {
+    it("should build the tag-15 instruction", async () => {
+      const walletOwner = address("11111111111111111111111111111113");
+      const mint = address("11111111111111111111111111111114");
+      const ata = await rentPendingAtaAddress(walletOwner, mint);
+      const instruction = await createRentPendingAtaInstruction(
+        mockAddress,
+        walletOwner,
+        mint,
+      );
+      const data = instruction.data as Uint8Array;
+
+      expect(instruction.programAddress).toBe(MAGIC_PROGRAM_ID);
+      expect(instruction.accounts).toHaveLength(4);
+      expect(instruction.accounts?.[0].role).toBe(AccountRole.READONLY_SIGNER);
+      expect(instruction.accounts?.[1].address).toBe(ata);
+      expect(instruction.accounts?.[1].role).toBe(AccountRole.WRITABLE);
+      expect(data).toHaveLength(100);
+      expect(new DataView(data.buffer).getUint32(0, true)).toBe(15);
+      expect(data.slice(4, 36)).toEqual(addressEncoder.encode(walletOwner));
+      expect(data.slice(36, 68)).toEqual(addressEncoder.encode(mint));
+      expect(data.slice(68, 100)).toEqual(
+        addressEncoder.encode(TOKEN_PROGRAM_ID),
+      );
+    });
+
     it("should derive the canonical ATA address", async () => {
       const walletOwner = address("11111111111111111111111111111113");
       const mint = address("11111111111111111111111111111114");
@@ -1201,13 +1227,43 @@ describe("Exposed Instructions (@solana/kit)", () => {
       expect(instructions[1].data?.[0]).toBe(3);
     });
 
-    it("should use the shuttle merge instruction for private base-to-ephemeral transfers", async () => {
+    it("should use the encrypted-destination merge instruction for private base-to-ephemeral transfers", async () => {
       const instructions = await transferSpl(from, to, mint, 25n, {
         visibility: "private",
         fromBalance: "base",
         toBalance: "ephemeral",
         validator,
         shuttleId: 7,
+      });
+
+      expect(instructions).toHaveLength(1);
+      const data = Buffer.from(instructions[0].data ?? []);
+      expect(data[0]).toBe(32);
+      expect(data).toHaveLength(1 + 4 + 8 + 2 * 80 + 32);
+      expect(instructions[0].accounts).toHaveLength(18);
+      expect(data.readUInt32LE(1)).toBe(7);
+      expect(data.readBigUInt64LE(5)).toBe(25n);
+      // The destination never appears in cleartext in data or account metas.
+      const addressEncoder = getAddressEncoder();
+      expect(data.includes(Buffer.from(addressEncoder.encode(to)))).toBe(false);
+      expect(
+        instructions[0].accounts?.find((account) => account.address === to),
+      ).toBeUndefined();
+      expect(
+        data
+          .subarray(data.length - 32)
+          .equals(Buffer.from(addressEncoder.encode(validator))),
+      ).toBe(true);
+    });
+
+    it("should use the legacy shuttle merge instruction for private base-to-ephemeral transfers when requested", async () => {
+      const instructions = await transferSpl(from, to, mint, 25n, {
+        visibility: "private",
+        fromBalance: "base",
+        toBalance: "ephemeral",
+        validator,
+        shuttleId: 7,
+        legacyCleartextDestination: true,
       });
 
       expect(instructions).toHaveLength(1);
@@ -1239,10 +1295,24 @@ describe("Exposed Instructions (@solana/kit)", () => {
             ix.accounts?.[1].address === vaultEphemeralAta,
         ),
       ).toBeUndefined();
-      expect(instructions[2].data?.[0]).toBe(24);
+      expect(instructions[2].data?.[0]).toBe(32);
     });
 
-    it("should initialize permission and delegate the receiver eata for private base-to-ephemeral transfers when requested", async () => {
+    it("should skip cleartext destination setup for private base-to-ephemeral transfers even when initIfMissing", async () => {
+      const instructions = await transferSpl(from, to, mint, 25n, {
+        visibility: "private",
+        fromBalance: "base",
+        toBalance: "ephemeral",
+        validator,
+        shuttleId: 7,
+        initIfMissing: true,
+      });
+
+      expect(instructions).toHaveLength(1);
+      expect(instructions[0].data?.[0]).toBe(32);
+    });
+
+    it("should initialize permission and delegate the receiver eata for legacy private base-to-ephemeral transfers when requested", async () => {
       const [toEphemeralAta] = await deriveEphemeralAta(to, mint);
 
       const instructions = await transferSpl(from, to, mint, 25n, {
@@ -1252,6 +1322,7 @@ describe("Exposed Instructions (@solana/kit)", () => {
         validator,
         shuttleId: 7,
         initIfMissing: true,
+        legacyCleartextDestination: true,
       });
 
       expect(instructions).toHaveLength(5);
@@ -1397,7 +1468,7 @@ describe("Exposed Instructions (@solana/kit)", () => {
       );
     });
 
-    it("should use a normal transfer for private ephemeral-to-ephemeral transfers", async () => {
+    it("should ensure the rent-pending destination before private ephemeral-to-ephemeral transfers", async () => {
       const instructions = await transferSpl(from, to, mint, 25n, {
         visibility: "private",
         fromBalance: "ephemeral",
@@ -1406,10 +1477,13 @@ describe("Exposed Instructions (@solana/kit)", () => {
         initVaultIfMissing: true,
       });
 
-      expect(instructions).toHaveLength(1);
-      expect(instructions[0].data?.[0]).toBe(3);
-      expect(instructions[0].accounts).toHaveLength(3);
-      expect(Buffer.from(instructions[0].data ?? []).readBigUInt64LE(1)).toBe(
+      expect(instructions).toHaveLength(2);
+      expect(instructions[0].data?.[0]).toBe(34);
+      expect(instructions[0].accounts).toHaveLength(6);
+      expect(instructions[0].accounts?.[1].address).toBe(to);
+      expect(instructions[1].data?.[0]).toBe(3);
+      expect(instructions[1].accounts).toHaveLength(3);
+      expect(Buffer.from(instructions[1].data ?? []).readBigUInt64LE(1)).toBe(
         25n,
       );
     });
