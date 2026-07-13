@@ -18,6 +18,10 @@ pub const MAGIC_CONTEXT_ID: Address =
 pub const EPHEMERAL_VAULT_ID: Address =
     Address::new_from_array(pubkey!("MagicVau1t999999999999999999999999999999999"));
 
+/// The ephemeral system program ID
+pub const EPHEMERAL_SYSTEM_PROGRAM_ID: Address =
+    Address::new_from_array(pubkey!("EphSystem1111111111111111111111111111111111"));
+
 /// The seed of the authority account PDA.
 pub const DELEGATION_RECORD: &[u8] = b"delegation";
 

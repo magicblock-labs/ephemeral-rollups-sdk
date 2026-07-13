@@ -39,11 +39,9 @@
 //!     .resize(2000)?;
 //! ```
 
-use crate::{
-    compat::{self, AsModern, Compat, Modern},
-    consts::MAGIC_PROGRAM_ID,
-};
-use magicblock_magic_program_api::{instruction::MagicBlockInstruction, EPHEMERAL_RENT_PER_BYTE};
+use crate::compat::{self, AsModern, Compat, Modern};
+use magicblock_magic_program_api::instruction::EphemeralSystemInstruction;
+use magicblock_magic_program_api::{EPHEMERAL_RENT_PER_BYTE, EPHEMERAL_SYSTEM_PROGRAM_ID};
 use solana_program::{
     instruction::{AccountMeta, Instruction},
     program::invoke_signed,
@@ -126,7 +124,7 @@ impl<'a, 'info> EphemeralAccount<'a, 'info> {
     /// Provide seeds via [`Self::with_signer_seeds`] if ephemeral is a PDA.
     pub fn create(&self, data_len: u32) -> compat::ProgramResult {
         self.invoke(
-            MagicBlockInstruction::CreateEphemeralAccount { data_len },
+            EphemeralSystemInstruction::CreateEphemeralAccount { data_len },
             true, // ephemeral must sign on create
         )
     }
@@ -137,7 +135,7 @@ impl<'a, 'info> EphemeralAccount<'a, 'info> {
     /// Shrinking: vault refunds excess rent to sponsor.
     pub fn resize(&self, new_data_len: u32) -> compat::ProgramResult {
         self.invoke(
-            MagicBlockInstruction::ResizeEphemeralAccount { new_data_len },
+            EphemeralSystemInstruction::ResizeEphemeralAccount { new_data_len },
             false,
         )
     }
@@ -146,16 +144,16 @@ impl<'a, 'info> EphemeralAccount<'a, 'info> {
     ///
     /// All rent is refunded from vault to sponsor.
     pub fn close(&self) -> compat::ProgramResult {
-        self.invoke(MagicBlockInstruction::CloseEphemeralAccount, false)
+        self.invoke(EphemeralSystemInstruction::CloseEphemeralAccount, false)
     }
 
     fn invoke(
         &self,
-        instruction: MagicBlockInstruction,
+        instruction: EphemeralSystemInstruction,
         ephemeral_is_signer: bool,
     ) -> compat::ProgramResult {
         let ix = Instruction::new_with_bincode(
-            *MAGIC_PROGRAM_ID.as_modern(),
+            *EPHEMERAL_SYSTEM_PROGRAM_ID.as_modern(),
             &instruction,
             vec![
                 AccountMeta::new(*self.sponsor.key.as_modern(), true),

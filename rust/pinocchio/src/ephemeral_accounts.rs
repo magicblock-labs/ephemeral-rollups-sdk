@@ -20,22 +20,22 @@
 //! use ephemeral_rollups_pinocchio::ephemeral_accounts::EphemeralAccount;
 //!
 //! // Create: both sponsor and ephemeral are PDAs - provide seeds for both
-//! EphemeralAccount::new(&ctx.sponsor, &ctx.ephemeral, &ctx.vault, &ctx.magic_program)
+//! EphemeralAccount::new(&ctx.sponsor, &ctx.ephemeral, &ctx.vault, &ctx.esp_program)
 //!     .with_signers(&[&sponsor_signer, &ephemeral_signer])
 //!     .create(1000)?;
 //!
 //! // Resize/Close: only sponsor needs to sign - only sponsor seeds needed
-//! EphemeralAccount::new(&ctx.sponsor, &ctx.ephemeral, &ctx.vault, &ctx.magic_program)
+//! EphemeralAccount::new(&ctx.sponsor, &ctx.ephemeral, &ctx.vault, &ctx.esp_program)
 //!     .with_signers(&[&sponsor_signer])
 //!     .resize(2000)?;
 //!
 //! // Create with oncurve sponsor (signed tx), ephemeral is PDA
-//! EphemeralAccount::new(&ctx.sponsor, &ctx.ephemeral, &ctx.vault, &ctx.magic_program)
+//! EphemeralAccount::new(&ctx.sponsor, &ctx.ephemeral, &ctx.vault, &ctx.esp_program)
 //!     .with_signers(&[&ephemeral_signer])
 //!     .create(1000)?;
 //!
 //! // Resize/Close with oncurve sponsor - no seeds needed
-//! EphemeralAccount::new(&ctx.sponsor, &ctx.ephemeral, &ctx.vault, &ctx.magic_program)
+//! EphemeralAccount::new(&ctx.sponsor, &ctx.ephemeral, &ctx.vault, &ctx.esp_program)
 //!     .resize(2000)?;
 //! ```
 
@@ -49,9 +49,9 @@ use pinocchio::{
 const ACCOUNT_OVERHEAD: u32 = 60;
 const EPHEMERAL_RENT_PER_BYTE: u64 = 32;
 
-const CREATE_EPHEMERAL_ACCOUNT_DISCRIMINATOR: u32 = 12;
-const RESIZE_EPHEMERAL_ACCOUNT_DISCRIMINATOR: u32 = 13;
-const CLOSE_EPHEMERAL_ACCOUNT_DISCRIMINATOR: u32 = 14;
+const CREATE_EPHEMERAL_ACCOUNT_DISCRIMINATOR: u32 = 0;
+const RESIZE_EPHEMERAL_ACCOUNT_DISCRIMINATOR: u32 = 1;
+const CLOSE_EPHEMERAL_ACCOUNT_DISCRIMINATOR: u32 = 2;
 
 // -----------------
 // Utility Functions
@@ -85,7 +85,7 @@ pub struct EphemeralAccount<'a> {
     sponsor: &'a AccountView,
     ephemeral: &'a AccountView,
     vault: &'a AccountView,
-    magic_program: &'a AccountView,
+    esp_program: &'a AccountView,
     signer_seeds: &'a [Signer<'a, 'a>],
 }
 
@@ -97,18 +97,18 @@ impl<'a> EphemeralAccount<'a> {
     /// * `sponsor` - Account paying rent (must be signer for all operations)
     /// * `ephemeral` - Account to create/modify (must be signer only on create)
     /// * `vault` - Rent vault ([`crate::consts::EPHEMERAL_VAULT_ID`])
-    /// * `magic_program` - Magic program ([`crate::consts::MAGIC_PROGRAM_ID`])
+    /// * `esp_program` - Ephemeral system program ([`crate::consts::EPHEMERAL_SYSTEM_PROGRAM_ID`])
     pub fn new(
         sponsor: &'a AccountView,
         ephemeral: &'a AccountView,
         vault: &'a AccountView,
-        magic_program: &'a AccountView,
+        esp_program: &'a AccountView,
     ) -> Self {
         Self {
             sponsor,
             ephemeral,
             vault,
-            magic_program,
+            esp_program,
             signer_seeds: &[],
         }
     }
@@ -158,7 +158,7 @@ impl<'a> EphemeralAccount<'a> {
 
     fn invoke(&self, data: &[u8], ephemeral_is_signer: bool) -> ProgramResult {
         let ix = InstructionView {
-            program_id: self.magic_program.address(),
+            program_id: self.esp_program.address(),
             data,
             accounts: &[
                 InstructionAccount::writable_signer(self.sponsor.address()),
