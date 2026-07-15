@@ -2630,9 +2630,9 @@ dependencies = [
 
 [[package]]
 name = "magicblock-delegation-program-api"
-version = "3.0.0"
+version = "3.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "288904a9950bd20f27f0ef934f320ab1410bd35a6d5c9cf138eca276442b6b2e"
+checksum = "bea16e41e04319201919afca98dd4241b18549f2db0c68f58e4bc531537b5dab"
 dependencies = [
  "bincode 1.3.3",
  "borsh 0.10.4",
