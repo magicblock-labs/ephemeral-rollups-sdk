@@ -56,6 +56,7 @@ build_no_default() {
 
 build
 build_no_default "solana-system-interface"
+build_no_default "solana-system-interface,instruction"
 
 build "backward-compat"
 
@@ -92,6 +93,9 @@ build "anchor-compat,access-control"
 
 build "access-control"
 build "access-control,backward-compat"
+
+build "instruction"
+build "instruction,backward-compat"
 
 build "encryption"
 build "encryption,backward-compat"

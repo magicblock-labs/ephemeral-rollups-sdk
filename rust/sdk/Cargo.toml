@@ -47,9 +47,11 @@ access-control = ["num-derive", "num-traits", "thiserror"]
 # spl support.
 spl = ["spl-associated-token-account-interface", "encryption"]
 
+instruction = ["magicblock-delegation-program-api/instruction"]
+
 encryption = [
     "magicblock-delegation-program-api/encryption",
-    "magicblock-delegation-program-api/instruction",
+    "instruction",
 ]
 
 # backward compatability support (can be combined with [access-control | encryption])

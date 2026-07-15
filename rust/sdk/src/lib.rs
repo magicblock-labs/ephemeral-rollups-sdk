@@ -30,6 +30,8 @@ pub mod spl;
 
 pub use dlp_api;
 pub use dlp_api::args::CallHandlerArgs;
+#[cfg(feature = "instruction")]
+pub use dlp_api::instruction_builder;
 pub use dlp_api::pda;
 pub use dlp_api::{
     commit_record_seeds_from_delegated_account, commit_state_seeds_from_delegated_account,
