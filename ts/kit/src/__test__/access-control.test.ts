@@ -200,6 +200,58 @@ describe("Access Control (@solana/kit)", () => {
       expect(body.pubkey).toBe(mockAddress.toString());
       expect(body.challenge).toBe(mockChallenge);
     });
+
+    it("should not include template in challenge request by default", async () => {
+      const mockChallenge = "test-challenge";
+      const mockToken = "test-token";
+
+      global.fetch = vi
+        .fn()
+        .mockResolvedValueOnce({
+          json: async () => ({ challenge: mockChallenge }),
+        })
+        .mockResolvedValueOnce({
+          status: 200,
+          json: async () => ({ token: mockToken }),
+        });
+
+      const signMessage = vi.fn().mockResolvedValue(new Uint8Array([1, 2, 3]));
+
+      await getAuthToken(mockRpcUrl, mockAddress, signMessage);
+
+      const firstCall = (global.fetch as any).mock.calls[0];
+      expect(firstCall[0]).not.toContain("template=");
+    });
+
+    it("should include the template in the challenge request when provided", async () => {
+      const mockChallenge = "test-challenge";
+      const mockToken = "test-token";
+      const mockTemplate = "Custom login\n{timestamp}\nUser: {pubkey}";
+
+      global.fetch = vi
+        .fn()
+        .mockResolvedValueOnce({
+          json: async () => ({ challenge: mockChallenge }),
+        })
+        .mockResolvedValueOnce({
+          status: 200,
+          json: async () => ({ token: mockToken }),
+        });
+
+      const signMessage = vi.fn().mockResolvedValue(new Uint8Array([1, 2, 3]));
+
+      await getAuthToken(
+        mockRpcUrl,
+        mockAddress,
+        signMessage,
+        mockTemplate,
+      );
+
+      const firstCall = (global.fetch as any).mock.calls[0];
+      expect(firstCall[0]).toContain(
+        new URLSearchParams({ template: mockTemplate }).toString(),
+      );
+    });
   });
 
   describe("verifyTeeIntegrity", () => {
