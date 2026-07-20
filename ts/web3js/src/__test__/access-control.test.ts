@@ -240,12 +240,7 @@ describe("Access Control (web3.js)", () => {
 
       const signMessage = vi.fn().mockResolvedValue(new Uint8Array([1, 2, 3]));
 
-      await getAuthToken(
-        mockRpcUrl,
-        mockPublicKey,
-        signMessage,
-        mockTemplate,
-      );
+      await getAuthToken(mockRpcUrl, mockPublicKey, signMessage, mockTemplate);
 
       const firstCall = (global.fetch as any).mock.calls[0];
       expect(firstCall[0]).toContain(

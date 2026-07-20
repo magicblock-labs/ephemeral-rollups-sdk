@@ -240,12 +240,7 @@ describe("Access Control (@solana/kit)", () => {
 
       const signMessage = vi.fn().mockResolvedValue(new Uint8Array([1, 2, 3]));
 
-      await getAuthToken(
-        mockRpcUrl,
-        mockAddress,
-        signMessage,
-        mockTemplate,
-      );
+      await getAuthToken(mockRpcUrl, mockAddress, signMessage, mockTemplate);
 
       const firstCall = (global.fetch as any).mock.calls[0];
       expect(firstCall[0]).toContain(

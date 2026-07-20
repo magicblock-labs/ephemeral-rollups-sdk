@@ -36,6 +36,9 @@ export async function getAuthToken(
     pubkey: publicKey.toString(),
   });
   if (template != null && template !== "") {
+    if (!template.includes("{timestamp}")) {
+      throw new Error("Template must contain a {timestamp} placeholder");
+    }
     challengeParams.set("template", template);
   }
   const challengeResponse = await fetch(
