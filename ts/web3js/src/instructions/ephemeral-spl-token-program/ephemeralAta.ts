@@ -945,7 +945,7 @@ export function depositAndDelegateShuttleEphemeralAtaWithMergeAndPrivateTransfer
 }
 
 /**
- * Private base->ephemeral transfer with an encrypted destination (instruction 32).
+ * Private base->ephemeral transfer with an encrypted destination (instruction 33).
  *
  * Initialize shuttle metadata/EATA/wallet ATA, deposit into the shuttle EATA,
  * then delegate it with post-delegation actions that, on the ER, create the
@@ -1005,7 +1005,7 @@ export function depositAndDelegateShuttleWithMergeToEncryptedDestinationIx(
   };
 
   const data = Buffer.concat([
-    Buffer.from([32]),
+    Buffer.from([33]),
     u32leBuffer(shuttleId),
     u64leBuffer(amount),
     encrypt(destinationOwner),
@@ -1065,7 +1065,7 @@ export function depositAndDelegateShuttleWithMergeToEncryptedDestinationIx(
 
 /**
  * Idempotently create the destination's ATA as a rent-pending ATA through the
- * Magic program (instruction 34), so a plain SPL transfer in the same
+ * Magic program (instruction 35), so a plain SPL transfer in the same
  * transaction can fund a destination that does not exist yet on the ER.
  */
 export function ensureRentPendingDestinationIx(
@@ -1091,7 +1091,7 @@ export function ensureRentPendingDestinationIx(
       { pubkey: tokenProgram, isSigner: false, isWritable: false },
       { pubkey: MAGIC_PROGRAM_ID, isSigner: false, isWritable: false },
     ],
-    data: Buffer.from([34]),
+    data: Buffer.from([35]),
   });
 }
 

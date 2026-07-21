@@ -1210,14 +1210,14 @@ describe("Exposed Instructions (web3.js)", () => {
       );
     }
 
-    it("should encode instruction 32 with four encrypted destination fields", () => {
+    it("should encode instruction 33 with four encrypted destination fields", () => {
       const ix = buildIx(25n, validator);
       const data = Buffer.from(ix.data);
 
       expect(ix.programId.equals(EPHEMERAL_SPL_TOKEN_PROGRAM_ID)).toBe(true);
       expect(ix.keys).toHaveLength(18);
       expect(data).toHaveLength(1 + 4 + 8 + 2 * 80 + 32);
-      expect(data[0]).toBe(32);
+      expect(data[0]).toBe(33);
       expect(data.readUInt32LE(1)).toBe(shuttleId);
       expect(data.readBigUInt64LE(5)).toBe(25n);
       expect(data.subarray(data.length - 32).equals(validator.toBuffer())).toBe(
@@ -1243,7 +1243,7 @@ describe("Exposed Instructions (web3.js)", () => {
   });
 
   describe("ensureRentPendingDestinationIx (Ephemeral SPL Token Program)", () => {
-    it("should encode instruction 34 with the derived destination ATA", () => {
+    it("should encode instruction 35 with the derived destination ATA", () => {
       const payer = Keypair.generate().publicKey;
       const destinationOwner = Keypair.generate().publicKey;
       const mint = Keypair.generate().publicKey;
@@ -1251,7 +1251,7 @@ describe("Exposed Instructions (web3.js)", () => {
       const ix = ensureRentPendingDestinationIx(payer, destinationOwner, mint);
 
       expect(ix.programId.equals(EPHEMERAL_SPL_TOKEN_PROGRAM_ID)).toBe(true);
-      expect(Buffer.from(ix.data)).toEqual(Buffer.from([34]));
+      expect(Buffer.from(ix.data)).toEqual(Buffer.from([35]));
       expect(ix.keys).toHaveLength(6);
       expect(ix.keys[0].pubkey.toBase58()).toBe(payer.toBase58());
       expect(ix.keys[0].isSigner).toBe(true);
@@ -1489,7 +1489,7 @@ describe("Exposed Instructions (web3.js)", () => {
 
       expect(instructions).toHaveLength(1);
       const data = Buffer.from(instructions[0].data);
-      expect(data[0]).toBe(32);
+      expect(data[0]).toBe(33);
       expect(data).toHaveLength(1 + 4 + 8 + 2 * 80 + 32);
       expect(instructions[0].keys).toHaveLength(18);
       expect(data.readUInt32LE(1)).toBe(7);
@@ -1540,7 +1540,7 @@ describe("Exposed Instructions (web3.js)", () => {
             ix.data[0] === 4 && ix.keys[1]?.pubkey.equals(vaultEphemeralAta),
         ),
       ).toBeUndefined();
-      expect(instructions[2].data[0]).toBe(32);
+      expect(instructions[2].data[0]).toBe(33);
     });
 
     it("should skip cleartext destination setup for private base-to-ephemeral transfers even when initIfMissing", async () => {
@@ -1554,7 +1554,7 @@ describe("Exposed Instructions (web3.js)", () => {
       });
 
       expect(instructions).toHaveLength(1);
-      expect(instructions[0].data[0]).toBe(32);
+      expect(instructions[0].data[0]).toBe(33);
     });
 
     it("should initialize permission and delegate the receiver eata for legacy private base-to-ephemeral transfers when requested", async () => {
@@ -1703,7 +1703,7 @@ describe("Exposed Instructions (web3.js)", () => {
       });
 
       expect(instructions).toHaveLength(2);
-      expect(instructions[0].data[0]).toBe(34);
+      expect(instructions[0].data[0]).toBe(35);
       expect(instructions[0].keys).toHaveLength(6);
       expect(instructions[0].keys[1].pubkey.toBase58()).toBe(to.toBase58());
       expect(instructions[1].data[0]).toBe(3);

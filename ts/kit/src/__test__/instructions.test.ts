@@ -1238,7 +1238,7 @@ describe("Exposed Instructions (@solana/kit)", () => {
 
       expect(instructions).toHaveLength(1);
       const data = Buffer.from(instructions[0].data ?? []);
-      expect(data[0]).toBe(32);
+      expect(data[0]).toBe(33);
       expect(data).toHaveLength(1 + 4 + 8 + 2 * 80 + 32);
       expect(instructions[0].accounts).toHaveLength(18);
       expect(data.readUInt32LE(1)).toBe(7);
@@ -1295,7 +1295,7 @@ describe("Exposed Instructions (@solana/kit)", () => {
             ix.accounts?.[1].address === vaultEphemeralAta,
         ),
       ).toBeUndefined();
-      expect(instructions[2].data?.[0]).toBe(32);
+      expect(instructions[2].data?.[0]).toBe(33);
     });
 
     it("should skip cleartext destination setup for private base-to-ephemeral transfers even when initIfMissing", async () => {
@@ -1309,7 +1309,7 @@ describe("Exposed Instructions (@solana/kit)", () => {
       });
 
       expect(instructions).toHaveLength(1);
-      expect(instructions[0].data?.[0]).toBe(32);
+      expect(instructions[0].data?.[0]).toBe(33);
     });
 
     it("should initialize permission and delegate the receiver eata for legacy private base-to-ephemeral transfers when requested", async () => {
@@ -1478,7 +1478,7 @@ describe("Exposed Instructions (@solana/kit)", () => {
       });
 
       expect(instructions).toHaveLength(2);
-      expect(instructions[0].data?.[0]).toBe(34);
+      expect(instructions[0].data?.[0]).toBe(35);
       expect(instructions[0].accounts).toHaveLength(6);
       expect(instructions[0].accounts?.[1].address).toBe(to);
       expect(instructions[1].data?.[0]).toBe(3);
