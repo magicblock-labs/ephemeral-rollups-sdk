@@ -4,6 +4,7 @@ import {
   Keypair,
   PublicKey,
   Transaction,
+  TransactionInstruction,
 } from "@solana/web3.js";
 
 import { compileLegacyTransactionToV0 } from "../lookup-table.js";
@@ -107,6 +108,37 @@ describe("compileLegacyTransactionToV0", () => {
     expect(result.transaction.message.addressTableLookups).toHaveLength(1);
     expect(result.bytesSaved).toBeGreaterThan(0);
     expect(result.v0Size).toBeLessThan(result.legacySize);
+  });
+
+  it("compiles an oversized legacy transaction when the v0 transaction fits", () => {
+    const feePayer = Keypair.generate().publicKey;
+    const transaction = new Transaction({
+      feePayer,
+      recentBlockhash: "11111111111111111111111111111111",
+    }).add(
+      new TransactionInstruction({
+        programId: Keypair.generate().publicKey,
+        keys: Array.from({ length: 57 }, () => ({
+          pubkey: Keypair.generate().publicKey,
+          isSigner: false,
+          isWritable: false,
+        })),
+        data: Buffer.alloc(32),
+      }),
+    );
+    const lookupTable = createLookupTable(
+      Keypair.generate().publicKey,
+      collectNonSignerAccounts(transaction),
+    );
+
+    const result = compileLegacyTransactionToV0({
+      transaction,
+      lookupTables: [lookupTable],
+    });
+
+    expect(result.legacySize).toBe(2082);
+    expect(result.v0Size).toBeLessThanOrEqual(1232);
+    expect(result.bytesSaved).toBeGreaterThan(0);
   });
 
   it("returns no used lookup tables when none of the addresses match", async () => {
