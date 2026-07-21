@@ -118,7 +118,7 @@ describe("compileLegacyTransactionToV0", () => {
     }).add(
       new TransactionInstruction({
         programId: Keypair.generate().publicKey,
-        keys: Array.from({ length: 35 }, () => ({
+        keys: Array.from({ length: 57 }, () => ({
           pubkey: Keypair.generate().publicKey,
           isSigner: false,
           isWritable: false,
@@ -136,7 +136,7 @@ describe("compileLegacyTransactionToV0", () => {
       lookupTables: [lookupTable],
     });
 
-    expect(result.legacySize).toBeGreaterThan(1232);
+    expect(result.legacySize).toBe(2082);
     expect(result.v0Size).toBeLessThanOrEqual(1232);
     expect(result.bytesSaved).toBeGreaterThan(0);
   });
