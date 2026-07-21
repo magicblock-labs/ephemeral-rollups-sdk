@@ -37,10 +37,9 @@ export function compileLegacyTransactionToV0({
     throw new Error("transaction.recentBlockhash is required");
   }
 
-  const legacySize = transaction.serialize({
-    requireAllSignatures: false,
-    verifySignatures: false,
-  }).length;
+  const legacySize = new VersionedTransaction(
+    transaction.compileMessage(),
+  ).serialize().length;
 
   const message = new TransactionMessage({
     payerKey: transaction.feePayer,
