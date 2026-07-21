@@ -1,0 +1,26 @@
+[package]
+name = "ephemeral-vrf-sdk-vrf-macro"
+description = "ephemeral-vrf-sdk-vrf-macro"
+version = { workspace = true }
+authors = { workspace = true }
+repository = { workspace = true }
+homepage = { workspace = true }
+edition = { workspace = true }
+license = { workspace = true }
+
+[features]
+default = []
+backward-compat = []
+# When enabled, generated code references the VRF SDK through its re-export in
+# `ephemeral-rollups-sdk` (`::ephemeral_rollups_sdk::vrf`) instead of `::ephemeral_vrf_sdk`.
+# `ephemeral-rollups-sdk` activates this so users depending only on the rollups SDK build
+# without a direct `ephemeral-vrf-sdk` dependency.
+rollups = []
+
+[lib]
+proc-macro = true
+
+[dependencies]
+proc-macro2 = { workspace = true }
+syn = { workspace = true }
+quote = { workspace = true }
