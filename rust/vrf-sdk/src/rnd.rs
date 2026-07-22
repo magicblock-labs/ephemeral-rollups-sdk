@@ -29,6 +29,10 @@ pub fn random_u8(bytes: &[u8; 32]) -> u8 {
 /// a value that falls within an evenly divisible range. If no such value is found,
 /// it falls back to a slightly biased approach using the last byte.
 pub fn random_u8_with_range(bytes: &[u8; 32], min_value: u8, max_value: u8) -> u8 {
+    assert!(
+        min_value <= max_value,
+        "random_u8_with_range requires min_value <= max_value"
+    );
     let range = max_value as u16 - min_value as u16 + 1;
     let threshold = 256 / range * range;
 

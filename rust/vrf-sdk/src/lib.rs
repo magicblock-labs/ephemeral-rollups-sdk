@@ -6,7 +6,6 @@ pub mod anchor;
 pub mod compat;
 pub mod consts;
 pub mod instructions;
-pub mod pda;
 pub mod rnd;
 pub mod types;
 

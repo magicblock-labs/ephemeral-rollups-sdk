@@ -35,6 +35,7 @@ pub fn vrf(_attr: TokenStream, item: TokenStream) -> TokenStream {
     let mut has_slot_hashes = false;
     let mut has_vrf_program = false;
     let mut has_system_program = false;
+    let mut has_oracle_queue = false;
 
     for field in fields.iter() {
         let field_attrs = field.attrs.clone();
@@ -70,6 +71,21 @@ pub fn vrf(_attr: TokenStream, item: TokenStream) -> TokenStream {
         if field_name.eq("system_program") {
             has_system_program = true;
         }
+        if field_name.eq("oracle_queue") {
+            has_oracle_queue = true;
+        }
+    }
+
+    // `oracle_queue` is caller-provided (its address is the user's chosen queue, so the macro
+    // cannot inject it) but is required by `invoke_signed_vrf`. Fail with a clear diagnostic
+    // instead of a confusing "no field `oracle_queue`" error from the generated impl.
+    if !has_oracle_queue {
+        return syn::Error::new_spanned(
+            struct_name,
+            "`#[vrf]` requires an `oracle_queue` account field, used by `invoke_signed_vrf`",
+        )
+        .to_compile_error()
+        .into();
     }
 
     // Add missing required fields
@@ -122,6 +138,7 @@ pub fn vrf(_attr: TokenStream, item: TokenStream) -> TokenStream {
                         payer.clone(),
                         self.program_identity.to_account_info(),
                         self.oracle_queue.to_account_info(),
+                        self.system_program.to_account_info(),
                         self.slot_hashes.to_account_info(),
                     ],
                     &[&[#vrf::consts::IDENTITY, &[bump.1]]],
