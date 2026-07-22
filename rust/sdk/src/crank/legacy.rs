@@ -1,6 +1,7 @@
 #![allow(deprecated)]
 
-use magicblock_magic_program_api::{args::ScheduleTaskArgs, instruction::MagicBlockInstruction};
+pub use magicblock_magic_program_api::args::ScheduleTaskArgs;
+use magicblock_magic_program_api::instruction::MagicBlockInstruction;
 use solana_program::{
     instruction::{AccountMeta, Instruction},
     program::{invoke, invoke_signed},
@@ -11,14 +12,14 @@ use crate::compat::{self, AsModern, Compat, Modern};
 #[deprecated(
     note = "Use `ephemeral_rollups_sdk::crank::hydra::ephemeral::create::CreateCrankCpi` instead"
 )]
-pub struct ScheduleCrankCpi<'a> {
-    pub payer: &'a compat::AccountInfo<'a>,
-    pub magic_program: &'a compat::AccountInfo<'a>,
-    pub instruction_accounts: &'a [compat::AccountInfo<'a>],
+pub struct ScheduleCrankCpi<'a, 'b> {
+    pub payer: compat::AccountInfo<'a>,
+    pub magic_program: compat::AccountInfo<'a>,
+    pub instruction_accounts: &'b [compat::AccountInfo<'a>],
     pub args: ScheduleTaskArgs,
 }
 
-impl<'a> ScheduleCrankCpi<'a> {
+impl<'a, 'b> ScheduleCrankCpi<'a, 'b> {
     pub fn instruction(&self) -> compat::Instruction {
         let mut accounts = Vec::with_capacity(1 + self.instruction_accounts.len());
         accounts.push(AccountMeta::new(*self.payer.key.as_modern(), true));
@@ -37,13 +38,13 @@ impl<'a> ScheduleCrankCpi<'a> {
     }
 
     pub fn invoke(&self) -> compat::ProgramResult {
-        let accounts = Self::build_accounts(self.payer, self.instruction_accounts);
+        let accounts = Self::build_accounts(self.payer.clone(), self.instruction_accounts);
 
         invoke(&self.instruction().modern(), &accounts.modern()).compat()
     }
 
     pub fn invoke_signed(&self, signers_seeds: &[&[&[u8]]]) -> compat::ProgramResult {
-        let accounts = Self::build_accounts(self.payer, self.instruction_accounts);
+        let accounts = Self::build_accounts(self.payer.clone(), self.instruction_accounts);
 
         invoke_signed(
             &self.instruction().modern(),
@@ -54,11 +55,11 @@ impl<'a> ScheduleCrankCpi<'a> {
     }
 
     fn build_accounts(
-        payer: &'a compat::AccountInfo<'a>,
-        instruction_accounts: &'a [compat::AccountInfo<'a>],
+        payer: compat::AccountInfo<'a>,
+        instruction_accounts: &'b [compat::AccountInfo<'a>],
     ) -> Vec<compat::AccountInfo<'a>> {
         let mut accounts = Vec::with_capacity(1 + instruction_accounts.len());
-        accounts.push(payer.clone());
+        accounts.push(payer);
         accounts.extend_from_slice(instruction_accounts);
         accounts
     }
@@ -161,8 +162,8 @@ mod tests {
         let instruction_accounts = [task_context];
 
         let instruction = ScheduleCrankCpi {
-            payer: &payer,
-            magic_program: &magic_program,
+            payer: payer,
+            magic_program: magic_program,
             instruction_accounts: &instruction_accounts,
             args: ScheduleTaskArgs {
                 task_id: 7,
