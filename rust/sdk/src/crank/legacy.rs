@@ -13,8 +13,8 @@ use crate::compat::{self, AsModern, Compat, Modern};
     note = "Use `ephemeral_rollups_sdk::crank::hydra::ephemeral::create::CreateCrankCpi` instead"
 )]
 pub struct ScheduleCrankCpi<'a, 'b> {
-    pub payer: compat::AccountInfo<'a>,
-    pub magic_program: compat::AccountInfo<'a>,
+    pub payer: &'a compat::AccountInfo<'a>,
+    pub magic_program: &'a compat::AccountInfo<'a>,
     pub instruction_accounts: &'b [compat::AccountInfo<'a>],
     pub args: ScheduleTaskArgs,
 }
@@ -38,13 +38,13 @@ impl<'a, 'b> ScheduleCrankCpi<'a, 'b> {
     }
 
     pub fn invoke(&self) -> compat::ProgramResult {
-        let accounts = Self::build_accounts(self.payer.clone(), self.instruction_accounts);
+        let accounts = Self::build_accounts(self.payer, self.instruction_accounts);
 
         invoke(&self.instruction().modern(), &accounts.modern()).compat()
     }
 
     pub fn invoke_signed(&self, signers_seeds: &[&[&[u8]]]) -> compat::ProgramResult {
-        let accounts = Self::build_accounts(self.payer.clone(), self.instruction_accounts);
+        let accounts = Self::build_accounts(self.payer, self.instruction_accounts);
 
         invoke_signed(
             &self.instruction().modern(),
@@ -55,11 +55,11 @@ impl<'a, 'b> ScheduleCrankCpi<'a, 'b> {
     }
 
     fn build_accounts(
-        payer: compat::AccountInfo<'a>,
+        payer: &compat::AccountInfo<'a>,
         instruction_accounts: &'b [compat::AccountInfo<'a>],
     ) -> Vec<compat::AccountInfo<'a>> {
         let mut accounts = Vec::with_capacity(1 + instruction_accounts.len());
-        accounts.push(payer);
+        accounts.push(payer.clone());
         accounts.extend_from_slice(instruction_accounts);
         accounts
     }
@@ -162,8 +162,8 @@ mod tests {
         let instruction_accounts = [task_context];
 
         let instruction = ScheduleCrankCpi {
-            payer: payer,
-            magic_program: magic_program,
+            payer: &payer,
+            magic_program: &magic_program,
             instruction_accounts: &instruction_accounts,
             args: ScheduleTaskArgs {
                 task_id: 7,
