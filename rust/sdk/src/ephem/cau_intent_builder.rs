@@ -17,7 +17,6 @@ pub struct CommitAndUndelegateIntentBuilder<'info> {
     pub(in crate::ephem) post_commit_callbacks: Vec<Option<ActionCallback>>,
     pub(in crate::ephem) post_undelegate_actions: Vec<CallHandler<'info>>,
     pub(in crate::ephem) post_undelegate_callbacks: Vec<Option<ActionCallback>>,
-    pub(in crate::ephem) is_compressed: bool,
 }
 
 impl<'info> CommitAndUndelegateIntentBuilder<'info> {
@@ -93,13 +92,6 @@ impl<'info> CommitAndUndelegateIntentBuilder<'info> {
             },
         )
     }
-
-    /// Sets the intent to be compressed. Chainable.
-    /// Only works if the account was compressed when delegated.
-    pub fn compressed(mut self) -> Self {
-        self.is_compressed = true;
-        self
-    }
 }
 
 impl<'info> FoldableIntentBuilder<'info> for CommitAndUndelegateIntentBuilder<'info> {
@@ -111,7 +103,6 @@ impl<'info> FoldableIntentBuilder<'info> for CommitAndUndelegateIntentBuilder<'i
             post_commit_callbacks,
             post_undelegate_actions,
             post_undelegate_callbacks,
-            is_compressed,
         } = self;
         let commit_type = if post_commit_actions.is_empty() {
             CommitType::Standalone(accounts)
@@ -134,15 +125,9 @@ impl<'info> FoldableIntentBuilder<'info> for CommitAndUndelegateIntentBuilder<'i
             commit_type,
             undelegate_type,
         };
-        if is_compressed {
-            parent
-                .intent_bundle
-                .add_intent(MagicIntent::CommitFinalizeAndUndelegateCompressed(cau));
-        } else {
-            parent
-                .intent_bundle
-                .add_intent(MagicIntent::CommitAndUndelegate(cau));
-        }
+        parent
+            .intent_bundle
+            .add_intent(MagicIntent::CommitAndUndelegate(cau));
         parent
     }
 }
