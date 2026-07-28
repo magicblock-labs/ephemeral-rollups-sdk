@@ -1,31 +1,12 @@
 use proc_macro::TokenStream;
-use proc_macro2::TokenStream as TokenStream2;
 use quote::quote;
 use syn::{parse_macro_input, ItemStruct};
-
-/// Resolve the base path to the VRF SDK that generated code references.
-///
-/// The generated code needs an absolute path to the VRF SDK. Users may depend on it in two ways:
-/// - directly, as `ephemeral-vrf-sdk` (the macro emits `::ephemeral_vrf_sdk`), or
-/// - via `ephemeral-rollups-sdk`, which re-exports it under `::ephemeral_rollups_sdk::vrf`.
-///
-/// The `rollups` feature selects between the two. `ephemeral-rollups-sdk` enables it (see its
-/// `anchor-support` feature) so users depending only on the rollups SDK build without a direct
-/// `ephemeral-vrf-sdk` dependency. With the feature off (direct VRF SDK users), the historical
-/// `::ephemeral_vrf_sdk` path is emitted unchanged.
-fn vrf_sdk_path() -> TokenStream2 {
-    if cfg!(feature = "rollups") {
-        quote!(::ephemeral_rollups_sdk::vrf)
-    } else {
-        quote!(::ephemeral_vrf_sdk)
-    }
-}
 
 #[proc_macro_attribute]
 pub fn vrf(_attr: TokenStream, item: TokenStream) -> TokenStream {
     let input = parse_macro_input!(item as ItemStruct);
 
-    let vrf = vrf_sdk_path();
+    let vrf = quote!(::ephemeral_rollups_sdk::vrf);
     let unchecked_account = generated_unchecked_account_type();
     let struct_name = &input.ident;
     let fields = &input.fields;
@@ -161,7 +142,7 @@ pub fn vrf(_attr: TokenStream, item: TokenStream) -> TokenStream {
 #[proc_macro_attribute]
 pub fn vrf_callback(_attr: TokenStream, item: TokenStream) -> TokenStream {
     let input = parse_macro_input!(item as ItemStruct);
-    let vrf = vrf_sdk_path();
+    let vrf = quote!(::ephemeral_rollups_sdk::vrf);
     let struct_name = &input.ident;
     let original_attrs = &input.attrs;
 

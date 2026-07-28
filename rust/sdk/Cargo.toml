@@ -66,8 +66,8 @@ backward-compat = [
     "ephemeral-vrf-sdk/backward-compat",
 ]
 
-# Activate this feature to use the vrf macro without having to import the ephemeral-vrf-sdk crate.
-vrf = ["ephemeral-vrf-sdk-vrf-macro/rollups"]
+# Compatibility feature for consumers that explicitly enable VRF support.
+vrf = []
 crank = []
 modular-sdk = [
     "solana-account",

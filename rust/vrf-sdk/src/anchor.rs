@@ -1,7 +1,5 @@
 use crate::compat::anchor_lang;
 
-pub use ephemeral_vrf_sdk_vrf_macro::*;
-
 pub struct VrfProgram;
 
 impl anchor_lang::Id for VrfProgram {
