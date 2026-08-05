@@ -28,7 +28,7 @@ anchor = ["anchor-modern"]
 anchor-modern = [
     "anchor-support",
     "anchor-lang-current",
-    "ephemeral-vrf-sdk/anchor-modern",
+    "ephemeral-vrf-sdk?/anchor-modern",
 ]
 anchor-debug = ["anchor-lang-current/anchor-debug"]
 
@@ -37,7 +37,7 @@ anchor-compat = [
     "anchor-support",
     "backward-compat",
     "anchor-lang-compat",
-    "ephemeral-vrf-sdk/anchor-compat",
+    "ephemeral-vrf-sdk?/anchor-compat",
 ]
 anchor-compat-debug = ["anchor-lang-compat/anchor-debug"]
 
@@ -62,12 +62,15 @@ backward-compat = [
     "ephemeral-rollups-sdk-attribute-delegate/backward-compat",
     "ephemeral-rollups-sdk-attribute-ephemeral/backward-compat",
     "ephemeral-rollups-sdk-attribute-ephemeral-accounts/backward-compat",
-    "ephemeral-vrf-sdk-vrf-macro/backward-compat",
-    "ephemeral-vrf-sdk/backward-compat",
+    "ephemeral-vrf-sdk-vrf-macro?/backward-compat",
+    "ephemeral-vrf-sdk?/backward-compat",
 ]
 
-# Compatibility feature for consumers that explicitly enable VRF support.
-vrf = []
+# Enable VRF re-exports and generate macro paths through ephemeral-rollups-sdk.
+vrf = [
+    "dep:ephemeral-vrf-sdk",
+    "ephemeral-vrf-sdk-vrf-macro/ephemeral-rollups-sdk",
+]
 crank = []
 modular-sdk = [
     "solana-account",
@@ -96,8 +99,8 @@ ephemeral-rollups-sdk-attribute-ephemeral = { workspace = true }
 ephemeral-rollups-sdk-attribute-ephemeral-accounts = { workspace = true }
 ephemeral-rollups-sdk-attribute-commit = { workspace = true }
 ephemeral-rollups-sdk-attribute-action = { workspace = true }
-ephemeral-vrf-sdk = { workspace = true }
-ephemeral-vrf-sdk-vrf-macro = { workspace = true }
+ephemeral-vrf-sdk = { workspace = true, optional = true }
+ephemeral-vrf-sdk-vrf-macro = { workspace = true, optional = true }
 solana-program = { workspace = true }
 solana-address = { workspace = true }
 solana-account = { workspace = true, optional = true }

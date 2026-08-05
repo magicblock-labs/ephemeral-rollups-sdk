@@ -1587,6 +1587,7 @@ dependencies = [
  "anchor-lang 1.0.2",
  "borsh 0.10.4",
  "borsh 1.6.1",
+ "ephemeral-vrf-sdk-vrf-macro",
  "solana-program 2.3.0",
  "solana-program 3.0.0",
  "solana-pubkey 2.4.0",

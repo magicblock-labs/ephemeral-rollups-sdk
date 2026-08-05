@@ -1,16 +1,19 @@
 use proc_macro::TokenStream;
+use proc_macro2::TokenStream as TokenStream2;
 use quote::quote;
 use syn::{parse_macro_input, ItemStruct};
 
-/// Absolute path to the VRF SDK that generated code references.
+/// Resolve the base path to the VRF SDK that generated code references.
 ///
-/// These macros reach users only through `ephemeral_rollups_sdk::anchor`, so every consumer has
-/// `ephemeral-rollups-sdk` as a direct dependency, which re-exports the entire VRF SDK as
-/// `ephemeral_rollups_sdk::vrf` (see `sdk/src/vrf.rs`). Emitting that path keeps generated code
-/// compiling for consumers without a direct `ephemeral-vrf-sdk` dependency, which a
-/// `::ephemeral_vrf_sdk` path would require.
-fn vrf_sdk_path() -> proc_macro2::TokenStream {
-    quote!(::ephemeral_rollups_sdk::vrf)
+/// The macro is exported by both SDK crates. The rollups SDK enables the
+/// `ephemeral-rollups-sdk` feature so generated code resolves through its VRF re-export;
+/// standalone VRF SDK consumers use the canonical `ephemeral_vrf_sdk` path.
+fn vrf_sdk_path() -> TokenStream2 {
+    if cfg!(feature = "ephemeral-rollups-sdk") {
+        quote!(::ephemeral_rollups_sdk::vrf)
+    } else {
+        quote!(::ephemeral_vrf_sdk)
+    }
 }
 
 #[proc_macro_attribute]

@@ -11,6 +11,11 @@ license = { workspace = true }
 [features]
 default = []
 backward-compat = []
+# When enabled, generated code references the VRF SDK through its re-export in
+# `ephemeral-rollups-sdk` (`::ephemeral_rollups_sdk::vrf`) instead of `::ephemeral_vrf_sdk`.
+# `ephemeral-rollups-sdk` activates this so users depending only on the rollups SDK build
+# without a direct `ephemeral-vrf-sdk` dependency.
+ephemeral-rollups-sdk = []
 
 [lib]
 proc-macro = true
