@@ -44,33 +44,37 @@ fn build_request_ix(params: RequestRandomnessParams) -> compat::Instruction {
     .compat()
 }
 
-#[deprecated(
-    note = "Legacy global-identity request (high priority). Use create_request_high_priority_scoped_randomness_ix (or the #[vrf] macro)."
-)]
+/// Requests randomness using the scoped (per-callback-program) VRF identity, regular priority.
+///
+/// This is the default request builder. The fulfillment signs the callback with the scoped
+/// identity PDA ([`crate::consts::scoped_vrf_identity`]) rather than the global one, so the
+/// callback must validate that PDA (see the `#[vrf_callback]` macro). For the legacy
+/// global-identity behavior, use [`create_request_legacy_randomness_ix`].
 pub fn create_request_randomness_ix(params: RequestRandomnessParams) -> compat::Instruction {
+    let mut ix = build_request_ix(params);
+    ix.data[0] = 10;
+    ix
+}
+
+/// Legacy global-identity randomness request (high priority).
+#[deprecated(
+    note = "Legacy global-identity request (high priority). Use create_request_randomness_ix (scoped, regular) or create_request_high_priority_scoped_randomness_ix."
+)]
+pub fn create_request_legacy_randomness_ix(
+    params: RequestRandomnessParams,
+) -> compat::Instruction {
     build_request_ix(params)
 }
 
+/// Legacy global-identity randomness request (regular priority).
 #[deprecated(
-    note = "Legacy global-identity request (regular priority). Use create_request_scoped_randomness_ix (or the #[vrf] macro)."
+    note = "Legacy global-identity request (regular priority). Use create_request_randomness_ix (scoped, regular)."
 )]
 pub fn create_request_regular_randomness_ix(
     params: RequestRandomnessParams,
 ) -> compat::Instruction {
     let mut ix = build_request_ix(params);
     ix.data[0] = 8;
-    ix
-}
-
-/// Scoped (per-callback identity) randomness request, regular priority.
-///
-/// The fulfillment signs the callback with the scoped identity PDA
-/// ([`crate::consts::scoped_vrf_identity`]) instead of the global one, so the callback
-/// must validate that PDA (see the `#[vrf_callback]` macro). This is the default for new
-/// integrations.
-pub fn create_request_scoped_randomness_ix(params: RequestRandomnessParams) -> compat::Instruction {
-    let mut ix = build_request_ix(params);
-    ix.data[0] = 10;
     ix
 }
 
