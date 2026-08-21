@@ -8,7 +8,15 @@ use pinocchio::{
 };
 use pinocchio_system::instructions::CreateAccount;
 
-use crate::pda::find_program_address;
+use crate::{
+    consts::DELEGATION_PROGRAM_ID,
+    pda::{find_program_address, undelegate_buffer_pda_from_delegated_account},
+};
+
+#[inline(always)]
+fn is_canonical_undelegation_buffer(delegated_account: &Address, buffer: &Address) -> bool {
+    buffer == &undelegate_buffer_pda_from_delegated_account(delegated_account)
+}
 
 #[inline(always)]
 pub fn undelegate(
@@ -20,6 +28,12 @@ pub fn undelegate(
 ) -> ProgramResult {
     if !buffer.is_signer() {
         return Err(ProgramError::MissingRequiredSignature);
+    }
+    if !buffer.owned_by(&DELEGATION_PROGRAM_ID) {
+        return Err(ProgramError::InvalidAccountOwner);
+    }
+    if !is_canonical_undelegation_buffer(delegated_account.address(), buffer.address()) {
+        return Err(ProgramError::InvalidSeeds);
     }
 
     // fast u32 reader (inlined to avoid closure)
@@ -92,4 +106,25 @@ pub fn undelegate(
     (*data).copy_from_slice(&buffer_data);
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn validates_canonical_undelegation_buffer() {
+        let delegated_account = Address::new_from_array([1; 32]);
+        let canonical_buffer = undelegate_buffer_pda_from_delegated_account(&delegated_account);
+        let unrelated_buffer = Address::new_from_array([2; 32]);
+
+        assert!(is_canonical_undelegation_buffer(
+            &delegated_account,
+            &canonical_buffer
+        ));
+        assert!(!is_canonical_undelegation_buffer(
+            &delegated_account,
+            &unrelated_buffer
+        ));
+    }
 }

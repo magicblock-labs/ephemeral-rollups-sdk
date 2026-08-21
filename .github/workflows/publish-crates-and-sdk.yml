@@ -136,12 +136,26 @@ jobs:
             cargo publish $DRY_RUN_FLAG --manifest-path="$manifest_path" --token "$CRATES_TOKEN" $NO_VERIFY_FLAG
           }
 
+          wait_for_crate() {
+            local crate_name="$1"
+
+            for attempt in $(seq 1 30); do
+              if cargo info "${crate_name}@${CARGO_PACKAGE_VERSION}" >/dev/null 2>&1; then
+                return 0
+              fi
+
+              echo "Waiting for ${crate_name} ${CARGO_PACKAGE_VERSION} to become available (attempt ${attempt}/30)"
+              sleep 10
+            done
+
+            echo "${crate_name} ${CARGO_PACKAGE_VERSION} did not become available in time" >&2
+            return 1
+          }
+
           DRY_RUN_FLAG=""
+          NO_VERIFY_FLAG=""
           if [ "${DRY_RUN}" = "true" ]; then
             DRY_RUN_FLAG="--dry-run"
-          fi
-
-          if [ "${DRY_RUN}" = "true" ]; then
             NO_VERIFY_FLAG="--no-verify"
           fi
 
@@ -152,11 +166,18 @@ jobs:
           publish_crate delegate/Cargo.toml
           publish_crate commit-attribute/Cargo.toml
           publish_crate action-attribute/Cargo.toml
+          publish_crate vrf-macro/Cargo.toml
 
           if [ "${DRY_RUN}" != "true" ]; then
+            wait_for_crate ephemeral-vrf-sdk-vrf-macro
+            publish_crate vrf-sdk/Cargo.toml
+            wait_for_crate ephemeral-vrf-sdk
+
             publish_crate sdk/Cargo.toml
             publish_crate resolver/Cargo.toml
             publish_crate pinocchio/Cargo.toml
+          else
+            echo "Skipping vrf-sdk and downstream Rust crates because their same-version dependencies are not published during a dry run"
           fi
         env:
           CRATES_TOKEN: ${{ secrets.CRATES_TOKEN }}
