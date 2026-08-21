@@ -126,9 +126,7 @@ mod tests {
     use alloc::vec;
     use alloc::vec::Vec;
 
-    use ephemeral_vrf_sdk::instructions::{
-        create_request_randomness_ix, RequestRandomnessParams,
-    };
+    use ephemeral_vrf_sdk::instructions::{create_request_randomness_ix, RequestRandomnessParams};
     use pinocchio::account::RuntimeAccount;
     use pinocchio::Address;
     use solana_program::pubkey::Pubkey;

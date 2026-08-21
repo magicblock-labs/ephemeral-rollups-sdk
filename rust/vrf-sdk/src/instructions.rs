@@ -60,9 +60,7 @@ pub fn create_request_randomness_ix(params: RequestRandomnessParams) -> compat::
 #[deprecated(
     note = "Legacy global-identity request (high priority). Use create_request_randomness_ix (scoped, regular) or create_request_high_priority_scoped_randomness_ix."
 )]
-pub fn create_request_legacy_randomness_ix(
-    params: RequestRandomnessParams,
-) -> compat::Instruction {
+pub fn create_request_legacy_randomness_ix(params: RequestRandomnessParams) -> compat::Instruction {
     build_request_ix(params)
 }
 
