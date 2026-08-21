@@ -1079,6 +1079,17 @@ describe("Exposed Instructions (@solana/kit)", () => {
       expect(instructions[1].data?.[0]).toBe(26);
       expect(instructions[1].accounts).toHaveLength(16);
     });
+
+    it("should reject a rent-pending source in the legacy flow", async () => {
+      await expect(
+        withdrawSpl(owner, mint, 1n, {
+          idempotent: false,
+          rentPendingSource: true,
+        }),
+      ).rejects.toThrow(
+        "rentPendingSource requires the idempotent shuttle withdrawal flow",
+      );
+    });
   });
 
   describe("lamportsDelegatedTransferIx (Ephemeral SPL Token Program)", () => {

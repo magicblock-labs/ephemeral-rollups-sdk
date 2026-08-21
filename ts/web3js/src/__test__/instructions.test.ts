@@ -1161,6 +1161,17 @@ describe("Exposed Instructions (web3.js)", () => {
         ),
       ).toBe(instructions[1]);
     });
+
+    it("should reject a rent-pending source in the legacy flow", async () => {
+      await expect(
+        withdrawSpl(owner, mint, 1n, {
+          idempotent: false,
+          rentPendingSource: true,
+        }),
+      ).rejects.toThrow(
+        "rentPendingSource requires the idempotent shuttle withdrawal flow",
+      );
+    });
   });
 
   describe("lamportsDelegatedTransferIx (Ephemeral SPL Token Program)", () => {

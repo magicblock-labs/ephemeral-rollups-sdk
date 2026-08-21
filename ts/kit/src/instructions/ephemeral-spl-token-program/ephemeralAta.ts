@@ -274,8 +274,9 @@ export async function deriveLamportsPda(
 export async function deriveVaultAta(
   mint: Address,
   vault: Address,
+  tokenProgram: Address = TOKEN_PROGRAM_ID,
 ): Promise<Address> {
-  return getAssociatedTokenAddressSync(mint, vault, true);
+  return getAssociatedTokenAddressSync(mint, vault, true, tokenProgram);
 }
 
 /**
@@ -913,7 +914,7 @@ export async function depositAndDelegateShuttleWithMergeToEncryptedDestinationIx
 
   const [rentPda] = await deriveRentPda();
   const [vault] = await deriveVault(mint);
-  const vaultAta = await deriveVaultAta(mint, vault);
+  const vaultAta = await deriveVaultAta(mint, vault, tokenProgram);
   const destinationAta = await getAssociatedTokenAddressSync(
     mint,
     destinationOwner,
@@ -2049,6 +2050,11 @@ export async function withdrawSpl(
   opts?: WithdrawSplOptions,
 ): Promise<Instruction[]> {
   if (opts?.idempotent === false) {
+    if (opts.rentPendingSource === true) {
+      throw new Error(
+        "rentPendingSource requires the idempotent shuttle withdrawal flow",
+      );
+    }
     const instructions: Instruction[] = [];
     if (opts?.initAtasIfMissing === true) {
       const payer = opts.payer ?? owner;

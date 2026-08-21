@@ -2299,6 +2299,11 @@ export async function withdrawSpl(
   const tokenProgram = opts?.tokenProgram ?? TOKEN_PROGRAM_ID;
 
   if (opts?.idempotent === false) {
+    if (opts.rentPendingSource === true) {
+      throw new Error(
+        "rentPendingSource requires the idempotent shuttle withdrawal flow",
+      );
+    }
     const instructions: TransactionInstruction[] = [];
     if (opts?.initAtasIfMissing === true) {
       const payer = opts.payer ?? owner;
