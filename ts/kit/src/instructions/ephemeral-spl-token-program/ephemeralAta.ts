@@ -878,9 +878,10 @@ export async function depositAndDelegateShuttleEphemeralAtaWithMergeAndPrivateTr
  * Initialize shuttle metadata/EATA/wallet ATA, deposit into the shuttle EATA,
  * then delegate it with post-delegation actions that, on the ER, create the
  * destination's rent-pending ATA + ephemeral EATA permission and merge the
- * shuttle balance into it. The destination owner, ATA, EATA, and permission PDA
- * are carried only as ciphertexts encrypted to the validator key and never
- * appear in cleartext on the base layer.
+ * shuttle balance into it. The destination owner and ATA are carried only as
+ * ciphertexts encrypted to the validator key and never appear in cleartext on
+ * the base layer; the EATA and permission PDA are not transmitted at all, but
+ * re-derived on the ER from the decrypted owner.
  *
  * Requires the validator to support rent-pending ATA materialization.
  */
