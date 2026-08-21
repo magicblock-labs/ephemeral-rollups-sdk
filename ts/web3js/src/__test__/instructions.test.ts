@@ -1262,10 +1262,11 @@ describe("Exposed Instructions (web3.js)", () => {
 
       expect(ix.programId.equals(EPHEMERAL_SPL_TOKEN_PROGRAM_ID)).toBe(true);
       expect(ix.keys).toHaveLength(18);
-      expect(data).toHaveLength(1 + 4 + 8 + 2 * 80 + 32);
+      expect(data).toHaveLength(1 + 4 + 8 + 2 * 80 + 1 + 32);
       expect(data[0]).toBe(33);
       expect(data.readUInt32LE(1)).toBe(shuttleId);
       expect(data.readBigUInt64LE(5)).toBe(25n);
+      expect(data[data.length - 33]).toBe(1);
       expect(data.subarray(data.length - 32).equals(validator.toBuffer())).toBe(
         true,
       );
@@ -1536,7 +1537,7 @@ describe("Exposed Instructions (web3.js)", () => {
       expect(instructions).toHaveLength(1);
       const data = Buffer.from(instructions[0].data);
       expect(data[0]).toBe(33);
-      expect(data).toHaveLength(1 + 4 + 8 + 2 * 80 + 32);
+      expect(data).toHaveLength(1 + 4 + 8 + 2 * 80 + 1 + 32);
       expect(instructions[0].keys).toHaveLength(18);
       expect(data.readUInt32LE(1)).toBe(7);
       expect(data.readBigUInt64LE(5)).toBe(25n);
@@ -1755,6 +1756,17 @@ describe("Exposed Instructions (web3.js)", () => {
       expect(instructions[1].data[0]).toBe(3);
       expect(instructions[1].keys).toHaveLength(3);
       expect(Buffer.from(instructions[1].data).readBigUInt64LE(1)).toBe(25n);
+    });
+
+    it("should skip the rent-pending destination setup unless initIfMissing", async () => {
+      const instructions = await transferSpl(from, to, mint, 25n, {
+        visibility: "private",
+        fromBalance: "ephemeral",
+        toBalance: "ephemeral",
+      });
+
+      expect(instructions).toHaveLength(1);
+      expect(instructions[0].data[0]).toBe(3);
     });
 
     it("should reject unsupported routes", async () => {

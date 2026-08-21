@@ -1278,7 +1278,7 @@ describe("Exposed Instructions (@solana/kit)", () => {
       expect(instructions).toHaveLength(1);
       const data = Buffer.from(instructions[0].data ?? []);
       expect(data[0]).toBe(33);
-      expect(data).toHaveLength(1 + 4 + 8 + 2 * 80 + 32);
+      expect(data).toHaveLength(1 + 4 + 8 + 2 * 80 + 1 + 32);
       expect(instructions[0].accounts).toHaveLength(18);
       expect(data.readUInt32LE(1)).toBe(7);
       expect(data.readBigUInt64LE(5)).toBe(25n);
@@ -1525,6 +1525,17 @@ describe("Exposed Instructions (@solana/kit)", () => {
       expect(Buffer.from(instructions[1].data ?? []).readBigUInt64LE(1)).toBe(
         25n,
       );
+    });
+
+    it("should skip the rent-pending destination setup unless initIfMissing", async () => {
+      const instructions = await transferSpl(from, to, mint, 25n, {
+        visibility: "private",
+        fromBalance: "ephemeral",
+        toBalance: "ephemeral",
+      });
+
+      expect(instructions).toHaveLength(1);
+      expect(instructions[0].data?.[0]).toBe(3);
     });
 
     it("should reject unsupported routes", async () => {

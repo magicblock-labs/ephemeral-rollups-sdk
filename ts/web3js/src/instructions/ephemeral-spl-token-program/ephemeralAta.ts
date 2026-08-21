@@ -1010,7 +1010,7 @@ export function depositAndDelegateShuttleWithMergeToEncryptedDestinationIx(
     u64leBuffer(amount),
     encrypt(destinationOwner),
     encrypt(destinationAta),
-    // Implicit trailing option: the validator pubkey is present by length.
+    Buffer.from([1]),
     validator.toBytes(),
   ]);
 
@@ -1996,7 +1996,9 @@ export async function transferSpl(
 
         if (opts.toBalance === "ephemeral") {
           return [
-            ensureRentPendingDestinationIx(payer, to, mint, tokenProgram),
+            ...(initIfMissing
+              ? [ensureRentPendingDestinationIx(payer, to, mint, tokenProgram)]
+              : []),
             createTransferInstruction(
               fromAta(),
               toAta(),
