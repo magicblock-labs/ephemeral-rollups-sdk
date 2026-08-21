@@ -12,6 +12,7 @@ import {
 import {
   createCommitInstruction,
   createCommitAndUndelegateInstruction,
+  closeRentPendingAtaInstruction,
   createRentPendingAtaInstruction,
   isRentPendingTokenAccount,
   rentPendingAtaAddress,
@@ -693,13 +694,26 @@ describe("Exposed Instructions (@solana/kit)", () => {
       expect(instruction.accounts?.[0].role).toBe(AccountRole.READONLY_SIGNER);
       expect(instruction.accounts?.[1].address).toBe(ata);
       expect(instruction.accounts?.[1].role).toBe(AccountRole.WRITABLE);
-      expect(data).toHaveLength(100);
+      expect(data).toHaveLength(36);
       expect(new DataView(data.buffer).getUint32(0, true)).toBe(15);
       expect(data.slice(4, 36)).toEqual(addressEncoder.encode(walletOwner));
-      expect(data.slice(36, 68)).toEqual(addressEncoder.encode(mint));
-      expect(data.slice(68, 100)).toEqual(
-        addressEncoder.encode(TOKEN_PROGRAM_ID),
-      );
+    });
+
+    it("should build the tag-26 close instruction", async () => {
+      const owner = address("11111111111111111111111111111113");
+      const mint = address("11111111111111111111111111111114");
+      const ata = await rentPendingAtaAddress(owner, mint);
+      const instruction = await closeRentPendingAtaInstruction(owner, mint);
+      const data = instruction.data as Uint8Array;
+
+      expect(instruction.programAddress).toBe(MAGIC_PROGRAM_ID);
+      expect(instruction.accounts).toHaveLength(2);
+      expect(instruction.accounts?.[0].address).toBe(owner);
+      expect(instruction.accounts?.[0].role).toBe(AccountRole.READONLY_SIGNER);
+      expect(instruction.accounts?.[1].address).toBe(ata);
+      expect(instruction.accounts?.[1].role).toBe(AccountRole.WRITABLE);
+      expect(data).toHaveLength(4);
+      expect(new DataView(data.buffer).getUint32(0, true)).toBe(26);
     });
 
     it("should derive the canonical ATA address", async () => {
@@ -1050,6 +1064,20 @@ describe("Exposed Instructions (@solana/kit)", () => {
 
       expect(instructions).toHaveLength(1);
       expect(instructions[0].data?.[0]).toBe(3);
+    });
+
+    it("should skip eATA instructions for a rent-pending source", async () => {
+      const instructions = await withdrawSpl(owner, mint, 1n, {
+        validator,
+        shuttleId: 7,
+        rentPendingSource: true,
+        initAtasIfMissing: true,
+      });
+
+      expect(instructions).toHaveLength(2);
+      // createAssociatedTokenAccountIdempotent + ix 26 only
+      expect(instructions[1].data?.[0]).toBe(26);
+      expect(instructions[1].accounts).toHaveLength(16);
     });
   });
 

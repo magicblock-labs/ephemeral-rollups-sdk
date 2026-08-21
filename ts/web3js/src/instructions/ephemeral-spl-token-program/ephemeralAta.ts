@@ -1567,7 +1567,15 @@ export interface DelegateSplWithPrivateTransferOptions
 }
 
 export interface WithdrawSplOptions
-  extends Omit<DelegateSplOptions, "private" | "initVaultIfMissing"> {}
+  extends Omit<DelegateSplOptions, "private" | "initVaultIfMissing"> {
+  /**
+   * The ephemeral balance lives in a rent-pending ATA (no eATA exists yet):
+   * skip the eATA init/delegate instructions and drain the rent-pending ATA
+   * directly. The validator closes the account when it is fully drained.
+   * Detect with isRentPendingTokenAccount on the ER account.
+   */
+  rentPendingSource?: boolean;
+}
 
 export type TransferBalance = "base" | "ephemeral";
 
@@ -1988,7 +1996,7 @@ export async function transferSpl(
 
         if (opts.toBalance === "ephemeral") {
           return [
-            ensureRentPendingDestinationIx(from, to, mint, tokenProgram),
+            ensureRentPendingDestinationIx(payer, to, mint, tokenProgram),
             createTransferInstruction(
               fromAta(),
               toAta(),
@@ -2256,12 +2264,14 @@ async function buildIdempotentWithdrawSplInstructions(
     );
   }
 
-  if (initIfMissing) {
-    instructions.push(initEphemeralAtaIx(ephemeralAta, owner, mint, payer));
+  if (opts?.rentPendingSource !== true) {
+    if (initIfMissing) {
+      instructions.push(initEphemeralAtaIx(ephemeralAta, owner, mint, payer));
+    }
+    instructions.push(delegateEphemeralAtaIx(payer, ephemeralAta, validator));
   }
 
   instructions.push(
-    delegateEphemeralAtaIx(payer, ephemeralAta, validator),
     withdrawThroughDelegatedShuttleWithMergeIx(
       payer,
       shuttleEphemeralAta,

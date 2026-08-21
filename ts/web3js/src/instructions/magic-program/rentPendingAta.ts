@@ -58,11 +58,9 @@ export function createRentPendingAtaInstruction(
   tokenProgram: PublicKey = TOKEN_PROGRAM_ID,
 ): TransactionInstruction {
   const ata = rentPendingAtaAddress(walletOwner, mint, tokenProgram);
-  const data = Buffer.alloc(100);
+  const data = Buffer.alloc(36);
   data.writeUInt32LE(15, 0);
   walletOwner.toBuffer().copy(data, 4);
-  mint.toBuffer().copy(data, 36);
-  tokenProgram.toBuffer().copy(data, 68);
 
   return new TransactionInstruction({
     keys: [
@@ -70,6 +68,37 @@ export function createRentPendingAtaInstruction(
       { pubkey: ata, isSigner: false, isWritable: true },
       { pubkey: mint, isSigner: false, isWritable: false },
       { pubkey: tokenProgram, isSigner: false, isWritable: false },
+    ],
+    programId: MAGIC_PROGRAM_ID,
+    data,
+  });
+}
+
+/**
+ * Closes a drained rent-pending ATA through the Magic Program.
+ *
+ * No-op unless the ATA matches the rent-pending marker for the signing
+ * owner and holds zero tokens, so it can be appended unconditionally to
+ * withdrawal flows.
+ *
+ * @param owner - The wallet owning the rent-pending ATA (must sign)
+ * @param mint - The token mint
+ * @param tokenProgram - The token program (TOKEN_PROGRAM_ID or TOKEN_2022_PROGRAM_ID)
+ * @returns TransactionInstruction
+ */
+export function closeRentPendingAtaInstruction(
+  owner: PublicKey,
+  mint: PublicKey,
+  tokenProgram: PublicKey = TOKEN_PROGRAM_ID,
+): TransactionInstruction {
+  const ata = rentPendingAtaAddress(owner, mint, tokenProgram);
+  const data = Buffer.alloc(4);
+  data.writeUInt32LE(26, 0);
+
+  return new TransactionInstruction({
+    keys: [
+      { pubkey: owner, isSigner: true, isWritable: false },
+      { pubkey: ata, isSigner: false, isWritable: true },
     ],
     programId: MAGIC_PROGRAM_ID,
     data,

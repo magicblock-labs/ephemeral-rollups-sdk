@@ -9,13 +9,14 @@ use {
 };
 
 pub const CREATE_RENT_PENDING_ATA_DISCRIMINATOR: u32 = 15;
-pub const CREATE_RENT_PENDING_ATA_DATA_LEN: usize = 100;
+pub const CREATE_RENT_PENDING_ATA_DATA_LEN: usize = 36;
+pub const CLOSE_RENT_PENDING_ATA_DISCRIMINATOR: u32 = 26;
 
 const TOKEN_ACCOUNT_CLOSE_AUTHORITY_OFFSET: usize = 129;
 const TOKEN_ACCOUNT_CLOSE_AUTHORITY_PUBKEY_OFFSET: usize = 133;
 const TOKEN_ACCOUNT_LEN: usize = 165;
 
-pub fn rent_pending_ata_address(
+pub fn get_associated_token_address(
     wallet_owner: &Address,
     mint: &Address,
     token_program: &Address,
@@ -29,13 +30,9 @@ pub fn rent_pending_ata_address(
 pub fn encode_create_rent_pending_ata_data(
     data: &mut [u8; CREATE_RENT_PENDING_ATA_DATA_LEN],
     wallet_owner: &Address,
-    mint: &Address,
-    token_program: &Address,
 ) {
     data[0..4].copy_from_slice(&CREATE_RENT_PENDING_ATA_DISCRIMINATOR.to_le_bytes());
     data[4..36].copy_from_slice(wallet_owner.as_ref());
-    data[36..68].copy_from_slice(mint.as_ref());
-    data[68..100].copy_from_slice(token_program.as_ref());
 }
 
 pub fn is_rent_pending_token_account(data: &[u8]) -> bool {
@@ -97,12 +94,7 @@ impl<'a> CreateRentPendingAta<'a> {
         accounts[3].write(self.token_program);
 
         let mut instruction_data = [0u8; CREATE_RENT_PENDING_ATA_DATA_LEN];
-        encode_create_rent_pending_ata_data(
-            &mut instruction_data,
-            self.wallet_owner,
-            self.mint.address(),
-            self.token_program.address(),
-        );
+        encode_create_rent_pending_ata_data(&mut instruction_data, self.wallet_owner);
 
         invoke_signed_with_bounds::<NUM_ACCOUNTS>(
             &InstructionView {
@@ -126,27 +118,23 @@ mod tests {
     #[test]
     fn test_encode_create_rent_pending_ata_data() {
         let wallet_owner = Address::new_from_array([1; 32]);
-        let mint = Address::new_from_array([2; 32]);
-        let token_program = TOKEN_PROGRAM_ID;
         let mut data = [0u8; CREATE_RENT_PENDING_ATA_DATA_LEN];
 
-        encode_create_rent_pending_ata_data(&mut data, &wallet_owner, &mint, &token_program);
+        encode_create_rent_pending_ata_data(&mut data, &wallet_owner);
 
         assert_eq!(
             u32::from_le_bytes(data[0..4].try_into().unwrap()),
             CREATE_RENT_PENDING_ATA_DISCRIMINATOR
         );
         assert_eq!(&data[4..36], wallet_owner.as_ref());
-        assert_eq!(&data[36..68], mint.as_ref());
-        assert_eq!(&data[68..100], token_program.as_ref());
     }
 
     #[test]
-    fn test_rent_pending_ata_address() {
+    fn test_get_associated_token_address() {
         let wallet_owner = Address::new_from_array([1; 32]);
         let mint = Address::new_from_array([2; 32]);
         let token_program = TOKEN_PROGRAM_ID;
-        let (ata, _) = rent_pending_ata_address(&wallet_owner, &mint, &token_program);
+        let (ata, _) = get_associated_token_address(&wallet_owner, &mint, &token_program);
         let (expected_ata, _) = Address::find_program_address(
             &[wallet_owner.as_ref(), token_program.as_ref(), mint.as_ref()],
             &crate::spl::consts::ASSOCIATED_TOKEN_PROGRAM_ID,

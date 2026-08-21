@@ -14,6 +14,7 @@ import {
 import {
   createCommitInstruction,
   createCommitAndUndelegateInstruction,
+  closeRentPendingAtaInstruction,
   createRentPendingAtaInstruction,
   isRentPendingTokenAccount,
   rentPendingAtaAddress,
@@ -722,13 +723,28 @@ describe("Exposed Instructions (web3.js)", () => {
       });
       expect(instruction.keys[1].pubkey.equals(ata)).toBe(true);
       expect(instruction.keys[1].isWritable).toBe(true);
-      expect(instruction.data).toHaveLength(100);
+      expect(instruction.data).toHaveLength(36);
       expect(instruction.data.readUInt32LE(0)).toBe(15);
       expect(instruction.data.subarray(4, 36)).toEqual(walletOwner.toBuffer());
-      expect(instruction.data.subarray(36, 68)).toEqual(mint.toBuffer());
-      expect(instruction.data.subarray(68, 100)).toEqual(
-        TOKEN_PROGRAM_ID.toBuffer(),
-      );
+    });
+
+    it("should build the tag-26 close instruction", () => {
+      const owner = new PublicKey("11111111111111111111111111111113");
+      const mint = new PublicKey("11111111111111111111111111111114");
+      const ata = rentPendingAtaAddress(owner, mint);
+      const instruction = closeRentPendingAtaInstruction(owner, mint);
+
+      expect(instruction.programId.equals(MAGIC_PROGRAM_ID)).toBe(true);
+      expect(instruction.keys).toHaveLength(2);
+      expect(instruction.keys[0]).toMatchObject({
+        isSigner: true,
+        isWritable: false,
+      });
+      expect(instruction.keys[0].pubkey.equals(owner)).toBe(true);
+      expect(instruction.keys[1].pubkey.equals(ata)).toBe(true);
+      expect(instruction.keys[1].isWritable).toBe(true);
+      expect(instruction.data).toHaveLength(4);
+      expect(instruction.data.readUInt32LE(0)).toBe(26);
     });
 
     it("should derive the canonical ATA address", () => {
@@ -1125,6 +1141,25 @@ describe("Exposed Instructions (web3.js)", () => {
 
       expect(instructions).toHaveLength(1);
       expect(instructions[0].data[0]).toBe(3);
+    });
+
+    it("should skip eATA instructions for a rent-pending source", async () => {
+      const instructions = await withdrawSpl(owner, mint, 1n, {
+        validator,
+        shuttleId: 7,
+        rentPendingSource: true,
+        initAtasIfMissing: true,
+      });
+
+      expect(instructions).toHaveLength(2);
+      // createAssociatedTokenAccountIdempotent + ix 26 only
+      expect(instructions[1].data[0]).toBe(26);
+      expect(instructions[1].keys).toHaveLength(16);
+      expect(
+        instructions.find((ix) =>
+          ix.programId.equals(EPHEMERAL_SPL_TOKEN_PROGRAM_ID),
+        ),
+      ).toBe(instructions[1]);
     });
   });
 

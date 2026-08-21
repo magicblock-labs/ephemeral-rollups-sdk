@@ -60,13 +60,14 @@ async function getAssociatedTokenAddressSync(
   mint: Address,
   owner: Address,
   allowOwnerOffCurve: boolean = true,
+  tokenProgram: Address = TOKEN_PROGRAM_ID,
 ): Promise<Address> {
   const addressEncoder = getAddressEncoder();
   const [ata] = await getProgramDerivedAddress({
     programAddress: ASSOCIATED_TOKEN_PROGRAM_ID,
     seeds: [
       addressEncoder.encode(owner),
-      addressEncoder.encode(TOKEN_PROGRAM_ID),
+      addressEncoder.encode(tokenProgram),
       addressEncoder.encode(mint),
     ],
   });
@@ -894,6 +895,7 @@ export async function depositAndDelegateShuttleWithMergeToEncryptedDestinationIx
   shuttleId: number,
   amount: bigint,
   validator?: Address,
+  tokenProgram: Address = TOKEN_PROGRAM_ID,
 ): Promise<Instruction> {
   if (
     !Number.isInteger(shuttleId) ||
@@ -916,6 +918,7 @@ export async function depositAndDelegateShuttleWithMergeToEncryptedDestinationIx
     mint,
     destinationOwner,
     true,
+    tokenProgram,
   );
   const delegateBuffer =
     await delegateBufferPdaFromDelegatedAccountAndOwnerProgram(
@@ -970,7 +973,7 @@ export async function depositAndDelegateShuttleWithMergeToEncryptedDestinationIx
       },
       { address: SYSTEM_PROGRAM_ADDRESS, role: AccountRole.READONLY },
       { address: mint, role: AccountRole.READONLY },
-      { address: TOKEN_PROGRAM_ID, role: AccountRole.READONLY },
+      { address: tokenProgram, role: AccountRole.READONLY },
       { address: vault, role: AccountRole.READONLY },
       { address: sourceAta, role: AccountRole.WRITABLE },
       { address: vaultAta, role: AccountRole.WRITABLE },
@@ -989,11 +992,13 @@ export async function ensureRentPendingDestinationIx(
   payer: Address,
   destinationOwner: Address,
   mint: Address,
+  tokenProgram: Address = TOKEN_PROGRAM_ID,
 ): Promise<Instruction> {
   const destinationAta = await getAssociatedTokenAddressSync(
     mint,
     destinationOwner,
     true,
+    tokenProgram,
   );
 
   return {
@@ -1002,7 +1007,7 @@ export async function ensureRentPendingDestinationIx(
       { address: destinationOwner, role: AccountRole.READONLY },
       { address: destinationAta, role: AccountRole.WRITABLE },
       { address: mint, role: AccountRole.READONLY },
-      { address: TOKEN_PROGRAM_ID, role: AccountRole.READONLY },
+      { address: tokenProgram, role: AccountRole.READONLY },
       { address: MAGIC_PROGRAM_ID, role: AccountRole.READONLY },
     ],
     data: Buffer.from([35]),
@@ -1455,7 +1460,15 @@ export interface DelegateSplWithPrivateTransferOptions
 }
 
 export interface WithdrawSplOptions
-  extends Omit<DelegateSplOptions, "private" | "initVaultIfMissing"> {}
+  extends Omit<DelegateSplOptions, "private" | "initVaultIfMissing"> {
+  /**
+   * The ephemeral balance lives in a rent-pending ATA (no eATA exists yet):
+   * skip the eATA init/delegate instructions and drain the rent-pending ATA
+   * directly. The validator closes the account when it is fully drained.
+   * Detect with isRentPendingTokenAccount on the ER account.
+   */
+  rentPendingSource?: boolean;
+}
 
 export type TransferBalance = "base" | "ephemeral";
 
@@ -1807,7 +1820,7 @@ export async function transferSpl(
 
         if (opts.toBalance === "ephemeral") {
           return [
-            await ensureRentPendingDestinationIx(from, to, mint),
+            await ensureRentPendingDestinationIx(payer, to, mint),
             createTransferInstruction(fromAta, toAta, from, amount),
           ];
         }
@@ -2004,12 +2017,14 @@ async function buildIdempotentWithdrawSplInstructions(
     instructions.push(initVaultAtaIx(payer, ownerAta, owner, mint));
   }
 
-  if (initIfMissing) {
-    instructions.push(initEphemeralAtaIx(ephemeralAta, owner, mint, payer));
+  if (opts?.rentPendingSource !== true) {
+    if (initIfMissing) {
+      instructions.push(initEphemeralAtaIx(ephemeralAta, owner, mint, payer));
+    }
+    instructions.push(await delegateIx(payer, ephemeralAta, validator));
   }
 
   instructions.push(
-    await delegateIx(payer, ephemeralAta, validator),
     await withdrawThroughDelegatedShuttleWithMergeIx(
       payer,
       shuttleEphemeralAta,

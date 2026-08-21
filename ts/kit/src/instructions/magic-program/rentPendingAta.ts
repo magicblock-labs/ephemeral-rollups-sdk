@@ -69,11 +69,9 @@ export async function createRentPendingAtaInstruction(
 ): Promise<Instruction> {
   const addressEncoder = getAddressEncoder();
   const ata = await rentPendingAtaAddress(walletOwner, mint, tokenProgram);
-  const data = new Uint8Array(100);
+  const data = new Uint8Array(36);
   new DataView(data.buffer).setUint32(0, 15, true);
   data.set(addressEncoder.encode(walletOwner), 4);
-  data.set(addressEncoder.encode(mint), 36);
-  data.set(addressEncoder.encode(tokenProgram), 68);
 
   return {
     accounts: [
@@ -81,6 +79,37 @@ export async function createRentPendingAtaInstruction(
       { address: ata, role: AccountRole.WRITABLE },
       { address: mint, role: AccountRole.READONLY },
       { address: tokenProgram, role: AccountRole.READONLY },
+    ],
+    programAddress: MAGIC_PROGRAM_ID,
+    data,
+  };
+}
+
+/**
+ * Closes a drained rent-pending ATA through the Magic Program.
+ *
+ * No-op unless the ATA matches the rent-pending marker for the signing
+ * owner and holds zero tokens, so it can be appended unconditionally to
+ * withdrawal flows.
+ *
+ * @param owner - The wallet owning the rent-pending ATA (must sign)
+ * @param mint - The token mint
+ * @param tokenProgram - The token program (TOKEN_PROGRAM_ID or TOKEN_2022_PROGRAM_ID)
+ * @returns Instruction
+ */
+export async function closeRentPendingAtaInstruction(
+  owner: Address,
+  mint: Address,
+  tokenProgram: Address = TOKEN_PROGRAM_ID,
+): Promise<Instruction> {
+  const ata = await rentPendingAtaAddress(owner, mint, tokenProgram);
+  const data = new Uint8Array(4);
+  new DataView(data.buffer).setUint32(0, 26, true);
+
+  return {
+    accounts: [
+      { address: owner, role: AccountRole.READONLY_SIGNER },
+      { address: ata, role: AccountRole.WRITABLE },
     ],
     programAddress: MAGIC_PROGRAM_ID,
     data,
