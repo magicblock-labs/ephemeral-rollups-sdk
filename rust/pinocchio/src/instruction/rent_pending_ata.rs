@@ -110,6 +110,50 @@ impl<'a> CreateRentPendingAta<'a> {
     }
 }
 
+/// Close a drained rent-pending ATA through the Magic Program.
+///
+/// No-op unless the ATA matches the rent-pending marker for the signing owner
+/// and holds zero tokens, so it can be appended unconditionally to withdrawal
+/// flows.
+pub struct CloseRentPendingAta<'a> {
+    pub owner: &'a AccountView,
+    pub ata: &'a AccountView,
+    pub magic_program: &'a AccountView,
+}
+
+impl CloseRentPendingAta<'_> {
+    #[inline(always)]
+    pub fn invoke(&self) -> ProgramResult {
+        self.invoke_signed(&[])
+    }
+
+    #[inline(always)]
+    pub fn invoke_signed(&self, signers: &[Signer<'_, '_>]) -> ProgramResult {
+        const NUM_ACCOUNTS: usize = 2;
+
+        let mut instruction_accounts =
+            [const { MaybeUninit::<InstructionAccount>::uninit() }; NUM_ACCOUNTS];
+        instruction_accounts[0].write(InstructionAccount::readonly_signer(self.owner.address()));
+        instruction_accounts[1].write(InstructionAccount::writable(self.ata.address()));
+
+        let mut accounts = [const { MaybeUninit::<&AccountView>::uninit() }; NUM_ACCOUNTS];
+        accounts[0].write(self.owner);
+        accounts[1].write(self.ata);
+
+        invoke_signed_with_bounds::<NUM_ACCOUNTS>(
+            &InstructionView {
+                program_id: self.magic_program.address(),
+                accounts: unsafe {
+                    from_raw_parts(instruction_accounts.as_ptr() as _, NUM_ACCOUNTS)
+                },
+                data: &CLOSE_RENT_PENDING_ATA_DISCRIMINATOR.to_le_bytes(),
+            },
+            unsafe { from_raw_parts(accounts.as_ptr() as _, NUM_ACCOUNTS) },
+            signers,
+        )
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
