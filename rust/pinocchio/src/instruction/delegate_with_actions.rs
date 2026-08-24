@@ -25,7 +25,7 @@ fn find_buffer_pda_bump(pda_key: &[u8], owner_program: &Address) -> u8 {
     bump
 }
 
-#[allow(unknown_lints, clippy::cloned_ref_to_slice_refs)]
+#[allow(unknown_lints)]
 pub fn delegate_account_with_actions(
     accounts: &mut [AccountView],
     seeds: &[&[u8]],

@@ -17,7 +17,7 @@ fn find_buffer_pda_bump(pda_key: &[u8], owner_program: &Address) -> u8 {
     bump
 }
 
-#[allow(unknown_lints, clippy::cloned_ref_to_slice_refs)]
+#[allow(unknown_lints)]
 pub fn delegate_account(
     accounts: &mut [AccountView],
     seeds: &[&[u8]],
@@ -27,7 +27,7 @@ pub fn delegate_account(
     delegate_account_inner(accounts, seeds, bump, config, false)
 }
 
-#[allow(unknown_lints, clippy::cloned_ref_to_slice_refs)]
+#[allow(unknown_lints)]
 pub fn delegate_account_with_any_validator(
     accounts: &mut [AccountView],
     seeds: &[&[u8]],
@@ -37,7 +37,7 @@ pub fn delegate_account_with_any_validator(
     delegate_account_inner(accounts, seeds, bump, config, true)
 }
 
-#[allow(unknown_lints, clippy::cloned_ref_to_slice_refs)]
+#[allow(unknown_lints)]
 fn delegate_account_inner(
     accounts: &mut [AccountView],
     seeds: &[&[u8]],
@@ -111,7 +111,7 @@ fn delegate_account_inner(
             account: pda_acc,
             owner: &DELEGATION_PROGRAM_ID,
         }
-        .invoke_signed(&[delegate_signer_seeds.clone()])?;
+        .invoke_signed(core::array::from_ref(&delegate_signer_seeds))?;
     }
 
     // Delegate
