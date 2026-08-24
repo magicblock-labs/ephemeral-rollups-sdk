@@ -125,9 +125,9 @@ impl<'acc, 'args> MagicIntentBundleBuilder<'acc, 'args> {
         &self,
     ) -> Result<NoVec<AccountView, MAX_STATIC_CPI_ACCOUNTS>, ProgramError> {
         let mut all_accounts = NoVec::<AccountView, MAX_STATIC_CPI_ACCOUNTS>::new();
-        all_accounts.try_append([self.payer.clone(), self.magic_context.clone()])?;
+        all_accounts.try_append([self.payer, self.magic_context])?;
         if let Some(ref vault) = self.magic_fee_vault {
-            all_accounts.try_push(vault.clone())?;
+            all_accounts.try_push(*vault)?;
         }
         self.intent_bundle
             .collect_unique_accounts(&mut all_accounts)?;
@@ -217,18 +217,13 @@ impl<'acc, 'args> MagicIntentBundleBuilder<'acc, 'args> {
     ) -> ProgramResult {
         let instruction_accounts = Self::instruction_accounts(all_accounts)?;
 
-        let mut account_refs = NoVec::<&AccountView, MAX_STATIC_CPI_ACCOUNTS>::new();
-        for account in all_accounts.iter() {
-            account_refs.try_push(account)?;
-        }
-
         let ix = InstructionView {
             program_id,
             data,
             accounts: instruction_accounts.as_slice(),
         };
 
-        Self::do_invoke_signed(&ix, account_refs.as_slice(), signers_seeds)
+        Self::do_invoke_signed(&ix, all_accounts, signers_seeds)
     }
 
     /// Builds the CPI account metas for the magic program.
@@ -264,10 +259,10 @@ impl<'acc, 'args> MagicIntentBundleBuilder<'acc, 'args> {
     #[inline(never)]
     fn do_invoke_signed(
         ix: &InstructionView,
-        account_refs: &[&AccountView],
+        account_refs: &[AccountView],
         signers_seeds: &[Signer<'_, '_>],
     ) -> ProgramResult {
-        invoke_signed_with_bounds::<MAX_STATIC_CPI_ACCOUNTS>(ix, account_refs, signers_seeds)
+        invoke_signed_with_bounds::<MAX_STATIC_CPI_ACCOUNTS, _>(ix, account_refs, signers_seeds)
     }
 }
 
@@ -303,7 +298,7 @@ impl MagicIntentBundleBuilder<'_, '_> {
         let all_accounts = self.collect_unique_account().unwrap();
         let mut account_keys = NoVec::<Address, MAX_STATIC_CPI_ACCOUNTS>::new();
         for account in all_accounts.iter() {
-            account_keys.push(account.address().clone());
+            account_keys.push(*account.address());
         }
         let indices_map = create_indices_map(all_accounts.as_slice()).unwrap();
         let serializable = MagicIntentBundleSerialize::new(&indices_map, self.intent_bundle);
@@ -362,7 +357,7 @@ mod tests {
         is_signer: u8,
         is_writable: u8,
         executable: u8,
-        resize_delta: i32,
+        padding: [u8; 4],
         address: [u8; 32],
         owner: [u8; 32],
         lamports: u64,
@@ -380,7 +375,7 @@ mod tests {
                 is_signer: 0,
                 is_writable: 1,
                 executable: 0,
-                resize_delta: 0,
+                padding: [0; 4],
                 address,
                 owner: [0; 32],
                 lamports: 1_000_000,

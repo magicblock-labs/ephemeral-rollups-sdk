@@ -19,7 +19,7 @@ fn find_buffer_pda_bump(pda_key: &[u8], owner_program: &Address) -> u8 {
 
 #[allow(unknown_lints, clippy::cloned_ref_to_slice_refs)]
 pub fn delegate_account(
-    accounts: &[&AccountView],
+    accounts: &mut [AccountView],
     seeds: &[&[u8]],
     bump: u8,
     config: DelegateConfig,
@@ -29,7 +29,7 @@ pub fn delegate_account(
 
 #[allow(unknown_lints, clippy::cloned_ref_to_slice_refs)]
 pub fn delegate_account_with_any_validator(
-    accounts: &[&AccountView],
+    accounts: &mut [AccountView],
     seeds: &[&[u8]],
     bump: u8,
     config: DelegateConfig,
@@ -39,7 +39,7 @@ pub fn delegate_account_with_any_validator(
 
 #[allow(unknown_lints, clippy::cloned_ref_to_slice_refs)]
 fn delegate_account_inner(
-    accounts: &[&AccountView],
+    accounts: &mut [AccountView],
     seeds: &[&[u8]],
     bump: u8,
     config: DelegateConfig,
@@ -101,11 +101,11 @@ fn delegate_account_inner(
     let filled = fill_seeds(&mut seed_buf, seeds, &bump);
     let delegate_signer_seeds = Signer::from(filled);
 
-    let current_owner = unsafe { pda_acc.owner() };
+    let current_owner = pda_acc.owner();
     if current_owner != &pinocchio_system::ID {
         unsafe { pda_acc.assign(&pinocchio_system::ID) };
     }
-    let current_owner = unsafe { pda_acc.owner() };
+    let current_owner = pda_acc.owner();
     if current_owner != &DELEGATION_PROGRAM_ID {
         Assign {
             account: pda_acc,
@@ -220,19 +220,19 @@ impl<'a> DelegateAccountCpiBuilder<'a> {
         }
         let bump = self.bump.ok_or(ProgramError::InvalidInstructionData)?;
         let config = self.config.ok_or(ProgramError::InvalidInstructionData)?;
-        let accounts = [
-            self.payer,
-            self.pda_acc,
-            self.owner_program,
-            self.buffer_acc,
-            self.delegation_record,
-            self.delegation_metadata,
-            self.system_program,
+        let mut accounts = [
+            *self.payer,
+            *self.pda_acc,
+            *self.owner_program,
+            *self.buffer_acc,
+            *self.delegation_record,
+            *self.delegation_metadata,
+            *self.system_program,
         ];
         if any_validator {
-            delegate_account_with_any_validator(&accounts, seeds, bump, config)
+            delegate_account_with_any_validator(&mut accounts, seeds, bump, config)
         } else {
-            delegate_account(&accounts, seeds, bump, config)
+            delegate_account(&mut accounts, seeds, bump, config)
         }
     }
 }

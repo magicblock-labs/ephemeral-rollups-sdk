@@ -1,22 +1,18 @@
 // NOTE: this should go into a core package that both the sdk + the program can depend on
 use pinocchio::Address;
-use pinocchio_pubkey::pubkey;
+use solana_address::address;
 
 /// The delegation program ID.
-pub const DELEGATION_PROGRAM_ID: Address =
-    Address::new_from_array(pubkey!("DELeGGvXpWV2fqJUhqcF5ZSYMS4JTLjteaAMARRSaeSh"));
+pub const DELEGATION_PROGRAM_ID: Address = address!("DELeGGvXpWV2fqJUhqcF5ZSYMS4JTLjteaAMARRSaeSh");
 
 /// The magic program ID.
-pub const MAGIC_PROGRAM_ID: Address =
-    Address::new_from_array(pubkey!("Magic11111111111111111111111111111111111111"));
+pub const MAGIC_PROGRAM_ID: Address = address!("Magic11111111111111111111111111111111111111");
 
 /// The magic context ID.
-pub const MAGIC_CONTEXT_ID: Address =
-    Address::new_from_array(pubkey!("MagicContext1111111111111111111111111111111"));
+pub const MAGIC_CONTEXT_ID: Address = address!("MagicContext1111111111111111111111111111111");
 
 /// The ephemeral vault ID (collects rent for ephemeral accounts).
-pub const EPHEMERAL_VAULT_ID: Address =
-    Address::new_from_array(pubkey!("MagicVau1t999999999999999999999999999999999"));
+pub const EPHEMERAL_VAULT_ID: Address = address!("MagicVau1t999999999999999999999999999999999");
 
 /// The seed of the authority account PDA.
 pub const DELEGATION_RECORD: &[u8] = b"delegation";
