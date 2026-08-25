@@ -8,7 +8,7 @@ use pinocchio::{
     cpi::{invoke_signed, Seed, Signer, MAX_CPI_ACCOUNTS},
     error::ProgramError,
     instruction::{InstructionAccount, InstructionView},
-    AccountView,
+    AccountView, Resize,
 };
 
 #[inline(always)]
@@ -30,7 +30,10 @@ pub fn make_seed_buf<'a>() -> [Seed<'a>; MAX_SEEDS] {
     unsafe { core::mem::transmute_copy::<_, [Seed<'a>; MAX_SEEDS]>(&buf) }
 }
 
-pub fn close_pda_acc(payer: &AccountView, pda_acc: &AccountView) -> Result<(), ProgramError> {
+pub fn close_pda_acc(
+    payer: &mut AccountView,
+    pda_acc: &mut AccountView,
+) -> Result<(), ProgramError> {
     payer.set_lamports(payer.lamports() + pda_acc.lamports());
     pda_acc.set_lamports(0);
 
@@ -209,7 +212,7 @@ pub fn cpi_delegate_with_actions(
     system_program: &AccountView,
     delegate_args: DelegateAccountArgs,
     actions: dlp_api::args::PostDelegationActions,
-    action_signer_accounts: &[&AccountView],
+    action_signer_accounts: &[AccountView],
     signer_seeds: Signer<'_, '_>,
 ) -> Result<(), ProgramError> {
     use pinocchio::cpi::invoke_signed_with_bounds;
@@ -282,21 +285,21 @@ pub fn cpi_delegate_with_actions(
         data: &data,
     };
 
-    let mut acc_infos: [&AccountView; MAX_ACCOUNTS] = [payer; MAX_ACCOUNTS];
-    acc_infos[0] = payer;
-    acc_infos[1] = pda_acc;
-    acc_infos[2] = owner_program;
-    acc_infos[3] = buffer_acc;
-    acc_infos[4] = delegation_record;
-    acc_infos[5] = delegation_metadata;
-    acc_infos[6] = system_program;
+    let mut acc_infos = [*payer; MAX_ACCOUNTS];
+    acc_infos[0] = *payer;
+    acc_infos[1] = *pda_acc;
+    acc_infos[2] = *owner_program;
+    acc_infos[3] = *buffer_acc;
+    acc_infos[4] = *delegation_record;
+    acc_infos[5] = *delegation_metadata;
+    acc_infos[6] = *system_program;
     let mut j = 0;
     while j < action_signer_accounts.len() {
         acc_infos[7 + j] = action_signer_accounts[j];
         j += 1;
     }
 
-    invoke_signed_with_bounds::<MAX_ACCOUNTS>(
+    invoke_signed_with_bounds::<MAX_ACCOUNTS, _>(
         &instruction,
         &acc_infos[..num_accounts],
         &[signer_seeds],

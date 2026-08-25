@@ -141,7 +141,7 @@ impl<'a> ScheduleCrankArgs<'a> {
 pub struct ScheduleCrankCpi<'a> {
     pub payer: AccountView,
     pub magic_program: AccountView,
-    pub instruction_accounts: &'a [&'a AccountView],
+    pub instruction_accounts: &'a [AccountView],
     pub args: ScheduleCrankArgs<'a>,
 }
 
@@ -150,7 +150,7 @@ impl<'a> ScheduleCrankCpi<'a> {
     pub const fn new(
         payer: AccountView,
         magic_program: AccountView,
-        instruction_accounts: &'a [&'a AccountView],
+        instruction_accounts: &'a [AccountView],
         args: ScheduleCrankArgs<'a>,
     ) -> Self {
         Self {
@@ -225,7 +225,7 @@ impl<'a> ScheduleCrankCpi<'a> {
             return Err(ProgramError::InvalidArgument);
         }
 
-        let mut account_refs = [&self.payer; MAX_ACCOUNT_INFOS];
+        let mut account_refs = [self.payer; MAX_ACCOUNT_INFOS];
         account_refs[1..num_accounts].copy_from_slice(self.instruction_accounts);
 
         let data_len = self.serialize_into(data_buf)?;
@@ -245,7 +245,7 @@ impl<'a> ScheduleCrankCpi<'a> {
             return Err(ProgramError::InvalidArgument);
         }
 
-        let mut account_refs = [&self.payer; MAX_ACCOUNT_INFOS];
+        let mut account_refs = [self.payer; MAX_ACCOUNT_INFOS];
         account_refs[1..num_accounts].copy_from_slice(self.instruction_accounts);
 
         let data_len = self.serialize_into(data_buf)?;
@@ -260,25 +260,25 @@ impl<'a> ScheduleCrankCpi<'a> {
     #[inline(never)]
     fn do_invoke<const MAX_ACCOUNT_INFOS: usize>(
         ix: &InstructionView,
-        account_refs: &[&AccountView],
+        account_refs: &[AccountView],
     ) -> ProgramResult {
-        invoke_with_bounds::<MAX_ACCOUNT_INFOS>(ix, account_refs)
+        invoke_with_bounds::<MAX_ACCOUNT_INFOS, _>(ix, account_refs)
     }
 
     #[inline(never)]
     fn do_invoke_signed<const MAX_ACCOUNT_INFOS: usize>(
         ix: &InstructionView,
-        account_refs: &[&AccountView],
+        account_refs: &[AccountView],
         signers_seeds: &[Signer<'_, '_>],
     ) -> ProgramResult {
-        invoke_signed_with_bounds::<MAX_ACCOUNT_INFOS>(ix, account_refs, signers_seeds)
+        invoke_signed_with_bounds::<MAX_ACCOUNT_INFOS, _>(ix, account_refs, signers_seeds)
     }
 }
 
 pub struct ScheduleCrankCpiBuilder<'a> {
     payer: AccountView,
     magic_program: AccountView,
-    instruction_accounts: Option<&'a [&'a AccountView]>,
+    instruction_accounts: Option<&'a [AccountView]>,
     task_id: Option<i64>,
     execution_interval_millis: i64,
     iterations: i64,
@@ -300,10 +300,7 @@ impl<'a> ScheduleCrankCpiBuilder<'a> {
     }
 
     #[inline(always)]
-    pub const fn instruction_accounts(
-        mut self,
-        instruction_accounts: &'a [&'a AccountView],
-    ) -> Self {
+    pub const fn instruction_accounts(mut self, instruction_accounts: &'a [AccountView]) -> Self {
         self.instruction_accounts = Some(instruction_accounts);
         self
     }
@@ -419,7 +416,7 @@ impl CancelCrankCpi {
         let accounts = [&self.authority, &self.task_context];
         let data = self.data();
 
-        invoke_with_bounds::<2>(&self.instruction(&data, &mut ix_accounts)?, &accounts)
+        invoke_with_bounds::<2, _>(&self.instruction(&data, &mut ix_accounts)?, &accounts)
     }
 
     pub fn invoke_signed(&self, signers_seeds: &[Signer<'_, '_>]) -> ProgramResult {
@@ -427,7 +424,7 @@ impl CancelCrankCpi {
         let accounts = [&self.authority, &self.task_context];
         let data = self.data();
 
-        invoke_signed_with_bounds::<2>(
+        invoke_signed_with_bounds::<2, _>(
             &self.instruction(&data, &mut ix_accounts)?,
             &accounts,
             signers_seeds,
@@ -472,7 +469,7 @@ mod tests {
             is_signer,
             is_writable,
             executable: 0,
-            resize_delta: 0,
+            padding: [0; 4],
             address,
             owner: Address::new_from_array([0; 32]),
             lamports: 0,
@@ -506,7 +503,7 @@ mod tests {
                     is_signer: 0,
                     is_writable: 0,
                     executable: 0,
-                    resize_delta: 0,
+                    padding: [0; 4],
                     address: Address::new_from_array([0; 32]),
                     owner: Address::new_from_array([0; 32]),
                     lamports: 0,
@@ -519,7 +516,7 @@ mod tests {
                     is_signer: 0,
                     is_writable: 0,
                     executable: 0,
-                    resize_delta: 0,
+                    padding: [0; 4],
                     address: Address::new_from_array([0; 32]),
                     owner: Address::new_from_array([0; 32]),
                     lamports: 0,
@@ -543,7 +540,7 @@ mod tests {
         let acc1 = Address::new_from_array(core::array::from_fn(|i| if i == 0 { 2 } else { 0 }));
         let instruction_accounts = [InstructionAccount::new(&acc1, true, false)];
         let crank_instructions = [CrankInstruction::new(
-            program_id.clone(),
+            program_id,
             &instruction_accounts,
             &[1, 2, 3],
         )];
@@ -572,7 +569,7 @@ mod tests {
                     is_signer: 0,
                     is_writable: 0,
                     executable: 0,
-                    resize_delta: 0,
+                    padding: [0; 4],
                     address: Address::new_from_array([0; 32]),
                     owner: Address::new_from_array([0; 32]),
                     lamports: 0,
@@ -585,7 +582,7 @@ mod tests {
                     is_signer: 0,
                     is_writable: 0,
                     executable: 0,
-                    resize_delta: 0,
+                    padding: [0; 4],
                     address: Address::new_from_array([0; 32]),
                     owner: Address::new_from_array([0; 32]),
                     lamports: 0,
@@ -617,8 +614,8 @@ mod tests {
             InstructionAccount::new(&acc2, true, false),
         ];
         let crank_instructions = [
-            CrankInstruction::new(program_id.clone(), &first_accounts, &[1, 2, 3]),
-            CrankInstruction::new(program_id.clone(), &second_accounts, &[1, 2, 3]),
+            CrankInstruction::new(program_id, &first_accounts, &[1, 2, 3]),
+            CrankInstruction::new(program_id, &second_accounts, &[1, 2, 3]),
         ];
         let this_args = ScheduleCrankArgs::new(123, &crank_instructions)
             .execution_interval_millis(123456)
@@ -670,7 +667,7 @@ mod tests {
                     is_signer: 0,
                     is_writable: 0,
                     executable: 0,
-                    resize_delta: 0,
+                    padding: [0; 4],
                     address: Address::new_from_array([0; 32]),
                     owner: Address::new_from_array([0; 32]),
                     lamports: 0,
@@ -683,7 +680,7 @@ mod tests {
                     is_signer: 0,
                     is_writable: 0,
                     executable: 0,
-                    resize_delta: 0,
+                    padding: [0; 4],
                     address: Address::new_from_array([0; 32]),
                     owner: Address::new_from_array([0; 32]),
                     lamports: 0,
@@ -712,7 +709,7 @@ mod tests {
         };
         let task_context =
             unsafe { AccountView::new_unchecked(&mut task_context_account as *mut RuntimeAccount) };
-        let task_context_accounts = [&task_context];
+        let task_context_accounts = [task_context];
         let target_program = Address::new_from_array([9; 32]);
         let target_account = Address::new_from_array([8; 32]);
         let execute_accounts = [InstructionAccount::new(&target_account, true, false)];
@@ -723,8 +720,8 @@ mod tests {
         )];
 
         let direct = ScheduleCrankCpi::new(
-            payer.clone(),
-            magic_program.clone(),
+            payer,
+            magic_program,
             &task_context_accounts,
             ScheduleCrankArgs::new(55, &crank_instructions)
                 .execution_interval_millis(99)
@@ -848,8 +845,8 @@ mod tests {
 
         let readonly_instruction = CancelCrankCpi {
             authority: readonly_authority,
-            task_context: task_context.clone(),
-            magic_program: magic_program.clone(),
+            task_context,
+            magic_program,
             crank_id: 1,
         };
         let writable_instruction = CancelCrankCpi {

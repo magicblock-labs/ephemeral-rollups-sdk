@@ -67,15 +67,14 @@ websocket = { package = "tokio-websockets", version = "0.10", features = [
 ] }
 reqwest = { version = "0.12" }
 
-pinocchio = { version = "0.10", default-features = false, features = [
+pinocchio = { version = "0.11", default-features = false, features = [
 	"cpi",
 	"alloc",
+	"account-resize",
+	"copy",
 ] }
 pinocchio-log = { version = "0.5", default-features = false }
-pinocchio-pubkey = { version = "0.3", default-features = false, features = [
-	"const",
-] }
-pinocchio-system = { version = "0.5", default-features = false }
+pinocchio-system = { version = "0.6", default-features = false }
 pinocchio-token = { version = "0.5", default-features = false }
 
 solana-program = { version = "3.0.0", default-features = false }
