@@ -349,13 +349,8 @@ mod tests {
             &[],
             REQUEST_SCOPED_RANDOMNESS_DISCRIMINATOR,
         );
-        let ix = create_request_randomness_ix(canonical(
-            caller_seed,
-            callback_program,
-            &disc,
-            &[],
-            &[],
-        ));
+        let ix =
+            create_request_randomness_ix(canonical(caller_seed, callback_program, &disc, &[], &[]));
         assert_eq!(ours, ix.data);
     }
 
