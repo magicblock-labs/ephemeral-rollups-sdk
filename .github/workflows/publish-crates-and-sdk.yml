@@ -12,7 +12,7 @@ concurrency:
 
 env:
   rust_version: 1.93.1
-  node_version: 23
+  node_version: 24
   DRY_RUN: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/heads/release/v') }}
 
 jobs:
