@@ -23,3 +23,23 @@ impl anchor_lang::Id for MagicProgram {
         crate::consts::MAGIC_PROGRAM_ID.to_bytes().into()
     }
 }
+
+#[cfg(feature = "access-control")]
+pub struct PermissionProgram;
+
+#[cfg(feature = "access-control")]
+impl anchor_lang::Id for PermissionProgram {
+    fn id() -> anchor_lang::prelude::Pubkey {
+        crate::consts::PERMISSION_PROGRAM_ID.to_bytes().into()
+    }
+}
+
+#[cfg(feature = "spl")]
+pub struct EsplProgram;
+
+#[cfg(feature = "spl")]
+impl anchor_lang::Id for EsplProgram {
+    fn id() -> anchor_lang::prelude::Pubkey {
+        crate::consts::ESPL_TOKEN_PROGRAM_ID.to_bytes().into()
+    }
+}
