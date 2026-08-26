@@ -12,6 +12,8 @@ concurrency:
 
 env:
   rust_version: 1.93.1
+  node_version: 23
+  DRY_RUN: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/heads/release/v') }}
 
 jobs:
   install:
@@ -47,22 +49,19 @@ jobs:
       - name: Run clippy
         run: cargo clippy -- --deny=warnings
 
-  publish:
+  publish-npm:
     needs: [install, lint]
     runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: run build
-        working-directory: rust/
-        run: |
-          cargo build
-          cargo test
-
-      - name: Set DRY_RUN based on trigger
-        run: echo "DRY_RUN=true" >> $GITHUB_ENV
-        if: github.event_name == 'push' && startsWith(github.ref, 'refs/heads/release/v')
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.node_version }}
+          cache: "npm"
+          registry-url: "https://registry.npmjs.org"
 
       - name: publish ephemeral-rollups-kit
         working-directory: ts/kit/
@@ -119,6 +118,31 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
           DRY_RUN: ${{ env.DRY_RUN }}
+
+  publish-crates:
+    needs: [install, lint]
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: install essentials
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pkg-config build-essential libudev-dev
+
+      - name: Install Rust
+        shell: "bash"
+        run: rustup toolchain install ${{ env.rust_version }} --profile minimal
+
+      - name: Cache rust
+        uses: Swatinem/rust-cache@v2
+
+      - name: run build
+        working-directory: rust/
+        run: |
+          cargo build
+          cargo test
 
       - name: cargo publish
         working-directory: rust/
