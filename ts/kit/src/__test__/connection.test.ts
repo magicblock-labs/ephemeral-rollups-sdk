@@ -27,7 +27,7 @@ const mockLifetimeConstraint = {
 const mockRpc = {
   sendTransaction: vi.fn(() => ({ send: vi.fn(async () => mockSignature) })),
   getTransaction: vi.fn(() => ({
-    send: vi.fn(async () => ({ meta: { logMessages: ["log1"] } })),
+    send: vi.fn(async () => ({ meta: { err: null, logMessages: ["log1"] } })),
   })),
   getLatestBlockhash: vi.fn(() => ({
     send: vi.fn(async () => ({
@@ -313,6 +313,23 @@ describe("Connection", () => {
     const connection = await Connection.create("http://localhost");
     const sig = await connection.getCommitmentSignature(mockSignature);
     expect(sig).toBe(mockSignature);
+  });
+
+  it("should reject getCommitmentSignature when the scheduling transaction failed", async () => {
+    const connection = await Connection.create("http://localhost");
+    vi.mocked(mockRpc.getTransaction).mockReturnValueOnce({
+      send: vi.fn(async () => ({
+        meta: {
+          err: { InstructionError: [1, "Custom"] },
+          logMessages: [
+            "Program log: ScheduledCommitSent signature: would-look-valid",
+          ],
+        },
+      })),
+    } as any);
+    await expect(
+      connection.getCommitmentSignature(mockSignature),
+    ).rejects.toThrow(/Transaction failed; commitment was not scheduled/);
   });
 
   it("should getBalance", async () => {
