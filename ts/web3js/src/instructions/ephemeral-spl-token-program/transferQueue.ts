@@ -113,15 +113,16 @@ export function deriveGroupReceipt(
 }
 
 function randomTransferGroupId(): number {
-  const cryptoObj = getCryptoObject();
   let groupId = 0;
 
   while (groupId === 0) {
-    if (cryptoObj?.getRandomValues !== undefined) {
+    try {
+      const cryptoObj = getCryptoObject();
       const bytes = new Uint8Array(3);
       cryptoObj.getRandomValues(bytes);
       groupId = bytes[0] | (bytes[1] << 8) | (bytes[2] << 16);
-    } else {
+    } catch (error) {
+      console.warn("Crypto random generation failed, falling back to Math.random():", error);
       groupId = Math.floor(Math.random() * 0x0100_0000);
     }
   }
@@ -129,11 +130,15 @@ function randomTransferGroupId(): number {
   return groupId;
 }
 
-function getCryptoObject(): Crypto | undefined {
+function getCryptoObject(): Crypto {
   if (typeof globalThis !== "undefined" && globalThis.crypto) {
     return globalThis.crypto;
   }
-  return undefined;
+  throw new Error(
+    "Crypto API is not available in this environment. " +
+    "Please ensure you're running in a browser or Node.js environment with crypto support. " +
+    "For Node.js, use: import('crypto').then(c => globalThis.crypto = c.webcrypto)"
+  );
 }
 
 /**

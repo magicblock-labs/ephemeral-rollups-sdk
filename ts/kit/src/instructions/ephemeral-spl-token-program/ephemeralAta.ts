@@ -1342,20 +1342,26 @@ export interface TransferSplOptions {
 }
 
 function randomShuttleId(): number {
-  const cryptoObj = getCryptoObject();
-  if (cryptoObj?.getRandomValues !== undefined) {
+  try {
+    const cryptoObj = getCryptoObject();
     const buf = new Uint32Array(1);
     cryptoObj.getRandomValues(buf);
     return buf[0];
+  } catch (error) {
+    console.warn("Crypto random generation failed, falling back to Math.random():", error);
+    return Math.floor(Math.random() * 0x1_0000_0000);
   }
-  return Math.floor(Math.random() * 0x1_0000_0000);
 }
 
-function getCryptoObject(): Crypto | undefined {
+function getCryptoObject(): Crypto {
   if (typeof globalThis !== "undefined" && globalThis.crypto) {
     return globalThis.crypto;
   }
-  return undefined;
+  throw new Error(
+    "Crypto API is not available in this environment. " +
+    "Please ensure you're running in a browser or Node.js environment with crypto support. " +
+    "For Node.js, use: import('crypto').then(c => globalThis.crypto = c.webcrypto)"
+  );
 }
 
 async function buildDelegateSplInstructions(
