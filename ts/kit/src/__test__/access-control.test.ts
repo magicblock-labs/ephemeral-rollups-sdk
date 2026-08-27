@@ -143,7 +143,7 @@ describe("Access Control (@solana/kit)", () => {
 
       await getAuthToken(mockRpcUrl, mockAddress, signMessage);
 
-      const firstCall = (global.fetch as any).mock.calls[0];
+      const firstCall = (global.fetch as unknown as { mock: { calls: unknown[][] } }).mock.calls[0];
       expect(firstCall[0]).toContain(`${mockRpcUrl}/auth/challenge`);
       expect(firstCall[0]).toContain(`pubkey=${mockAddress.toString()}`);
     });
@@ -166,10 +166,11 @@ describe("Access Control (@solana/kit)", () => {
 
       await getAuthToken(mockRpcUrl, mockAddress, signMessage);
 
-      const secondCall = (global.fetch as any).mock.calls[1];
+      const secondCall = (global.fetch as unknown as { mock: { calls: unknown[][] } }).mock.calls[1] as unknown[];
       expect(secondCall[0]).toContain(`${mockRpcUrl}/auth/login`);
-      expect(secondCall[1].method).toBe("POST");
-      expect(secondCall[1].headers["Content-Type"]).toBe("application/json");
+      const secondCallConfig = secondCall[1] as { method: string; headers: Record<string, string> };
+      expect(secondCallConfig.method).toBe("POST");
+      expect(secondCallConfig.headers["Content-Type"]).toBe("application/json");
     });
 
     it("should include pubkey, challenge, and signature in login request", async () => {
@@ -190,9 +191,9 @@ describe("Access Control (@solana/kit)", () => {
 
       await getAuthToken(mockRpcUrl, mockAddress, signMessage);
 
-      const secondCall = (global.fetch as any).mock.calls[1];
+      const secondCall = (global.fetch as unknown as { mock: { calls: unknown[][] } }).mock.calls[1] as unknown[];
       // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
-      const body = JSON.parse(secondCall[1].body);
+      const body = JSON.parse((secondCall[1] as { body: string }).body);
 
       expect(body).toHaveProperty("pubkey");
       expect(body).toHaveProperty("challenge");
@@ -219,7 +220,7 @@ describe("Access Control (@solana/kit)", () => {
 
       await getAuthToken(mockRpcUrl, mockAddress, signMessage);
 
-      const firstCall = (global.fetch as any).mock.calls[0];
+      const firstCall = (global.fetch as unknown as { mock: { calls: unknown[][] } }).mock.calls[0];
       expect(firstCall[0]).not.toContain("template=");
     });
 
@@ -242,7 +243,7 @@ describe("Access Control (@solana/kit)", () => {
 
       await getAuthToken(mockRpcUrl, mockAddress, signMessage, mockTemplate);
 
-      const firstCall = (global.fetch as any).mock.calls[0];
+      const firstCall = (global.fetch as unknown as { mock: { calls: unknown[][] } }).mock.calls[0];
       expect(firstCall[0]).toContain(
         new URLSearchParams({ template: mockTemplate }).toString(),
       );

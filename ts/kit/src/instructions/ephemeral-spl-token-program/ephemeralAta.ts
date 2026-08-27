@@ -1342,13 +1342,20 @@ export interface TransferSplOptions {
 }
 
 function randomShuttleId(): number {
-  const cryptoObj = (globalThis as any)?.crypto;
+  const cryptoObj = getCryptoObject();
   if (cryptoObj?.getRandomValues !== undefined) {
     const buf = new Uint32Array(1);
     cryptoObj.getRandomValues(buf);
     return buf[0];
   }
   return Math.floor(Math.random() * 0x1_0000_0000);
+}
+
+function getCryptoObject(): Crypto | undefined {
+  if (typeof globalThis !== "undefined" && globalThis.crypto) {
+    return globalThis.crypto;
+  }
+  return undefined;
 }
 
 async function buildDelegateSplInstructions(
