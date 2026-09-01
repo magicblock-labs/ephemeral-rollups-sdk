@@ -35,10 +35,10 @@ ephemeral-rollups-sdk-attribute-action = { path = "action-attribute", version = 
 ephemeral-vrf-sdk = { path = "vrf-sdk", version = "=0.17.0", default-features = false }
 ephemeral-vrf-sdk-vrf-macro = { path = "vrf-macro", version = "=0.17.0", default-features = false }
 
-
 # Magicblock
 magicblock-delegation-program-api = { version = "3.1.0", default-features = false }
 magicblock-magic-program-api = { version = "0.10.1", default-features = false }
+hydra-api = "0.2.0"
 
 ## External crates
 anchor-lang-compat = { package = "anchor-lang", version = ">=0.28.0, <1.0.0" }

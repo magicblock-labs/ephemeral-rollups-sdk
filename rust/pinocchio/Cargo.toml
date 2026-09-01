@@ -12,14 +12,15 @@ license = { workspace = true }
 edition = { workspace = true }
 
 [dependencies]
+bincode = { version = "2.0.1", default-features = false, features = ["derive"] }
+hydra-api = { workspace = true, features = ["cpi-pinocchio", "ephemeral"] }
+magicblock-delegation-program-api = { workspace = true, optional = true }
 pinocchio = { workspace = true }
 pinocchio-system = { workspace = true, default-features = false }
 solana-address = { version = ">=2, <3", default-features = false, features = [
     "curve25519",
     "decode",
 ] }
-bincode = { version = "2.0.1", default-features = false, features = ["derive"] }
-magicblock-delegation-program-api = { workspace = true, optional = true }
 
 [dev-dependencies]
 bincode1 = { package = "bincode", version = "1.3" }

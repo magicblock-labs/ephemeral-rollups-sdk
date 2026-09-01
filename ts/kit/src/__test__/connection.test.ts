@@ -326,7 +326,7 @@ describe("Connection", () => {
           ],
         },
       })),
-    } as any);
+    } as unknown as ReturnType<typeof mockRpc.getTransaction>);
     await expect(
       connection.getCommitmentSignature(mockSignature),
     ).rejects.toThrow(/Transaction failed; commitment was not scheduled/);

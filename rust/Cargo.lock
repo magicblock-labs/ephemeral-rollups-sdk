@@ -1484,6 +1484,7 @@ dependencies = [
  "bincode 2.0.1",
  "ephemeral-rollups-sdk",
  "ephemeral-vrf-sdk",
+ "hydra-api",
  "magicblock-delegation-program-api",
  "magicblock-magic-program-api",
  "pinocchio 0.11.2",
@@ -1491,6 +1492,18 @@ dependencies = [
  "solana-address 2.6.1",
  "solana-instruction 3.4.0",
  "solana-program 3.0.0",
+]
+
+[[package]]
+name = "ephemeral-rollups-pinocchio"
+version = "0.17.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a175e532d887f6ae43fd6d314ced9d9c44e714dc38692cb312403897c6b6bdce"
+dependencies = [
+ "bincode 2.0.1",
+ "pinocchio 0.11.2",
+ "pinocchio-system 0.6.1",
+ "solana-address 2.6.1",
 ]
 
 [[package]]
@@ -1511,6 +1524,7 @@ dependencies = [
  "ephemeral-vrf-sdk-vrf-macro",
  "five8 0.2.1",
  "getrandom 0.2.17",
+ "hydra-api",
  "magicblock-delegation-program-api",
  "magicblock-magic-program-api",
  "num-derive",
@@ -2113,6 +2127,22 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9155a582abd142abc056962c29e3ce5ff2ad5469f4246b537ed42c5deba857da"
 dependencies = [
  "typenum",
+]
+
+[[package]]
+name = "hydra-api"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "25017a85c1e189844ff869fe606fa7621e7346a28329661f03a2b33b8bf44465"
+dependencies = [
+ "ephemeral-rollups-pinocchio 0.17.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "pinocchio 0.11.2",
+ "solana-account-info 3.1.1",
+ "solana-address 2.6.1",
+ "solana-cpi 3.1.0",
+ "solana-instruction 3.4.0",
+ "solana-program-error 3.0.1",
+ "solana-pubkey 4.2.0",
 ]
 
 [[package]]
