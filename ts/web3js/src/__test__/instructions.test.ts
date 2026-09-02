@@ -44,6 +44,7 @@ import {
   processPendingTransferQueueRefillIx,
   schedulePrivateTransferIx,
   transferSpl,
+  undelegateIx,
   undelegateAndCloseShuttleEphemeralAtaIx,
   withdrawSplIx,
   withdrawSpl,
@@ -58,6 +59,7 @@ import {
   PERMISSION_PROGRAM_ID,
   TOKEN_PROGRAM_ID,
   TOKEN_2022_PROGRAM_ID,
+  ASSOCIATED_TOKEN_PROGRAM_ID,
 } from "../constants";
 import {
   delegateBufferPdaFromDelegatedAccountAndOwnerProgram,
@@ -943,6 +945,40 @@ describe("Exposed Instructions (web3.js)", () => {
       );
       expect(initShuttleInstruction?.keys[2].isWritable).toBe(true);
       expect(delegateShuttleInstruction?.keys[2].isWritable).toBe(true);
+    });
+  });
+
+  describe("undelegateIx (Ephemeral SPL Token Program)", () => {
+    const owner = new PublicKey("11111111111111111111111111111113");
+    const mint = new PublicKey("11111111111111111111111111111114");
+
+    it("should use the default SPL Token ATA", () => {
+      const instruction = undelegateIx(owner, mint);
+      const [defaultAta] = PublicKey.findProgramAddressSync(
+        [owner.toBuffer(), TOKEN_PROGRAM_ID.toBuffer(), mint.toBuffer()],
+        ASSOCIATED_TOKEN_PROGRAM_ID,
+      );
+
+      expect(instruction.keys[1].pubkey.toBase58()).toBe(defaultAta.toBase58());
+    });
+
+    it("should derive the Token-2022 ATA when a token program override is provided", () => {
+      const instruction = undelegateIx(owner, mint, TOKEN_2022_PROGRAM_ID);
+      const [defaultAta] = PublicKey.findProgramAddressSync(
+        [owner.toBuffer(), TOKEN_PROGRAM_ID.toBuffer(), mint.toBuffer()],
+        ASSOCIATED_TOKEN_PROGRAM_ID,
+      );
+      const [token2022Ata] = PublicKey.findProgramAddressSync(
+        [owner.toBuffer(), TOKEN_2022_PROGRAM_ID.toBuffer(), mint.toBuffer()],
+        ASSOCIATED_TOKEN_PROGRAM_ID,
+      );
+
+      expect(instruction.keys[1].pubkey.toBase58()).toBe(
+        token2022Ata.toBase58(),
+      );
+      expect(instruction.keys[1].pubkey.toBase58()).not.toBe(
+        defaultAta.toBase58(),
+      );
     });
   });
 

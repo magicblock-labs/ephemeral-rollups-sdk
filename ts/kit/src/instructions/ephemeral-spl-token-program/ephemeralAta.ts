@@ -60,13 +60,14 @@ async function getAssociatedTokenAddressSync(
   mint: Address,
   owner: Address,
   allowOwnerOffCurve: boolean = true,
+  tokenProgram: Address = TOKEN_PROGRAM_ID,
 ): Promise<Address> {
   const addressEncoder = getAddressEncoder();
   const [ata] = await getProgramDerivedAddress({
     programAddress: ASSOCIATED_TOKEN_PROGRAM_ID,
     seeds: [
       addressEncoder.encode(owner),
-      addressEncoder.encode(TOKEN_PROGRAM_ID),
+      addressEncoder.encode(tokenProgram),
       addressEncoder.encode(mint),
     ],
   });
@@ -1133,8 +1134,14 @@ export async function withdrawSplIx(
 export async function undelegateIx(
   owner: Address,
   mint: Address,
+  tokenProgram: Address = TOKEN_PROGRAM_ID,
 ): Promise<Instruction> {
-  const userAta = await getAssociatedTokenAddressSync(mint, owner);
+  const userAta = await getAssociatedTokenAddressSync(
+    mint,
+    owner,
+    true,
+    tokenProgram,
+  );
   const [ephemeralAta] = await deriveEphemeralAta(owner, mint);
 
   return {

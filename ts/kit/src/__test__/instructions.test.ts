@@ -44,6 +44,7 @@ import {
   processPendingTransferQueueRefillIx,
   schedulePrivateTransferIx,
   transferSpl,
+  undelegateIx,
   undelegateAndCloseShuttleEphemeralAtaIx,
   withdrawSplIx,
   withdrawSpl,
@@ -57,6 +58,7 @@ import {
   HYDRA_PROGRAM_ID,
   PERMISSION_PROGRAM_ID,
   TOKEN_PROGRAM_ID,
+  ASSOCIATED_TOKEN_PROGRAM_ID,
 } from "../constants";
 import {
   delegateBufferPdaFromDelegatedAccountAndOwnerProgram,
@@ -78,6 +80,9 @@ function readLengthPrefixedField(
 describe("Exposed Instructions (@solana/kit)", () => {
   const mockAddress = "11111111111111111111111111111111" as Address;
   const differentAddress = "11111111111111111111111111111112" as Address;
+  const token2022ProgramId = address(
+    "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+  );
   const addressEncoder = getAddressEncoder();
 
   describe("delegate instruction", () => {
@@ -877,6 +882,48 @@ describe("Exposed Instructions (@solana/kit)", () => {
 
       expect(initInstruction).toBeUndefined();
       expect(delegateInstruction).toBeDefined();
+    });
+  });
+
+  describe("undelegateIx (Ephemeral SPL Token Program)", () => {
+    const owner = address("11111111111111111111111111111113");
+    const mint = address("11111111111111111111111111111114");
+
+    it("should use the default SPL Token ATA", async () => {
+      const instruction = await undelegateIx(owner, mint);
+      const [defaultAta] = await getProgramDerivedAddress({
+        programAddress: ASSOCIATED_TOKEN_PROGRAM_ID,
+        seeds: [
+          addressEncoder.encode(owner),
+          addressEncoder.encode(TOKEN_PROGRAM_ID),
+          addressEncoder.encode(mint),
+        ],
+      });
+
+      expect(instruction.accounts?.[1].address).toBe(defaultAta);
+    });
+
+    it("should derive the Token-2022 ATA when a token program override is provided", async () => {
+      const instruction = await undelegateIx(owner, mint, token2022ProgramId);
+      const [defaultAta] = await getProgramDerivedAddress({
+        programAddress: ASSOCIATED_TOKEN_PROGRAM_ID,
+        seeds: [
+          addressEncoder.encode(owner),
+          addressEncoder.encode(TOKEN_PROGRAM_ID),
+          addressEncoder.encode(mint),
+        ],
+      });
+      const [token2022Ata] = await getProgramDerivedAddress({
+        programAddress: ASSOCIATED_TOKEN_PROGRAM_ID,
+        seeds: [
+          addressEncoder.encode(owner),
+          addressEncoder.encode(token2022ProgramId),
+          addressEncoder.encode(mint),
+        ],
+      });
+
+      expect(instruction.accounts?.[1].address).toBe(token2022Ata);
+      expect(instruction.accounts?.[1].address).not.toBe(defaultAta);
     });
   });
 
