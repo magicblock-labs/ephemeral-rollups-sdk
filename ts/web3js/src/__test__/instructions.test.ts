@@ -14,6 +14,11 @@ import {
 import {
   createCommitInstruction,
   createCommitAndUndelegateInstruction,
+  closeRentPendingAtaInstruction,
+  createRentPendingAtaInstruction,
+  isRentPendingTokenAccount,
+  rentPendingAtaAddress,
+  RENT_PENDING_ATA_CLOSE_AUTHORITY,
 } from "../instructions/magic-program";
 import {
   allocateTransferQueueIx,
@@ -22,6 +27,8 @@ import {
   delegateSpl,
   delegateSplWithPrivateTransfer,
   delegateTransferQueueIx,
+  depositAndDelegateShuttleWithMergeToEncryptedDestinationIx,
+  ensureRentPendingDestinationIx,
   deriveEphemeralAta,
   deriveHydraCrankPda,
   deriveLamportsPda,
@@ -697,6 +704,73 @@ describe("Exposed Instructions (web3.js)", () => {
     });
   });
 
+  describe("rent-pending ATA helpers (Magic Program)", () => {
+    it("should build the tag-15 instruction", () => {
+      const walletOwner = new PublicKey("11111111111111111111111111111113");
+      const mint = new PublicKey("11111111111111111111111111111114");
+      const ata = rentPendingAtaAddress(walletOwner, mint);
+      const instruction = createRentPendingAtaInstruction(
+        mockPublicKey,
+        walletOwner,
+        mint,
+      );
+
+      expect(instruction.programId.equals(MAGIC_PROGRAM_ID)).toBe(true);
+      expect(instruction.keys).toHaveLength(4);
+      expect(instruction.keys[0]).toMatchObject({
+        isSigner: true,
+        isWritable: false,
+      });
+      expect(instruction.keys[1].pubkey.equals(ata)).toBe(true);
+      expect(instruction.keys[1].isWritable).toBe(true);
+      expect(instruction.data).toHaveLength(36);
+      expect(instruction.data.readUInt32LE(0)).toBe(15);
+      expect(instruction.data.subarray(4, 36)).toEqual(walletOwner.toBuffer());
+    });
+
+    it("should build the tag-26 close instruction", () => {
+      const owner = new PublicKey("11111111111111111111111111111113");
+      const mint = new PublicKey("11111111111111111111111111111114");
+      const ata = rentPendingAtaAddress(owner, mint);
+      const instruction = closeRentPendingAtaInstruction(owner, mint);
+
+      expect(instruction.programId.equals(MAGIC_PROGRAM_ID)).toBe(true);
+      expect(instruction.keys).toHaveLength(2);
+      expect(instruction.keys[0]).toMatchObject({
+        isSigner: true,
+        isWritable: false,
+      });
+      expect(instruction.keys[0].pubkey.equals(owner)).toBe(true);
+      expect(instruction.keys[1].pubkey.equals(ata)).toBe(true);
+      expect(instruction.keys[1].isWritable).toBe(true);
+      expect(instruction.data).toHaveLength(4);
+      expect(instruction.data.readUInt32LE(0)).toBe(26);
+    });
+
+    it("should derive the canonical ATA address", () => {
+      const walletOwner = new PublicKey("11111111111111111111111111111113");
+      const mint = new PublicKey("11111111111111111111111111111114");
+      const [ata] = PublicKey.findProgramAddressSync(
+        [walletOwner.toBuffer(), TOKEN_PROGRAM_ID.toBuffer(), mint.toBuffer()],
+        new PublicKey("ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"),
+      );
+      const derivedAta = rentPendingAtaAddress(walletOwner, mint);
+
+      expect(derivedAta.toBase58()).toBe(ata.toBase58());
+    });
+
+    it("should detect rent-pending token accounts", () => {
+      const data = Buffer.alloc(165);
+      data.writeUInt32LE(1, 129);
+      RENT_PENDING_ATA_CLOSE_AUTHORITY.toBuffer().copy(data, 133);
+
+      expect(isRentPendingTokenAccount(data)).toBe(true);
+      data.writeUInt32LE(0, 129);
+      expect(isRentPendingTokenAccount(data)).toBe(false);
+      expect(isRentPendingTokenAccount(Buffer.alloc(164))).toBe(false);
+    });
+  });
+
   describe("scheduleCommitAndUndelegate instruction (Magic Program)", () => {
     it("should create a scheduleCommitAndUndelegate instruction with required parameters", () => {
       const instruction = createCommitAndUndelegateInstruction(mockPublicKey, [
@@ -1068,6 +1142,36 @@ describe("Exposed Instructions (web3.js)", () => {
       expect(instructions).toHaveLength(1);
       expect(instructions[0].data[0]).toBe(3);
     });
+
+    it("should skip eATA instructions for a rent-pending source", async () => {
+      const instructions = await withdrawSpl(owner, mint, 1n, {
+        validator,
+        shuttleId: 7,
+        rentPendingSource: true,
+        initAtasIfMissing: true,
+      });
+
+      expect(instructions).toHaveLength(2);
+      // createAssociatedTokenAccountIdempotent + ix 26 only
+      expect(instructions[1].data[0]).toBe(26);
+      expect(instructions[1].keys).toHaveLength(16);
+      expect(
+        instructions.find((ix) =>
+          ix.programId.equals(EPHEMERAL_SPL_TOKEN_PROGRAM_ID),
+        ),
+      ).toBe(instructions[1]);
+    });
+
+    it("should reject a rent-pending source in the legacy flow", async () => {
+      await expect(
+        withdrawSpl(owner, mint, 1n, {
+          idempotent: false,
+          rentPendingSource: true,
+        }),
+      ).rejects.toThrow(
+        "rentPendingSource requires the idempotent shuttle withdrawal flow",
+      );
+    });
   });
 
   describe("lamportsDelegatedTransferIx (Ephemeral SPL Token Program)", () => {
@@ -1119,6 +1223,88 @@ describe("Exposed Instructions (web3.js)", () => {
         true,
       );
       expect(data).toHaveLength(41);
+    });
+  });
+
+  describe("depositAndDelegateShuttleWithMergeToEncryptedDestinationIx (Ephemeral SPL Token Program)", () => {
+    const payer = Keypair.generate().publicKey;
+    const owner = Keypair.generate().publicKey;
+    const destinationOwner = Keypair.generate().publicKey;
+    const mint = Keypair.generate().publicKey;
+    const validator = Keypair.generate().publicKey;
+    const shuttleId = 5;
+
+    function buildIx(amount: bigint, withValidator?: PublicKey) {
+      const [shuttleEphemeralAta] = deriveShuttleEphemeralAta(
+        owner,
+        mint,
+        shuttleId,
+      );
+      const [shuttleAta] = deriveShuttleAta(shuttleEphemeralAta, mint);
+      return depositAndDelegateShuttleWithMergeToEncryptedDestinationIx(
+        payer,
+        shuttleEphemeralAta,
+        shuttleAta,
+        owner,
+        Keypair.generate().publicKey,
+        destinationOwner,
+        Keypair.generate().publicKey,
+        mint,
+        shuttleId,
+        amount,
+        withValidator,
+      );
+    }
+
+    it("should encode instruction 33 with four encrypted destination fields", () => {
+      const ix = buildIx(25n, validator);
+      const data = Buffer.from(ix.data);
+
+      expect(ix.programId.equals(EPHEMERAL_SPL_TOKEN_PROGRAM_ID)).toBe(true);
+      expect(ix.keys).toHaveLength(18);
+      expect(data).toHaveLength(1 + 4 + 8 + 2 * 80 + 1 + 32);
+      expect(data[0]).toBe(33);
+      expect(data.readUInt32LE(1)).toBe(shuttleId);
+      expect(data.readBigUInt64LE(5)).toBe(25n);
+      expect(data[data.length - 33]).toBe(1);
+      expect(data.subarray(data.length - 32).equals(validator.toBuffer())).toBe(
+        true,
+      );
+
+      // The ciphertexts are randomized per call and never equal plaintext.
+      expect(data.includes(destinationOwner.toBuffer())).toBe(false);
+      expect(
+        ix.keys.find((key) => key.pubkey.equals(destinationOwner)),
+      ).toBeUndefined();
+    });
+
+    it("should reject zero amounts", () => {
+      expect(() => buildIx(0n, validator)).toThrow("amount must be positive");
+    });
+
+    it("should require a validator", () => {
+      expect(() => buildIx(25n)).toThrow(
+        "validator is required for encrypted private transfers",
+      );
+    });
+  });
+
+  describe("ensureRentPendingDestinationIx (Ephemeral SPL Token Program)", () => {
+    it("should encode instruction 35 with the derived destination ATA", () => {
+      const payer = Keypair.generate().publicKey;
+      const destinationOwner = Keypair.generate().publicKey;
+      const mint = Keypair.generate().publicKey;
+
+      const ix = ensureRentPendingDestinationIx(payer, destinationOwner, mint);
+
+      expect(ix.programId.equals(EPHEMERAL_SPL_TOKEN_PROGRAM_ID)).toBe(true);
+      expect(Buffer.from(ix.data)).toEqual(Buffer.from([35]));
+      expect(ix.keys).toHaveLength(6);
+      expect(ix.keys[0].pubkey.toBase58()).toBe(payer.toBase58());
+      expect(ix.keys[0].isSigner).toBe(true);
+      expect(ix.keys[1].pubkey.toBase58()).toBe(destinationOwner.toBase58());
+      expect(ix.keys[2].isWritable).toBe(true);
+      expect(ix.keys[5].pubkey.equals(MAGIC_PROGRAM_ID)).toBe(true);
     });
   });
 
@@ -1339,13 +1525,40 @@ describe("Exposed Instructions (web3.js)", () => {
       expect(instructions[1].data[0]).toBe(3);
     });
 
-    it("should use the shuttle merge instruction for private base-to-ephemeral transfers", async () => {
+    it("should use the encrypted-destination merge instruction for private base-to-ephemeral transfers", async () => {
       const instructions = await transferSpl(from, to, mint, 25n, {
         visibility: "private",
         fromBalance: "base",
         toBalance: "ephemeral",
         validator,
         shuttleId: 7,
+      });
+
+      expect(instructions).toHaveLength(1);
+      const data = Buffer.from(instructions[0].data);
+      expect(data[0]).toBe(33);
+      expect(data).toHaveLength(1 + 4 + 8 + 2 * 80 + 1 + 32);
+      expect(instructions[0].keys).toHaveLength(18);
+      expect(data.readUInt32LE(1)).toBe(7);
+      expect(data.readBigUInt64LE(5)).toBe(25n);
+      // The destination never appears in cleartext in data or account metas.
+      expect(data.includes(to.toBuffer())).toBe(false);
+      expect(
+        instructions[0].keys.find((key) => key.pubkey.equals(to)),
+      ).toBeUndefined();
+      expect(data.subarray(data.length - 32).equals(validator.toBuffer())).toBe(
+        true,
+      );
+    });
+
+    it("should use the legacy shuttle merge instruction for private base-to-ephemeral transfers when requested", async () => {
+      const instructions = await transferSpl(from, to, mint, 25n, {
+        visibility: "private",
+        fromBalance: "base",
+        toBalance: "ephemeral",
+        validator,
+        shuttleId: 7,
+        legacyCleartextDestination: true,
       });
 
       expect(instructions).toHaveLength(1);
@@ -1374,10 +1587,24 @@ describe("Exposed Instructions (web3.js)", () => {
             ix.data[0] === 4 && ix.keys[1]?.pubkey.equals(vaultEphemeralAta),
         ),
       ).toBeUndefined();
-      expect(instructions[2].data[0]).toBe(24);
+      expect(instructions[2].data[0]).toBe(33);
     });
 
-    it("should initialize permission and delegate the receiver eata for private base-to-ephemeral transfers when requested", async () => {
+    it("should skip cleartext destination setup for private base-to-ephemeral transfers even when initIfMissing", async () => {
+      const instructions = await transferSpl(from, to, mint, 25n, {
+        visibility: "private",
+        fromBalance: "base",
+        toBalance: "ephemeral",
+        validator,
+        shuttleId: 7,
+        initIfMissing: true,
+      });
+
+      expect(instructions).toHaveLength(1);
+      expect(instructions[0].data[0]).toBe(33);
+    });
+
+    it("should initialize permission and delegate the receiver eata for legacy private base-to-ephemeral transfers when requested", async () => {
       const [toEphemeralAta] = deriveEphemeralAta(to, mint);
 
       const instructions = await transferSpl(from, to, mint, 25n, {
@@ -1387,6 +1614,7 @@ describe("Exposed Instructions (web3.js)", () => {
         validator,
         shuttleId: 7,
         initIfMissing: true,
+        legacyCleartextDestination: true,
       });
 
       expect(instructions).toHaveLength(5);
@@ -1512,7 +1740,7 @@ describe("Exposed Instructions (web3.js)", () => {
       expect(Buffer.from(instructions[0].data).readBigUInt64LE(1)).toBe(25n);
     });
 
-    it("should use a normal transfer for private ephemeral-to-ephemeral transfers", async () => {
+    it("should ensure the rent-pending destination before private ephemeral-to-ephemeral transfers", async () => {
       const instructions = await transferSpl(from, to, mint, 25n, {
         visibility: "private",
         fromBalance: "ephemeral",
@@ -1521,10 +1749,24 @@ describe("Exposed Instructions (web3.js)", () => {
         initVaultIfMissing: true,
       });
 
+      expect(instructions).toHaveLength(2);
+      expect(instructions[0].data[0]).toBe(35);
+      expect(instructions[0].keys).toHaveLength(6);
+      expect(instructions[0].keys[1].pubkey.toBase58()).toBe(to.toBase58());
+      expect(instructions[1].data[0]).toBe(3);
+      expect(instructions[1].keys).toHaveLength(3);
+      expect(Buffer.from(instructions[1].data).readBigUInt64LE(1)).toBe(25n);
+    });
+
+    it("should skip the rent-pending destination setup unless initIfMissing", async () => {
+      const instructions = await transferSpl(from, to, mint, 25n, {
+        visibility: "private",
+        fromBalance: "ephemeral",
+        toBalance: "ephemeral",
+      });
+
       expect(instructions).toHaveLength(1);
       expect(instructions[0].data[0]).toBe(3);
-      expect(instructions[0].keys).toHaveLength(3);
-      expect(Buffer.from(instructions[0].data).readBigUInt64LE(1)).toBe(25n);
     });
 
     it("should reject unsupported routes", async () => {

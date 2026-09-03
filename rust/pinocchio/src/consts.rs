@@ -14,6 +14,10 @@ pub const MAGIC_CONTEXT_ID: Address = address!("MagicContext11111111111111111111
 /// The ephemeral vault ID (collects rent for ephemeral accounts).
 pub const EPHEMERAL_VAULT_ID: Address = address!("MagicVau1t999999999999999999999999999999999");
 
+/// Sentinel close authority marking a token account as a rent-pending ATA.
+pub const RENT_PENDING_ATA_CLOSE_AUTHORITY: Address =
+    Address::new_from_array(pubkey!("SysvarRent111111111111111111111111111111111"));
+
 /// The seed of the authority account PDA.
 pub const DELEGATION_RECORD: &[u8] = b"delegation";
 
