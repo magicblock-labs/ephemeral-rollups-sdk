@@ -445,6 +445,29 @@ describe("Exposed Instructions (@solana/kit)", () => {
       expect(amount).toBe(BigInt(largeAmount));
     });
 
+    it("should reject invalid amount and index values", () => {
+      expect(() =>
+        createTopUpEscrowInstruction(mockAddress, mockAddress, mockAddress, -1),
+      ).toThrow("amount must be a non-negative safe integer");
+      expect(() =>
+        createTopUpEscrowInstruction(
+          mockAddress,
+          mockAddress,
+          mockAddress,
+          Number.MAX_SAFE_INTEGER + 1,
+        ),
+      ).toThrow("amount must be a non-negative safe integer");
+      expect(() =>
+        createTopUpEscrowInstruction(
+          mockAddress,
+          mockAddress,
+          mockAddress,
+          1,
+          256,
+        ),
+      ).toThrow("index must fit in u8");
+    });
+
     it("should include correct account keys", () => {
       const instruction = createTopUpEscrowInstruction(
         mockAddress,
