@@ -112,7 +112,7 @@ export async function deriveGroupReceipt(
 }
 
 function randomTransferGroupId(): number {
-  const cryptoObj = (globalThis as any)?.crypto;
+  const cryptoObj = getCryptoObject();
   let groupId = 0;
 
   while (groupId === 0) {
@@ -126,6 +126,13 @@ function randomTransferGroupId(): number {
   }
 
   return groupId;
+}
+
+function getCryptoObject(): Crypto | undefined {
+  if (typeof globalThis !== "undefined" && globalThis.crypto) {
+    return globalThis.crypto;
+  }
+  return undefined;
 }
 
 /**
