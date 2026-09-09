@@ -12,6 +12,22 @@ fn generated_unchecked_account_type() -> TokenStream2 {
     }
 }
 
+/// Anchor re-serializes typed accounts after the handler returns. By then a delegated
+/// account is owned by the delegation program, so that write fails with
+/// `ExternalAccountDataModified` once direct mapping (SIMD-0460) is active.
+/// Only `UncheckedAccount` and `AccountInfo` are exempt from that exit.
+fn is_untyped_anchor_account(ty: &syn::Type) -> bool {
+    let syn::Type::Path(path) = ty else {
+        return false;
+    };
+    path.path.segments.last().is_some_and(|segment| {
+        matches!(
+            segment.ident.to_string().as_str(),
+            "UncheckedAccount" | "AccountInfo"
+        )
+    })
+}
+
 #[proc_macro_attribute]
 pub fn delegate(_attr: TokenStream, item: TokenStream) -> TokenStream {
     let input = parse_macro_input!(item as ItemStruct);
@@ -48,6 +64,20 @@ pub fn delegate(_attr: TokenStream, item: TokenStream) -> TokenStream {
         let has_del = field_attrs
             .iter()
             .any(|attr| attr.path.is_ident("account") && attr.tokens.to_string().contains("del"));
+
+        if has_del && !is_untyped_anchor_account(&field.ty) {
+            return syn::Error::new_spanned(
+                &field.ty,
+                "`del` accounts must be `UncheckedAccount<'info>` or `AccountInfo<'info>`. \
+                 Anchor re-serializes typed accounts after the handler returns, but by then the \
+                 account is owned by the delegation program, so the write fails with \
+                 ExternalAccountDataModified once direct mapping (SIMD-0460) is active. \
+                 Load the account into a local typed wrapper (e.g. `Account::<T>::try_from`) \
+                 inside the handler and call `.exit(&crate::ID)` on it before delegating.",
+            )
+            .to_compile_error()
+            .into();
+        }
 
         if has_del {
             let buffer_field = syn::Ident::new(&format!("buffer_{field_name}"), field.span());
