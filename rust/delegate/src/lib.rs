@@ -16,6 +16,8 @@ fn generated_unchecked_account_type() -> TokenStream2 {
 /// account is owned by the delegation program, so that write fails with
 /// `ExternalAccountDataModified` once direct mapping (SIMD-0460) is active.
 /// Only `UncheckedAccount` and `AccountInfo` are exempt from that exit.
+/// This is a syntactic guard: a proc macro cannot resolve type aliases, so it catches the
+/// common mistake rather than a deliberate alias that shadows one of those names.
 fn is_untyped_anchor_account(ty: &syn::Type) -> bool {
     let syn::Type::Path(path) = ty else {
         return false;
@@ -38,15 +40,17 @@ fn account_constraints(attr: &syn::Attribute) -> Option<Vec<TokenStream2>> {
     if group.delimiter() != Delimiter::Parenthesis {
         return None;
     }
-    let mut constraints = vec![TokenStream2::new()];
+    let mut constraints = Vec::new();
+    let mut current = TokenStream2::new();
     for tree in group.stream() {
         match tree {
             TokenTree::Punct(punct) if punct.as_char() == ',' => {
-                constraints.push(TokenStream2::new());
+                constraints.push(std::mem::take(&mut current));
             }
-            tree => constraints.last_mut().unwrap().extend(Some(tree)),
+            tree => current.extend(Some(tree)),
         }
     }
+    constraints.push(current);
     constraints.retain(|constraint| !constraint.is_empty());
     Some(constraints)
 }
