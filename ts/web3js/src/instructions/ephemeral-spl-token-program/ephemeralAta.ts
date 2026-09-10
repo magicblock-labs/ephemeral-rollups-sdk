@@ -1223,8 +1223,14 @@ export function withdrawSplIx(
 export function undelegateIx(
   owner: PublicKey,
   mint: PublicKey,
+  tokenProgram: PublicKey = TOKEN_PROGRAM_ID,
 ): TransactionInstruction {
-  const userAta = getAssociatedTokenAddressSync(mint, owner);
+  const userAta = getAssociatedTokenAddressSync(
+    mint,
+    owner,
+    true,
+    tokenProgram,
+  );
   const [ephemeralAta] = deriveEphemeralAta(owner, mint);
 
   return new TransactionInstruction({
