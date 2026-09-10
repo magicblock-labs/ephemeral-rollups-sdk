@@ -1,8 +1,8 @@
 use proc_macro::TokenStream;
-use proc_macro2::TokenStream as TokenStream2;
+use proc_macro2::{Delimiter, TokenStream as TokenStream2, TokenTree};
 use quote::quote;
 use syn::spanned::Spanned;
-use syn::{parse_macro_input, ItemStruct};
+use syn::ItemStruct;
 
 fn generated_unchecked_account_type() -> TokenStream2 {
     if cfg!(feature = "backward-compat") {
@@ -28,9 +28,62 @@ fn is_untyped_anchor_account(ty: &syn::Type) -> bool {
     })
 }
 
+/// Splits `#[account(...)]` into its top-level comma-separated constraints.
+/// Nested groups such as `seeds = [a, b]` stay intact because they are single token trees.
+fn account_constraints(attr: &syn::Attribute) -> Option<Vec<TokenStream2>> {
+    let mut trees = attr.tokens.clone().into_iter();
+    let (Some(TokenTree::Group(group)), None) = (trees.next(), trees.next()) else {
+        return None;
+    };
+    if group.delimiter() != Delimiter::Parenthesis {
+        return None;
+    }
+    let mut constraints = vec![TokenStream2::new()];
+    for tree in group.stream() {
+        match tree {
+            TokenTree::Punct(punct) if punct.as_char() == ',' => {
+                constraints.push(TokenStream2::new());
+            }
+            tree => constraints.last_mut().unwrap().extend(Some(tree)),
+        }
+    }
+    constraints.retain(|constraint| !constraint.is_empty());
+    Some(constraints)
+}
+
+/// A constraint is the `del` marker only when it is exactly that identifier, so
+/// `seeds::program = delegation_program.key()` and the like are never mistaken for it.
+fn is_del_marker(constraint: &TokenStream2) -> bool {
+    let mut trees = constraint.clone().into_iter();
+    matches!(
+        (trees.next(), trees.next()),
+        (Some(TokenTree::Ident(ident)), None) if ident == "del"
+    )
+}
+
+/// Removes the `del` marker from an `#[account(...)]` attribute, reporting whether it was present.
+fn strip_del_marker(attr: &mut syn::Attribute) -> bool {
+    let Some(constraints) = account_constraints(attr) else {
+        return false;
+    };
+    let (del, kept): (Vec<_>, Vec<_>) = constraints.into_iter().partition(is_del_marker);
+    if del.is_empty() {
+        return false;
+    }
+    attr.tokens = quote! { ( #(#kept),* ) };
+    true
+}
+
 #[proc_macro_attribute]
 pub fn delegate(_attr: TokenStream, item: TokenStream) -> TokenStream {
-    let input = parse_macro_input!(item as ItemStruct);
+    expand(item.into()).into()
+}
+
+fn expand(item: TokenStream2) -> TokenStream2 {
+    let input = match syn::parse2::<ItemStruct>(item) {
+        Ok(input) => input,
+        Err(err) => return err.to_compile_error(),
+    };
 
     // Extract the struct name and fields
     let struct_name = &input.ident;
@@ -55,15 +108,17 @@ pub fn delegate(_attr: TokenStream, item: TokenStream) -> TokenStream {
                     field,
                     "Unnamed fields are not supported in this macro",
                 )
-                .to_compile_error()
-                .into();
+                .to_compile_error();
             }
         };
 
-        // Check if the field has the `del` attribute
-        let has_del = field_attrs
-            .iter()
-            .any(|attr| attr.path.is_ident("account") && attr.tokens.to_string().contains("del"));
+        // Check if the field has the `del` marker, dropping it from the emitted attributes
+        let mut has_del = false;
+        for attr in &mut field_attrs {
+            if attr.path.is_ident("account") {
+                has_del |= strip_del_marker(attr);
+            }
+        }
 
         if has_del && !is_untyped_anchor_account(&field.ty) {
             return syn::Error::new_spanned(
@@ -75,8 +130,7 @@ pub fn delegate(_attr: TokenStream, item: TokenStream) -> TokenStream {
                  Load the account into a local typed wrapper (e.g. `Account::<T>::try_from`) \
                  inside the handler and call `.exit(&crate::ID)` on it before delegating.",
             )
-            .to_compile_error()
-            .into();
+            .to_compile_error();
         }
 
         if has_del {
@@ -85,20 +139,6 @@ pub fn delegate(_attr: TokenStream, item: TokenStream) -> TokenStream {
                 syn::Ident::new(&format!("delegation_record_{field_name}"), field.span());
             let delegation_metadata_field =
                 syn::Ident::new(&format!("delegation_metadata_{field_name}"), field.span());
-
-            // Remove `del` from attributes
-            for attr in &mut field_attrs {
-                if attr.path.is_ident("account") {
-                    let tokens = attr.tokens.to_string();
-                    if tokens.contains("del") {
-                        let new_tokens = tokens
-                            .replace(", del", "")
-                            .replace("del, ", "")
-                            .replace("del", "");
-                        attr.tokens = syn::parse_str(&new_tokens).unwrap();
-                    }
-                }
-            }
 
             // Add new fields
             new_fields.push(quote! {
@@ -205,5 +245,79 @@ pub fn delegate(_attr: TokenStream, item: TokenStream) -> TokenStream {
         }
     };
 
-    TokenStream::from(expanded)
+    expanded
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn expand_str(item: &str) -> String {
+        expand(item.parse().unwrap()).to_string()
+    }
+
+    #[test]
+    fn del_marker_is_matched_as_whole_constraint() {
+        let attr: syn::Attribute = syn::parse_quote! {
+            #[account(mut, del, seeds = [b"player", payer.key().as_ref()], bump)]
+        };
+        let constraints = account_constraints(&attr).unwrap();
+        assert_eq!(constraints.len(), 4);
+        assert_eq!(constraints.iter().filter(|c| is_del_marker(c)).count(), 1);
+
+        let attr: syn::Attribute = syn::parse_quote! {
+            #[account(mut, seeds::program = delegation_program.key(), bump)]
+        };
+        assert!(!account_constraints(&attr)
+            .unwrap()
+            .iter()
+            .any(is_del_marker));
+    }
+
+    #[test]
+    fn strip_del_marker_keeps_other_constraints() {
+        let mut attr: syn::Attribute = syn::parse_quote! {
+            #[account(mut, del, seeds = [b"player", payer.key().as_ref()], bump)]
+        };
+        assert!(strip_del_marker(&mut attr));
+        assert_eq!(
+            attr.tokens.to_string(),
+            quote! { (mut, seeds = [b"player", payer.key().as_ref()], bump) }.to_string()
+        );
+
+        let mut attr: syn::Attribute = syn::parse_quote! { #[account(del)] };
+        assert!(strip_del_marker(&mut attr));
+        assert_eq!(attr.tokens.to_string(), quote! { () }.to_string());
+    }
+
+    #[test]
+    fn typed_field_referencing_delegation_program_is_not_a_del_field() {
+        let output = expand_str(
+            r#"
+            pub struct Delegate<'info> {
+                #[account(mut, seeds = [b"record"], bump, seeds::program = delegation_program.key())]
+                pub record: Account<'info, Record>,
+                /// CHECK: delegated PDA
+                #[account(mut, del, seeds = [b"player"], bump)]
+                pub player: UncheckedAccount<'info>,
+            }
+            "#,
+        );
+        assert!(!output.contains("compile_error"), "{output}");
+        assert!(output.contains("delegate_player"));
+        assert!(!output.contains("delegate_record"));
+    }
+
+    #[test]
+    fn typed_del_field_is_rejected() {
+        let output = expand_str(
+            r#"
+            pub struct Delegate<'info> {
+                #[account(mut, del)]
+                pub player: Account<'info, Player>,
+            }
+            "#,
+        );
+        assert!(output.contains("compile_error"), "{output}");
+    }
 }
