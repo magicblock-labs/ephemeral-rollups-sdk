@@ -1,26 +1,27 @@
 # @magicblock-labs/ephemeral-rollups-kit
 
-TypeScript helpers for preparing and routing transactions to Ephemeral Rollups on Solana with `@solana/kit`.
-
-Quickstart and integration guide:
-https://docs.magicblock.gg
-
-## Install
+Transaction helpers, delegation instructions, PDAs, token operations, and
+access control for `@solana/kit` 4.x.
 
 ```bash
 npm install @magicblock-labs/ephemeral-rollups-kit
 ```
 
-# or
-
-```bash
-yarn add @magicblock-labs/ephemeral-rollups-kit
-```
-
-## Usage (basic)
-
 ```ts
 import { Connection } from "@magicblock-labs/ephemeral-rollups-kit";
 
-// See full examples and docs in the Quickstart link above.
+// rpcUrl is your cluster or Magic Router HTTP endpoint.
+const connection = await Connection.create(rpcUrl);
 ```
+
+- Use async `Connection.create`, not `new Connection`. It detects router support;
+  pass a second URL if WebSocket access uses a different endpoint.
+- `getLatestBlockhashForTransaction` uses writable accounts to request a routed
+  blockhash when supported; otherwise it uses the cluster's standard RPC.
+- `sendTransaction` defaults to `skipPreflight: true`; set it explicitly if you
+  need preflight. Submission and confirmation are separate operations.
+
+Use the [web3.js package](../web3js/README.md) for `PublicKey` and web3.js
+transaction types; the two packages are not drop-in replacements.
+
+[Integration guides](https://docs.magicblock.gg/)

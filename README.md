@@ -1,20 +1,22 @@
-## ⚡ Ephemeral Rollups SDK
+# ⚡ Ephemeral Rollups SDK
 
-The SDK provides convenience utils to prepare programs for executing transactions in the Ephemeral Rollups
+Rust and TypeScript tools for delegating accounts, executing on Ephemeral Rollups,
+and committing state back to Solana.
 
-## Packages
+## Choose a package
 
-| Package                                  | Description                                                                             | Version                                                                                                                                                            | Docs                                                                                        |
-|:-----------------------------------------|:----------------------------------------------------------------------------------------|:-------------------------------------------------------------------------------------------------------------------------------------------------------------------|:--------------------------------------------------------------------------------------------|
-| `ephemeral-rollups-sdk`                  | Rust SDK for integrating with the Ephemeral Rollups                                     | [![Crates.io](https://img.shields.io/crates/v/ephemeral-rollups-sdk?color=blue)](https://crates.io/crates/ephemeral-rollups-sdk)                                   | [![Docs.rs](https://img.shields.io/badge/docs-tutorials-blue)](https://docs.magicblock.gg/) |
-| `magic-resolver`                         | Rust library that facilitates connection resolution when working with Ephemeral Rollups | [![Crates.io](https://img.shields.io/crates/v/ephemeral-rollups-sdk?color=blue)](https://crates.io/crates/magic-resolver)                                          | [![Docs.rs](https://img.shields.io/badge/docs-tutorials-blue)](https://docs.magicblock.gg/) |
-| `@magicblock-labs/ephemeral-rollups-sdk` | TypeScript helper for preparing transactions (@solana/web3.js)                           | [![npm](https://img.shields.io/npm/v/@magicblock-labs/ephemeral-rollups-sdk.svg?color=blue)](https://www.npmjs.com/package/@magicblock-labs/ephemeral-rollups-sdk) | [![Docs](https://img.shields.io/badge/docs-tutorials-blue)](https://docs.magicblock.gg)     |
-| `@magicblock-labs/ephemeral-rollups-kit` | TypeScript helper for preparing transactions (@solana/kit)                              | [![npm](https://img.shields.io/npm/v/@magicblock-labs/ephemeral-rollups-kit.svg?color=blue)](https://www.npmjs.com/package/@magicblock-labs/ephemeral-rollups-kit) | [![Docs](https://img.shields.io/badge/docs-tutorials-blue)](https://docs.magicblock.xyz)    |
+| Package | Use |
+|---------|-----|
+| [ephemeral-rollups-sdk](rust/sdk/README.md) | Rust program integration, CPIs, and Anchor macros |
+| [ephemeral-rollups-pinocchio](rust/pinocchio/README.md) | Pinocchio program integration |
+| [magic-resolver](rust/resolver/README.md) | Rust client-side connection routing by delegation status |
+| [@magicblock-labs/ephemeral-rollups-sdk](ts/web3js/README.md) | TypeScript clients using `@solana/web3.js` |
+| [@magicblock-labs/ephemeral-rollups-kit](ts/kit/README.md) | TypeScript clients using `@solana/kit` |
 
-### ✨ Add CPIs to delegate, undelegate, and commit accounts
+For Rust, choose the [compatibility features](rust/sdk/README.md#features) before
+integrating: `anchor` targets Anchor 1.0; older Anchor versions use `anchor-compat`.
+Delegated accounts and [ephemeral-only accounts](rust/ephemeral-accounts-attribute/README.md)
+have different lifecycles; ephemeral-only accounts do not persist on Solana.
 
-See the integration example: https://github.com/magicblock-labs/magicblock-engine-examples
-
-## 👷Examples
-
-https://github.com/magicblock-labs/magicblock-engine-examples#-examples
+[Integration guides](https://docs.magicblock.gg/) ·
+[Example programs](https://github.com/magicblock-labs/magicblock-engine-examples)

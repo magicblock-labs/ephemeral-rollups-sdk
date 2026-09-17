@@ -1,6 +1,16 @@
 # ephemeral-rollups-pinocchio
 
-Pinocchio helpers for building programs that integrate with Ephemeral Rollups.
+Pinocchio helpers for delegation, intent bundles, ephemeral accounts, permissions,
+tokens, scheduled tasks, and VRF.
 
-Quickstart and integration guide:
-https://docs.magicblock.gg/pages/get-started/how-integrate-your-program/quickstart
+```toml
+[dependencies]
+ephemeral-rollups-pinocchio = "0.17"
+```
+
+Targets Pinocchio 0.11 and `solana-address` 2.x. Enable `delegation-actions` for
+delegation action support. Intent bundles are available without a feature flag;
+`intent-bundle` is a compatibility no-op.
+
+[Integration guides](https://docs.magicblock.gg/) ·
+[API reference](https://docs.rs/ephemeral-rollups-pinocchio)
