@@ -945,7 +945,7 @@ export function depositAndDelegateShuttleEphemeralAtaWithMergeAndPrivateTransfer
 }
 
 /**
- * Private base->ephemeral transfer with an encrypted destination (instruction 33).
+ * Private base->ephemeral transfer with an encrypted destination (instruction 34).
  *
  * Initialize shuttle metadata/EATA/wallet ATA, deposit into the shuttle EATA,
  * then delegate it with post-delegation actions that, on the ER, create the
@@ -1066,7 +1066,7 @@ export function depositAndDelegateShuttleWithMergeToEncryptedDestinationIx(
 
 /**
  * Idempotently create the destination's ATA as a Magic ATA through the
- * Magic program (instruction 35), so a plain SPL transfer in the same
+ * Magic program (instruction 36), so a plain SPL transfer in the same
  * transaction can fund a destination that does not exist yet on the ER.
  */
 export function ensureMagicAtaDestinationIx(

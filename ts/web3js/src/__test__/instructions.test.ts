@@ -1256,7 +1256,7 @@ describe("Exposed Instructions (web3.js)", () => {
       );
     }
 
-    it("should encode instruction 33 with four encrypted destination fields", () => {
+    it("should encode instruction 34 with four encrypted destination fields", () => {
       const ix = buildIx(25n, validator);
       const data = Buffer.from(ix.data);
 
@@ -1290,7 +1290,7 @@ describe("Exposed Instructions (web3.js)", () => {
   });
 
   describe("ensureMagicAtaDestinationIx (Ephemeral SPL Token Program)", () => {
-    it("should encode instruction 35 with the derived destination ATA", () => {
+    it("should encode instruction 36 with the derived destination ATA", () => {
       const payer = Keypair.generate().publicKey;
       const destinationOwner = Keypair.generate().publicKey;
       const mint = Keypair.generate().publicKey;
