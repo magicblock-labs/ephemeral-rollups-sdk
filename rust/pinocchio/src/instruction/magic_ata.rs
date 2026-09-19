@@ -1,5 +1,6 @@
 use {
     crate::{consts::MAGIC_ATA_CLOSE_AUTHORITY, spl::consts::ASSOCIATED_TOKEN_PROGRAM_ID},
+    core::{mem::MaybeUninit, slice::from_raw_parts},
     pinocchio::{
         cpi::{invoke_signed_with_bounds, Signer},
         instruction::{InstructionAccount, InstructionView},
@@ -79,25 +80,31 @@ impl<'a> CreateMagicAta<'a> {
     pub fn invoke_signed(&self, signers: &[Signer<'_, '_>]) -> ProgramResult {
         const NUM_ACCOUNTS: usize = 4;
 
-        let instruction_accounts = [
-            InstructionAccount::readonly_signer(self.payer.address()),
-            InstructionAccount::writable(self.ata.address()),
-            InstructionAccount::readonly(self.mint.address()),
-            InstructionAccount::readonly(self.token_program.address()),
-        ];
-        let accounts: [&AccountView; NUM_ACCOUNTS] =
-            [self.payer, self.ata, self.mint, self.token_program];
+        let mut instruction_accounts =
+            [const { MaybeUninit::<InstructionAccount>::uninit() }; NUM_ACCOUNTS];
+        instruction_accounts[0].write(InstructionAccount::readonly_signer(self.payer.address()));
+        instruction_accounts[1].write(InstructionAccount::writable(self.ata.address()));
+        instruction_accounts[2].write(InstructionAccount::readonly(self.mint.address()));
+        instruction_accounts[3].write(InstructionAccount::readonly(self.token_program.address()));
+
+        let mut accounts = [const { MaybeUninit::<&AccountView>::uninit() }; NUM_ACCOUNTS];
+        accounts[0].write(self.payer);
+        accounts[1].write(self.ata);
+        accounts[2].write(self.mint);
+        accounts[3].write(self.token_program);
 
         let mut instruction_data = [0u8; CREATE_MAGIC_ATA_DATA_LEN];
         encode_create_magic_ata_data(&mut instruction_data, self.wallet_owner);
 
-        invoke_signed_with_bounds::<NUM_ACCOUNTS, _>(
+        invoke_signed_with_bounds::<NUM_ACCOUNTS>(
             &InstructionView {
                 program_id: self.magic_program.address(),
-                accounts: &instruction_accounts,
+                accounts: unsafe {
+                    from_raw_parts(instruction_accounts.as_ptr() as _, NUM_ACCOUNTS)
+                },
                 data: &instruction_data,
             },
-            &accounts,
+            unsafe { from_raw_parts(accounts.as_ptr() as _, NUM_ACCOUNTS) },
             signers,
         )
     }
@@ -124,19 +131,24 @@ impl CloseMagicAta<'_> {
     pub fn invoke_signed(&self, signers: &[Signer<'_, '_>]) -> ProgramResult {
         const NUM_ACCOUNTS: usize = 2;
 
-        let instruction_accounts = [
-            InstructionAccount::readonly_signer(self.owner.address()),
-            InstructionAccount::writable(self.ata.address()),
-        ];
-        let accounts: [&AccountView; NUM_ACCOUNTS] = [self.owner, self.ata];
+        let mut instruction_accounts =
+            [const { MaybeUninit::<InstructionAccount>::uninit() }; NUM_ACCOUNTS];
+        instruction_accounts[0].write(InstructionAccount::readonly_signer(self.owner.address()));
+        instruction_accounts[1].write(InstructionAccount::writable(self.ata.address()));
 
-        invoke_signed_with_bounds::<NUM_ACCOUNTS, _>(
+        let mut accounts = [const { MaybeUninit::<&AccountView>::uninit() }; NUM_ACCOUNTS];
+        accounts[0].write(self.owner);
+        accounts[1].write(self.ata);
+
+        invoke_signed_with_bounds::<NUM_ACCOUNTS>(
             &InstructionView {
                 program_id: self.magic_program.address(),
-                accounts: &instruction_accounts,
+                accounts: unsafe {
+                    from_raw_parts(instruction_accounts.as_ptr() as _, NUM_ACCOUNTS)
+                },
                 data: &CLOSE_MAGIC_ATA_DISCRIMINATOR.to_le_bytes(),
             },
-            &accounts,
+            unsafe { from_raw_parts(accounts.as_ptr() as _, NUM_ACCOUNTS) },
             signers,
         )
     }
