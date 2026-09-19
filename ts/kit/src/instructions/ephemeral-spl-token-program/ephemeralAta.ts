@@ -877,13 +877,13 @@ export async function depositAndDelegateShuttleEphemeralAtaWithMergeAndPrivateTr
  *
  * Initialize shuttle metadata/EATA/wallet ATA, deposit into the shuttle EATA,
  * then delegate it with post-delegation actions that, on the ER, create the
- * destination's rent-pending ATA + ephemeral EATA permission and merge the
+ * destination's Magic ATA + ephemeral EATA permission and merge the
  * shuttle balance into it. The destination owner and ATA are carried only as
  * ciphertexts encrypted to the validator key and never appear in cleartext on
  * the base layer; the EATA and permission PDA are not transmitted at all, but
  * re-derived on the ER from the decrypted owner.
  *
- * Requires the validator to support rent-pending ATA materialization.
+ * Requires the validator to support Magic ATA materialization.
  */
 export async function depositAndDelegateShuttleWithMergeToEncryptedDestinationIx(
   payer: Address,
@@ -947,7 +947,7 @@ export async function depositAndDelegateShuttleWithMergeToEncryptedDestinationIx
   };
 
   const data = Buffer.concat([
-    Buffer.from([33]),
+    Buffer.from([34]),
     u32leBuffer(shuttleId),
     u64leBuffer(amount),
     encrypt(destinationOwner),
@@ -986,11 +986,11 @@ export async function depositAndDelegateShuttleWithMergeToEncryptedDestinationIx
 }
 
 /**
- * Idempotently create the destination's ATA as a rent-pending ATA through the
+ * Idempotently create the destination's ATA as a Magic ATA through the
  * Magic program (instruction 35), so a plain SPL transfer in the same
  * transaction can fund a destination that does not exist yet on the ER.
  */
-export async function ensureRentPendingDestinationIx(
+export async function ensureMagicAtaDestinationIx(
   payer: Address,
   destinationOwner: Address,
   mint: Address,
@@ -1012,7 +1012,7 @@ export async function ensureRentPendingDestinationIx(
       { address: tokenProgram, role: AccountRole.READONLY },
       { address: MAGIC_PROGRAM_ID, role: AccountRole.READONLY },
     ],
-    data: Buffer.from([35]),
+    data: Buffer.from([36]),
     programAddress: EPHEMERAL_SPL_TOKEN_PROGRAM_ID,
   };
 }
@@ -1464,12 +1464,12 @@ export interface DelegateSplWithPrivateTransferOptions
 export interface WithdrawSplOptions
   extends Omit<DelegateSplOptions, "private" | "initVaultIfMissing"> {
   /**
-   * The ephemeral balance lives in a rent-pending ATA (no eATA exists yet):
-   * skip the eATA init/delegate instructions and drain the rent-pending ATA
+   * The ephemeral balance lives in a Magic ATA (no eATA exists yet):
+   * skip the eATA init/delegate instructions and drain the Magic ATA
    * directly. The validator closes the account when it is fully drained.
-   * Detect with isRentPendingTokenAccount on the ER account.
+   * Detect with isMagicAtaTokenAccount on the ER account.
    */
-  rentPendingSource?: boolean;
+  magicAtaSource?: boolean;
 }
 
 export type TransferBalance = "base" | "ephemeral";
@@ -1497,7 +1497,7 @@ export interface TransferSplOptions {
   /**
    * Private base->ephemeral only: fall back to the legacy instruction-24 route
    * where the destination accounts are set up on base in cleartext. Use when
-   * the target validator does not support rent-pending ATA materialization.
+   * the target validator does not support Magic ATA materialization.
    */
   legacyCleartextDestination?: boolean;
 }
@@ -1823,7 +1823,7 @@ export async function transferSpl(
         if (opts.toBalance === "ephemeral") {
           return [
             ...(initIfMissing
-              ? [await ensureRentPendingDestinationIx(payer, to, mint)]
+              ? [await ensureMagicAtaDestinationIx(payer, to, mint)]
               : []),
             createTransferInstruction(fromAta, toAta, from, amount),
           ];
@@ -2021,7 +2021,7 @@ async function buildIdempotentWithdrawSplInstructions(
     instructions.push(initVaultAtaIx(payer, ownerAta, owner, mint));
   }
 
-  if (opts?.rentPendingSource !== true) {
+  if (opts?.magicAtaSource !== true) {
     if (initIfMissing) {
       instructions.push(initEphemeralAtaIx(ephemeralAta, owner, mint, payer));
     }
@@ -2053,9 +2053,9 @@ export async function withdrawSpl(
   opts?: WithdrawSplOptions,
 ): Promise<Instruction[]> {
   if (opts?.idempotent === false) {
-    if (opts.rentPendingSource === true) {
+    if (opts.magicAtaSource === true) {
       throw new Error(
-        "rentPendingSource requires the idempotent shuttle withdrawal flow",
+        "magicAtaSource requires the idempotent shuttle withdrawal flow",
       );
     }
     const instructions: Instruction[] = [];

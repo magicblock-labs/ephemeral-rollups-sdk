@@ -10,22 +10,22 @@ import {
 } from "../../constants";
 
 /**
- * Sentinel close authority marking a token account as a rent-pending ATA.
+ * Sentinel close authority marking a token account as a Magic ATA.
  * The validator sets close_authority to the rent sysvar on ATAs created
  * inside the ephemeral rollup whose base-layer eATA has not been
  * materialized yet. It is a data marker only, never a signer grant.
  */
-export const RENT_PENDING_ATA_CLOSE_AUTHORITY = SYSVAR_RENT_PUBKEY;
+export const MAGIC_ATA_CLOSE_AUTHORITY = SYSVAR_RENT_PUBKEY;
 
 /**
- * Derives the canonical ATA address for a rent-pending ATA.
+ * Derives the canonical ATA address for a Magic ATA.
  *
  * @param walletOwner - The wallet that will own the ATA
  * @param mint - The token mint
  * @param tokenProgram - The token program (TOKEN_PROGRAM_ID or TOKEN_2022_PROGRAM_ID)
  * @returns ATA public key
  */
-export function rentPendingAtaAddress(
+export function magicAtaAddress(
   walletOwner: PublicKey,
   mint: PublicKey,
   tokenProgram: PublicKey = TOKEN_PROGRAM_ID,
@@ -39,11 +39,11 @@ export function rentPendingAtaAddress(
 }
 
 /**
- * Creates a rent-pending ATA through the Magic Program.
+ * Creates a Magic ATA through the Magic Program.
  *
- * The instruction is idempotent for an existing matching rent-pending or
+ * The instruction is idempotent for an existing matching Magic ATA or
  * projected ATA. The ATA must end the transaction with a positive token
- * balance. Requires a validator that supports rent-pending ATA materialization.
+ * balance. Requires a validator that supports Magic ATA materialization.
  *
  * @param payer - Payer/sponsor account (must sign; the wallet owner does not sign)
  * @param walletOwner - The wallet that will own the ATA
@@ -51,13 +51,13 @@ export function rentPendingAtaAddress(
  * @param tokenProgram - The token program (TOKEN_PROGRAM_ID or TOKEN_2022_PROGRAM_ID)
  * @returns TransactionInstruction
  */
-export function createRentPendingAtaInstruction(
+export function createMagicAtaInstruction(
   payer: PublicKey,
   walletOwner: PublicKey,
   mint: PublicKey,
   tokenProgram: PublicKey = TOKEN_PROGRAM_ID,
 ): TransactionInstruction {
-  const ata = rentPendingAtaAddress(walletOwner, mint, tokenProgram);
+  const ata = magicAtaAddress(walletOwner, mint, tokenProgram);
   const data = Buffer.alloc(36);
   data.writeUInt32LE(15, 0);
   walletOwner.toBuffer().copy(data, 4);
@@ -75,23 +75,23 @@ export function createRentPendingAtaInstruction(
 }
 
 /**
- * Closes a drained rent-pending ATA through the Magic Program.
+ * Closes a drained Magic ATA through the Magic Program.
  *
- * No-op unless the ATA matches the rent-pending marker for the signing
+ * No-op unless the ATA matches the Magic ATA marker for the signing
  * owner and holds zero tokens, so it can be appended unconditionally to
  * withdrawal flows.
  *
- * @param owner - The wallet owning the rent-pending ATA (must sign)
+ * @param owner - The wallet owning the Magic ATA (must sign)
  * @param mint - The token mint
  * @param tokenProgram - The token program (TOKEN_PROGRAM_ID or TOKEN_2022_PROGRAM_ID)
  * @returns TransactionInstruction
  */
-export function closeRentPendingAtaInstruction(
+export function closeMagicAtaInstruction(
   owner: PublicKey,
   mint: PublicKey,
   tokenProgram: PublicKey = TOKEN_PROGRAM_ID,
 ): TransactionInstruction {
-  const ata = rentPendingAtaAddress(owner, mint, tokenProgram);
+  const ata = magicAtaAddress(owner, mint, tokenProgram);
   const data = Buffer.alloc(4);
   data.writeUInt32LE(26, 0);
 
@@ -106,19 +106,17 @@ export function closeRentPendingAtaInstruction(
 }
 
 /**
- * Returns true when the given token account data belongs to a rent-pending
+ * Returns true when the given token account data belongs to a Magic ATA
  * ATA, i.e. its close_authority is the rent sysvar sentinel.
  *
  * @param data - Raw SPL token account data (at least 165 bytes)
  */
-export function isRentPendingTokenAccount(data: Buffer | Uint8Array): boolean {
+export function isMagicAtaTokenAccount(data: Buffer | Uint8Array): boolean {
   const buf = Buffer.isBuffer(data) ? data : Buffer.from(data);
   if (buf.length < 165) return false;
   // close_authority COption<Pubkey>: u32 LE tag at offset 129, pubkey at 133..165
   return (
     buf.readUInt32LE(129) === 1 &&
-    new PublicKey(buf.subarray(133, 165)).equals(
-      RENT_PENDING_ATA_CLOSE_AUTHORITY,
-    )
+    new PublicKey(buf.subarray(133, 165)).equals(MAGIC_ATA_CLOSE_AUTHORITY)
   );
 }
