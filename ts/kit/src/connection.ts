@@ -367,7 +367,8 @@ export class Connection {
    * @param signature - The transaction signature of the accounts commitment transaction to the base layer.
    * @returns A `Promise<string>` that resolves with the commitment signature found in the commit logs.
    *
-   * @throws {Error} If the transaction or its metadata cannot be found, or if the
+   * @throws {Error} If the transaction or its metadata cannot be found, if the
+   *                 scheduling transaction failed (`meta.err`), or if the
    *                 expected log messages are missing from either scheduling or commit stages.
    */
   public async getCommitmentSignature(
@@ -382,6 +383,14 @@ export class Connection {
 
     if (txSchedulingSgn?.meta == null) {
       throw new Error("Transaction not found or meta is null");
+    }
+    // A later instruction can fail after magic-program logs ScheduledCommitSent.
+    // In that case the overall transaction fails and nothing was scheduled, so
+    // we must not return a signature that will never land on the ER.
+    if (txSchedulingSgn.meta.err != null) {
+      throw new Error(
+        "Transaction failed; commitment was not scheduled (ScheduledCommitSent logs from earlier instructions are not reliable when the transaction errors)",
+      );
     }
     const scheduledCommitSgn = parseScheduleCommitsLogsMessage(
       txSchedulingSgn.meta.logMessages ?? [],
@@ -400,6 +409,11 @@ export class Connection {
 
     if (txCommitInfo?.meta == null) {
       throw new Error("Transaction not found or meta is null");
+    }
+    if (txCommitInfo.meta.err != null) {
+      throw new Error(
+        "Scheduled commit transaction failed; commitment signature is not available",
+      );
     }
 
     const commitSignature = parseCommitsLogsMessage(

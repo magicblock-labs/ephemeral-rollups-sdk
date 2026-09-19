@@ -20,7 +20,7 @@ fn is_canonical_undelegation_buffer(delegated_account: &Address, buffer: &Addres
 
 #[inline(always)]
 pub fn undelegate(
-    delegated_account: &AccountView,
+    delegated_account: &mut AccountView,
     owner_program: &Address,
     buffer: &AccountView,
     payer: &AccountView,

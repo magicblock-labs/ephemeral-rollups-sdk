@@ -153,7 +153,7 @@ impl<'args> CommitIntent<'_, 'args> {
     ) -> ProgramResult {
         for el in self.accounts.iter() {
             if !container.contains(el) {
-                container.try_push(el.clone())?;
+                container.try_push(*el)?;
             }
         }
         for el in self.actions.iter() {
@@ -239,7 +239,7 @@ impl<'args> CommitAndUndelegateIntent<'_, 'args> {
     ) -> ProgramResult {
         for el in self.accounts.iter() {
             if !container.contains(el) {
-                container.try_push(el.clone())?;
+                container.try_push(*el)?;
             }
         }
         for el in self.post_commit_actions.iter() {
@@ -342,7 +342,7 @@ impl<'args> CallHandler<'args> {
         container: &mut NoVec<AccountView, MAX_STATIC_CPI_ACCOUNTS>,
     ) -> ProgramResult {
         if !container.contains(&self.escrow_authority) {
-            container.try_push(self.escrow_authority.clone())?;
+            container.try_push(self.escrow_authority)?;
         }
         Ok(())
     }

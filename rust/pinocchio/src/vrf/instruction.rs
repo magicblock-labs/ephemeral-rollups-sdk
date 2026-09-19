@@ -141,7 +141,7 @@ mod tests {
             is_signer,
             is_writable,
             executable: 0,
-            resize_delta: 0,
+            padding: [0; 4],
             address,
             owner: Address::new_from_array([0; 32]),
             lamports: 0,

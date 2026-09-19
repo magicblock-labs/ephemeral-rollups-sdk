@@ -71,7 +71,7 @@ impl<'a> DelegateEphemeralAta<'a> {
             1
         };
 
-        invoke_signed_with_bounds::<NUM_ACCOUNTS>(
+        invoke_signed_with_bounds::<NUM_ACCOUNTS, _>(
             &InstructionView {
                 program_id: &ESPL_TOKEN_PROGRAM_ID,
                 accounts: unsafe {
@@ -79,7 +79,7 @@ impl<'a> DelegateEphemeralAta<'a> {
                 },
                 data: &instruction_data[..instruction_data_len],
             },
-            unsafe { from_raw_parts(accounts.as_ptr() as _, NUM_ACCOUNTS) },
+            unsafe { from_raw_parts(accounts.as_ptr() as *const &AccountView, NUM_ACCOUNTS) },
             signers,
         )
     }

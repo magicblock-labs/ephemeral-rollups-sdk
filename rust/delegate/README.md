@@ -27,8 +27,9 @@ pub struct DelegatePlayer<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
 
-    #[account(mut, del)]  // <-- delegation marker
-    pub player: Account<'info, PlayerState>,
+    /// CHECK: delegated PDA, validated by seeds
+    #[account(mut, del, seeds = [b"player", payer.key().as_ref()], bump)]  // <-- delegation marker
+    pub player: UncheckedAccount<'info>,
 }
 
 pub fn delegate_player(ctx: Context<DelegatePlayer>) -> Result<()> {
@@ -41,6 +42,12 @@ pub fn delegate_player(ctx: Context<DelegatePlayer>) -> Result<()> {
     Ok(())
 }
 ```
+
+`del` fields must be `UncheckedAccount` or `AccountInfo`; the macro rejects typed accounts
+such as `Account<T>` at compile time. Anchor re-serializes typed accounts after the handler
+returns, when the account is already owned by the delegation program, and that write fails
+under direct mapping (SIMD-0460). To update the account in the same instruction, load it into
+a local typed wrapper, mutate it, and call `.exit(&crate::ID)` on it before delegating.
 
 **Auto-generated fields:**
 - `buffer_player`

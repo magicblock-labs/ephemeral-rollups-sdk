@@ -15,7 +15,7 @@ members = [
 resolver = "2"
 
 [workspace.package]
-version = "0.16.2"
+version = "0.17.0"
 authors = ["Magicblock Labs <dev@magicblock.gg>"]
 edition = "2021"
 license = "MIT"
@@ -26,19 +26,19 @@ readme = "README.md"
 keywords = ["solana", "crypto", "delegation", "ephemeral-rollups", "magicblock"]
 
 [workspace.dependencies]
-ephemeral-rollups-sdk = { path = "sdk", version = "=0.16.2" }
-ephemeral-rollups-sdk-attribute-ephemeral = { path = "ephemeral", version = "=0.16.2" }
-ephemeral-rollups-sdk-attribute-ephemeral-accounts = { path = "ephemeral-accounts-attribute", version = "=0.16.2" }
-ephemeral-rollups-sdk-attribute-delegate = { path = "delegate", version = "=0.16.2" }
-ephemeral-rollups-sdk-attribute-commit = { path = "commit-attribute", version = "=0.16.2" }
-ephemeral-rollups-sdk-attribute-action = { path = "action-attribute", version = "=0.16.2" }
-ephemeral-vrf-sdk = { path = "vrf-sdk", version = "=0.16.2", default-features = false }
-ephemeral-vrf-sdk-vrf-macro = { path = "vrf-macro", version = "=0.16.2", default-features = false }
-
+ephemeral-rollups-sdk = { path = "sdk", version = "=0.17.0" }
+ephemeral-rollups-sdk-attribute-ephemeral = { path = "ephemeral", version = "=0.17.0" }
+ephemeral-rollups-sdk-attribute-ephemeral-accounts = { path = "ephemeral-accounts-attribute", version = "=0.17.0" }
+ephemeral-rollups-sdk-attribute-delegate = { path = "delegate", version = "=0.17.0" }
+ephemeral-rollups-sdk-attribute-commit = { path = "commit-attribute", version = "=0.17.0" }
+ephemeral-rollups-sdk-attribute-action = { path = "action-attribute", version = "=0.17.0" }
+ephemeral-vrf-sdk = { path = "vrf-sdk", version = "=0.17.0", default-features = false }
+ephemeral-vrf-sdk-vrf-macro = { path = "vrf-macro", version = "=0.17.0", default-features = false }
 
 # Magicblock
 magicblock-delegation-program-api = { version = "3.1.0", default-features = false }
 magicblock-magic-program-api = { version = "0.10.1", default-features = false }
+hydra-api = "0.2.0"
 
 ## External crates
 anchor-lang-compat = { package = "anchor-lang", version = ">=0.28.0, <1.0.0" }
@@ -67,15 +67,14 @@ websocket = { package = "tokio-websockets", version = "0.10", features = [
 ] }
 reqwest = { version = "0.12" }
 
-pinocchio = { version = "0.10", default-features = false, features = [
+pinocchio = { version = "0.11", default-features = false, features = [
 	"cpi",
 	"alloc",
+	"account-resize",
+	"copy",
 ] }
 pinocchio-log = { version = "0.5", default-features = false }
-pinocchio-pubkey = { version = "0.3", default-features = false, features = [
-	"const",
-] }
-pinocchio-system = { version = "0.5", default-features = false }
+pinocchio-system = { version = "0.6", default-features = false }
 pinocchio-token = { version = "0.5", default-features = false }
 
 solana-program = { version = "3.0.0", default-features = false }

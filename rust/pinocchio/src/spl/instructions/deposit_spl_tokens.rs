@@ -57,7 +57,7 @@ impl<'a> DepositSplTokens<'a> {
         instruction_data[0] = EphemeralSplDiscriminator::DepositSplTokens as u8;
         instruction_data[1..9].copy_from_slice(&self.amount.to_le_bytes());
 
-        invoke_signed_with_bounds::<NUM_ACCOUNTS>(
+        invoke_signed_with_bounds::<NUM_ACCOUNTS, _>(
             &InstructionView {
                 program_id: &ESPL_TOKEN_PROGRAM_ID,
                 accounts: unsafe {
@@ -65,7 +65,7 @@ impl<'a> DepositSplTokens<'a> {
                 },
                 data: &instruction_data,
             },
-            unsafe { from_raw_parts(accounts.as_ptr() as _, NUM_ACCOUNTS) },
+            unsafe { from_raw_parts(accounts.as_ptr() as *const &AccountView, NUM_ACCOUNTS) },
             signers,
         )
     }

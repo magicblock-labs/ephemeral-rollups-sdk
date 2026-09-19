@@ -25,14 +25,14 @@ fn find_buffer_pda_bump(pda_key: &[u8], owner_program: &Address) -> u8 {
     bump
 }
 
-#[allow(unknown_lints, clippy::cloned_ref_to_slice_refs)]
+#[allow(unknown_lints)]
 pub fn delegate_account_with_actions(
-    accounts: &[&AccountView],
+    accounts: &mut [AccountView],
     seeds: &[&[u8]],
     bump: u8,
     config: DelegateConfig,
     actions: PostDelegationActions,
-    action_signer_accounts: &[&AccountView],
+    action_signer_accounts: &[AccountView],
 ) -> ProgramResult {
     let [payer, pda_acc, owner_program, buffer_acc, delegation_record, delegation_metadata, system_program] =
         accounts
@@ -90,11 +90,11 @@ pub fn delegate_account_with_actions(
     let filled = fill_seeds(&mut seed_buf, seeds, &bump);
     let delegate_signer_seeds = Signer::from(filled);
 
-    let current_owner = unsafe { pda_acc.owner() };
+    let current_owner = pda_acc.owner();
     if current_owner != &pinocchio_system::ID {
         unsafe { pda_acc.assign(&pinocchio_system::ID) };
     }
-    let current_owner = unsafe { pda_acc.owner() };
+    let current_owner = pda_acc.owner();
     if current_owner != &DELEGATION_PROGRAM_ID {
         Assign {
             account: pda_acc,
@@ -141,7 +141,7 @@ pub struct DelegateAccountWithActionsCpiBuilder<'a> {
     bump: Option<u8>,
     config: Option<DelegateConfig>,
     actions: Option<PostDelegationActions>,
-    action_signer_accounts: Option<&'a [&'a AccountView]>,
+    action_signer_accounts: Option<&'a [AccountView]>,
 }
 
 impl<'a> DelegateAccountWithActionsCpiBuilder<'a> {
@@ -190,7 +190,7 @@ impl<'a> DelegateAccountWithActionsCpiBuilder<'a> {
         self
     }
 
-    pub fn action_signer_accounts(mut self, accounts: &'a [&'a AccountView]) -> Self {
+    pub fn action_signer_accounts(mut self, accounts: &'a [AccountView]) -> Self {
         self.action_signer_accounts = Some(accounts);
         self
     }
@@ -208,14 +208,14 @@ impl<'a> DelegateAccountWithActionsCpiBuilder<'a> {
             .ok_or(ProgramError::InvalidInstructionData)?;
 
         delegate_account_with_actions(
-            &[
-                self.payer,
-                self.pda_acc,
-                self.owner_program,
-                self.buffer_acc,
-                self.delegation_record,
-                self.delegation_metadata,
-                self.system_program,
+            &mut [
+                *self.payer,
+                *self.pda_acc,
+                *self.owner_program,
+                *self.buffer_acc,
+                *self.delegation_record,
+                *self.delegation_metadata,
+                *self.system_program,
             ],
             seeds,
             bump,
