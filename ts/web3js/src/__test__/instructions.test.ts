@@ -1148,11 +1148,11 @@ describe("Exposed Instructions (web3.js)", () => {
         validator,
         shuttleId: 7,
         magicAtaSource: true,
-        initAtasIfMissing: true,
       });
 
+      // The base ATA create is implied by a Magic ATA source: the balance
+      // exists only in the ER, so the base ATA cannot be assumed.
       expect(instructions).toHaveLength(2);
-      // createAssociatedTokenAccountIdempotent + ix 26 only
       expect(instructions[1].data[0]).toBe(26);
       expect(instructions[1].keys).toHaveLength(16);
       expect(

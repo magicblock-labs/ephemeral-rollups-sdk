@@ -2017,7 +2017,9 @@ async function buildIdempotentWithdrawSplInstructions(
     shuttleEphemeralAta,
   );
 
-  if (initAtasIfMissing) {
+  // A Magic ATA source exists only in the ER, so the base ATA that the
+  // shuttle withdrawal settles into cannot be assumed to exist.
+  if (initAtasIfMissing || opts?.magicAtaSource === true) {
     instructions.push(initVaultAtaIx(payer, ownerAta, owner, mint));
   }
 
