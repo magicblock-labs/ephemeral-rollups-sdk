@@ -1,6 +1,5 @@
 use {
-    crate::{consts::RENT_PENDING_ATA_CLOSE_AUTHORITY, spl::consts::ASSOCIATED_TOKEN_PROGRAM_ID},
-    core::{mem::MaybeUninit, slice::from_raw_parts},
+    crate::{consts::MAGIC_ATA_CLOSE_AUTHORITY, spl::consts::ASSOCIATED_TOKEN_PROGRAM_ID},
     pinocchio::{
         cpi::{invoke_signed_with_bounds, Signer},
         instruction::{InstructionAccount, InstructionView},
@@ -8,9 +7,9 @@ use {
     },
 };
 
-pub const CREATE_RENT_PENDING_ATA_DISCRIMINATOR: u32 = 15;
-pub const CREATE_RENT_PENDING_ATA_DATA_LEN: usize = 36;
-pub const CLOSE_RENT_PENDING_ATA_DISCRIMINATOR: u32 = 26;
+pub const CREATE_MAGIC_ATA_DISCRIMINATOR: u32 = 15;
+pub const CREATE_MAGIC_ATA_DATA_LEN: usize = 36;
+pub const CLOSE_MAGIC_ATA_DISCRIMINATOR: u32 = 26;
 
 const TOKEN_ACCOUNT_CLOSE_AUTHORITY_OFFSET: usize = 129;
 const TOKEN_ACCOUNT_CLOSE_AUTHORITY_PUBKEY_OFFSET: usize = 133;
@@ -27,15 +26,15 @@ pub fn get_associated_token_address(
     )
 }
 
-pub fn encode_create_rent_pending_ata_data(
-    data: &mut [u8; CREATE_RENT_PENDING_ATA_DATA_LEN],
+pub fn encode_create_magic_ata_data(
+    data: &mut [u8; CREATE_MAGIC_ATA_DATA_LEN],
     wallet_owner: &Address,
 ) {
-    data[0..4].copy_from_slice(&CREATE_RENT_PENDING_ATA_DISCRIMINATOR.to_le_bytes());
+    data[0..4].copy_from_slice(&CREATE_MAGIC_ATA_DISCRIMINATOR.to_le_bytes());
     data[4..36].copy_from_slice(wallet_owner.as_ref());
 }
 
-pub fn is_rent_pending_token_account(data: &[u8]) -> bool {
+pub fn is_magic_ata_token_account(data: &[u8]) -> bool {
     if data.len() < TOKEN_ACCOUNT_LEN {
         return false;
     }
@@ -50,18 +49,18 @@ pub fn is_rent_pending_token_account(data: &[u8]) -> bool {
     close_authority_tag == 1
         && &data[TOKEN_ACCOUNT_CLOSE_AUTHORITY_PUBKEY_OFFSET
             ..TOKEN_ACCOUNT_CLOSE_AUTHORITY_PUBKEY_OFFSET + 32]
-            == RENT_PENDING_ATA_CLOSE_AUTHORITY.as_ref()
+            == MAGIC_ATA_CLOSE_AUTHORITY.as_ref()
 }
 
-/// Create a rent-pending ATA through the Magic Program.
+/// Create a Magic ATA through the Magic Program.
 ///
-/// Requires a validator that supports rent-pending ATA materialization.
+/// Requires a validator that supports Magic ATA materialization.
 ///
 /// Idempotent on the validator side: succeeds if the ATA already exists as a
-/// rent-pending or projected token account for the same wallet owner and mint.
+/// Magic ATA or projected token account for the same wallet owner and mint.
 /// The ATA must end the transaction with a positive token amount, otherwise
 /// the whole transaction is rolled back by the validator.
-pub struct CreateRentPendingAta<'a> {
+pub struct CreateMagicAta<'a> {
     pub payer: &'a AccountView,
     pub ata: &'a AccountView,
     pub mint: &'a AccountView,
@@ -70,7 +69,7 @@ pub struct CreateRentPendingAta<'a> {
     pub wallet_owner: &'a Address,
 }
 
-impl<'a> CreateRentPendingAta<'a> {
+impl<'a> CreateMagicAta<'a> {
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
         self.invoke_signed(&[])
@@ -80,48 +79,42 @@ impl<'a> CreateRentPendingAta<'a> {
     pub fn invoke_signed(&self, signers: &[Signer<'_, '_>]) -> ProgramResult {
         const NUM_ACCOUNTS: usize = 4;
 
-        let mut instruction_accounts =
-            [const { MaybeUninit::<InstructionAccount>::uninit() }; NUM_ACCOUNTS];
-        instruction_accounts[0].write(InstructionAccount::readonly_signer(self.payer.address()));
-        instruction_accounts[1].write(InstructionAccount::writable(self.ata.address()));
-        instruction_accounts[2].write(InstructionAccount::readonly(self.mint.address()));
-        instruction_accounts[3].write(InstructionAccount::readonly(self.token_program.address()));
+        let instruction_accounts = [
+            InstructionAccount::readonly_signer(self.payer.address()),
+            InstructionAccount::writable(self.ata.address()),
+            InstructionAccount::readonly(self.mint.address()),
+            InstructionAccount::readonly(self.token_program.address()),
+        ];
+        let accounts: [&AccountView; NUM_ACCOUNTS] =
+            [self.payer, self.ata, self.mint, self.token_program];
 
-        let mut accounts = [const { MaybeUninit::<&AccountView>::uninit() }; NUM_ACCOUNTS];
-        accounts[0].write(self.payer);
-        accounts[1].write(self.ata);
-        accounts[2].write(self.mint);
-        accounts[3].write(self.token_program);
+        let mut instruction_data = [0u8; CREATE_MAGIC_ATA_DATA_LEN];
+        encode_create_magic_ata_data(&mut instruction_data, self.wallet_owner);
 
-        let mut instruction_data = [0u8; CREATE_RENT_PENDING_ATA_DATA_LEN];
-        encode_create_rent_pending_ata_data(&mut instruction_data, self.wallet_owner);
-
-        invoke_signed_with_bounds::<NUM_ACCOUNTS>(
+        invoke_signed_with_bounds::<NUM_ACCOUNTS, _>(
             &InstructionView {
                 program_id: self.magic_program.address(),
-                accounts: unsafe {
-                    from_raw_parts(instruction_accounts.as_ptr() as _, NUM_ACCOUNTS)
-                },
+                accounts: &instruction_accounts,
                 data: &instruction_data,
             },
-            unsafe { from_raw_parts(accounts.as_ptr() as _, NUM_ACCOUNTS) },
+            &accounts,
             signers,
         )
     }
 }
 
-/// Close a drained rent-pending ATA through the Magic Program.
+/// Close a drained Magic ATA through the Magic Program.
 ///
-/// No-op unless the ATA matches the rent-pending marker for the signing owner
+/// No-op unless the ATA matches the Magic ATA marker for the signing owner
 /// and holds zero tokens, so it can be appended unconditionally to withdrawal
 /// flows.
-pub struct CloseRentPendingAta<'a> {
+pub struct CloseMagicAta<'a> {
     pub owner: &'a AccountView,
     pub ata: &'a AccountView,
     pub magic_program: &'a AccountView,
 }
 
-impl CloseRentPendingAta<'_> {
+impl CloseMagicAta<'_> {
     #[inline(always)]
     pub fn invoke(&self) -> ProgramResult {
         self.invoke_signed(&[])
@@ -131,24 +124,19 @@ impl CloseRentPendingAta<'_> {
     pub fn invoke_signed(&self, signers: &[Signer<'_, '_>]) -> ProgramResult {
         const NUM_ACCOUNTS: usize = 2;
 
-        let mut instruction_accounts =
-            [const { MaybeUninit::<InstructionAccount>::uninit() }; NUM_ACCOUNTS];
-        instruction_accounts[0].write(InstructionAccount::readonly_signer(self.owner.address()));
-        instruction_accounts[1].write(InstructionAccount::writable(self.ata.address()));
+        let instruction_accounts = [
+            InstructionAccount::readonly_signer(self.owner.address()),
+            InstructionAccount::writable(self.ata.address()),
+        ];
+        let accounts: [&AccountView; NUM_ACCOUNTS] = [self.owner, self.ata];
 
-        let mut accounts = [const { MaybeUninit::<&AccountView>::uninit() }; NUM_ACCOUNTS];
-        accounts[0].write(self.owner);
-        accounts[1].write(self.ata);
-
-        invoke_signed_with_bounds::<NUM_ACCOUNTS>(
+        invoke_signed_with_bounds::<NUM_ACCOUNTS, _>(
             &InstructionView {
                 program_id: self.magic_program.address(),
-                accounts: unsafe {
-                    from_raw_parts(instruction_accounts.as_ptr() as _, NUM_ACCOUNTS)
-                },
-                data: &CLOSE_RENT_PENDING_ATA_DISCRIMINATOR.to_le_bytes(),
+                accounts: &instruction_accounts,
+                data: &CLOSE_MAGIC_ATA_DISCRIMINATOR.to_le_bytes(),
             },
-            unsafe { from_raw_parts(accounts.as_ptr() as _, NUM_ACCOUNTS) },
+            &accounts,
             signers,
         )
     }
@@ -160,15 +148,15 @@ mod tests {
     use crate::spl::consts::TOKEN_PROGRAM_ID;
 
     #[test]
-    fn test_encode_create_rent_pending_ata_data() {
+    fn test_encode_create_magic_ata_data() {
         let wallet_owner = Address::new_from_array([1; 32]);
-        let mut data = [0u8; CREATE_RENT_PENDING_ATA_DATA_LEN];
+        let mut data = [0u8; CREATE_MAGIC_ATA_DATA_LEN];
 
-        encode_create_rent_pending_ata_data(&mut data, &wallet_owner);
+        encode_create_magic_ata_data(&mut data, &wallet_owner);
 
         assert_eq!(
             u32::from_le_bytes(data[0..4].try_into().unwrap()),
-            CREATE_RENT_PENDING_ATA_DISCRIMINATOR
+            CREATE_MAGIC_ATA_DISCRIMINATOR
         );
         assert_eq!(&data[4..36], wallet_owner.as_ref());
     }
@@ -188,20 +176,18 @@ mod tests {
     }
 
     #[test]
-    fn test_is_rent_pending_token_account() {
+    fn test_is_magic_ata_token_account() {
         let mut data = [0u8; TOKEN_ACCOUNT_LEN];
         data[TOKEN_ACCOUNT_CLOSE_AUTHORITY_OFFSET..TOKEN_ACCOUNT_CLOSE_AUTHORITY_OFFSET + 4]
             .copy_from_slice(&1u32.to_le_bytes());
         data[TOKEN_ACCOUNT_CLOSE_AUTHORITY_PUBKEY_OFFSET
             ..TOKEN_ACCOUNT_CLOSE_AUTHORITY_PUBKEY_OFFSET + 32]
-            .copy_from_slice(RENT_PENDING_ATA_CLOSE_AUTHORITY.as_ref());
+            .copy_from_slice(MAGIC_ATA_CLOSE_AUTHORITY.as_ref());
 
-        assert!(is_rent_pending_token_account(&data));
+        assert!(is_magic_ata_token_account(&data));
         data[TOKEN_ACCOUNT_CLOSE_AUTHORITY_OFFSET..TOKEN_ACCOUNT_CLOSE_AUTHORITY_OFFSET + 4]
             .copy_from_slice(&0u32.to_le_bytes());
-        assert!(!is_rent_pending_token_account(&data));
-        assert!(!is_rent_pending_token_account(
-            &data[..TOKEN_ACCOUNT_LEN - 1]
-        ));
+        assert!(!is_magic_ata_token_account(&data));
+        assert!(!is_magic_ata_token_account(&data[..TOKEN_ACCOUNT_LEN - 1]));
     }
 }

@@ -12,11 +12,11 @@ import {
 import {
   createCommitInstruction,
   createCommitAndUndelegateInstruction,
-  closeRentPendingAtaInstruction,
-  createRentPendingAtaInstruction,
-  isRentPendingTokenAccount,
-  rentPendingAtaAddress,
-  RENT_PENDING_ATA_CLOSE_AUTHORITY,
+  closeMagicAtaInstruction,
+  createMagicAtaInstruction,
+  isMagicAtaTokenAccount,
+  magicAtaAddress,
+  MAGIC_ATA_CLOSE_AUTHORITY,
 } from "../instructions/magic-program";
 import {
   address,
@@ -677,12 +677,12 @@ describe("Exposed Instructions (@solana/kit)", () => {
     });
   });
 
-  describe("rent-pending ATA helpers (Magic Program)", () => {
+  describe("Magic ATA helpers (Magic Program)", () => {
     it("should build the tag-15 instruction", async () => {
       const walletOwner = address("11111111111111111111111111111113");
       const mint = address("11111111111111111111111111111114");
-      const ata = await rentPendingAtaAddress(walletOwner, mint);
-      const instruction = await createRentPendingAtaInstruction(
+      const ata = await magicAtaAddress(walletOwner, mint);
+      const instruction = await createMagicAtaInstruction(
         mockAddress,
         walletOwner,
         mint,
@@ -702,8 +702,8 @@ describe("Exposed Instructions (@solana/kit)", () => {
     it("should build the tag-26 close instruction", async () => {
       const owner = address("11111111111111111111111111111113");
       const mint = address("11111111111111111111111111111114");
-      const ata = await rentPendingAtaAddress(owner, mint);
-      const instruction = await closeRentPendingAtaInstruction(owner, mint);
+      const ata = await magicAtaAddress(owner, mint);
+      const instruction = await closeMagicAtaInstruction(owner, mint);
       const data = instruction.data as Uint8Array;
 
       expect(instruction.programAddress).toBe(MAGIC_PROGRAM_ID);
@@ -727,20 +727,20 @@ describe("Exposed Instructions (@solana/kit)", () => {
           addressEncoder.encode(mint),
         ],
       });
-      const derivedAta = await rentPendingAtaAddress(walletOwner, mint);
+      const derivedAta = await magicAtaAddress(walletOwner, mint);
 
       expect(derivedAta).toBe(ata);
     });
 
-    it("should detect rent-pending token accounts", () => {
+    it("should detect Magic ATA token accounts", () => {
       const data = new Uint8Array(165);
       new DataView(data.buffer).setUint32(129, 1, true);
-      data.set(addressEncoder.encode(RENT_PENDING_ATA_CLOSE_AUTHORITY), 133);
+      data.set(addressEncoder.encode(MAGIC_ATA_CLOSE_AUTHORITY), 133);
 
-      expect(isRentPendingTokenAccount(data)).toBe(true);
+      expect(isMagicAtaTokenAccount(data)).toBe(true);
       new DataView(data.buffer).setUint32(129, 0, true);
-      expect(isRentPendingTokenAccount(data)).toBe(false);
-      expect(isRentPendingTokenAccount(new Uint8Array(164))).toBe(false);
+      expect(isMagicAtaTokenAccount(data)).toBe(false);
+      expect(isMagicAtaTokenAccount(new Uint8Array(164))).toBe(false);
     });
   });
 
@@ -1066,11 +1066,11 @@ describe("Exposed Instructions (@solana/kit)", () => {
       expect(instructions[0].data?.[0]).toBe(3);
     });
 
-    it("should skip eATA instructions for a rent-pending source", async () => {
+    it("should skip eATA instructions for a Magic ATA source", async () => {
       const instructions = await withdrawSpl(owner, mint, 1n, {
         validator,
         shuttleId: 7,
-        rentPendingSource: true,
+        magicAtaSource: true,
         initAtasIfMissing: true,
       });
 
@@ -1080,14 +1080,14 @@ describe("Exposed Instructions (@solana/kit)", () => {
       expect(instructions[1].accounts).toHaveLength(16);
     });
 
-    it("should reject a rent-pending source in the legacy flow", async () => {
+    it("should reject a Magic ATA source in the legacy flow", async () => {
       await expect(
         withdrawSpl(owner, mint, 1n, {
           idempotent: false,
-          rentPendingSource: true,
+          magicAtaSource: true,
         }),
       ).rejects.toThrow(
-        "rentPendingSource requires the idempotent shuttle withdrawal flow",
+        "magicAtaSource requires the idempotent shuttle withdrawal flow",
       );
     });
   });
@@ -1277,7 +1277,7 @@ describe("Exposed Instructions (@solana/kit)", () => {
 
       expect(instructions).toHaveLength(1);
       const data = Buffer.from(instructions[0].data ?? []);
-      expect(data[0]).toBe(33);
+      expect(data[0]).toBe(34);
       expect(data).toHaveLength(1 + 4 + 8 + 2 * 80 + 1 + 32);
       expect(instructions[0].accounts).toHaveLength(18);
       expect(data.readUInt32LE(1)).toBe(7);
@@ -1334,7 +1334,7 @@ describe("Exposed Instructions (@solana/kit)", () => {
             ix.accounts?.[1].address === vaultEphemeralAta,
         ),
       ).toBeUndefined();
-      expect(instructions[2].data?.[0]).toBe(33);
+      expect(instructions[2].data?.[0]).toBe(34);
     });
 
     it("should skip cleartext destination setup for private base-to-ephemeral transfers even when initIfMissing", async () => {
@@ -1348,7 +1348,7 @@ describe("Exposed Instructions (@solana/kit)", () => {
       });
 
       expect(instructions).toHaveLength(1);
-      expect(instructions[0].data?.[0]).toBe(33);
+      expect(instructions[0].data?.[0]).toBe(34);
     });
 
     it("should initialize permission and delegate the receiver eata for legacy private base-to-ephemeral transfers when requested", async () => {
@@ -1507,7 +1507,7 @@ describe("Exposed Instructions (@solana/kit)", () => {
       );
     });
 
-    it("should ensure the rent-pending destination before private ephemeral-to-ephemeral transfers", async () => {
+    it("should ensure the Magic ATA destination before private ephemeral-to-ephemeral transfers", async () => {
       const instructions = await transferSpl(from, to, mint, 25n, {
         visibility: "private",
         fromBalance: "ephemeral",
@@ -1517,7 +1517,7 @@ describe("Exposed Instructions (@solana/kit)", () => {
       });
 
       expect(instructions).toHaveLength(2);
-      expect(instructions[0].data?.[0]).toBe(35);
+      expect(instructions[0].data?.[0]).toBe(36);
       expect(instructions[0].accounts).toHaveLength(6);
       expect(instructions[0].accounts?.[1].address).toBe(to);
       expect(instructions[1].data?.[0]).toBe(3);
@@ -1527,7 +1527,7 @@ describe("Exposed Instructions (@solana/kit)", () => {
       );
     });
 
-    it("should skip the rent-pending destination setup unless initIfMissing", async () => {
+    it("should skip the Magic ATA destination setup unless initIfMissing", async () => {
       const instructions = await transferSpl(from, to, mint, 25n, {
         visibility: "private",
         fromBalance: "ephemeral",
