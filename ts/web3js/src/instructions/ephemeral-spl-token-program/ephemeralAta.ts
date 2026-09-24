@@ -2016,6 +2016,9 @@ export async function transferSpl(
       case "public":
         if (opts.toBalance === "ephemeral") {
           return [
+            ...(initIfMissing
+              ? [ensureMagicAtaDestinationIx(payer, to, mint, tokenProgram)]
+              : []),
             createTransferInstruction(
               fromAta(),
               toAta(),

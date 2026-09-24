@@ -1833,7 +1833,12 @@ export async function transferSpl(
 
       case "public":
         if (opts.toBalance === "ephemeral") {
-          return [createTransferInstruction(fromAta, toAta, from, amount)];
+          return [
+            ...(initIfMissing
+              ? [await ensureMagicAtaDestinationIx(payer, to, mint)]
+              : []),
+            createTransferInstruction(fromAta, toAta, from, amount),
+          ];
         }
 
         break;
