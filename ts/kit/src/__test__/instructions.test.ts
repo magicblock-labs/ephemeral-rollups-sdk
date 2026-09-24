@@ -1507,6 +1507,25 @@ describe("Exposed Instructions (@solana/kit)", () => {
       );
     });
 
+    it("should ensure the Magic ATA destination before public ephemeral-to-ephemeral transfers", async () => {
+      const instructions = await transferSpl(from, to, mint, 25n, {
+        visibility: "public",
+        fromBalance: "ephemeral",
+        toBalance: "ephemeral",
+        initIfMissing: true,
+      });
+
+      expect(instructions).toHaveLength(2);
+      expect(instructions[0].data?.[0]).toBe(36);
+      expect(instructions[0].accounts).toHaveLength(6);
+      expect(instructions[0].accounts?.[1].address).toBe(to);
+      expect(instructions[1].data?.[0]).toBe(3);
+      expect(instructions[1].accounts).toHaveLength(3);
+      expect(Buffer.from(instructions[1].data ?? []).readBigUInt64LE(1)).toBe(
+        25n,
+      );
+    });
+
     it("should ensure the Magic ATA destination before private ephemeral-to-ephemeral transfers", async () => {
       const instructions = await transferSpl(from, to, mint, 25n, {
         visibility: "private",

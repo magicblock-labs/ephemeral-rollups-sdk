@@ -1740,6 +1740,23 @@ describe("Exposed Instructions (web3.js)", () => {
       expect(Buffer.from(instructions[0].data).readBigUInt64LE(1)).toBe(25n);
     });
 
+    it("should ensure the Magic ATA destination before public ephemeral-to-ephemeral transfers", async () => {
+      const instructions = await transferSpl(from, to, mint, 25n, {
+        visibility: "public",
+        fromBalance: "ephemeral",
+        toBalance: "ephemeral",
+        initIfMissing: true,
+      });
+
+      expect(instructions).toHaveLength(2);
+      expect(instructions[0].data[0]).toBe(36);
+      expect(instructions[0].keys).toHaveLength(6);
+      expect(instructions[0].keys[1].pubkey.toBase58()).toBe(to.toBase58());
+      expect(instructions[1].data[0]).toBe(3);
+      expect(instructions[1].keys).toHaveLength(3);
+      expect(Buffer.from(instructions[1].data).readBigUInt64LE(1)).toBe(25n);
+    });
+
     it("should ensure the Magic ATA destination before private ephemeral-to-ephemeral transfers", async () => {
       const instructions = await transferSpl(from, to, mint, 25n, {
         visibility: "private",
