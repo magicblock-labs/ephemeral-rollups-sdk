@@ -28,6 +28,7 @@ anchor-lang-compat = { workspace = true, optional = true }
 anchor-lang-current = { workspace = true, optional = true }
 borsh-compat = { package = "borsh", version = "0.10.4", optional = true }
 borsh-current = { package = "borsh", version = "1.5.7", features = ["derive"] }
+const-crypto = { workspace = true }
 ephemeral-vrf-sdk-vrf-macro = { workspace = true }
 solana-program = { workspace = true, features = ["borsh"] }
 solana-program-compat = { workspace = true, optional = true }

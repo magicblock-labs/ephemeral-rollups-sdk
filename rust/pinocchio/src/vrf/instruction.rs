@@ -120,6 +120,7 @@ impl<'a> RequestRandomnessCpi<'a> {
 }
 
 #[cfg(test)]
+#[allow(deprecated)]
 mod tests {
     extern crate alloc;
 
