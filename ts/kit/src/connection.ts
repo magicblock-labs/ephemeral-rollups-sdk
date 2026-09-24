@@ -215,14 +215,7 @@ export class Connection {
 
     // Case 1: Already serialized form
     if ("signatures" in transaction && "messageBytes" in transaction) {
-      const fullySigned = (() => {
-        try {
-          isFullySignedTransaction(transaction);
-          return true;
-        } catch {
-          return false;
-        }
-      })();
+      const fullySigned = isFullySignedTransaction(transaction);
 
       if (fullySigned) {
         return serializeAndSendTransaction(transaction);
