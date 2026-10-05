@@ -125,17 +125,9 @@ export class Connection {
     const getRecentSignatureConfirmationPromise =
       createRecentSignatureConfirmationPromiseFactory(solanaRpc);
     await waitForRecentTransactionConfirmationUntilTimeout({
-      getTimeoutPromise: async () =>
-        getTimeoutPromise({
-          abortSignal,
-          commitment,
-        }),
-      getRecentSignatureConfirmationPromise: async () =>
-        getRecentSignatureConfirmationPromise({
-          abortSignal,
-          commitment,
-          signature,
-        }),
+      abortSignal,
+      getTimeoutPromise,
+      getRecentSignatureConfirmationPromise,
       signature,
       commitment,
     });
