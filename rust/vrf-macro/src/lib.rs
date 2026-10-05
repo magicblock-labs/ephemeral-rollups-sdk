@@ -118,7 +118,7 @@ pub fn vrf(_attr: TokenStream, item: TokenStream) -> TokenStream {
 
         impl<'info> #struct_name<'info> {
             fn invoke_signed_vrf<'a>(&self, payer: &'a AccountInfo<'info>, ix: &#vrf::compat::Instruction) -> #vrf::compat::anchor_lang::solana_program::entrypoint::ProgramResult {
-                let bump = Pubkey::try_find_program_address(&[#vrf::consts::IDENTITY], &crate::ID).ok_or(#vrf::compat::anchor_lang::prelude::ProgramError::InvalidSeeds)?;
+                const PROGRAM_IDENTITY: ([u8; 32], u8) = #vrf::consts::program_identity_pda(&crate::ID);
                 // `#[vrf]` issues scoped randomness requests by default: the fulfillment signs
                 // the callback with the per-program scoped identity PDA, which the callback
                 // validates (see `#[vrf_callback]`). Map any legacy request discriminator to its
@@ -136,7 +136,7 @@ pub fn vrf(_attr: TokenStream, item: TokenStream) -> TokenStream {
                         self.system_program.to_account_info(),
                         self.slot_hashes.to_account_info(),
                     ],
-                    &[&[#vrf::consts::IDENTITY, &[bump.1]]],
+                    &[&[#vrf::consts::IDENTITY, &[PROGRAM_IDENTITY.1]]],
                 )
             }
         }
@@ -148,7 +148,7 @@ pub fn vrf(_attr: TokenStream, item: TokenStream) -> TokenStream {
 /// Attribute macro for a callback (consume) `#[derive(Accounts)]` struct.
 ///
 /// Injects a `vrf_program_identity: Signer<'info>` constrained to the scoped per-program VRF
-/// identity PDA (`scoped_vrf_identity(&crate::ID)`). This is the default way to authenticate
+/// identity PDA (`scoped_vrf_identity_const(&crate::ID)`). This is the default way to authenticate
 /// the VRF program in a callback; the identity is bound to this program. The legacy
 /// global-identity check (`address = VRF_PROGRAM_IDENTITY`) is deprecated.
 ///
@@ -188,7 +188,7 @@ pub fn vrf_callback(_attr: TokenStream, item: TokenStream) -> TokenStream {
             quote! {
                 /// Scoped VRF identity PDA, bound to this program. Its presence as a signer proves
                 /// the callback was issued by the VRF program for this program.
-                #[account(address = #vrf::consts::scoped_vrf_identity(&crate::ID))]
+                #[account(address = Pubkey::new_from_array(#vrf::consts::scoped_vrf_identity_const(&crate::ID).0))]
                 pub vrf_program_identity: Signer<'info>,
             },
         );

@@ -131,6 +131,7 @@ fn write_bytes(data: &mut [u8], offset: &mut usize, bytes: &[u8]) -> Result<(), 
 }
 
 #[cfg(test)]
+#[allow(deprecated)]
 mod tests {
     extern crate alloc;
 

@@ -129,6 +129,7 @@ smallvec = { version = "1.13", features = ["serde"] }
 tracing = "0.1"
 
 # misc
+const-crypto = "0.3"
 num-derive = "0.4.2"
 num-traits = "0.2.19"
 thiserror = "1.0"
