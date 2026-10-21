@@ -28,6 +28,16 @@ export function createTopUpEscrowInstruction(
     { address: SYSTEM_PROGRAM_ADDRESS, role: AccountRole.READONLY },
   ];
 
+  if (!Number.isSafeInteger(amount) || amount < 0) {
+    throw new Error("amount must be a non-negative safe integer");
+  }
+  if (
+    index !== undefined &&
+    (!Number.isInteger(index) || index < 0 || index > 0xff)
+  ) {
+    throw new Error("index must fit in u8");
+  }
+
   const [instructionData] = serializeTopUpEphemeralBalanceInstructionData({
     amount: BigInt(amount),
     index: index ?? 255,
