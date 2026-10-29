@@ -14,7 +14,28 @@ use std::collections::{HashMap, HashSet};
 const EXPECTED_KEY_MSG: &str = "Key expected to exist!";
 
 /// Instruction builder for magicprogram
-#[deprecated(since = "0.7.0", note = "Use `MagicIntentBundleBuilder` instead")]
+///
+/// # Deprecation
+///
+/// This struct is deprecated since v0.7.0. Use [`MagicIntentBundleBuilder`] instead.
+///
+/// # Migration
+///
+/// ```ignore
+/// // Before (deprecated)
+/// let builder = MagicInstructionBuilder { payer, magic_context, magic_program, magic_fee_vault: None };
+/// let (accounts, instruction) = builder.build();
+///
+/// // After (current)
+/// let mut builder = MagicIntentBundleBuilder::new(payer, magic_context, magic_program);
+/// let intent_instructions = builder.build()?;
+/// ```
+///
+/// See [DEPRECATION.md](../../../DEPRECATION.md) for more details.
+#[deprecated(
+    since = "0.7.0",
+    note = "Use `MagicIntentBundleBuilder` instead. See DEPRECATION.md for migration guide."
+)]
 pub struct MagicInstructionBuilder<'info> {
     pub payer: compat::AccountInfo<'info>,
     pub magic_context: compat::AccountInfo<'info>,
@@ -74,9 +95,25 @@ impl<'info> MagicInstructionBuilder<'info> {
 }
 
 /// Action that user wants to perform on base layer
+///
+/// # Deprecation
+///
+/// This enum is deprecated since v0.7.0. Use [`MagicIntent`] instead.
+///
+/// # Migration
+///
+/// ```ignore
+/// // Before (deprecated)
+/// let action = MagicAction::Commit(commit_type);
+///
+/// // After (current)
+/// let intent = MagicIntent::Commit(commit_type);
+/// ```
+///
+/// See [DEPRECATION.md](../../../DEPRECATION.md) for more details.
 #[deprecated(
     since = "0.7.0",
-    note = "Use `MagicIntentBundleBuilder` with `MagicBaseIntent` instead"
+    note = "Use `MagicIntent` instead. See DEPRECATION.md for migration guide."
 )]
 pub enum MagicAction<'info> {
     BaseActions(Vec<CallHandler<'info>>),
@@ -117,8 +154,30 @@ impl<'info> MagicAction<'info> {
     }
 }
 
-/// Type of commit , can be whether standalone or with some custom actions on Base layer post commit
-#[deprecated(since = "0.7.0", note = "Use `CommitIntentBuilder` instead")]
+/// Type of commit, can be whether standalone or with some custom actions on Base layer post commit
+///
+/// # Deprecation
+///
+/// This enum is deprecated since v0.7.0. Use [`CommitIntentBuilder`] instead.
+///
+/// # Migration
+///
+/// ```ignore
+/// // Before (deprecated)
+/// let commit = CommitType::Standalone(accounts);
+///
+/// // After (current)
+/// let mut builder = CommitIntentBuilder::new();
+/// for account in accounts {
+///     builder.add_account(account);
+/// }
+/// ```
+///
+/// See [DEPRECATION.md](../../../DEPRECATION.md) for more details.
+#[deprecated(
+    since = "0.7.0",
+    note = "Use `CommitIntentBuilder` instead. See DEPRECATION.md for migration guide."
+)]
 pub enum CommitType<'info> {
     /// Regular commit without actions
     Standalone(Vec<compat::AccountInfo<'info>>), // accounts to commit
