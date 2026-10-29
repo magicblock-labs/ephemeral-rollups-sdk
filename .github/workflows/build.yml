@@ -61,6 +61,7 @@ jobs:
         run: |
           cargo build
           cargo test
+          cargo test -p ephemeral-rollups-sdk --features anchor --test ephemeral_seed_literals
 
       - name: build all sensible features combinations
         working-directory: rust/sdk
