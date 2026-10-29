@@ -1,3 +1,12 @@
+//! Build bundles of commits, commit-and-undelegate operations, and standalone actions.
+//!
+//! # Unsupported operations
+//!
+//! `commit_finalize` and `commit_finalize_and_undelegate` are reserved and cannot
+//! be requested through [`MagicIntentBundleBuilder`]. Their private serializer
+//! fields always encode as `None` for wire-format compatibility and contribute
+//! no actions or callbacks. No release version or date is promised for support.
+
 use crate::intent_bundle::no_vec::{CapacityError, NoVec};
 use pinocchio::cpi::{invoke_signed_with_bounds, Signer, MAX_STATIC_CPI_ACCOUNTS};
 use pinocchio::error::ProgramError;
