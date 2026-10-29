@@ -1,5 +1,6 @@
 use crate::compat::borsh::{self, BorshDeserialize, BorshSerialize};
 
+use crate::access_control::errors::BuilderError;
 use crate::access_control::structs::Permission;
 use crate::compat::{self, Compat, Modern};
 use crate::consts::PERMISSION_PROGRAM_ID;
@@ -22,13 +23,14 @@ pub struct ClosePermission {
 impl ClosePermission {
     pub fn instruction(&self) -> compat::Instruction {
         self.instruction_with_remaining_accounts(&[])
+            .expect("instruction construction failed")
     }
     #[allow(clippy::arithmetic_side_effects)]
     #[allow(clippy::vec_init_then_push)]
     pub fn instruction_with_remaining_accounts(
         &self,
         remaining_accounts: &[compat::AccountMeta],
-    ) -> compat::Instruction {
+    ) -> Result<compat::Instruction, BuilderError> {
         let mut accounts = Vec::with_capacity(4 + remaining_accounts.len());
         accounts.push(compat::AccountMeta::new(self.payer, true));
         accounts.push(compat::AccountMeta::new_readonly(
@@ -41,13 +43,13 @@ impl ClosePermission {
         ));
         accounts.push(compat::AccountMeta::new(self.permission, false));
         accounts.extend_from_slice(remaining_accounts);
-        let data = ClosePermissionInstructionData::new().try_to_vec().unwrap();
+        let data = ClosePermissionInstructionData::new().try_to_vec()?;
 
-        compat::Instruction {
+        Ok(compat::Instruction {
             program_id: PERMISSION_PROGRAM_ID,
             accounts,
             data,
-        }
+        })
     }
 }
 
@@ -67,8 +69,8 @@ impl ClosePermissionInstructionData {
         }
     }
 
-    pub(crate) fn try_to_vec(&self) -> Result<Vec<u8>, std::io::Error> {
-        borsh::to_vec(self)
+    pub fn try_to_vec(&self) -> Result<Vec<u8>, BuilderError> {
+        borsh::to_vec(self).map_err(|e| BuilderError::SerializationError(e.to_string()))
     }
 }
 
@@ -139,14 +141,14 @@ impl ClosePermissionBuilder {
         self
     }
     #[allow(clippy::clone_on_copy)]
-    pub fn instruction(&self) -> compat::Instruction {
+    pub fn instruction(&self) -> Result<compat::Instruction, BuilderError> {
         let accounts = ClosePermission {
-            payer: self.payer.expect("payer is not set"),
-            authority: self.authority.expect("authority is not set"),
+            payer: self.payer.ok_or(BuilderError::PayerNotSet)?,
+            authority: self.authority.ok_or(BuilderError::AuthorityNotSet)?,
             permissioned_account: self
                 .permissioned_account
-                .expect("permissioned_account is not set"),
-            permission: self.permission.expect("permission is not set"),
+                .ok_or(BuilderError::PermissionedAccountNotSet)?,
+            permission: self.permission.ok_or(BuilderError::PermissionNotSet)?,
         };
 
         accounts.instruction_with_remaining_accounts(&self.__remaining_accounts)
@@ -213,7 +215,7 @@ impl<'a, 'b> ClosePermissionCpi<'a, 'b> {
         &self,
         signers_seeds: &[&[&[u8]]],
         remaining_accounts: &[(&'b compat::AccountInfo<'a>, bool, bool)],
-    ) -> compat::ProgramResult {
+    ) -> Result<(), BuilderError> {
         let mut accounts = Vec::with_capacity(4 + remaining_accounts.len());
         accounts.push(compat::AccountMeta::new(*self.payer.key, true));
         accounts.push(compat::AccountMeta::new_readonly(
@@ -232,7 +234,7 @@ impl<'a, 'b> ClosePermissionCpi<'a, 'b> {
                 is_writable: remaining_account.1,
             })
         });
-        let data = ClosePermissionInstructionData::new().try_to_vec().unwrap();
+        let data = ClosePermissionInstructionData::new().try_to_vec()?;
 
         let instruction = compat::Instruction {
             program_id: PERMISSION_PROGRAM_ID,
@@ -250,7 +252,9 @@ impl<'a, 'b> ClosePermissionCpi<'a, 'b> {
             .for_each(|remaining_account| account_infos.push(remaining_account.0.clone()));
 
         if signers_seeds.is_empty() {
-            invoke(&instruction.modern(), &account_infos.modern()).compat()
+            invoke(&instruction.modern(), &account_infos.modern())
+                .compat()
+                .map_err(|e| BuilderError::SerializationError(e.to_string()))
         } else {
             invoke_signed(
                 &instruction.modern(),
@@ -258,6 +262,7 @@ impl<'a, 'b> ClosePermissionCpi<'a, 'b> {
                 signers_seeds,
             )
             .compat()
+            .map_err(|e| BuilderError::SerializationError(e.to_string()))
         }
     }
 }
@@ -348,20 +353,20 @@ impl<'a, 'b> ClosePermissionCpiBuilder<'a, 'b> {
     }
     #[allow(clippy::clone_on_copy)]
     #[allow(clippy::vec_init_then_push)]
-    pub fn invoke_signed(&self, signers_seeds: &[&[&[u8]]]) -> compat::ProgramResult {
+    pub fn invoke_signed(&self, signers_seeds: &[&[&[u8]]]) -> Result<(), BuilderError> {
         let instruction = ClosePermissionCpi {
             __program: self.instruction.__program,
 
-            payer: self.instruction.payer.expect("payer is not set"),
+            payer: self.instruction.payer.ok_or(BuilderError::PayerNotSet)?,
 
-            authority: self.instruction.authority.expect("authority is not set"),
+            authority: self.instruction.authority.ok_or(BuilderError::AuthorityNotSet)?,
 
             permissioned_account: self
                 .instruction
                 .permissioned_account
-                .expect("permissioned_account is not set"),
+                .ok_or(BuilderError::PermissionedAccountNotSet)?,
 
-            permission: self.instruction.permission.expect("permission is not set"),
+            permission: self.instruction.permission.ok_or(BuilderError::PermissionNotSet)?,
         };
         instruction.invoke_signed_with_remaining_accounts(
             signers_seeds,
