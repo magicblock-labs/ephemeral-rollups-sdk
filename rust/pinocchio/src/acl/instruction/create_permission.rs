@@ -5,7 +5,7 @@ use crate::utils::make_seed_buf;
 
 /// Create a new permission for a delegated account.
 pub fn create_permission(
-    accounts: &[&AccountView],
+    accounts: &[AccountView],
     permission_program: &Address,
     args: MembersArgs,
     signer_seeds: Option<Signer<'_, '_>>,
@@ -92,10 +92,10 @@ impl<'a> CreatePermissionCpiBuilder<'a> {
 
         create_permission(
             &[
-                self.permissioned_account,
-                self.permission,
-                self.payer,
-                self.system_program,
+                *self.permissioned_account,
+                *self.permission,
+                *self.payer,
+                *self.system_program,
             ],
             self.permission_program,
             members,

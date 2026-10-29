@@ -18,19 +18,31 @@ interface AuthLoginResponse {
  * @param rpcUrl - The URL of the RPC server
  * @param publicKey - The public key of the user
  * @param signMessage - The function to sign a message
+ * @param template - Optional custom challenge template to sign; must contain
+ * a `{timestamp}` placeholder. Defaults to the service's standard challenge.
  * @returns The auth token and its expiration time
  */
 export async function getAuthToken(
   rpcUrl: string,
   publicKey: Address,
   signMessage: (message: Uint8Array) => Promise<Uint8Array>,
+  template?: string,
 ): Promise<{ token: string; expiresAt: number }> {
   // Import this way because bs58 is an ECMAScript module
   const bs58 = (await import("bs58")).default;
 
   // Getting the challenge from the RPC
+  const challengeParams = new URLSearchParams({
+    pubkey: publicKey.toString(),
+  });
+  if (template != null && template !== "") {
+    if (!template.includes("{timestamp}")) {
+      throw new Error("Template must contain a {timestamp} placeholder");
+    }
+    challengeParams.set("template", template);
+  }
   const challengeResponse = await fetch(
-    `${rpcUrl}/auth/challenge?pubkey=${publicKey.toString()}`,
+    `${rpcUrl}/auth/challenge?${challengeParams.toString()}`,
   );
   const { challenge, error }: AuthChallengeResponse =
     await challengeResponse.json();

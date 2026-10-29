@@ -1,5 +1,8 @@
 import {
   AddressLookupTableAccount,
+  type Message,
+  PUBLIC_KEY_LENGTH,
+  SIGNATURE_LENGTH_IN_BYTES,
   Transaction,
   TransactionMessage,
   VersionedTransaction,
@@ -16,6 +19,46 @@ export interface CompileLegacyTransactionToV0Result {
   v0Size: number;
   bytesSaved: number;
   usedLookupTables: string[];
+}
+
+function getShortVecEncodedLength(value: number): number {
+  let remaining = value;
+  let length = 1;
+
+  while (remaining >= 0x80) {
+    remaining = Math.floor(remaining / 0x80);
+    length += 1;
+  }
+
+  return length;
+}
+
+function getLegacyTransactionSize(message: Message): number {
+  const instructions = message.compiledInstructions;
+  const instructionsSize = instructions.reduce(
+    (size, instruction) =>
+      size +
+      1 +
+      getShortVecEncodedLength(instruction.accountKeyIndexes.length) +
+      instruction.accountKeyIndexes.length +
+      getShortVecEncodedLength(instruction.data.length) +
+      instruction.data.length,
+    0,
+  );
+  const messageSize =
+    3 +
+    getShortVecEncodedLength(message.accountKeys.length) +
+    message.accountKeys.length * PUBLIC_KEY_LENGTH +
+    PUBLIC_KEY_LENGTH +
+    getShortVecEncodedLength(instructions.length) +
+    instructionsSize;
+  const signatureCount = message.header.numRequiredSignatures;
+
+  return (
+    getShortVecEncodedLength(signatureCount) +
+    signatureCount * SIGNATURE_LENGTH_IN_BYTES +
+    messageSize
+  );
 }
 
 /**
@@ -37,10 +80,7 @@ export function compileLegacyTransactionToV0({
     throw new Error("transaction.recentBlockhash is required");
   }
 
-  const legacySize = transaction.serialize({
-    requireAllSignatures: false,
-    verifySignatures: false,
-  }).length;
+  const legacySize = getLegacyTransactionSize(transaction.compileMessage());
 
   const message = new TransactionMessage({
     payerKey: transaction.feePayer,

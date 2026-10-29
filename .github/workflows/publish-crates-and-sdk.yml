@@ -10,14 +10,21 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
 env:
   rust_version: 1.93.1
+  node_version: 24
+  DRY_RUN: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/heads/release/v') }}
 
 jobs:
   install:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: install essentials
         run: |
@@ -41,28 +48,29 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - name: Run fmt
         run: cargo fmt -- --check
 
       - name: Run clippy
         run: cargo clippy -- --deny=warnings
 
-  publish:
+  publish-npm:
     needs: [install, lint]
     runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
-      - name: run build
-        working-directory: rust/
-        run: |
-          cargo build
-          cargo test
-
-      - name: Set DRY_RUN based on trigger
-        run: echo "DRY_RUN=true" >> $GITHUB_ENV
-        if: github.event_name == 'push' && startsWith(github.ref, 'refs/heads/release/v')
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.node_version }}
+          cache: "npm"
+          registry-url: "https://registry.npmjs.org"
 
       - name: publish ephemeral-rollups-kit
         working-directory: ts/kit/
@@ -120,6 +128,33 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
           DRY_RUN: ${{ env.DRY_RUN }}
 
+  publish-crates:
+    needs: [install, lint]
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: install essentials
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pkg-config build-essential libudev-dev
+
+      - name: Install Rust
+        shell: "bash"
+        run: rustup toolchain install ${{ env.rust_version }} --profile minimal
+
+      - name: Cache rust
+        uses: Swatinem/rust-cache@v2
+
+      - name: run build
+        working-directory: rust/
+        run: |
+          cargo build
+          cargo test
+
       - name: cargo publish
         working-directory: rust/
         run: |
@@ -136,12 +171,26 @@ jobs:
             cargo publish $DRY_RUN_FLAG --manifest-path="$manifest_path" --token "$CRATES_TOKEN" $NO_VERIFY_FLAG
           }
 
+          wait_for_crate() {
+            local crate_name="$1"
+
+            for attempt in $(seq 1 30); do
+              if cargo info "${crate_name}@${CARGO_PACKAGE_VERSION}" >/dev/null 2>&1; then
+                return 0
+              fi
+
+              echo "Waiting for ${crate_name} ${CARGO_PACKAGE_VERSION} to become available (attempt ${attempt}/30)"
+              sleep 10
+            done
+
+            echo "${crate_name} ${CARGO_PACKAGE_VERSION} did not become available in time" >&2
+            return 1
+          }
+
           DRY_RUN_FLAG=""
+          NO_VERIFY_FLAG=""
           if [ "${DRY_RUN}" = "true" ]; then
             DRY_RUN_FLAG="--dry-run"
-          fi
-
-          if [ "${DRY_RUN}" = "true" ]; then
             NO_VERIFY_FLAG="--no-verify"
           fi
 
@@ -152,11 +201,18 @@ jobs:
           publish_crate delegate/Cargo.toml
           publish_crate commit-attribute/Cargo.toml
           publish_crate action-attribute/Cargo.toml
+          publish_crate vrf-macro/Cargo.toml
 
           if [ "${DRY_RUN}" != "true" ]; then
+            wait_for_crate ephemeral-vrf-sdk-vrf-macro
+            publish_crate vrf-sdk/Cargo.toml
+            wait_for_crate ephemeral-vrf-sdk
+
             publish_crate sdk/Cargo.toml
             publish_crate resolver/Cargo.toml
             publish_crate pinocchio/Cargo.toml
+          else
+            echo "Skipping vrf-sdk and downstream Rust crates because their same-version dependencies are not published during a dry run"
           fi
         env:
           CRATES_TOKEN: ${{ secrets.CRATES_TOKEN }}

@@ -257,7 +257,7 @@ fn gen_pda_seeds(
 
     let code = quote! {
         #bindings
-        let #raw = #transformed;
+        let #raw: [&[u8]; #n] = #transformed;
         let #seeds_arr: [&[u8]; #n] = [#(#raw[#indices].as_ref()),*];
         let (_, #bump) = anchor_lang::prelude::Pubkey::find_program_address(&#seeds_arr, &crate::id());
         let #bump_arr: [u8; 1] = [#bump];

@@ -53,7 +53,7 @@ pub(crate) fn commit_accounts_internal(
         i += 1;
     }
 
-    invoke_signed_with_bounds::<MAX_LOCAL_CPI_ACCOUNTS>(
+    invoke_signed_with_bounds::<MAX_LOCAL_CPI_ACCOUNTS, _>(
         &ix,
         &all_accounts[..ix.accounts.len()],
         signer_seeds.unwrap_or(&[]),

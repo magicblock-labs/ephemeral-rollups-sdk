@@ -5,7 +5,7 @@ use crate::utils::make_seed_buf;
 
 /// Update a permission.
 pub fn update_permission(
-    accounts: &[&AccountView],
+    accounts: &[AccountView],
     permission_program: &Address,
     authority_is_signer: bool,
     permissioned_account_is_signer: bool,
@@ -96,7 +96,11 @@ impl<'a> UpdatePermissionCpiBuilder<'a> {
         let signer_seeds = Signer::from(&seed_buf[..=seeds.len()]);
 
         update_permission(
-            &[self.authority, self.permissioned_account, self.permission],
+            &[
+                *self.authority,
+                *self.permissioned_account,
+                *self.permission,
+            ],
             self.permission_program,
             self.authority_is_signer,
             self.permissioned_account_is_signer,
