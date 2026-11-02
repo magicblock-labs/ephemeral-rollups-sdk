@@ -131,6 +131,7 @@ fn write_bytes(data: &mut [u8], offset: &mut usize, bytes: &[u8]) -> Result<(), 
 }
 
 #[cfg(test)]
+#[allow(deprecated)]
 mod tests {
     extern crate alloc;
 
@@ -138,7 +139,7 @@ mod tests {
     use alloc::vec::Vec;
 
     use ephemeral_vrf_sdk::instructions::{
-        create_request_high_priority_scoped_randomness_ix, create_request_scoped_randomness_ix,
+        create_request_high_priority_scoped_randomness_ix, create_request_randomness_ix,
         RequestRandomnessParams,
     };
     use ephemeral_vrf_sdk::types::SerializableAccountMeta as SdkMeta;
@@ -227,7 +228,7 @@ mod tests {
             &args,
             REQUEST_SCOPED_RANDOMNESS_DISCRIMINATOR,
         );
-        let ix = create_request_scoped_randomness_ix(canonical(
+        let ix = create_request_randomness_ix(canonical(
             caller_seed,
             callback_program,
             &disc,
@@ -258,7 +259,7 @@ mod tests {
             &args,
             REQUEST_SCOPED_RANDOMNESS_DISCRIMINATOR,
         );
-        let ix = create_request_scoped_randomness_ix(canonical(
+        let ix = create_request_randomness_ix(canonical(
             caller_seed,
             callback_program,
             &disc,
@@ -288,7 +289,7 @@ mod tests {
             &args,
             REQUEST_SCOPED_RANDOMNESS_DISCRIMINATOR,
         );
-        let ix = create_request_scoped_randomness_ix(canonical(
+        let ix = create_request_randomness_ix(canonical(
             caller_seed,
             callback_program,
             &disc,
@@ -349,13 +350,8 @@ mod tests {
             &[],
             REQUEST_SCOPED_RANDOMNESS_DISCRIMINATOR,
         );
-        let ix = create_request_scoped_randomness_ix(canonical(
-            caller_seed,
-            callback_program,
-            &disc,
-            &[],
-            &[],
-        ));
+        let ix =
+            create_request_randomness_ix(canonical(caller_seed, callback_program, &disc, &[], &[]));
         assert_eq!(ours, ix.data);
     }
 
@@ -401,7 +397,7 @@ mod tests {
             buf
         };
 
-        let ix = create_request_scoped_randomness_ix(canonical(
+        let ix = create_request_randomness_ix(canonical(
             caller_seed,
             callback_program,
             &disc,

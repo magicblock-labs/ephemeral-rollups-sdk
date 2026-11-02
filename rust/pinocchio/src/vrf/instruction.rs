@@ -120,15 +120,14 @@ impl<'a> RequestRandomnessCpi<'a> {
 }
 
 #[cfg(test)]
+#[allow(deprecated)]
 mod tests {
     extern crate alloc;
 
     use alloc::vec;
     use alloc::vec::Vec;
 
-    use ephemeral_vrf_sdk::instructions::{
-        create_request_scoped_randomness_ix, RequestRandomnessParams,
-    };
+    use ephemeral_vrf_sdk::instructions::{create_request_randomness_ix, RequestRandomnessParams};
     use pinocchio::account::RuntimeAccount;
     use pinocchio::Address;
     use solana_program::pubkey::Pubkey;
@@ -143,7 +142,7 @@ mod tests {
             is_signer,
             is_writable,
             executable: 0,
-            resize_delta: 0,
+            padding: [0; 4],
             address,
             owner: Address::new_from_array([0; 32]),
             lamports: 0,
@@ -162,7 +161,7 @@ mod tests {
 
         // Build the canonical instruction first; it is the source of truth for the
         // program-identity, system-program and slot-hashes account keys.
-        let ix = create_request_scoped_randomness_ix(RequestRandomnessParams {
+        let ix = create_request_randomness_ix(RequestRandomnessParams {
             payer: Pubkey::new_from_array(payer_key),
             oracle_queue: Pubkey::new_from_array(oracle_key),
             callback_program_id: Pubkey::new_from_array(callback_program),

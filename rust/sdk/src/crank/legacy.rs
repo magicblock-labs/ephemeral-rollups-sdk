@@ -1,4 +1,7 @@
-use magicblock_magic_program_api::{args::ScheduleTaskArgs, instruction::MagicBlockInstruction};
+#![allow(deprecated)]
+
+pub use magicblock_magic_program_api::args::ScheduleTaskArgs;
+use magicblock_magic_program_api::instruction::MagicBlockInstruction;
 use solana_program::{
     instruction::{AccountMeta, Instruction},
     program::{invoke, invoke_signed},
@@ -6,14 +9,17 @@ use solana_program::{
 
 use crate::compat::{self, AsModern, Compat, Modern};
 
-pub struct ScheduleCrankCpi<'a> {
+#[deprecated(
+    note = "Use `ephemeral_rollups_sdk::crank::hydra::ephemeral::create::CreateCrankCpi` instead"
+)]
+pub struct ScheduleCrankCpi<'a, 'b> {
     pub payer: &'a compat::AccountInfo<'a>,
     pub magic_program: &'a compat::AccountInfo<'a>,
-    pub instruction_accounts: &'a [compat::AccountInfo<'a>],
+    pub instruction_accounts: &'b [compat::AccountInfo<'a>],
     pub args: ScheduleTaskArgs,
 }
 
-impl<'a> ScheduleCrankCpi<'a> {
+impl<'a, 'b> ScheduleCrankCpi<'a, 'b> {
     pub fn instruction(&self) -> compat::Instruction {
         let mut accounts = Vec::with_capacity(1 + self.instruction_accounts.len());
         accounts.push(AccountMeta::new(*self.payer.key.as_modern(), true));
@@ -49,8 +55,8 @@ impl<'a> ScheduleCrankCpi<'a> {
     }
 
     fn build_accounts(
-        payer: &'a compat::AccountInfo<'a>,
-        instruction_accounts: &'a [compat::AccountInfo<'a>],
+        payer: &compat::AccountInfo<'a>,
+        instruction_accounts: &'b [compat::AccountInfo<'a>],
     ) -> Vec<compat::AccountInfo<'a>> {
         let mut accounts = Vec::with_capacity(1 + instruction_accounts.len());
         accounts.push(payer.clone());
@@ -59,6 +65,9 @@ impl<'a> ScheduleCrankCpi<'a> {
     }
 }
 
+#[deprecated(
+    note = "Use `ephemeral_rollups_sdk::crank::hydra::ephemeral::cancel::CancelCrankCpi` instead"
+)]
 pub struct CancelCrankCpi<'a> {
     pub authority: &'a compat::AccountInfo<'a>,
     pub task_context: &'a compat::AccountInfo<'a>,

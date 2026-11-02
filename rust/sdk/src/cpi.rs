@@ -19,6 +19,14 @@ use solana_program::{program::invoke_signed, program_memory::sol_memset};
 pub const DELEGATION_PROGRAM_ID: compat::Pubkey =
     compat::Pubkey::new_from_array(dlp_api::consts::DELEGATION_PROGRAM_ID.to_bytes());
 
+#[inline]
+fn is_canonical_undelegation_buffer(
+    delegated_account: &compat::Pubkey,
+    buffer: &compat::Pubkey,
+) -> bool {
+    buffer == &dlp_api::pda::undelegate_buffer_pda_from_delegated_account(delegated_account)
+}
+
 pub struct DelegateAccounts<'a, 'info> {
     pub payer: &'a compat::AccountInfo<'info>,
     pub pda: &'a compat::AccountInfo<'info>,
@@ -293,6 +301,9 @@ pub fn undelegate_account<'a, 'info>(
     if buffer.owner != &DELEGATION_PROGRAM_ID {
         return Err(ProgramError::InvalidAccountOwner.compat());
     }
+    if !is_canonical_undelegation_buffer(delegated_account.key, buffer.key) {
+        return Err(ProgramError::InvalidSeeds.compat());
+    }
 
     let account_seeds: Vec<&[u8]> = account_signer_seeds.iter().map(|v| v.as_slice()).collect();
 
@@ -502,4 +513,26 @@ pub fn cpi_delegate_with_actions<'a, 'info>(
     invoke_accounts.extend(signer_infos);
 
     invoke_signed(&delegation_instruction, &invoke_accounts, signers_seeds).compat()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn validates_canonical_undelegation_buffer() {
+        let delegated_account = compat::Pubkey::new_from_array([1; 32]);
+        let canonical_buffer =
+            dlp_api::pda::undelegate_buffer_pda_from_delegated_account(&delegated_account);
+        let unrelated_buffer = compat::Pubkey::new_from_array([2; 32]);
+
+        assert!(is_canonical_undelegation_buffer(
+            &delegated_account,
+            &canonical_buffer
+        ));
+        assert!(!is_canonical_undelegation_buffer(
+            &delegated_account,
+            &unrelated_buffer
+        ));
+    }
 }

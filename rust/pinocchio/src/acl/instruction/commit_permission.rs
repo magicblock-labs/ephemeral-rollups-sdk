@@ -5,7 +5,7 @@ use pinocchio::{error::ProgramError, AccountView, Address, ProgramResult};
 
 /// Commit permission state to ephemeral rollups.
 pub fn commit_permission(
-    accounts: &[&AccountView],
+    accounts: &[AccountView],
     permission_program: &Address,
     authority_is_signer: bool,
     permissioned_account_is_signer: bool,

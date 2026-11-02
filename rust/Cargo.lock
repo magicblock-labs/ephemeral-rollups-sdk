@@ -1478,17 +1478,18 @@ dependencies = [
 
 [[package]]
 name = "ephemeral-rollups-pinocchio"
-version = "0.15.5"
+version = "0.17.3"
 dependencies = [
  "bincode 1.3.3",
  "bincode 2.0.1",
+ "const-crypto",
  "ephemeral-rollups-sdk",
  "ephemeral-vrf-sdk",
+ "hydra-api",
  "magicblock-delegation-program-api",
  "magicblock-magic-program-api",
- "pinocchio 0.10.2",
- "pinocchio-pubkey",
- "pinocchio-system",
+ "pinocchio 0.11.2",
+ "pinocchio-system 0.6.1",
  "solana-address 2.6.1",
  "solana-instruction 3.4.0",
  "solana-program 3.0.0",
@@ -1496,7 +1497,7 @@ dependencies = [
 
 [[package]]
 name = "ephemeral-rollups-sdk"
-version = "0.15.5"
+version = "0.17.3"
 dependencies = [
  "anchor-lang 0.32.1",
  "anchor-lang 1.0.2",
@@ -1512,6 +1513,7 @@ dependencies = [
  "ephemeral-vrf-sdk-vrf-macro",
  "five8 0.2.1",
  "getrandom 0.2.17",
+ "hydra-api",
  "magicblock-delegation-program-api",
  "magicblock-magic-program-api",
  "num-derive",
@@ -1537,7 +1539,7 @@ dependencies = [
 
 [[package]]
 name = "ephemeral-rollups-sdk-attribute-action"
-version = "0.15.5"
+version = "0.17.3"
 dependencies = [
  "quote",
  "syn 1.0.109",
@@ -1545,7 +1547,7 @@ dependencies = [
 
 [[package]]
 name = "ephemeral-rollups-sdk-attribute-commit"
-version = "0.15.5"
+version = "0.17.3"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1554,7 +1556,7 @@ dependencies = [
 
 [[package]]
 name = "ephemeral-rollups-sdk-attribute-delegate"
-version = "0.15.5"
+version = "0.17.3"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1563,7 +1565,7 @@ dependencies = [
 
 [[package]]
 name = "ephemeral-rollups-sdk-attribute-ephemeral"
-version = "0.15.5"
+version = "0.17.3"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1572,7 +1574,7 @@ dependencies = [
 
 [[package]]
 name = "ephemeral-rollups-sdk-attribute-ephemeral-accounts"
-version = "0.15.5"
+version = "0.17.3"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1581,26 +1583,23 @@ dependencies = [
 
 [[package]]
 name = "ephemeral-vrf-sdk"
-version = "0.4.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "77f3741c733907c10e0d0b32f9aa485c20a73e0b1e7e673a0ac38185fb2a6c11"
+version = "0.17.3"
 dependencies = [
  "anchor-lang 0.32.1",
  "anchor-lang 1.0.2",
  "borsh 0.10.4",
  "borsh 1.6.1",
+ "const-crypto",
  "ephemeral-vrf-sdk-vrf-macro",
  "solana-program 2.3.0",
  "solana-program 3.0.0",
  "solana-pubkey 2.4.0",
- "solana-system-interface 3.2.0",
+ "solana-system-interface 2.0.0",
 ]
 
 [[package]]
 name = "ephemeral-vrf-sdk-vrf-macro"
-version = "0.4.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a7b8b3fe3863a27d4c0f32da7b3cfeff179772fd4124d6c9fdcb9d4ab23cd602"
+version = "0.17.3"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -2121,6 +2120,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "hydra-api"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "08e9af439e55d04d4762ca36927ca9bb7f8b759efd2cbb44f1e03034144d1965"
+dependencies = [
+ "pinocchio 0.11.2",
+ "solana-account-info 3.1.1",
+ "solana-address 2.6.1",
+ "solana-cpi 3.1.0",
+ "solana-instruction 3.4.0",
+ "solana-program-error 3.0.1",
+ "solana-pubkey 4.2.0",
+]
+
+[[package]]
 name = "hyper"
 version = "1.10.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2600,7 +2614,7 @@ dependencies = [
 
 [[package]]
 name = "magic-resolver"
-version = "0.15.5"
+version = "0.17.3"
 dependencies = [
  "base64 0.12.3",
  "bincode 1.3.3",
@@ -2630,9 +2644,9 @@ dependencies = [
 
 [[package]]
 name = "magicblock-delegation-program-api"
-version = "3.0.0"
+version = "3.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "288904a9950bd20f27f0ef934f320ab1410bd35a6d5c9cf138eca276442b6b2e"
+checksum = "bea16e41e04319201919afca98dd4241b18549f2db0c68f58e4bc531537b5dab"
 dependencies = [
  "bincode 1.3.3",
  "borsh 0.10.4",
@@ -2644,7 +2658,7 @@ dependencies = [
  "pinocchio 0.10.2",
  "pinocchio-log",
  "pinocchio-pubkey",
- "pinocchio-system",
+ "pinocchio-system 0.5.0",
  "rkyv 0.7.46",
  "serde",
  "solana-address 2.6.1",
@@ -2969,10 +2983,23 @@ version = "0.10.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c06810dac15a4ef83d3dabdb4f2f22fb39c9adff669cd2781da4f716510a647c"
 dependencies = [
- "solana-account-view",
+ "solana-account-view 1.0.0",
  "solana-address 2.6.1",
  "solana-define-syscall 4.0.1",
- "solana-instruction-view",
+ "solana-instruction-view 1.0.0",
+ "solana-program-error 3.0.1",
+]
+
+[[package]]
+name = "pinocchio"
+version = "0.11.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a6cababcb62a2e739c7078ae16eda02789a6e3edd21bbdded864e85c38a7914d"
+dependencies = [
+ "solana-account-view 2.0.0",
+ "solana-address 2.6.1",
+ "solana-define-syscall 5.1.0",
+ "solana-instruction-view 2.1.0",
  "solana-program-error 3.0.1",
 ]
 
@@ -3014,6 +3041,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "24044a0815753862b558e179e78f03f7344cb755de48617a09d7d23b50883b6c"
 dependencies = [
  "pinocchio 0.10.2",
+ "solana-address 2.6.1",
+]
+
+[[package]]
+name = "pinocchio-system"
+version = "0.6.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f3ae2ee67b42e2ac797dd88312da473c895660e270d8093e0ba2749b885b5778"
+dependencies = [
+ "pinocchio 0.11.2",
  "solana-address 2.6.1",
 ]
 
@@ -4020,6 +4057,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "solana-account-view"
+version = "2.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fc141b940560430425ebaadb7645496c45f6a10fad9911d719bd03eab7f4d422"
+dependencies = [
+ "solana-address 2.6.1",
+ "solana-program-error 3.0.1",
+]
+
+[[package]]
 name = "solana-address"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4765,9 +4812,21 @@ version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "60147e4d0a4620013df40bf30a86dd299203ff12fcb8b593cd51014fce0875d8"
 dependencies = [
- "solana-account-view",
+ "solana-account-view 1.0.0",
  "solana-address 2.6.1",
  "solana-define-syscall 4.0.1",
+ "solana-program-error 3.0.1",
+]
+
+[[package]]
+name = "solana-instruction-view"
+version = "2.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6ab7a27d0c4214b9f7389c3dd00b68c93093a67f1dcc5b7893aebe299bbcbb47"
+dependencies = [
+ "solana-account-view 2.0.0",
+ "solana-address 2.6.1",
+ "solana-define-syscall 5.1.0",
  "solana-program-error 3.0.1",
 ]
 

@@ -18,6 +18,14 @@ export async function GetCommitmentSignature(
   if (txSchedulingSgn?.meta == null) {
     throw new Error("Transaction not found or meta is null");
   }
+  // A later instruction can fail after magic-program logs ScheduledCommitSent.
+  // In that case the overall transaction fails and nothing was scheduled, so
+  // we must not return a signature that will never land on the ER.
+  if (txSchedulingSgn.meta.err != null) {
+    throw new Error(
+      "Transaction failed; commitment was not scheduled (ScheduledCommitSent logs from earlier instructions are not reliable when the transaction errors)",
+    );
+  }
 
   const scheduledCommitSgn = parseScheduleCommitsLogsMessage(
     txSchedulingSgn.meta.logMessages ?? [],
@@ -38,6 +46,11 @@ export async function GetCommitmentSignature(
   );
   if (txCommitInfo?.meta == null) {
     throw new Error("Transaction not found or meta is null");
+  }
+  if (txCommitInfo.meta.err != null) {
+    throw new Error(
+      "Scheduled commit transaction failed; commitment signature is not available",
+    );
   }
 
   const commitSignature = parseCommitsLogsMessage(

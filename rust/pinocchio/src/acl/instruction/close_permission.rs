@@ -5,7 +5,7 @@ use crate::utils::make_seed_buf;
 
 /// Close a permission and recover rent.
 pub fn close_permission(
-    accounts: &[&AccountView],
+    accounts: &[AccountView],
     permission_program: &Address,
     authority_is_signer: bool,
     permissioned_account_is_signer: bool,
@@ -91,10 +91,10 @@ impl<'a> ClosePermissionCpiBuilder<'a> {
 
         close_permission(
             &[
-                self.payer,
-                self.authority,
-                self.permissioned_account,
-                self.permission,
+                *self.payer,
+                *self.authority,
+                *self.permissioned_account,
+                *self.permission,
             ],
             self.permission_program,
             self.authority_is_signer,

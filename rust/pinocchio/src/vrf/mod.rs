@@ -25,8 +25,11 @@
 //! };
 //! use pinocchio::cpi::{Seed, Signer};
 //!
-//! // `program_identity` is the PDA ["identity"] of THIS program; `identity_bump`
-//! // is its bump. `oracle_queue` is e.g. `vrf::consts::DEFAULT_QUEUE`.
+//! // Compile-time identity PDA of THIS program (`["identity"]`).
+//! const PROGRAM_IDENTITY: ([u8; 32], u8) =
+//!     ephemeral_rollups_pinocchio::vrf::program_identity_pda_const(&crate::ID);
+//! let identity_bump = PROGRAM_IDENTITY.1;
+//! // `oracle_queue` is e.g. `vrf::consts::DEFAULT_QUEUE`.
 //! let request = RequestRandomness {
 //!     caller_seed: [0u8; 32],
 //!     callback_program_id: *crate_program_id,

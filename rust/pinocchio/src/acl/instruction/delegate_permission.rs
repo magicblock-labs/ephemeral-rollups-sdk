@@ -7,7 +7,7 @@ const DELEGATE_PERMISSION_DISCRIMINATOR: u64 = 3;
 
 /// Delegate permission to ephemeral rollups.
 pub fn delegate_permission(
-    accounts: &[&AccountView],
+    accounts: &[AccountView],
     permission_program: &Address,
     authority_is_signer: bool,
     permissioned_account_is_signer: bool,
@@ -27,11 +27,7 @@ pub fn delegate_permission(
     let delegation_record = accounts[7];
     let delegation_metadata = accounts[8];
     let delegation_program = accounts[9];
-    let validator = if accounts.len() == 11 {
-        Some(accounts[10])
-    } else {
-        None
-    };
+    let validator = accounts.get(10);
 
     if !authority_is_signer && !permissioned_account_is_signer {
         return Err(ProgramError::MissingRequiredSignature);
@@ -122,7 +118,7 @@ pub fn delegate_permission(
     };
 
     if let Some(validator_acc) = validator {
-        let acc_infos: [&AccountView; 11] = [
+        let acc_infos: [AccountView; 11] = [
             payer,
             authority,
             permissioned_account,
@@ -133,7 +129,7 @@ pub fn delegate_permission(
             delegation_record,
             delegation_metadata,
             delegation_program,
-            validator_acc,
+            *validator_acc,
         ];
         if let Some(seeds) = signer_seeds {
             invoke_signed(&instruction, &acc_infos, &[seeds])?;
@@ -141,7 +137,7 @@ pub fn delegate_permission(
             invoke(&instruction, &acc_infos)?;
         }
     } else {
-        let acc_infos: [&AccountView; 10] = [
+        let acc_infos: [AccountView; 10] = [
             payer,
             authority,
             permissioned_account,
@@ -233,21 +229,21 @@ impl<'a> DelegatePermissionCpiBuilder<'a> {
 
     pub fn invoke(self) -> ProgramResult {
         let accounts = [
-            self.payer,
-            self.authority,
-            self.permissioned_account,
-            self.permission,
-            self.system_program,
-            self.owner_program,
-            self.delegation_buffer,
-            self.delegation_record,
-            self.delegation_metadata,
-            self.delegation_program,
+            *self.payer,
+            *self.authority,
+            *self.permissioned_account,
+            *self.permission,
+            *self.system_program,
+            *self.owner_program,
+            *self.delegation_buffer,
+            *self.delegation_record,
+            *self.delegation_metadata,
+            *self.delegation_program,
         ];
         if let Some(validator) = self.validator {
-            let mut all_accounts = [self.payer; 11];
+            let mut all_accounts = [*self.payer; 11];
             all_accounts[..10].copy_from_slice(&accounts);
-            all_accounts[10] = validator;
+            all_accounts[10] = *validator;
             delegate_permission(
                 &all_accounts,
                 self.permission_program,

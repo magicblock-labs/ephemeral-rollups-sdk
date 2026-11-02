@@ -221,14 +221,7 @@ impl<'i, 'acc, 'args> MagicIntentBundleSerialize<'i, 'acc, 'args> {
             action_index -= cau_action_len;
         }
 
-        if let Some(ref _commit_finalize) = self.commit_finalize {
-            // TODO: implement once supported
-        }
-
-        if let Some(ref _commit_finalize_and_undelegate) = self.commit_finalize_and_undelegate {
-            // TODO: implement once supported
-        }
-
+        // Reserved finalize slots are always None and contribute no callbacks.
         let standalone_action_len = self.standalone_actions.len();
         if action_index < standalone_action_len {
             self.get_standalone_action_callback(action_index)
@@ -237,8 +230,8 @@ impl<'i, 'acc, 'args> MagicIntentBundleSerialize<'i, 'acc, 'args> {
         }
     }
 
-    #[allow(clippy::identity_op)]
     pub(super) fn get_actions_len(&self) -> usize {
+        // Reserved finalize slots are always None and contribute no actions.
         self.standalone_actions.len()
             + self
                 .commit
@@ -250,8 +243,6 @@ impl<'i, 'acc, 'args> MagicIntentBundleSerialize<'i, 'acc, 'args> {
                 .as_ref()
                 .map(|el| el.get_actions_len())
                 .unwrap_or(0)
-            + 0 // TODO: support commit_finalize & commit_finalize_and_undelegate
-            + 0 // TODO: support commit_finalize_and_undelegate
     }
 
     pub(super) fn get_standalone_action_callback(

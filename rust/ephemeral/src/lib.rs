@@ -147,15 +147,35 @@ fn generate_undelegate() -> (TokenStream2, TokenStream2, TokenStream2) {
                 /// CHECK:`
                 #[account(mut)]
                 pub base_account: #unchecked_account,
-                /// CHECK:`
-                #[account()]
+                /// CHECK: canonical undelegation buffer
+                #[account(
+                    seeds = [b"undelegate-buffer", base_account.key().as_ref()],
+                    bump,
+                    seeds::program = ephemeral_rollups_sdk::id(),
+                )]
                 pub buffer: #unchecked_account,
                 /// CHECK:`
                 #[account(mut)]
                 pub payer: #unchecked_account,
-                /// CHECK:`
+                /// CHECK: system program
+                #[account(address = anchor_lang::system_program::ID)]
                 pub system_program: #unchecked_account,
             }
         },
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::generate_undelegate;
+
+    #[test]
+    fn generated_callback_requires_canonical_undelegation_buffer() {
+        let (_, _, accounts) = generate_undelegate();
+        let accounts = accounts.to_string();
+
+        assert!(accounts.contains("undelegate-buffer"));
+        assert!(accounts.contains("seeds :: program"));
+        assert!(accounts.contains("system_program :: ID"));
+    }
 }
