@@ -18,7 +18,7 @@ export function createTopUpEscrowInstruction(
   escrow: Address,
   escrowAuthority: Address,
   payer: Address,
-  amount: number,
+  amount: number | bigint,
   index?: number,
 ): Instruction {
   const accounts: AccountMeta[] = [
@@ -28,8 +28,14 @@ export function createTopUpEscrowInstruction(
     { address: SYSTEM_PROGRAM_ADDRESS, role: AccountRole.READONLY },
   ];
 
-  if (!Number.isSafeInteger(amount) || amount < 0) {
+  if (
+    typeof amount !== "bigint" &&
+    (!Number.isSafeInteger(amount) || amount < 0)
+  ) {
     throw new Error("amount must be a non-negative safe integer");
+  }
+  if (amount < 0n || amount > 0xffffffffffffffffn) {
+    throw new Error("amount must fit in u64");
   }
   if (
     index !== undefined &&
