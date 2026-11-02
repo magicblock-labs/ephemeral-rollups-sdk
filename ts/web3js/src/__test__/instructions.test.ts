@@ -354,6 +354,33 @@ describe("Exposed Instructions (web3.js)", () => {
   });
 
   describe("topUpEscrow instruction", () => {
+    it.each([0n, 1n, 9007199254740993n, 0xffffffffffffffffn])(
+      "should serialize bigint amount %s exactly",
+      (amount) => {
+        const instruction = createTopUpEscrowInstruction(
+          mockPublicKey,
+          mockPublicKey,
+          mockPublicKey,
+          amount,
+        );
+        expect(instruction.data.readBigUInt64LE(8)).toBe(amount);
+      },
+    );
+
+    it.each([-1n, 0x10000000000000000n])(
+      "should reject bigint amount outside u64: %s",
+      (amount) => {
+        expect(() =>
+          createTopUpEscrowInstruction(
+            mockPublicKey,
+            mockPublicKey,
+            mockPublicKey,
+            amount,
+          ),
+        ).toThrow("amount must fit in u64");
+      },
+    );
+
     it("should create a topUpEscrow instruction with all parameters", () => {
       const instruction = createTopUpEscrowInstruction(
         mockPublicKey,
@@ -450,6 +477,43 @@ describe("Exposed Instructions (web3.js)", () => {
 
       const amount = instruction.data.readBigUInt64LE(8);
       expect(amount).toBe(BigInt(largeAmount));
+    });
+
+    it("should reject invalid amount and index values", () => {
+      expect(() =>
+        createTopUpEscrowInstruction(
+          mockPublicKey,
+          mockPublicKey,
+          mockPublicKey,
+          -1,
+        ),
+      ).toThrow("amount must be a non-negative safe integer");
+      expect(() =>
+        createTopUpEscrowInstruction(
+          mockPublicKey,
+          mockPublicKey,
+          mockPublicKey,
+          Number.MAX_SAFE_INTEGER + 1,
+        ),
+      ).toThrow("amount must be a non-negative safe integer");
+      expect(() =>
+        createTopUpEscrowInstruction(
+          mockPublicKey,
+          mockPublicKey,
+          mockPublicKey,
+          1,
+          256,
+        ),
+      ).toThrow("index must fit in u8");
+      expect(() =>
+        createTopUpEscrowInstruction(
+          mockPublicKey,
+          mockPublicKey,
+          mockPublicKey,
+          1,
+          1.5,
+        ),
+      ).toThrow("index must fit in u8");
     });
 
     it("should include correct account keys", () => {

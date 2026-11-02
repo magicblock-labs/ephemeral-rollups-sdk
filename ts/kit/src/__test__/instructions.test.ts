@@ -344,6 +344,35 @@ describe("Exposed Instructions (@solana/kit)", () => {
   });
 
   describe("topUpEscrow instruction", () => {
+    it.each([0n, 1n, 9007199254740993n, 0xffffffffffffffffn])(
+      "should serialize bigint amount %s exactly",
+      (amount) => {
+        const instruction = createTopUpEscrowInstruction(
+          mockAddress,
+          mockAddress,
+          mockAddress,
+          amount,
+        );
+        if (!instruction.data) throw new Error("Missing instruction data");
+        const data = new DataView(Uint8Array.from(instruction.data).buffer);
+        expect(data.getBigUint64(8, true)).toBe(amount);
+      },
+    );
+
+    it.each([-1n, 0x10000000000000000n])(
+      "should reject bigint amount outside u64: %s",
+      (amount) => {
+        expect(() =>
+          createTopUpEscrowInstruction(
+            mockAddress,
+            mockAddress,
+            mockAddress,
+            amount,
+          ),
+        ).toThrow("amount must fit in u64");
+      },
+    );
+
     it("should create a topUpEscrow instruction with all parameters", () => {
       const instruction = createTopUpEscrowInstruction(
         mockAddress,
@@ -448,6 +477,38 @@ describe("Exposed Instructions (@solana/kit)", () => {
       // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
       const amount = new DataView(buffer4!, 8, 8).getBigUint64(0, true);
       expect(amount).toBe(BigInt(largeAmount));
+    });
+
+    it("should reject invalid amount and index values", () => {
+      expect(() =>
+        createTopUpEscrowInstruction(mockAddress, mockAddress, mockAddress, -1),
+      ).toThrow("amount must be a non-negative safe integer");
+      expect(() =>
+        createTopUpEscrowInstruction(
+          mockAddress,
+          mockAddress,
+          mockAddress,
+          Number.MAX_SAFE_INTEGER + 1,
+        ),
+      ).toThrow("amount must be a non-negative safe integer");
+      expect(() =>
+        createTopUpEscrowInstruction(
+          mockAddress,
+          mockAddress,
+          mockAddress,
+          1,
+          256,
+        ),
+      ).toThrow("index must fit in u8");
+      expect(() =>
+        createTopUpEscrowInstruction(
+          mockAddress,
+          mockAddress,
+          mockAddress,
+          1,
+          1.5,
+        ),
+      ).toThrow("index must fit in u8");
     });
 
     it("should include correct account keys", () => {

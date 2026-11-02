@@ -22,7 +22,7 @@ export function createTopUpEscrowInstruction(
   escrow: PublicKey,
   escrowAuthority: PublicKey,
   payer: PublicKey,
-  amount: number,
+  amount: number | bigint,
   index?: number,
 ): TransactionInstruction {
   const keys: AccountMeta[] = [
@@ -31,6 +31,22 @@ export function createTopUpEscrowInstruction(
     { pubkey: escrow, isWritable: true, isSigner: false },
     { pubkey: SystemProgram.programId, isWritable: false, isSigner: false },
   ];
+
+  if (
+    typeof amount !== "bigint" &&
+    (!Number.isSafeInteger(amount) || amount < 0)
+  ) {
+    throw new Error("amount must be a non-negative safe integer");
+  }
+  if (amount < 0n || amount > 0xffffffffffffffffn) {
+    throw new Error("amount must fit in u64");
+  }
+  if (
+    index !== undefined &&
+    (!Number.isInteger(index) || index < 0 || index > 0xff)
+  ) {
+    throw new Error("index must fit in u8");
+  }
 
   const instructionData = serializeTopUpEphemeralBalanceInstructionData({
     amount: BigInt(amount),
