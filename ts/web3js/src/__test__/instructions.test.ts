@@ -505,6 +505,15 @@ describe("Exposed Instructions (web3.js)", () => {
           256,
         ),
       ).toThrow("index must fit in u8");
+      expect(() =>
+        createTopUpEscrowInstruction(
+          mockPublicKey,
+          mockPublicKey,
+          mockPublicKey,
+          1,
+          1.5,
+        ),
+      ).toThrow("index must fit in u8");
     });
 
     it("should include correct account keys", () => {

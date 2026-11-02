@@ -353,7 +353,9 @@ describe("Exposed Instructions (@solana/kit)", () => {
           mockAddress,
           amount,
         );
-        expect(new DataView(Uint8Array.from(instruction.data!).buffer).getBigUint64(8, true)).toBe(amount);
+        if (!instruction.data) throw new Error("Missing instruction data");
+        const data = new DataView(Uint8Array.from(instruction.data).buffer);
+        expect(data.getBigUint64(8, true)).toBe(amount);
       },
     );
 
@@ -496,6 +498,15 @@ describe("Exposed Instructions (@solana/kit)", () => {
           mockAddress,
           1,
           256,
+        ),
+      ).toThrow("index must fit in u8");
+      expect(() =>
+        createTopUpEscrowInstruction(
+          mockAddress,
+          mockAddress,
+          mockAddress,
+          1,
+          1.5,
         ),
       ).toThrow("index must fit in u8");
     });
