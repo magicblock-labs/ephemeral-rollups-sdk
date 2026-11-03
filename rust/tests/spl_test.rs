@@ -246,7 +246,7 @@ mod tests {
             find_transfer_group_receipt(&queue, &owner, group_id);
 
         assert_eq!(instruction.program_id, ESPL_TOKEN_PROGRAM_ID);
-        assert_eq!(instruction.accounts.len(), 12);
+        assert_eq!(instruction.accounts.len(), 14);
         assert_eq!(instruction.accounts[0].pubkey, queue);
         assert_eq!(instruction.accounts[1].pubkey, vault);
         assert_eq!(instruction.accounts[2].pubkey, mint);
@@ -259,6 +259,11 @@ mod tests {
         assert_eq!(instruction.accounts[9].pubkey, group_receipt);
         assert_eq!(instruction.accounts[10].pubkey, EPHEMERAL_VAULT_ID);
         assert_eq!(instruction.accounts[11].pubkey, MAGIC_PROGRAM_ID);
+        let (group_receipt_permission, _permission_bump) = Permission::find_pda(&group_receipt);
+        assert_eq!(instruction.accounts[12].pubkey, group_receipt_permission);
+        assert!(instruction.accounts[12].is_writable);
+        assert_eq!(instruction.accounts[13].pubkey, PERMISSION_PROGRAM_ID);
+        assert!(!instruction.accounts[13].is_writable);
         assert_eq!(
             instruction.data[0],
             EphemeralSplDiscriminator::DepositAndQueueTransfer as u8

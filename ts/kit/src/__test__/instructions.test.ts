@@ -1473,13 +1473,16 @@ describe("Exposed Instructions (@solana/kit)", () => {
       expect(instructions).toHaveLength(2);
       expect(instructions[0].data?.[0]).toBe(12);
       expect(instructions[1].data?.[0]).toBe(16);
-      expect(instructions[1].accounts).toHaveLength(12);
+      expect(instructions[1].accounts).toHaveLength(14);
       expect(instructions[1].accounts?.[5].address).toBe(to);
       expect(instructions[1].accounts?.[8].address).toBe(
         instructions[1].accounts?.[3].address,
       );
       expect(instructions[1].accounts?.[10].address).toBe(EPHEMERAL_VAULT_ID);
       expect(instructions[1].accounts?.[11].address).toBe(MAGIC_PROGRAM_ID);
+      expect(instructions[1].accounts?.[13].address).toBe(
+        PERMISSION_PROGRAM_ID,
+      );
       expect(Buffer.from(instructions[1].data ?? []).readBigUInt64LE(1)).toBe(
         25n,
       );
@@ -1716,7 +1719,7 @@ describe("Exposed Instructions (@solana/kit)", () => {
         ],
       });
 
-      expect(instruction.accounts).toHaveLength(12);
+      expect(instruction.accounts).toHaveLength(14);
       expect(groupId).not.toBe(0);
       expect(groupReceipt).toBe(expectedGroupReceipt);
       expect(instruction.accounts?.[8].address).toBe(source);
@@ -1727,6 +1730,12 @@ describe("Exposed Instructions (@solana/kit)", () => {
       expect(instruction.accounts?.[10].role).toBe(AccountRole.WRITABLE);
       expect(instruction.accounts?.[11].address).toBe(MAGIC_PROGRAM_ID);
       expect(instruction.accounts?.[11].role).toBe(AccountRole.READONLY);
+      expect(instruction.accounts?.[12].address).toBe(
+        await permissionPdaFromAccount(groupReceipt),
+      );
+      expect(instruction.accounts?.[12].role).toBe(AccountRole.WRITABLE);
+      expect(instruction.accounts?.[13].address).toBe(PERMISSION_PROGRAM_ID);
+      expect(instruction.accounts?.[13].role).toBe(AccountRole.READONLY);
       expect(instruction.data?.[0]).toBe(16);
       expect(Buffer.from(instruction.data ?? []).readBigUInt64LE(1)).toBe(25n);
       expect(Buffer.from(instruction.data ?? []).readBigUInt64LE(12)).toBe(
