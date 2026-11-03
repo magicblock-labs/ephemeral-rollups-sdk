@@ -226,6 +226,9 @@ export function allocateTransferQueueIx(
 
 /**
  * Deposit SPL tokens into the vault and queue one or more delayed transfers.
+ * The group receipt's ACL permission accounts are passed along, so the receipt
+ * is readable only by the sender and the program closes the permission once
+ * every split has settled.
  * @param queue - The transfer queue PDA
  * @param vault - The vault authority PDA (global vault or transfer queue)
  * @param mint - The mint account
@@ -276,6 +279,7 @@ export function depositAndQueueTransferIx(
   const groupIdBytes = Buffer.alloc(4);
   groupIdBytes.writeUInt32LE(groupId, 0);
   const [groupReceipt] = deriveGroupReceipt(queue, owner, groupId);
+  const groupReceiptPermission = permissionPdaFromAccount(groupReceipt);
   const data = [
     DEPOSIT_AND_QUEUE_TRANSFER_DISCRIMINATOR,
     ...u64le(amount),
@@ -304,6 +308,8 @@ export function depositAndQueueTransferIx(
       { pubkey: groupReceipt, isSigner: false, isWritable: true },
       { pubkey: EPHEMERAL_VAULT_ID, isSigner: false, isWritable: true },
       { pubkey: MAGIC_PROGRAM_ID, isSigner: false, isWritable: false },
+      { pubkey: groupReceiptPermission, isSigner: false, isWritable: true },
+      { pubkey: PERMISSION_PROGRAM_ID, isSigner: false, isWritable: false },
     ],
     data: new Uint8Array(data),
     programAddress: EPHEMERAL_SPL_TOKEN_PROGRAM_ID,

@@ -1,8 +1,12 @@
 use core::fmt;
 
 use crate::{
+    access_control::structs::Permission,
     compat,
-    consts::{EPHEMERAL_VAULT_ID, ESPL_TOKEN_PROGRAM_ID, MAGIC_PROGRAM_ID, TOKEN_PROGRAM_ID},
+    consts::{
+        EPHEMERAL_VAULT_ID, ESPL_TOKEN_PROGRAM_ID, MAGIC_PROGRAM_ID, PERMISSION_PROGRAM_ID,
+        TOKEN_PROGRAM_ID,
+    },
     spl::{find_transfer_group_receipt, EphemeralSplDiscriminator},
 };
 
@@ -34,6 +38,9 @@ impl fmt::Display for DepositAndQueueTransferBuilderError {
     }
 }
 
+/// Builds `DepositAndQueueTransfer` with the group receipt's ACL permission
+/// accounts, so the receipt stays private to the sender and the program can
+/// close the permission once every split has settled.
 pub struct DepositAndQueueTransferBuilder {
     pub queue: compat::Pubkey,
     pub vault: compat::Pubkey,
@@ -79,6 +86,7 @@ impl DepositAndQueueTransferBuilder {
         let reimbursement_token_info = self.reimbursement_token_info.unwrap_or(self.source);
         let (group_receipt, _group_receipt_bump) =
             find_transfer_group_receipt(&self.queue, &self.owner, group_id);
+        let (group_receipt_permission, _permission_bump) = Permission::find_pda(&group_receipt);
 
         Ok(compat::Instruction {
             program_id: ESPL_TOKEN_PROGRAM_ID,
@@ -95,6 +103,8 @@ impl DepositAndQueueTransferBuilder {
                 compat::AccountMeta::new(group_receipt, false),
                 compat::AccountMeta::new(EPHEMERAL_VAULT_ID, false),
                 compat::AccountMeta::new_readonly(MAGIC_PROGRAM_ID, false),
+                compat::AccountMeta::new(group_receipt_permission, false),
+                compat::AccountMeta::new_readonly(PERMISSION_PROGRAM_ID, false),
             ],
             data,
         })

@@ -1735,7 +1735,7 @@ describe("Exposed Instructions (web3.js)", () => {
       expect(instructions).toHaveLength(2);
       expect(instructions[0].data[0]).toBe(12);
       expect(instructions[1].data[0]).toBe(16);
-      expect(instructions[1].keys).toHaveLength(12);
+      expect(instructions[1].keys).toHaveLength(14);
       expect(instructions[1].keys[5].pubkey.toBase58()).toBe(to.toBase58());
       expect(instructions[1].keys[8].pubkey.toBase58()).toBe(
         instructions[1].keys[3].pubkey.toBase58(),
@@ -1745,6 +1745,9 @@ describe("Exposed Instructions (web3.js)", () => {
       );
       expect(instructions[1].keys[11].pubkey.toBase58()).toBe(
         MAGIC_PROGRAM_ID.toBase58(),
+      );
+      expect(instructions[1].keys[13].pubkey.toBase58()).toBe(
+        PERMISSION_PROGRAM_ID.toBase58(),
       );
       expect(Buffer.from(instructions[1].data).readBigUInt64LE(1)).toBe(25n);
       expect(Buffer.from(instructions[1].data).readUIntLE(9, 3)).not.toBe(0);
@@ -1931,7 +1934,7 @@ describe("Exposed Instructions (web3.js)", () => {
       );
 
       expect(instruction).toBeInstanceOf(TransactionInstruction);
-      expect(instruction.keys).toHaveLength(12);
+      expect(instruction.keys).toHaveLength(14);
       expect(groupId).not.toBe(0);
       expect(groupReceipt.toBase58()).toBe(expectedGroupReceipt.toBase58());
       expect(instruction.keys[8].pubkey.toBase58()).toBe(source.toBase58());
@@ -1948,6 +1951,14 @@ describe("Exposed Instructions (web3.js)", () => {
         MAGIC_PROGRAM_ID.toBase58(),
       );
       expect(instruction.keys[11].isWritable).toBe(false);
+      expect(instruction.keys[12].pubkey.toBase58()).toBe(
+        permissionPdaFromAccount(groupReceipt).toBase58(),
+      );
+      expect(instruction.keys[12].isWritable).toBe(true);
+      expect(instruction.keys[13].pubkey.toBase58()).toBe(
+        PERMISSION_PROGRAM_ID.toBase58(),
+      );
+      expect(instruction.keys[13].isWritable).toBe(false);
       expect(instruction.data[0]).toBe(16);
       expect(Buffer.from(instruction.data).readBigUInt64LE(1)).toBe(25n);
       expect(Buffer.from(instruction.data).readBigUInt64LE(12)).toBe(100n);
