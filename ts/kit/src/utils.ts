@@ -1,4 +1,9 @@
-import { AccountRole, Signature, TransactionMessage } from "@solana/kit";
+import {
+  AccountRole,
+  Signature,
+  TransactionMessage,
+  TransactionMessageWithFeePayer,
+} from "@solana/kit";
 
 /**
  * Extracts all writable accounts from a transaction message.
@@ -7,9 +12,13 @@ import { AccountRole, Signature, TransactionMessage } from "@solana/kit";
  * @returns An array of writable account addresses.
  */
 export function getWritableAccounts(
-  transactionMessage: TransactionMessage,
+  transactionMessage: TransactionMessage &
+    Partial<TransactionMessageWithFeePayer>,
 ): string[] {
   const writableAccounts = new Set<string>();
+  if (transactionMessage.feePayer) {
+    writableAccounts.add(transactionMessage.feePayer.address.toString());
+  }
   for (const instruction of transactionMessage.instructions) {
     if (instruction.accounts) {
       for (const account of instruction.accounts) {
