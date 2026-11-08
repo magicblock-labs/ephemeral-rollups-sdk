@@ -33,7 +33,10 @@ import {
   getWritableAccounts,
   isRouter,
   parseCommitsLogsMessage,
+  parseOutboxAddresses,
   parseScheduleCommitsLogsMessage,
+  receiptFromLogs,
+  SettlementReceipt,
 } from "./utils";
 
 /** Type representing a recent blockhash and its lifetime validity. */
@@ -381,6 +384,13 @@ export class Connection {
       txSchedulingSgn.meta.logMessages ?? [],
     );
     if (scheduledCommitSgn == null) {
+      const addresses = parseOutboxAddresses(txSchedulingSgn.meta.logMessages ?? []);
+      if (addresses.length === 1) {
+        const receipt = await this.waitForIntent(addresses[0] as Address);
+        if (receipt.signatures.length === 0) throw new Error("Settlement receipt contains no base-chain signature");
+        return receipt.signatures[0] as Signature;
+      }
+      if (addresses.length > 1) throw new Error("Scheduling transaction created multiple intents; use waitForSettlement");
       throw new Error("ScheduledCommitSent signature not found");
     }
     await this.confirmTransaction(scheduledCommitSgn);
@@ -408,6 +418,44 @@ export class Connection {
       throw new Error("Unable to find Commitment signature");
     }
     return commitSignature;
+  }
+
+  /** Wait for receipts for every intent created by a successful scheduling transaction. */
+  public async waitForSettlement(
+    signature: Signature,
+    options: { timeoutMs?: number; pollIntervalMs?: number } = {},
+  ): Promise<SettlementReceipt[]> {
+    const tx = await this.rpc.getTransaction(signature, { encoding: "base64", maxSupportedTransactionVersion: 0 }).send();
+    if (tx?.meta == null) throw new Error("Scheduling transaction not found");
+    if (tx.meta.err != null) throw new Error("Scheduling transaction failed; no settlement receipt exists");
+    const logs = tx.meta.logMessages ?? [];
+    const addresses = parseOutboxAddresses(logs);
+    if (addresses.length > 0) return Promise.all(addresses.map((address) => this.waitForIntent(address as Address, options)));
+    const legacy = parseScheduleCommitsLogsMessage(logs);
+    if (legacy == null) throw new Error("No settlement receipt found in scheduling logs");
+    await this.confirmTransaction(legacy);
+    const legacyTx = await this.rpc.getTransaction(legacy, { encoding: "base64", maxSupportedTransactionVersion: 0 }).send();
+    if (legacyTx?.meta == null || legacyTx.meta.err != null) throw new Error("Legacy settlement notification unavailable or failed");
+    return [receiptFromLogs(null, legacyTx.meta.logMessages ?? [])];
+  }
+
+  /** Wait for a completion transaction in an outbox intent address's history. */
+  public async waitForIntent(
+    intentAddress: Address,
+    options: { timeoutMs?: number; pollIntervalMs?: number } = {},
+  ): Promise<SettlementReceipt> {
+    const deadline = Date.now() + (options.timeoutMs ?? 120_000);
+    const interval = options.pollIntervalMs ?? 1_000;
+    while (Date.now() <= deadline) {
+      const history = await this.rpc.getSignaturesForAddress(intentAddress, { limit: 1000 }).send();
+      for (const item of history) {
+        const tx = await this.rpc.getTransaction(item.signature, { encoding: "base64", maxSupportedTransactionVersion: 0 }).send();
+        const logs = tx?.meta?.logMessages ?? [];
+        if (logs.some((line) => line.includes("ScheduledCommitSent id:"))) return receiptFromLogs(intentAddress, logs);
+      }
+      await new Promise((resolve) => setTimeout(resolve, interval));
+    }
+    throw new Error(`Timed out waiting for settlement intent ${intentAddress}; transaction history may be unavailable`);
   }
 
   /**

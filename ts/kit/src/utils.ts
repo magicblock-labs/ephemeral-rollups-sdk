@@ -95,3 +95,31 @@ export function parseCommitsLogsMessage(
   }
   return null;
 }
+
+export type SettlementReceipt = {
+  intentAddress: string | null;
+  result: { errorMessage: string | null; logs: string[] };
+  signatures: string[];
+};
+
+export function parseOutboxAddresses(logMessages: readonly string[]): string[] {
+  const prefix = "ScheduledCommitSent outbox: ";
+  return logMessages.flatMap((line) => {
+    const i = line.indexOf(prefix);
+    return i < 0 ? [] : [line.slice(i + prefix.length).trim()];
+  });
+}
+
+export function receiptFromLogs(intentAddress: string | null, logMessages: readonly string[]): SettlementReceipt {
+  const logs = [...logMessages];
+  const signatures = logs.flatMap((line) => {
+    const match = line.match(/ScheduledCommitSent signature\[\d+\]: (.+)$/);
+    return match ? [match[1].trim()] : [];
+  });
+  const errorLine = logs.find((line) => line.includes("ScheduledCommitSent error message:"));
+  return {
+    intentAddress,
+    result: { errorMessage: errorLine?.split("ScheduledCommitSent error message:")[1]?.trim() ?? null, logs },
+    signatures,
+  };
+}
