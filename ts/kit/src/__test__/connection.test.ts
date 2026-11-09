@@ -351,6 +351,45 @@ describe("Connection", () => {
         meta: { err: null, logMessages: ["schedule"] },
       })),
     } as unknown as ReturnType<typeof mockRpc.getTransaction>);
+    vi.mocked(utils.parseOutboxAddresses).mockReturnValue([
+      "outbox-1",
+      "outbox-2",
+    ]);
+    vi.mocked(mockRpc.getSignaturesForAddress).mockReturnValue({
+      send: vi.fn(async () => [{ signature: "completion" }]),
+    } as unknown as ReturnType<typeof mockRpc.getSignaturesForAddress>);
+    vi.mocked(mockRpc.getTransaction).mockReturnValue({
+      send: vi.fn(async () => ({
+        meta: {
+          err: null,
+          logMessages: ["Program log: ScheduledCommitSent id: 1"],
+        },
+        transaction: {
+          message: {
+            accountKeys: [
+              "validator",
+              "outbox-1",
+              "outbox-2",
+              "outboxintent1111111111111111111111111111111",
+            ],
+            header: { numRequiredSignatures: 1 },
+            instructions: [{ programIdIndex: 2, accounts: [1] }],
+          },
+        },
+      })),
+    } as unknown as ReturnType<typeof mockRpc.getTransaction>);
+    const result = await connection.waitForSettlement(mockSignature, {
+      timeoutMs: 100,
+    });
+    expect(result).toHaveLength(2);
+    expect(utils.receiptFromLogs).toHaveBeenCalledWith("outbox-1", [
+      "Program log: ScheduledCommitSent id: 1",
+    ]);
+  });
+
+  it("adapts the existing signature helper for one new-format intent", async () => {
+    const connection = await Connection.create("http://localhost");
+    vi.mocked(utils.parseScheduleCommitsLogsMessage).mockReturnValue(null);
     vi.mocked(utils.parseOutboxAddresses).mockReturnValue(["outbox-1"]);
     vi.mocked(mockRpc.getSignaturesForAddress).mockReturnValue({
       send: vi.fn(async () => [{ signature: "completion" }]),
@@ -374,13 +413,21 @@ describe("Connection", () => {
         },
       })),
     } as unknown as ReturnType<typeof mockRpc.getTransaction>);
-    const result = await connection.waitForSettlement(mockSignature, {
-      timeoutMs: 100,
-    });
-    expect(result).toHaveLength(1);
-    expect(utils.receiptFromLogs).toHaveBeenCalledWith("outbox-1", [
-      "Program log: ScheduledCommitSent id: 1",
+    await expect(
+      connection.getCommitmentSignature(mockSignature),
+    ).resolves.toBe("base-signature");
+  });
+
+  it("rejects the single-signature adapter when scheduling created multiple intents", async () => {
+    const connection = await Connection.create("http://localhost");
+    vi.mocked(utils.parseScheduleCommitsLogsMessage).mockReturnValue(null);
+    vi.mocked(utils.parseOutboxAddresses).mockReturnValue([
+      "outbox-1",
+      "outbox-2",
     ]);
+    await expect(
+      connection.getCommitmentSignature(mockSignature),
+    ).rejects.toThrow(/multiple intents; use waitForSettlement/);
   });
 
   it("waitForIntent times out when address history has no completion", async () => {
