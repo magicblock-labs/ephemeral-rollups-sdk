@@ -1,5 +1,7 @@
 import { AccountRole, Signature, TransactionMessage } from "@solana/kit";
 
+const OUTBOX_PROGRAM_ID = "outboxintent1111111111111111111111111111111";
+
 /**
  * Extracts all writable accounts from a transaction message.
  *
@@ -96,11 +98,11 @@ export function parseCommitsLogsMessage(
   return null;
 }
 
-export type SettlementReceipt = {
+export interface SettlementReceipt {
   intentAddress: string | null;
   result: { errorMessage: string | null; logs: string[] };
   signatures: string[];
-};
+}
 
 export function parseOutboxAddresses(logMessages: readonly string[]): string[] {
   const prefix = "ScheduledCommitSent outbox: ";
@@ -110,16 +112,75 @@ export function parseOutboxAddresses(logMessages: readonly string[]): string[] {
   });
 }
 
-export function receiptFromLogs(intentAddress: string | null, logMessages: readonly string[]): SettlementReceipt {
+export function receiptFromLogs(
+  intentAddress: string | null,
+  logMessages: readonly string[],
+): SettlementReceipt {
   const logs = [...logMessages];
   const signatures = logs.flatMap((line) => {
     const match = line.match(/ScheduledCommitSent signature\[\d+\]: (.+)$/);
     return match ? [match[1].trim()] : [];
   });
-  const errorLine = logs.find((line) => line.includes("ScheduledCommitSent error message:"));
+  const errorLine = logs.find((line) =>
+    line.includes("ScheduledCommitSent error message:"),
+  );
   return {
     intentAddress,
-    result: { errorMessage: errorLine?.split("ScheduledCommitSent error message:")[1]?.trim() ?? null, logs },
+    result: {
+      errorMessage:
+        errorLine?.split("ScheduledCommitSent error message:")[1]?.trim() ??
+        null,
+      logs,
+    },
     signatures,
   };
+}
+
+export function hasAuthorizedCompletion(
+  tx: unknown,
+  validator: string,
+  outbox: string,
+): boolean {
+  const transaction = tx as {
+    transaction?: {
+      message?: {
+        accountKeys?: Array<string | { pubkey: string; signer?: boolean }>;
+        staticAccountKeys?: string[];
+        header?: { numRequiredSignatures?: number };
+        instructions?: Array<{
+          programId?: string;
+          programIdIndex?: number;
+          accounts?: Array<string | number>;
+        }>;
+        compiledInstructions?: Array<{
+          programIdIndex: number;
+          accountKeyIndexes: number[];
+        }>;
+      };
+    };
+  };
+  const message = transaction.transaction?.message;
+  if (!message) return false;
+  const keys =
+    message.staticAccountKeys ??
+    message.accountKeys?.map((key) =>
+      typeof key === "string" ? key : key.pubkey,
+    ) ??
+    [];
+  const signers = message.header?.numRequiredSignatures ?? 0;
+  if (!keys.slice(0, signers).includes(validator)) return false;
+  const instructions =
+    message.compiledInstructions ?? message.instructions ?? [];
+  return instructions.some((ix) => {
+    const program =
+      ("programId" in ix ? ix.programId : undefined) ??
+      keys[ix.programIdIndex ?? -1];
+    const accounts =
+      "accountKeyIndexes" in ix
+        ? ix.accountKeyIndexes.map((index) => keys[index])
+        : (ix.accounts ?? []).map((account) =>
+            typeof account === "number" ? keys[account] : account,
+          );
+    return program === OUTBOX_PROGRAM_ID && accounts.includes(outbox);
+  });
 }

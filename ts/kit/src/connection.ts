@@ -31,6 +31,7 @@ import {
 import { waitForRecentTransactionConfirmationUntilTimeout } from "./confirmation";
 import {
   getWritableAccounts,
+  hasAuthorizedCompletion,
   isRouter,
   parseCommitsLogsMessage,
   parseOutboxAddresses,
@@ -44,6 +45,53 @@ type LatestBlockhash = Readonly<{
   blockhash: Blockhash;
   lastValidBlockHeight: bigint;
 }>;
+
+interface ReceiptWaitOptions {
+  timeoutMs?: number;
+  pollIntervalMs?: number;
+}
+
+async function withDeadline<T>(
+  promise: Promise<T>,
+  deadline: number,
+  signal?: AbortSignal,
+  cancel?: () => void,
+): Promise<T> {
+  const remaining = deadline - Date.now();
+  if (remaining <= 0) {
+    cancel?.();
+    return Promise.reject(
+      new Error("Timed out waiting for settlement receipt"),
+    );
+  }
+  return new Promise<T>((resolve, reject) => {
+    const cleanup = () => {
+      clearTimeout(timer);
+      signal?.removeEventListener("abort", onAbort);
+    };
+    const timer = setTimeout(() => {
+      cancel?.();
+      cleanup();
+      reject(new Error("Timed out waiting for settlement receipt"));
+    }, remaining);
+    const onAbort = () => {
+      cancel?.();
+      cleanup();
+      reject(new Error("Settlement receipt wait cancelled"));
+    };
+    signal?.addEventListener("abort", onAbort, { once: true });
+    promise.then(
+      (value) => {
+        cleanup();
+        resolve(value);
+      },
+      (error) => {
+        cleanup();
+        reject(error);
+      },
+    );
+  });
+}
 
 /**
  * Represents a connection to a Solana cluster (HTTP + WebSocket).
@@ -384,13 +432,21 @@ export class Connection {
       txSchedulingSgn.meta.logMessages ?? [],
     );
     if (scheduledCommitSgn == null) {
-      const addresses = parseOutboxAddresses(txSchedulingSgn.meta.logMessages ?? []);
+      const addresses = parseOutboxAddresses(
+        txSchedulingSgn.meta.logMessages ?? [],
+      );
       if (addresses.length === 1) {
         const receipt = await this.waitForIntent(addresses[0] as Address);
-        if (receipt.signatures.length === 0) throw new Error("Settlement receipt contains no base-chain signature");
+        if (receipt.signatures.length === 0)
+          throw new Error(
+            "Settlement receipt contains no base-chain signature",
+          );
         return receipt.signatures[0] as Signature;
       }
-      if (addresses.length > 1) throw new Error("Scheduling transaction created multiple intents; use waitForSettlement");
+      if (addresses.length > 1)
+        throw new Error(
+          "Scheduling transaction created multiple intents; use waitForSettlement",
+        );
       throw new Error("ScheduledCommitSent signature not found");
     }
     await this.confirmTransaction(scheduledCommitSgn);
@@ -423,39 +479,133 @@ export class Connection {
   /** Wait for receipts for every intent created by a successful scheduling transaction. */
   public async waitForSettlement(
     signature: Signature,
-    options: { timeoutMs?: number; pollIntervalMs?: number } = {},
+    options: ReceiptWaitOptions = {},
   ): Promise<SettlementReceipt[]> {
-    const tx = await this.rpc.getTransaction(signature, { encoding: "base64", maxSupportedTransactionVersion: 0 }).send();
+    const tx = await this.rpc
+      .getTransaction(signature, {
+        encoding: "base64",
+        maxSupportedTransactionVersion: 0,
+      })
+      .send();
     if (tx?.meta == null) throw new Error("Scheduling transaction not found");
-    if (tx.meta.err != null) throw new Error("Scheduling transaction failed; no settlement receipt exists");
+    if (tx.meta.err != null)
+      throw new Error(
+        "Scheduling transaction failed; no settlement receipt exists",
+      );
     const logs = tx.meta.logMessages ?? [];
     const addresses = parseOutboxAddresses(logs);
-    if (addresses.length > 0) return Promise.all(addresses.map((address) => this.waitForIntent(address as Address, options)));
+    if (addresses.length > 0) {
+      const controller = new AbortController();
+      const tasks = addresses.map(async (address) =>
+        this.waitForIntentUntil(address as Address, options, controller.signal),
+      );
+      try {
+        return await Promise.all(tasks);
+      } catch (error) {
+        controller.abort();
+        await Promise.allSettled(tasks);
+        throw error;
+      }
+    }
     const legacy = parseScheduleCommitsLogsMessage(logs);
-    if (legacy == null) throw new Error("No settlement receipt found in scheduling logs");
+    if (legacy == null)
+      throw new Error("No settlement receipt found in scheduling logs");
     await this.confirmTransaction(legacy);
-    const legacyTx = await this.rpc.getTransaction(legacy, { encoding: "base64", maxSupportedTransactionVersion: 0 }).send();
-    if (legacyTx?.meta == null || legacyTx.meta.err != null) throw new Error("Legacy settlement notification unavailable or failed");
+    const legacyTx = await this.rpc
+      .getTransaction(legacy, {
+        encoding: "base64",
+        maxSupportedTransactionVersion: 0,
+      })
+      .send();
+    if (legacyTx?.meta == null || legacyTx.meta.err != null)
+      throw new Error("Legacy settlement notification unavailable or failed");
     return [receiptFromLogs(null, legacyTx.meta.logMessages ?? [])];
   }
 
   /** Wait for a completion transaction in an outbox intent address's history. */
   public async waitForIntent(
     intentAddress: Address,
-    options: { timeoutMs?: number; pollIntervalMs?: number } = {},
+    options: ReceiptWaitOptions = {},
+  ): Promise<SettlementReceipt> {
+    return this.waitForIntentUntil(intentAddress, options);
+  }
+
+  private async waitForIntentUntil(
+    intentAddress: Address,
+    options: ReceiptWaitOptions,
+    signal?: AbortSignal,
   ): Promise<SettlementReceipt> {
     const deadline = Date.now() + (options.timeoutMs ?? 120_000);
     const interval = options.pollIntervalMs ?? 1_000;
+    const inspected = new Set<string>();
+    const identityRequest = new AbortController();
+    const { identity } = await withDeadline(
+      this.rpc.getIdentity().send({ abortSignal: identityRequest.signal }),
+      deadline,
+      signal,
+      () => {
+        identityRequest.abort();
+      },
+    );
     while (Date.now() <= deadline) {
-      const history = await this.rpc.getSignaturesForAddress(intentAddress, { limit: 1000 }).send();
+      if (signal?.aborted === true)
+        throw new Error("Settlement receipt wait cancelled");
+      const historyRequest = new AbortController();
+      const history = await withDeadline(
+        this.rpc
+          .getSignaturesForAddress(intentAddress, { limit: 1000 })
+          .send({ abortSignal: historyRequest.signal }),
+        deadline,
+        signal,
+        () => {
+          historyRequest.abort();
+        },
+      );
       for (const item of history) {
-        const tx = await this.rpc.getTransaction(item.signature, { encoding: "base64", maxSupportedTransactionVersion: 0 }).send();
+        if (inspected.has(item.signature)) continue;
+        let tx;
+        const txRequest = new AbortController();
+        try {
+          tx = await withDeadline(
+            this.rpc
+              .getTransaction(item.signature, {
+                encoding: "json",
+                maxSupportedTransactionVersion: 0,
+              })
+              .send({ abortSignal: txRequest.signal }),
+            deadline,
+            signal,
+            () => {
+              txRequest.abort();
+            },
+          );
+        } catch (error) {
+          if (Date.now() >= deadline) throw error;
+          continue;
+        }
+        if (tx?.meta != null) inspected.add(item.signature);
         const logs = tx?.meta?.logMessages ?? [];
-        if (logs.some((line) => line.includes("ScheduledCommitSent id:"))) return receiptFromLogs(intentAddress, logs);
+        if (
+          tx?.meta?.err == null &&
+          hasAuthorizedCompletion(tx, identity, intentAddress) &&
+          logs.some((line) => line.includes("ScheduledCommitSent id:"))
+        )
+          return receiptFromLogs(intentAddress, logs);
       }
-      await new Promise((resolve) => setTimeout(resolve, interval));
+      await withDeadline(
+        new Promise<void>((resolve) =>
+          setTimeout(
+            resolve,
+            Math.min(interval, Math.max(0, deadline - Date.now())),
+          ),
+        ),
+        deadline,
+        signal,
+      );
     }
-    throw new Error(`Timed out waiting for settlement intent ${intentAddress}; transaction history may be unavailable`);
+    throw new Error(
+      `Timed out waiting for settlement intent ${intentAddress}; transaction history may be unavailable`,
+    );
   }
 
   /**
