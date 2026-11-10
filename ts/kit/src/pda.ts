@@ -78,7 +78,7 @@ export async function escrowPdaFromEscrowAuthority(
   }
   const addressEncoder = getAddressEncoder();
   const [escrowPda] = await getProgramDerivedAddress({
-    programAddress: escrowAuthority,
+    programAddress: DELEGATION_PROGRAM_ID,
     seeds: [
       Buffer.from("balance"),
       addressEncoder.encode(escrowAuthority),
