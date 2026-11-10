@@ -84,6 +84,7 @@ const mockSigners = [
 // Vitest Mocks
 // ----------------------
 vi.mock("@solana/kit", () => ({
+  address: vi.fn((value) => value),
   createSolanaRpc: vi.fn(),
   createSolanaRpcSubscriptions: vi.fn(),
   partiallySignTransaction: vi.fn(),
@@ -102,8 +103,9 @@ vi.mock("../utils", () => ({
   parseCommitsLogsMessage: vi.fn(),
   parseOutboxAddresses: vi.fn(),
   parseScheduleCommitsLogsMessage: vi.fn(),
+  logsFromProgram: vi.fn((logs) => logs),
   receiptFromLogs: vi.fn(),
-  hasAuthorizedCompletion: vi.fn(),
+  receiptFromCompletion: vi.fn(),
 }));
 
 vi.mock("../confirmation", () => ({
@@ -155,7 +157,11 @@ describe("Connection", () => {
       result: { errorMessage: null, logs: [] },
       signatures: ["base-signature"],
     });
-    vi.mocked(utils.hasAuthorizedCompletion).mockReturnValue(true);
+    vi.mocked(utils.receiptFromCompletion).mockReturnValue({
+      intentAddress: "outbox",
+      result: { errorMessage: null, logs: [] },
+      signatures: ["base-signature"],
+    });
     vi.mocked(solanaKit.isFullySignedTransaction).mockImplementation(
       () => true,
     );
@@ -382,9 +388,10 @@ describe("Connection", () => {
       timeoutMs: 100,
     });
     expect(result).toHaveLength(2);
-    expect(utils.receiptFromLogs).toHaveBeenCalledWith("outbox-1", [
-      "Program log: ScheduledCommitSent id: 1",
-    ]);
+    expect(utils.receiptFromCompletion).toHaveBeenCalledWith(
+      expect.anything(),
+      "outbox-1",
+    );
   });
 
   it("adapts the existing signature helper for one new-format intent", async () => {
@@ -440,7 +447,7 @@ describe("Connection", () => {
         timeoutMs: 5,
         pollIntervalMs: 1,
       }),
-    ).rejects.toThrow(/Timed out waiting for settlement intent/);
+    ).rejects.toThrow(/Timed out waiting for settlement/);
   });
 
   it("should getBalance", async () => {

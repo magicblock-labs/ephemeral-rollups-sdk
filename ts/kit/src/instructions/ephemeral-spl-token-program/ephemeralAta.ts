@@ -1493,8 +1493,10 @@ export interface DelegateSplOptions {
   private?: boolean;
 }
 
-export interface DelegateSplWithPrivateTransferOptions
-  extends Omit<DelegateSplOptions, "private"> {
+export interface DelegateSplWithPrivateTransferOptions extends Omit<
+  DelegateSplOptions,
+  "private"
+> {
   minDelayMs?: bigint;
   maxDelayMs?: bigint;
   split?: number;
@@ -1502,8 +1504,10 @@ export interface DelegateSplWithPrivateTransferOptions
   initTransferQueueIfMissing?: boolean;
 }
 
-export interface WithdrawSplOptions
-  extends Omit<DelegateSplOptions, "private" | "initVaultIfMissing"> {
+export interface WithdrawSplOptions extends Omit<
+  DelegateSplOptions,
+  "private" | "initVaultIfMissing"
+> {
   /**
    * The ephemeral balance lives in a Magic ATA (no eATA exists yet):
    * skip the eATA init/delegate instructions and drain the Magic ATA
