@@ -101,10 +101,12 @@ async function withDeadline<T>(
   deadline: number,
 ): Promise<T> {
   const remaining = deadline - Date.now();
-  if (remaining <= 0)
+  if (remaining <= 0) {
+    void promise.catch(() => undefined);
     return Promise.reject(
       new Error("Timed out waiting for settlement receipt"),
     );
+  }
   return new Promise<T>((resolve, reject) => {
     const cleanup = () => {
       clearTimeout(timer);

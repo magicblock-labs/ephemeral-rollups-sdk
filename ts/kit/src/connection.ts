@@ -56,6 +56,7 @@ async function withDeadline<T>(
 ): Promise<T> {
   const remaining = deadline - Date.now();
   if (remaining <= 0) {
+    void promise.catch(() => undefined);
     cancel?.();
     return Promise.reject(
       new Error("Timed out waiting for settlement receipt"),
