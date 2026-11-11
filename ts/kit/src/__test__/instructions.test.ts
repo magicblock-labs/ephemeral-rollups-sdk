@@ -2050,21 +2050,15 @@ describe("Exposed Instructions (@solana/kit)", () => {
       });
 
       const data = Buffer.from(instruction.data ?? []);
-      expect(data[0]).toBe(30);
+      expect(data[0]).toBe(29);
       expect(data.readUInt32LE(1)).toBe(7);
       expect(
         data.subarray(6, 38).equals(Buffer.from(addressEncoder.encode(mint))),
       ).toBe(true);
 
-      const [validatorField, nextOffset] = readLengthPrefixedField(data, 48);
-      const [destinationField, suffixOffset] = readLengthPrefixedField(
-        data,
-        nextOffset,
-      );
-      const [suffixField, endOffset] = readLengthPrefixedField(
-        data,
-        suffixOffset,
-      );
+      const validatorField = data.subarray(48, 80);
+      const destinationField = data.subarray(80, 160);
+      const [suffixField, endOffset] = readLengthPrefixedField(data, 160);
 
       expect(
         validatorField.equals(Buffer.from(addressEncoder.encode(validator))),
@@ -2089,12 +2083,7 @@ describe("Exposed Instructions (@solana/kit)", () => {
       );
 
       const data = Buffer.from(instruction.data ?? []);
-      const [, afterValidator] = readLengthPrefixedField(data, 48);
-      const [, afterDestination] = readLengthPrefixedField(
-        data,
-        afterValidator,
-      );
-      const [suffixField] = readLengthPrefixedField(data, afterDestination);
+      const [suffixField] = readLengthPrefixedField(data, 160);
       expect(suffixField).toHaveLength(76);
     });
 
