@@ -28,7 +28,7 @@ import {
   u32leBuffer,
 } from "./wire";
 
-const SCHEDULE_PRIVATE_TRANSFER_DISCRIMINATOR = 30;
+const SCHEDULE_PRIVATE_TRANSFER_DISCRIMINATOR = 29;
 
 const STASH_PDA_SEED = new TextEncoder().encode("stash");
 const HYDRA_CRANK_SEED_PREFIX = new TextEncoder().encode("crank");
@@ -193,8 +193,8 @@ export async function schedulePrivateTransferIx(
     Buffer.from([vaultTokenBump]),
     Buffer.from([stashAtaBump]),
     Buffer.from([queueBump]),
-    encodeLengthPrefixedBytes(new Uint8Array(addressEncoder.encode(validator))),
-    encodeLengthPrefixedBytes(encryptedDestination),
+    Buffer.from(addressEncoder.encode(validator)),
+    encryptedDestination,
     encodeLengthPrefixedBytes(encryptedSuffix),
   ]);
 
