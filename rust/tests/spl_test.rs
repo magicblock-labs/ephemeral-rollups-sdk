@@ -14,8 +14,8 @@ mod tests {
     use ephemeral_rollups_sdk::{
         access_control::structs::Permission,
         consts::{
-            ASSOCIATED_TOKEN_PROGRAM_ID, EPHEMERAL_VAULT_ID, ESPL_TOKEN_PROGRAM_ID,
-            HYDRA_PROGRAM_ID, MAGIC_CONTEXT_ID, MAGIC_PROGRAM_ID, PERMISSION_PROGRAM_ID,
+            ASSOCIATED_TOKEN_PROGRAM_ID, ESPL_TOKEN_PROGRAM_ID, HYDRA_PROGRAM_ID,
+            MAGIC_ACCOUNT_VAULT_ID, MAGIC_CONTEXT_ID, MAGIC_PROGRAM_ID, PERMISSION_PROGRAM_ID,
             TOKEN_PROGRAM_ID,
         },
         spl::{
@@ -257,7 +257,7 @@ mod tests {
         assert_eq!(instruction.accounts[7].pubkey, TOKEN_PROGRAM_ID);
         assert_eq!(instruction.accounts[8].pubkey, source);
         assert_eq!(instruction.accounts[9].pubkey, group_receipt);
-        assert_eq!(instruction.accounts[10].pubkey, EPHEMERAL_VAULT_ID);
+        assert_eq!(instruction.accounts[10].pubkey, MAGIC_ACCOUNT_VAULT_ID);
         assert_eq!(instruction.accounts[11].pubkey, MAGIC_PROGRAM_ID);
         let (group_receipt_permission, _permission_bump) = Permission::find_pda(&group_receipt);
         assert_eq!(instruction.accounts[12].pubkey, group_receipt_permission);

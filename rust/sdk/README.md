@@ -1,7 +1,7 @@
 # Ephemeral Rollups SDK (Rust)
 
 CPIs, intent builders, and Anchor macros for delegation, commits, undelegation,
-and ephemeral accounts.
+and Magic accounts.
 
 ```toml
 [dependencies]
@@ -30,7 +30,7 @@ Import macros from `ephemeral_rollups_sdk::anchor`:
 - [`#[delegate]`](../delegate/README.md): generate delegation accounts and helpers.
 - [`#[commit]`](../commit-attribute/README.md): add Magic Program accounts to an accounts struct.
 - [`#[action]`](../action-attribute/README.md): add callback escrow accounts.
-- [`#[ephemeral_accounts]`](../ephemeral-accounts-attribute/README.md): create, resize, and close ephemeral-only accounts.
+- [`#[magic_accounts]`](../ephemeral-accounts-attribute/README.md): create, resize, and close Magic accounts.
 
 Delegation requires untyped accounts: Anchor must not serialize a delegated
 account after its ownership changes. See the delegation guide before updating

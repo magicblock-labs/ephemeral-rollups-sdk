@@ -11,8 +11,12 @@ pub const MAGIC_PROGRAM_ID: Address = address!("Magic111111111111111111111111111
 /// The magic context ID.
 pub const MAGIC_CONTEXT_ID: Address = address!("MagicContext1111111111111111111111111111111");
 
-/// The ephemeral vault ID (collects rent for ephemeral accounts).
-pub const EPHEMERAL_VAULT_ID: Address = address!("MagicVau1t999999999999999999999999999999999");
+/// The vault ID that collects rent for Magic accounts.
+pub const MAGIC_ACCOUNT_VAULT_ID: Address = address!("MagicVau1t999999999999999999999999999999999");
+
+/// Legacy name for [`MAGIC_ACCOUNT_VAULT_ID`].
+#[deprecated(note = "use `MAGIC_ACCOUNT_VAULT_ID` instead")]
+pub const EPHEMERAL_VAULT_ID: Address = MAGIC_ACCOUNT_VAULT_ID;
 
 /// Sentinel close authority marking a token account as a Magic ATA.
 pub const MAGIC_ATA_CLOSE_AUTHORITY: Address =

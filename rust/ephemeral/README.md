@@ -5,8 +5,8 @@ accounts struct to an inline Anchor program module, along with intent-builder
 trait imports. Import it from `ephemeral_rollups_sdk::anchor` and place it before
 `#[program]`.
 
-This is program-level undelegation support, not ephemeral account creation; use
-[`#[ephemeral_accounts]`](../ephemeral-accounts-attribute/README.md) for that.
+This is program-level undelegation support, not Magic account creation; use
+[`#[magic_accounts]`](../ephemeral-accounts-attribute/README.md) for that.
 
 See [SDK feature selection](../sdk/README.md#features) and the
 [integration guides](https://docs.magicblock.gg/).

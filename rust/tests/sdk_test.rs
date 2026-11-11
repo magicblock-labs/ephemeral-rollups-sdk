@@ -65,4 +65,13 @@ mod tests {
     fn test_solana_compat_module() {
         // Solana compatibility layer
     }
+
+    #[cfg(feature = "backward-compat")]
+    #[test]
+    fn test_magic_api_uses_compatible_pubkey_type() {
+        let _: ephemeral_rollups_sdk::ShortAccountMeta = ephemeral_rollups_sdk::ShortAccountMeta {
+            pubkey: ephemeral_rollups_sdk::compat::Pubkey::default(),
+            is_writable: false,
+        };
+    }
 }

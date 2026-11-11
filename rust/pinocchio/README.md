@@ -1,6 +1,6 @@
 # ephemeral-rollups-pinocchio
 
-Pinocchio helpers for delegation, intent bundles, ephemeral accounts, permissions,
+Pinocchio helpers for delegation, intent bundles, Magic accounts, permissions,
 tokens, scheduled tasks, and VRF.
 
 ```toml

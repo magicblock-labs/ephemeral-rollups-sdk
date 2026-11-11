@@ -6,6 +6,7 @@ use syn::{parse_macro_input, Attribute, Expr, ExprArray, Field, Ident, ItemStruc
 
 // ==================== Constants ====================
 
+const MARKER_MAGIC: &str = "magic";
 const MARKER_EPH: &str = "eph";
 const MARKER_SPONSOR: &str = "sponsor";
 const ATTR_ACCOUNT: &str = "account";
@@ -17,6 +18,28 @@ fn generated_unchecked_account_type() -> TokenStream2 {
         quote! { AccountInfo<'info> }
     } else {
         quote! { UncheckedAccount<'info> }
+    }
+}
+
+#[derive(Clone, Copy)]
+enum AccountNaming {
+    Magic,
+    Legacy,
+}
+
+impl AccountNaming {
+    fn marker(self) -> &'static str {
+        match self {
+            Self::Magic => MARKER_MAGIC,
+            Self::Legacy => MARKER_EPH,
+        }
+    }
+
+    fn helper_prefix(self) -> &'static str {
+        match self {
+            Self::Magic => "magic",
+            Self::Legacy => "ephemeral",
+        }
     }
 }
 
@@ -276,12 +299,12 @@ fn gen_pda_seeds(
     Ok((code, with_bump))
 }
 
-/// Generates the `EphemeralAccount` builder call.
-fn gen_builder(sponsor: &Ident, ephemeral: &Ident) -> TokenStream2 {
+/// Generates the `MagicAccount` builder call.
+fn gen_builder(sponsor: &Ident, magic: &Ident) -> TokenStream2 {
     quote! {
-        ephemeral_rollups_sdk::ephemeral_accounts::EphemeralAccount::new(
+        ephemeral_rollups_sdk::magic_accounts::MagicAccount::new(
             &self.#sponsor.to_account_info(),
-            &self.#ephemeral.to_account_info(),
+            &self.#magic.to_account_info(),
             &self.vault.to_account_info(),
         )
     }
@@ -290,10 +313,10 @@ fn gen_builder(sponsor: &Ident, ephemeral: &Ident) -> TokenStream2 {
 /// Generates code that optionally wraps builder with signer seeds.
 fn gen_builder_with_seeds(
     sponsor: &Ident,
-    ephemeral: &Ident,
+    magic: &Ident,
     seeds_code: Option<(TokenStream2, Vec<Ident>)>,
 ) -> TokenStream2 {
-    let builder = gen_builder(sponsor, ephemeral);
+    let builder = gen_builder(sponsor, magic);
 
     match seeds_code {
         Some((setup, seed_vars)) => {
@@ -308,8 +331,8 @@ fn gen_builder_with_seeds(
     }
 }
 
-/// Information about an ephemeral field for code generation.
-struct EphFieldInfo<'a> {
+/// Information about a Magic account field for code generation.
+struct MagicFieldInfo<'a> {
     name: &'a Ident,
     seeds: Option<ExprArray>,
 }
@@ -321,38 +344,41 @@ struct SponsorInfo {
     seeds: Option<ExprArray>,
 }
 
-/// Generates all four methods for an ephemeral field.
-fn gen_ephemeral_methods(
-    eph: &EphFieldInfo,
+/// Generates the four account helpers, retaining legacy names when requested.
+fn gen_account_methods(
+    magic: &MagicFieldInfo,
     sponsor: &SponsorInfo,
     field_names: &[Ident],
     span: proc_macro2::Span,
+    naming: AccountNaming,
 ) -> Result<Vec<TokenStream2>, syn::Error> {
-    let eph_name = eph.name;
+    let magic_name = magic.name;
     let spon_name = &sponsor.name;
+    let helper_prefix = naming.helper_prefix();
+    let init_if_needed = format!("init_if_needed_{helper_prefix}_{magic_name}");
 
     // Method names
-    let create = Ident::new(&format!("create_ephemeral_{eph_name}"), span);
-    let init_if_needed = Ident::new(&format!("init_if_needed_ephemeral_{eph_name}"), span);
-    let resize = Ident::new(&format!("resize_ephemeral_{eph_name}"), span);
-    let close = Ident::new(&format!("close_ephemeral_{eph_name}"), span);
+    let create = Ident::new(&format!("create_{helper_prefix}_{magic_name}"), span);
+    let init_if_needed = Ident::new(&init_if_needed, span);
+    let resize = Ident::new(&format!("resize_{helper_prefix}_{magic_name}"), span);
+    let close = Ident::new(&format!("close_{helper_prefix}_{magic_name}"), span);
 
-    // Build signer seeds for create (may need both sponsor and ephemeral)
-    let create_seeds = match (sponsor.is_signer, &eph.seeds, &sponsor.seeds) {
-        // Wallet sponsor, PDA ephemeral: only ephemeral seeds
+    // Build signer seeds for create (may need both sponsor and Magic account)
+    let create_seeds = match (sponsor.is_signer, &magic.seeds, &sponsor.seeds) {
+        // Wallet sponsor, PDA Magic account: only Magic account seeds
         (true, Some(s), _) => {
-            let (code, var) = gen_pda_seeds(s, field_names, "eph")?;
+            let (code, var) = gen_pda_seeds(s, field_names, "magic")?;
             Some((code, vec![var]))
         }
-        // Wallet sponsor, wallet ephemeral: no seeds
+        // Wallet sponsor, wallet Magic account: no seeds
         (true, None, _) => None,
-        // PDA sponsor, PDA ephemeral: both seeds
-        (false, Some(eph_s), Some(spon_s)) => {
+        // PDA sponsor, PDA Magic account: both seeds
+        (false, Some(magic_s), Some(spon_s)) => {
             let (spon_code, spon_var) = gen_pda_seeds(spon_s, field_names, "sponsor")?;
-            let (eph_code, eph_var) = gen_pda_seeds(eph_s, field_names, "eph")?;
-            Some((quote! { #spon_code #eph_code }, vec![spon_var, eph_var]))
+            let (magic_code, magic_var) = gen_pda_seeds(magic_s, field_names, "magic")?;
+            Some((quote! { #spon_code #magic_code }, vec![spon_var, magic_var]))
         }
-        // PDA sponsor, wallet ephemeral: only sponsor seeds
+        // PDA sponsor, wallet Magic account: only sponsor seeds
         (false, None, Some(s)) => {
             let (code, var) = gen_pda_seeds(s, field_names, "sponsor")?;
             Some((code, vec![var]))
@@ -375,35 +401,35 @@ fn gen_ephemeral_methods(
             .map(|(code, var)| (code, vec![var]))
     };
 
-    let create_builder = gen_builder_with_seeds(spon_name, eph_name, create_seeds);
-    let modify_builder = gen_builder_with_seeds(spon_name, eph_name, modify_seeds);
+    let create_builder = gen_builder_with_seeds(spon_name, magic_name, create_seeds);
+    let modify_builder = gen_builder_with_seeds(spon_name, magic_name, modify_seeds);
 
     Ok(vec![
         quote! {
-            /// Creates an ephemeral account with the specified data length.
+            /// Creates a Magic account with the specified data length.
             pub fn #create(&self, data_len: u32) -> anchor_lang::Result<()> {
                 #create_builder.create(data_len)?;
                 Ok(())
             }
         },
         quote! {
-            /// Creates an ephemeral account only if it doesn't exist (data_len == 0).
+            /// Creates a Magic account only if it doesn't exist (data_len == 0).
             pub fn #init_if_needed(&self, data_len: u32) -> anchor_lang::Result<()> {
-                if self.#eph_name.data_len() == 0 {
+                if self.#magic_name.data_len() == 0 {
                     self.#create(data_len)?;
                 }
                 Ok(())
             }
         },
         quote! {
-            /// Resizes an ephemeral account. Sponsor pays/receives rent difference.
+            /// Resizes a Magic account. Sponsor pays/receives rent difference.
             pub fn #resize(&self, new_data_len: u32) -> anchor_lang::Result<()> {
                 #modify_builder.resize(new_data_len)?;
                 Ok(())
             }
         },
         quote! {
-            /// Closes an ephemeral account. Rent is refunded to sponsor.
+            /// Closes a Magic account. Rent is refunded to sponsor.
             pub fn #close(&self) -> anchor_lang::Result<()> {
                 #modify_builder.close()?;
                 Ok(())
@@ -459,10 +485,10 @@ struct MacroContext {
     sponsor: Option<SponsorInfo>,
     has_vault: bool,
     has_magic_program: bool,
-    has_eph: bool,
+    has_magic: bool,
 }
 
-fn validate(input: &ItemStruct) -> Result<MacroContext, TokenStream> {
+fn validate(input: &ItemStruct, naming: AccountNaming) -> Result<MacroContext, TokenStream> {
     let fields = &input.fields;
     let field_names: Vec<Ident> = fields.iter().filter_map(|f| f.ident.clone()).collect();
 
@@ -471,7 +497,7 @@ fn validate(input: &ItemStruct) -> Result<MacroContext, TokenStream> {
         sponsor: None,
         has_vault: false,
         has_magic_program: false,
-        has_eph: false,
+        has_magic: false,
     };
 
     for field in fields.iter() {
@@ -499,12 +525,14 @@ fn validate(input: &ItemStruct) -> Result<MacroContext, TokenStream> {
             });
         }
 
-        if has_marker(field, MARKER_EPH) {
-            ctx.has_eph = true;
+        if has_marker(field, naming.marker()) {
+            ctx.has_magic = true;
             if has_marker(field, ATTR_INIT) || has_marker_prefix(field, ATTR_INIT) {
+                let marker = naming.marker();
+                let helper_prefix = naming.helper_prefix();
                 return Err(syn::Error::new_spanned(
                     field,
-                    "'eph' cannot be combined with 'init' or 'init_if_needed'. Use create_ephemeral_*() instead.",
+                    format!("'{marker}' cannot be combined with 'init' or 'init_if_needed'. Use create_{helper_prefix}_*() instead."),
                 )
                 .to_compile_error()
                 .into());
@@ -520,10 +548,10 @@ fn validate(input: &ItemStruct) -> Result<MacroContext, TokenStream> {
     }
 
     // Validation rules
-    if ctx.has_eph && ctx.sponsor.is_none() {
+    if ctx.has_magic && ctx.sponsor.is_none() {
         return Err(syn::Error::new(
             Span::call_site(),
-            "Ephemeral accounts require a sponsor. Add #[account(mut, sponsor)].",
+            "Magic accounts require a sponsor. Add #[account(mut, sponsor)].",
         )
         .to_compile_error()
         .into());
@@ -545,35 +573,9 @@ fn validate(input: &ItemStruct) -> Result<MacroContext, TokenStream> {
 
 // ==================== Main Macro ====================
 
-/// Generates ephemeral account helper methods for Anchor programs.
-///
-/// # Markers
-/// - `sponsor` - The account paying rent
-/// - `eph` - An ephemeral account
-///
-/// # Generated Methods (per `eph` field)
-/// - `create_ephemeral_<field>(data_len)` - Creates the account
-/// - `init_if_needed_ephemeral_<field>(data_len)` - Creates if not exists
-/// - `resize_ephemeral_<field>(new_len)` - Resizes the account
-/// - `close_ephemeral_<field>()` - Closes and refunds rent
-///
-/// # Example
-/// ```ignore
-/// #[ephemeral_accounts]
-/// #[derive(Accounts)]
-/// pub struct CreateGame<'info> {
-///     #[account(mut, sponsor)]
-///     pub payer: Signer<'info>,
-///
-///     /// CHECK: Ephemeral PDA
-///     #[account(mut, eph, seeds = [b"game", payer.key().as_ref()], bump)]
-///     pub game_state: AccountInfo<'info>,
-/// }
-/// ```
-#[proc_macro_attribute]
-pub fn ephemeral_accounts(_attr: TokenStream, item: TokenStream) -> TokenStream {
+fn expand_accounts(item: TokenStream, naming: AccountNaming) -> TokenStream {
     let input = parse_macro_input!(item as ItemStruct);
-    let ctx = match validate(&input) {
+    let ctx = match validate(&input, naming) {
         Ok(c) => c,
         Err(e) => return e,
     };
@@ -591,18 +593,18 @@ pub fn ephemeral_accounts(_attr: TokenStream, item: TokenStream) -> TokenStream 
         let ty = &field.ty;
         let mut attrs = field.attrs.clone();
 
-        let is_eph = has_marker(field, MARKER_EPH);
+        let is_magic = has_marker(field, naming.marker());
         let is_sponsor = has_marker(field, MARKER_SPONSOR);
 
-        // Generate methods for ephemeral fields
-        if is_eph {
+        // Generate helper methods for marked Magic account fields.
+        if is_magic {
             if let Some(sponsor) = sponsor {
                 let seeds = match extract_seeds(field) {
                     Ok(s) => s,
                     Err(e) => return TokenStream::from(e.to_compile_error()),
                 };
-                let info = EphFieldInfo { name, seeds };
-                match gen_ephemeral_methods(&info, sponsor, &ctx.field_names, field.span()) {
+                let info = MagicFieldInfo { name, seeds };
+                match gen_account_methods(&info, sponsor, &ctx.field_names, field.span(), naming) {
                     Ok(m) => methods.extend(m),
                     Err(e) => return TokenStream::from(e.to_compile_error()),
                 }
@@ -610,8 +612,8 @@ pub fn ephemeral_accounts(_attr: TokenStream, item: TokenStream) -> TokenStream 
         }
 
         // Clean markers from attributes
-        if is_eph || is_sponsor {
-            if let Err(err) = clean_field_attrs(&mut attrs, &[MARKER_EPH, MARKER_SPONSOR]) {
+        if is_magic || is_sponsor {
+            if let Err(err) = clean_field_attrs(&mut attrs, &[naming.marker(), MARKER_SPONSOR]) {
                 return TokenStream::from(err);
             }
         }
@@ -624,11 +626,11 @@ pub fn ephemeral_accounts(_attr: TokenStream, item: TokenStream) -> TokenStream 
     }
 
     // Auto-inject required fields
-    if ctx.has_eph {
+    if ctx.has_magic {
         if !ctx.has_vault {
             new_fields.push(quote! {
-                /// CHECK: Ephemeral rent vault
-                #[account(mut, address = ephemeral_rollups_sdk::consts::EPHEMERAL_VAULT_ID)]
+                /// CHECK: Magic account rent vault
+                #[account(mut, address = ephemeral_rollups_sdk::consts::MAGIC_ACCOUNT_VAULT_ID)]
                 pub vault: #unchecked_account,
             });
         }
@@ -654,4 +656,34 @@ pub fn ephemeral_accounts(_attr: TokenStream, item: TokenStream) -> TokenStream 
     };
 
     TokenStream::from(expanded)
+}
+
+/// Generates Magic account helper methods for Anchor programs.
+///
+/// Mark the sponsor field with `sponsor` and each Magic account field with
+/// `magic`. The macro generates `create_magic_*`, `init_if_needed_magic_*`,
+/// `resize_magic_*`, and `close_magic_*` methods.
+///
+/// ```ignore
+/// #[magic_accounts]
+/// #[derive(Accounts)]
+/// pub struct CreateGame<'info> {
+///     #[account(mut, sponsor)]
+///     pub payer: Signer<'info>,
+///
+///     /// CHECK: Magic account PDA
+///     #[account(mut, magic, seeds = [b"game", payer.key().as_ref()], bump)]
+///     pub game_state: UncheckedAccount<'info>,
+/// }
+/// ```
+#[proc_macro_attribute]
+pub fn magic_accounts(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    expand_accounts(item, AccountNaming::Magic)
+}
+
+/// Legacy attribute macro. Use [`magic_accounts`] and the `magic` field marker.
+#[deprecated(note = "use `magic_accounts` with the `magic` field marker instead")]
+#[proc_macro_attribute]
+pub fn ephemeral_accounts(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    expand_accounts(item, AccountNaming::Legacy)
 }
