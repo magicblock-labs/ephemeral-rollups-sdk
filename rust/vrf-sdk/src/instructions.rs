@@ -15,7 +15,7 @@ pub struct RequestRandomnessParams {
 }
 
 fn find_program_identity(callback_program_id: &Pubkey) -> Pubkey {
-    solana_program::pubkey::Pubkey::find_program_address(&[consts::IDENTITY], &callback_program_id)
+    solana_program::pubkey::Pubkey::find_program_address(&[consts::IDENTITY], callback_program_id)
         .0
 }
 
@@ -27,8 +27,6 @@ fn build_request_ix(
 ) -> solana_program::instruction::Instruction {
     let payer = params.payer;
     let oracle_queue = params.oracle_queue;
-    let program_identity = program_identity;
-
     solana_program::instruction::Instruction {
         program_id: consts::VRF_PROGRAM_ID,
         accounts: vec![

@@ -15,7 +15,7 @@ pub fn create_pda<'a, 'info>(
     payer: &'a solana_program::account_info::AccountInfo<'info>,
     rent_exempt: bool,
 ) -> solana_program::entrypoint_deprecated::ProgramResult {
-    let rent = Rent::get().map_err(|err| err)?;
+    let rent = Rent::get()?;
     if target_account.lamports().eq(&0) {
         let lamports = if rent_exempt {
             rent.minimum_balance(space)
