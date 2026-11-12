@@ -15,8 +15,7 @@ pub struct RequestRandomnessParams {
 }
 
 fn find_program_identity(callback_program_id: &Pubkey) -> Pubkey {
-    solana_program::pubkey::Pubkey::find_program_address(&[consts::IDENTITY], callback_program_id)
-        .0
+    solana_program::pubkey::Pubkey::find_program_address(&[consts::IDENTITY], callback_program_id).0
 }
 
 /// Build the base request-randomness instruction (discriminator defaults to high-priority `3`;
