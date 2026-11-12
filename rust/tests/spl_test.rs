@@ -41,13 +41,20 @@ mod tests {
             EphemeralAta, EphemeralSplDiscriminator, GlobalVault,
         },
     };
-    use magicblock_magic_program_api::Pubkey;
     #[cfg(feature = "encryption")]
     use sdk::signature::Keypair;
     #[cfg(feature = "encryption")]
     use sdk::signer::Signer;
+    use solana_program::pubkey::Pubkey;
     use solana_system_interface::program as system_program;
-    use spl_associated_token_account_interface::address::get_associated_token_address;
+
+    fn get_associated_token_address(owner: &Pubkey, mint: &Pubkey) -> Pubkey {
+        Pubkey::find_program_address(
+            &[owner.as_ref(), TOKEN_PROGRAM_ID.as_ref(), mint.as_ref()],
+            &ASSOCIATED_TOKEN_PROGRAM_ID,
+        )
+        .0
+    }
 
     fn read_length_prefixed_field(data: &[u8], offset: usize) -> (&[u8], usize) {
         let len = data[offset] as usize;

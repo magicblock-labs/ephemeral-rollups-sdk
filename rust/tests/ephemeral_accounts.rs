@@ -7,13 +7,7 @@
 //!
 //! If any method or field is missing, the code won't compile.
 
-#![allow(unexpected_cfgs)]
 #![allow(deprecated)]
-
-#[cfg(feature = "anchor-compat")]
-extern crate anchor_lang_compat as anchor_lang;
-#[cfg(feature = "anchor-modern")]
-extern crate anchor_lang_current as anchor_lang;
 
 use anchor_lang::prelude::*;
 use ephemeral_rollups_sdk::anchor::{ephemeral_accounts, magic_accounts};
@@ -69,7 +63,7 @@ pub struct MultiEphemeral<'info> {
     pub game_state: AccountInfo<'info>,
 }
 
-/// New API syntax is also typechecked with Anchor's compatibility types.
+/// New API syntax is also typechecked with Anchor 1.0 types.
 #[magic_accounts]
 #[derive(Accounts)]
 pub struct CreateMagicAccount<'info> {

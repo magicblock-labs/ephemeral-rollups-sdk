@@ -1,4 +1,4 @@
-use crate::compat::{pubkey, Pubkey};
+use solana_program::pubkey::{pubkey, Pubkey};
 
 /// Verifiable Random Function program id
 pub const VRF_PROGRAM_ID: Pubkey = pubkey!("Vrf1RNUjXmQGjmQrQLvJHs9SNkvDJEsRVFPkfSQUwGz");
@@ -63,19 +63,16 @@ pub const fn scoped_vrf_identity_const(callback_program_id: &Pubkey) -> ([u8; 32
     note = "Derives the scoped identity PDA at runtime via find_program_address. Use `scoped_vrf_identity_const(&crate::ID)` in a `const` item."
 )]
 pub fn scoped_vrf_identity(callback_program_id: &Pubkey) -> Pubkey {
-    use crate::compat::{Compat, Modern};
-    crate::compat::latest::Pubkey::find_program_address(
-        &[IDENTITY, callback_program_id.modern().as_ref()],
-        &VRF_PROGRAM_ID.modern(),
+    solana_program::pubkey::Pubkey::find_program_address(
+        &[IDENTITY, callback_program_id.as_ref()],
+        &VRF_PROGRAM_ID,
     )
     .0
-    .compat()
 }
 
 #[cfg(test)]
 #[allow(deprecated)]
 mod tests {
-    use crate::compat::{Compat, Modern};
 
     use super::*;
 
@@ -84,16 +81,11 @@ mod tests {
         for salt in [0u8, 1, 42, 200] {
             let program_id = Pubkey::new_from_array([salt; 32]);
             let (pda, bump) = program_identity_pda(&program_id);
-            let (expected, expected_bump) = crate::compat::latest::Pubkey::find_program_address(
-                &[IDENTITY],
-                &program_id.modern(),
-            );
+            let (expected, expected_bump) =
+                solana_program::pubkey::Pubkey::find_program_address(&[IDENTITY], &program_id);
             assert_eq!(pda, expected.to_bytes());
             assert_eq!(bump, expected_bump);
-            assert_eq!(
-                program_identity_pubkey(&program_id).modern(),
-                expected.compat().modern()
-            );
+            assert_eq!(program_identity_pubkey(&program_id), expected);
         }
     }
 
@@ -104,10 +96,10 @@ mod tests {
         const KEY: Pubkey = program_identity_pubkey(&PROGRAM_ID);
 
         let (expected, expected_bump) =
-            crate::compat::latest::Pubkey::find_program_address(&[IDENTITY], &PROGRAM_ID.modern());
+            solana_program::pubkey::Pubkey::find_program_address(&[IDENTITY], &PROGRAM_ID);
         assert_eq!(PDA.0, expected.to_bytes());
         assert_eq!(PDA.1, expected_bump);
-        assert_eq!(KEY.modern(), expected);
+        assert_eq!(KEY, expected);
     }
 
     #[test]
@@ -116,11 +108,12 @@ mod tests {
             let callback_program = Pubkey::new_from_array([salt; 32]);
             let (pda, bump) = scoped_vrf_identity_const(&callback_program);
             let expected = scoped_vrf_identity(&callback_program);
-            let (expected_pda, expected_bump) = crate::compat::latest::Pubkey::find_program_address(
-                &[IDENTITY, callback_program.modern().as_ref()],
-                &VRF_PROGRAM_ID.modern(),
-            );
-            assert_eq!(pda, expected.modern().to_bytes());
+            let (expected_pda, expected_bump) =
+                solana_program::pubkey::Pubkey::find_program_address(
+                    &[IDENTITY, callback_program.as_ref()],
+                    &VRF_PROGRAM_ID,
+                );
+            assert_eq!(pda, expected.to_bytes());
             assert_eq!(pda, expected_pda.to_bytes());
             assert_eq!(bump, expected_bump);
         }

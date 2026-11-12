@@ -4,23 +4,22 @@ use crate::pda::{
 };
 
 use crate::{
-    compat,
     consts::ESPL_TOKEN_PROGRAM_ID,
     cpi::DELEGATION_PROGRAM_ID,
     spl::{find_shuttle_ata, find_shuttle_ephemeral_ata, EphemeralSplDiscriminator},
 };
 
 pub struct DelegateShuttleEphemeralAtaBuilder {
-    pub payer: compat::Pubkey,
-    pub owner: compat::Pubkey,
-    pub mint: compat::Pubkey,
+    pub payer: solana_program::pubkey::Pubkey,
+    pub owner: solana_program::pubkey::Pubkey,
+    pub mint: solana_program::pubkey::Pubkey,
     pub shuttle_id: u32,
-    pub validator: Option<compat::Pubkey>,
+    pub validator: Option<solana_program::pubkey::Pubkey>,
 }
 
 impl DelegateShuttleEphemeralAtaBuilder {
     #[inline(always)]
-    pub fn instruction(&self) -> compat::Instruction {
+    pub fn instruction(&self) -> solana_program::instruction::Instruction {
         let (shuttle_ephemeral_ata, _shuttle_bump) =
             find_shuttle_ephemeral_ata(&self.owner, &self.mint, self.shuttle_id);
         let (shuttle_ata, _shuttle_ata_bump) = find_shuttle_ata(&shuttle_ephemeral_ata, &self.mint);
@@ -37,19 +36,30 @@ impl DelegateShuttleEphemeralAtaBuilder {
             data.extend_from_slice(validator.as_ref());
         }
 
-        compat::Instruction {
+        solana_program::instruction::Instruction {
             program_id: ESPL_TOKEN_PROGRAM_ID,
             accounts: vec![
-                compat::AccountMeta::new(self.payer, true),
-                compat::AccountMeta::new_readonly(shuttle_ephemeral_ata, false),
-                compat::AccountMeta::new(shuttle_ata, false),
-                compat::AccountMeta::new_readonly(ESPL_TOKEN_PROGRAM_ID, false),
-                compat::AccountMeta::new(delegation_buffer, false),
-                compat::AccountMeta::new(delegation_record, false),
-                compat::AccountMeta::new(delegation_metadata, false),
-                compat::AccountMeta::new_readonly(DELEGATION_PROGRAM_ID, false),
-                compat::AccountMeta::new_readonly(
-                    compat::Pubkey::new_from_array(solana_system_interface::program::ID.to_bytes()),
+                solana_program::instruction::AccountMeta::new(self.payer, true),
+                solana_program::instruction::AccountMeta::new_readonly(
+                    shuttle_ephemeral_ata,
+                    false,
+                ),
+                solana_program::instruction::AccountMeta::new(shuttle_ata, false),
+                solana_program::instruction::AccountMeta::new_readonly(
+                    ESPL_TOKEN_PROGRAM_ID,
+                    false,
+                ),
+                solana_program::instruction::AccountMeta::new(delegation_buffer, false),
+                solana_program::instruction::AccountMeta::new(delegation_record, false),
+                solana_program::instruction::AccountMeta::new(delegation_metadata, false),
+                solana_program::instruction::AccountMeta::new_readonly(
+                    DELEGATION_PROGRAM_ID,
+                    false,
+                ),
+                solana_program::instruction::AccountMeta::new_readonly(
+                    solana_program::pubkey::Pubkey::new_from_array(
+                        solana_system_interface::program::ID.to_bytes(),
+                    ),
                     false,
                 ),
             ],

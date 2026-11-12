@@ -1,7 +1,6 @@
 use core::fmt;
 
 use crate::{
-    compat,
     consts::{ESPL_TOKEN_PROGRAM_ID, HYDRA_PROGRAM_ID},
     cpi::DELEGATION_PROGRAM_ID,
     spl::{
@@ -46,21 +45,23 @@ impl fmt::Display for SchedulePrivateTransferBuilderError {
 }
 
 pub struct SchedulePrivateTransferBuilder {
-    pub user: compat::Pubkey,
-    pub mint: compat::Pubkey,
+    pub user: solana_program::pubkey::Pubkey,
+    pub mint: solana_program::pubkey::Pubkey,
     pub shuttle_id: u32,
-    pub destination_owner: compat::Pubkey,
+    pub destination_owner: solana_program::pubkey::Pubkey,
     pub min_delay_ms: u64,
     pub max_delay_ms: u64,
     pub split: u32,
-    pub validator: compat::Pubkey,
-    pub token_program: compat::Pubkey,
+    pub validator: solana_program::pubkey::Pubkey,
+    pub token_program: solana_program::pubkey::Pubkey,
     pub client_ref_id: Option<u64>,
 }
 
 impl SchedulePrivateTransferBuilder {
     #[inline(always)]
-    pub fn instruction(&self) -> Result<compat::Instruction, SchedulePrivateTransferBuilderError> {
+    pub fn instruction(
+        &self,
+    ) -> Result<solana_program::instruction::Instruction, SchedulePrivateTransferBuilderError> {
         if self.split == 0 {
             return Err(SchedulePrivateTransferBuilderError::InvalidSplit(
                 self.split,
@@ -86,18 +87,20 @@ impl SchedulePrivateTransferBuilder {
                 &self.mint,
                 &self.token_program,
             );
-        let (_buffer, buffer_bump) = compat::Pubkey::find_program_address(
+        let (_buffer, buffer_bump) = solana_program::pubkey::Pubkey::find_program_address(
             &[BUFFER_SEED, shuttle_ata.as_ref()],
             &ESPL_TOKEN_PROGRAM_ID,
         );
-        let (_delegation_record, delegation_record_bump) = compat::Pubkey::find_program_address(
-            &[DELEGATION_RECORD_SEED, shuttle_ata.as_ref()],
-            &DELEGATION_PROGRAM_ID,
-        );
-        let (_delegation_metadata, delegation_metadata_bump) = compat::Pubkey::find_program_address(
-            &[DELEGATION_METADATA_SEED, shuttle_ata.as_ref()],
-            &DELEGATION_PROGRAM_ID,
-        );
+        let (_delegation_record, delegation_record_bump) =
+            solana_program::pubkey::Pubkey::find_program_address(
+                &[DELEGATION_RECORD_SEED, shuttle_ata.as_ref()],
+                &DELEGATION_PROGRAM_ID,
+            );
+        let (_delegation_metadata, delegation_metadata_bump) =
+            solana_program::pubkey::Pubkey::find_program_address(
+                &[DELEGATION_METADATA_SEED, shuttle_ata.as_ref()],
+                &DELEGATION_PROGRAM_ID,
+            );
         let (vault, global_vault_bump) = GlobalVault::find_pda(&self.mint);
         let (_vault_ata, vault_token_bump) =
             find_associated_token_address_with_bump(&vault, &self.mint, &self.token_program);
@@ -147,19 +150,21 @@ impl SchedulePrivateTransferBuilder {
         push_length_prefixed(&mut data, &encrypted_destination)?;
         push_length_prefixed(&mut data, &encrypted_suffix)?;
 
-        Ok(compat::Instruction {
+        Ok(solana_program::instruction::Instruction {
             program_id: ESPL_TOKEN_PROGRAM_ID,
             accounts: vec![
-                compat::AccountMeta::new(self.user, true),
-                compat::AccountMeta::new(stash_pda, false),
-                compat::AccountMeta::new(rent_pda, false),
-                compat::AccountMeta::new(hydra_crank_pda, false),
-                compat::AccountMeta::new_readonly(HYDRA_PROGRAM_ID, false),
-                compat::AccountMeta::new_readonly(
-                    compat::Pubkey::new_from_array(solana_system_interface::program::ID.to_bytes()),
+                solana_program::instruction::AccountMeta::new(self.user, true),
+                solana_program::instruction::AccountMeta::new(stash_pda, false),
+                solana_program::instruction::AccountMeta::new(rent_pda, false),
+                solana_program::instruction::AccountMeta::new(hydra_crank_pda, false),
+                solana_program::instruction::AccountMeta::new_readonly(HYDRA_PROGRAM_ID, false),
+                solana_program::instruction::AccountMeta::new_readonly(
+                    solana_program::pubkey::Pubkey::new_from_array(
+                        solana_system_interface::program::ID.to_bytes(),
+                    ),
                     false,
                 ),
-                compat::AccountMeta::new_readonly(self.token_program, false),
+                solana_program::instruction::AccountMeta::new_readonly(self.token_program, false),
             ],
             data,
         })
@@ -199,7 +204,7 @@ fn push_length_prefixed(
 #[inline(always)]
 fn encrypt_private_transfer_field(
     plaintext: &[u8],
-    validator: &compat::Pubkey,
+    validator: &solana_program::pubkey::Pubkey,
 ) -> Result<Vec<u8>, SchedulePrivateTransferBuilderError> {
     dlp_api::encryption::encrypt_ed25519_recipient(plaintext, validator.as_array())
         .map_err(SchedulePrivateTransferBuilderError::Encryption)

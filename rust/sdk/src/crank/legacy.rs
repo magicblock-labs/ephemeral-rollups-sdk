@@ -7,57 +7,52 @@ use solana_program::{
     program::{invoke, invoke_signed},
 };
 
-use crate::compat::{self, AsModern, Compat, Modern};
-
 #[deprecated(
     note = "Use `ephemeral_rollups_sdk::crank::hydra::ephemeral::create::CreateCrankCpi` instead"
 )]
 pub struct ScheduleCrankCpi<'a, 'b> {
-    pub payer: &'a compat::AccountInfo<'a>,
-    pub magic_program: &'a compat::AccountInfo<'a>,
-    pub instruction_accounts: &'b [compat::AccountInfo<'a>],
+    pub payer: &'a solana_program::account_info::AccountInfo<'a>,
+    pub magic_program: &'a solana_program::account_info::AccountInfo<'a>,
+    pub instruction_accounts: &'b [solana_program::account_info::AccountInfo<'a>],
     pub args: ScheduleTaskArgs,
 }
 
 impl<'a, 'b> ScheduleCrankCpi<'a, 'b> {
-    pub fn instruction(&self) -> compat::Instruction {
+    pub fn instruction(&self) -> solana_program::instruction::Instruction {
         let mut accounts = Vec::with_capacity(1 + self.instruction_accounts.len());
-        accounts.push(AccountMeta::new(*self.payer.key.as_modern(), true));
+        accounts.push(AccountMeta::new(*self.payer.key, true));
         accounts.extend(self.instruction_accounts.iter().map(|ai| AccountMeta {
-            pubkey: *ai.key.as_modern(),
+            pubkey: *ai.key,
             is_signer: ai.is_signer,
             is_writable: ai.is_writable,
         }));
 
         Instruction::new_with_bincode(
-            *self.magic_program.key.as_modern(),
+            *self.magic_program.key,
             &MagicBlockInstruction::ScheduleTask(self.args.clone()),
             accounts,
         )
-        .compat()
     }
 
-    pub fn invoke(&self) -> compat::ProgramResult {
+    pub fn invoke(&self) -> solana_program::entrypoint_deprecated::ProgramResult {
         let accounts = Self::build_accounts(self.payer, self.instruction_accounts);
 
-        invoke(&self.instruction().modern(), &accounts.modern()).compat()
+        invoke(&self.instruction(), &accounts)
     }
 
-    pub fn invoke_signed(&self, signers_seeds: &[&[&[u8]]]) -> compat::ProgramResult {
+    pub fn invoke_signed(
+        &self,
+        signers_seeds: &[&[&[u8]]],
+    ) -> solana_program::entrypoint_deprecated::ProgramResult {
         let accounts = Self::build_accounts(self.payer, self.instruction_accounts);
 
-        invoke_signed(
-            &self.instruction().modern(),
-            &accounts.modern(),
-            signers_seeds,
-        )
-        .compat()
+        invoke_signed(&self.instruction(), &accounts, signers_seeds)
     }
 
     fn build_accounts(
-        payer: &compat::AccountInfo<'a>,
-        instruction_accounts: &'b [compat::AccountInfo<'a>],
-    ) -> Vec<compat::AccountInfo<'a>> {
+        payer: &solana_program::account_info::AccountInfo<'a>,
+        instruction_accounts: &'b [solana_program::account_info::AccountInfo<'a>],
+    ) -> Vec<solana_program::account_info::AccountInfo<'a>> {
         let mut accounts = Vec::with_capacity(1 + instruction_accounts.len());
         accounts.push(payer.clone());
         accounts.extend_from_slice(instruction_accounts);
@@ -69,39 +64,41 @@ impl<'a, 'b> ScheduleCrankCpi<'a, 'b> {
     note = "Use `ephemeral_rollups_sdk::crank::hydra::ephemeral::cancel::CancelCrankCpi` instead"
 )]
 pub struct CancelCrankCpi<'a> {
-    pub authority: &'a compat::AccountInfo<'a>,
-    pub task_context: &'a compat::AccountInfo<'a>,
-    pub magic_program: &'a compat::AccountInfo<'a>,
+    pub authority: &'a solana_program::account_info::AccountInfo<'a>,
+    pub task_context: &'a solana_program::account_info::AccountInfo<'a>,
+    pub magic_program: &'a solana_program::account_info::AccountInfo<'a>,
     pub crank_id: i64,
 }
 
 impl<'a> CancelCrankCpi<'a> {
-    pub fn instruction(&self) -> compat::Instruction {
+    pub fn instruction(&self) -> solana_program::instruction::Instruction {
         Instruction::new_with_bincode(
-            *self.magic_program.key.as_modern(),
+            *self.magic_program.key,
             &MagicBlockInstruction::CancelTask {
                 task_id: self.crank_id,
             },
             vec![
                 if self.authority.is_writable {
-                    AccountMeta::new(*self.authority.key.as_modern(), true)
+                    AccountMeta::new(*self.authority.key, true)
                 } else {
-                    AccountMeta::new_readonly(*self.authority.key.as_modern(), true)
+                    AccountMeta::new_readonly(*self.authority.key, true)
                 },
-                AccountMeta::new(*self.task_context.key.as_modern(), false),
+                AccountMeta::new(*self.task_context.key, false),
             ],
         )
-        .compat()
     }
 
-    pub fn invoke(&self) -> compat::ProgramResult {
-        let accounts = [self.authority.modern(), self.task_context.modern()];
-        invoke(&self.instruction().modern(), &accounts).compat()
+    pub fn invoke(&self) -> solana_program::entrypoint_deprecated::ProgramResult {
+        let accounts = [self.authority, self.task_context];
+        invoke(&self.instruction(), &accounts)
     }
 
-    pub fn invoke_signed(&self, signers_seeds: &[&[&[u8]]]) -> compat::ProgramResult {
-        let accounts = [self.authority.modern(), self.task_context.modern()];
-        invoke_signed(&self.instruction().modern(), &accounts, signers_seeds).compat()
+    pub fn invoke_signed(
+        &self,
+        signers_seeds: &[&[&[u8]]],
+    ) -> solana_program::entrypoint_deprecated::ProgramResult {
+        let accounts = [self.authority, self.task_context];
+        invoke_signed(&self.instruction(), &accounts, signers_seeds)
     }
 }
 

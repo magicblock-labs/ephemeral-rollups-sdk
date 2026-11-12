@@ -1,6 +1,5 @@
 #![allow(deprecated)]
 
-use crate::compat::{self, AsModern, Compat, Modern};
 use crate::ephem::deprecated::v1::utils::accounts_to_indices;
 use magicblock_magic_program_api::args::{
     ActionArgs, AddActionCallbackArgs, BaseActionArgs, CommitAndUndelegateArgs, CommitTypeArgs,
@@ -16,23 +15,31 @@ const EXPECTED_KEY_MSG: &str = "Key expected to exist!";
 /// Instruction builder for magicprogram
 #[deprecated(since = "0.7.0", note = "Use `MagicIntentBundleBuilder` instead")]
 pub struct MagicInstructionBuilder<'info> {
-    pub payer: compat::AccountInfo<'info>,
-    pub magic_context: compat::AccountInfo<'info>,
-    pub magic_program: compat::AccountInfo<'info>,
-    pub magic_fee_vault: Option<compat::AccountInfo<'info>>,
+    pub payer: solana_program::account_info::AccountInfo<'info>,
+    pub magic_context: solana_program::account_info::AccountInfo<'info>,
+    pub magic_program: solana_program::account_info::AccountInfo<'info>,
+    pub magic_fee_vault: Option<solana_program::account_info::AccountInfo<'info>>,
     pub magic_action: MagicAction<'info>,
 }
 
 impl<'info> MagicInstructionBuilder<'info> {
     /// Sets an optional magic fee vault account to be passed at index 2
     /// (right after payer and magic_context). Required when the payer is delegated.
-    pub fn magic_fee_vault(mut self, vault: compat::AccountInfo<'info>) -> Self {
+    pub fn magic_fee_vault(
+        mut self,
+        vault: solana_program::account_info::AccountInfo<'info>,
+    ) -> Self {
         self.magic_fee_vault = Some(vault);
         self
     }
 
     /// Build instruction for supplied an action and prepares accounts
-    pub fn build(self) -> (Vec<compat::AccountInfo<'info>>, compat::Instruction) {
+    pub fn build(
+        self,
+    ) -> (
+        Vec<solana_program::account_info::AccountInfo<'info>>,
+        solana_program::instruction::Instruction,
+    ) {
         // set those to be first
         let mut all_accounts = vec![self.payer, self.magic_context];
         if let Some(vault) = self.magic_fee_vault {
@@ -49,7 +56,7 @@ impl<'info> MagicInstructionBuilder<'info> {
         let accounts_meta = all_accounts
             .iter()
             .map(|account| AccountMeta {
-                pubkey: *account.key.as_modern(),
+                pubkey: *account.key,
                 is_signer: account.is_signer,
                 is_writable: account.is_writable,
             })
@@ -58,18 +65,17 @@ impl<'info> MagicInstructionBuilder<'info> {
         (
             all_accounts,
             Instruction::new_with_bincode(
-                *self.magic_program.key.as_modern(),
+                *self.magic_program.key,
                 &MagicBlockInstruction::ScheduleIntentBundle(args.into()),
                 accounts_meta,
-            )
-            .compat(),
+            ),
         )
     }
 
     /// Builds instruction for action & invokes magicprogram
-    pub fn build_and_invoke(self) -> compat::ProgramResult {
+    pub fn build_and_invoke(self) -> solana_program::entrypoint_deprecated::ProgramResult {
         let (accounts, ix) = self.build();
-        invoke(&ix.modern(), &accounts.modern()).compat()
+        invoke(&ix, &accounts)
     }
 }
 
@@ -86,8 +92,11 @@ pub enum MagicAction<'info> {
 
 impl<'info> MagicAction<'info> {
     /// Collects accounts. May contain duplicates that would have to be processd
-    /// TODO: could be &mut Vec<&'a compat::AccountInfo<'info>>
-    fn collect_accounts(&self, accounts_container: &mut Vec<compat::AccountInfo<'info>>) {
+    /// TODO: could be &mut Vec<&'a solana_program::account_info::AccountInfo<'info>>
+    fn collect_accounts(
+        &self,
+        accounts_container: &mut Vec<solana_program::account_info::AccountInfo<'info>>,
+    ) {
         match self {
             MagicAction::BaseActions(call_handlers) => call_handlers
                 .iter()
@@ -100,7 +109,10 @@ impl<'info> MagicAction<'info> {
     }
 
     /// Creates argument for CPI
-    fn build_args(self, indices_map: &HashMap<compat::Pubkey, u8>) -> MagicBaseIntentArgs {
+    fn build_args(
+        self,
+        indices_map: &HashMap<solana_program::pubkey::Pubkey, u8>,
+    ) -> MagicBaseIntentArgs {
         match self {
             MagicAction::BaseActions(call_handlers) => {
                 let call_handlers_args = call_handlers
@@ -121,17 +133,17 @@ impl<'info> MagicAction<'info> {
 #[deprecated(since = "0.7.0", note = "Use `CommitIntentBuilder` instead")]
 pub enum CommitType<'info> {
     /// Regular commit without actions
-    Standalone(Vec<compat::AccountInfo<'info>>), // accounts to commit
+    Standalone(Vec<solana_program::account_info::AccountInfo<'info>>), // accounts to commit
     /// Commits accounts and runs actions
     WithHandler {
-        commited_accounts: Vec<compat::AccountInfo<'info>>,
+        commited_accounts: Vec<solana_program::account_info::AccountInfo<'info>>,
         call_handlers: Vec<CallHandler<'info>>,
         callbacks: Vec<Option<ActionCallback>>,
     },
 }
 
 impl<'info> CommitType<'info> {
-    pub fn committed_accounts(&self) -> &Vec<compat::AccountInfo<'info>> {
+    pub fn committed_accounts(&self) -> &Vec<solana_program::account_info::AccountInfo<'info>> {
         match self {
             Self::Standalone(commited_accounts) => commited_accounts,
             Self::WithHandler {
@@ -140,7 +152,9 @@ impl<'info> CommitType<'info> {
         }
     }
 
-    pub(crate) fn committed_accounts_mut(&mut self) -> &mut Vec<compat::AccountInfo<'info>> {
+    pub(crate) fn committed_accounts_mut(
+        &mut self,
+    ) -> &mut Vec<solana_program::account_info::AccountInfo<'info>> {
         match self {
             Self::Standalone(commited_accounts) => commited_accounts,
             Self::WithHandler {
@@ -149,7 +163,7 @@ impl<'info> CommitType<'info> {
         }
     }
 
-    pub(crate) fn dedup(&mut self) -> HashSet<compat::Pubkey> {
+    pub(crate) fn dedup(&mut self) -> HashSet<solana_program::pubkey::Pubkey> {
         let committed_accounts = self.committed_accounts_mut();
         let mut seen = HashSet::with_capacity(committed_accounts.len());
         committed_accounts.retain(|el| seen.insert(*el.key));
@@ -159,7 +173,7 @@ impl<'info> CommitType<'info> {
 
     pub(crate) fn collect_accounts(
         &self,
-        accounts_container: &mut Vec<compat::AccountInfo<'info>>,
+        accounts_container: &mut Vec<solana_program::account_info::AccountInfo<'info>>,
     ) {
         match self {
             Self::Standalone(accounts) => accounts_container.extend(accounts.clone()),
@@ -176,7 +190,10 @@ impl<'info> CommitType<'info> {
         }
     }
 
-    pub(crate) fn into_args(self, indices_map: &HashMap<compat::Pubkey, u8>) -> CommitTypeArgs {
+    pub(crate) fn into_args(
+        self,
+        indices_map: &HashMap<solana_program::pubkey::Pubkey, u8>,
+    ) -> CommitTypeArgs {
         match self {
             Self::Standalone(accounts) => {
                 let accounts_indices = accounts_to_indices(accounts.as_slice(), indices_map);
@@ -219,7 +236,7 @@ impl<'info> CommitType<'info> {
 
     pub(crate) fn merge(&mut self, mut other: Self) {
         let take = |value: &mut _| -> (
-            Vec<compat::AccountInfo>,
+            Vec<solana_program::account_info::AccountInfo>,
             Vec<CallHandler>,
             Vec<Option<ActionCallback>>,
         ) {
@@ -271,7 +288,10 @@ pub enum UndelegateType<'info> {
 }
 
 impl<'info> UndelegateType<'info> {
-    fn collect_accounts(&self, accounts_container: &mut Vec<compat::AccountInfo<'info>>) {
+    fn collect_accounts(
+        &self,
+        accounts_container: &mut Vec<solana_program::account_info::AccountInfo<'info>>,
+    ) {
         match self {
             Self::Standalone => {}
             Self::WithHandler { call_handlers, .. } => call_handlers
@@ -280,7 +300,10 @@ impl<'info> UndelegateType<'info> {
         }
     }
 
-    fn into_args(self, indices_map: &HashMap<compat::Pubkey, u8>) -> UndelegateTypeArgs {
+    fn into_args(
+        self,
+        indices_map: &HashMap<solana_program::pubkey::Pubkey, u8>,
+    ) -> UndelegateTypeArgs {
         match self {
             Self::Standalone => UndelegateTypeArgs::Standalone,
             Self::WithHandler { call_handlers, .. } => {
@@ -349,7 +372,7 @@ pub struct CommitAndUndelegate<'info> {
 impl<'info> CommitAndUndelegate<'info> {
     pub(crate) fn collect_accounts(
         &self,
-        accounts_container: &mut Vec<compat::AccountInfo<'info>>,
+        accounts_container: &mut Vec<solana_program::account_info::AccountInfo<'info>>,
     ) {
         self.commit_type.collect_accounts(accounts_container);
         self.undelegate_type.collect_accounts(accounts_container);
@@ -357,7 +380,7 @@ impl<'info> CommitAndUndelegate<'info> {
 
     pub(crate) fn into_args(
         self,
-        indices_map: &HashMap<compat::Pubkey, u8>,
+        indices_map: &HashMap<solana_program::pubkey::Pubkey, u8>,
     ) -> CommitAndUndelegateArgs {
         let commit_type_args = self.commit_type.into_args(indices_map);
         let undelegate_type_args = self.undelegate_type.into_args(indices_map);
@@ -367,7 +390,7 @@ impl<'info> CommitAndUndelegate<'info> {
         }
     }
 
-    pub(crate) fn dedup(&mut self) -> HashSet<compat::Pubkey> {
+    pub(crate) fn dedup(&mut self) -> HashSet<solana_program::pubkey::Pubkey> {
         self.commit_type.dedup()
     }
 
@@ -388,7 +411,7 @@ impl<'info> CommitAndUndelegate<'info> {
 /// `action_index` required by `AddActionCallback` is computed automatically at
 /// invoke time — the callback travels with its action through merge/normalize.
 pub struct ActionCallback {
-    pub destination_program: compat::Pubkey,
+    pub destination_program: solana_program::pubkey::Pubkey,
     pub discriminator: Vec<u8>,
     pub payload: Vec<u8>,
     pub compute_units: u32,
@@ -411,17 +434,23 @@ impl ActionCallback {
 pub struct CallHandler<'info> {
     pub args: ActionArgs,
     pub compute_units: u32,
-    pub escrow_authority: compat::AccountInfo<'info>,
-    pub destination_program: compat::Pubkey,
+    pub escrow_authority: solana_program::account_info::AccountInfo<'info>,
+    pub destination_program: solana_program::pubkey::Pubkey,
     pub accounts: Vec<ShortAccountMeta>,
 }
 
 impl<'info> CallHandler<'info> {
-    pub(crate) fn collect_accounts(&self, container: &mut Vec<compat::AccountInfo<'info>>) {
+    pub(crate) fn collect_accounts(
+        &self,
+        container: &mut Vec<solana_program::account_info::AccountInfo<'info>>,
+    ) {
         container.push(self.escrow_authority.clone());
     }
 
-    pub(crate) fn into_args(self, indices_map: &HashMap<compat::Pubkey, u8>) -> BaseActionArgs {
+    pub(crate) fn into_args(
+        self,
+        indices_map: &HashMap<solana_program::pubkey::Pubkey, u8>,
+    ) -> BaseActionArgs {
         let escrow_authority_index = indices_map
             .get(self.escrow_authority.key)
             .expect(EXPECTED_KEY_MSG);
@@ -438,14 +467,13 @@ impl<'info> CallHandler<'info> {
 
 pub(crate) mod utils {
     use super::EXPECTED_KEY_MSG;
-    use crate::compat;
     use std::collections::hash_map::Entry;
     use std::collections::HashMap;
 
     #[inline(always)]
     pub fn accounts_to_indices(
-        accounts: &[compat::AccountInfo],
-        indices_map: &HashMap<compat::Pubkey, u8>,
+        accounts: &[solana_program::account_info::AccountInfo],
+        indices_map: &HashMap<solana_program::pubkey::Pubkey, u8>,
     ) -> Vec<u8> {
         accounts
             .iter()
@@ -456,8 +484,8 @@ pub(crate) mod utils {
     /// Removes duplicates from array by pubkey
     /// Returns a map of key to index in cleaned array
     pub fn filter_duplicates_with_map(
-        container: &mut Vec<compat::AccountInfo>,
-    ) -> HashMap<compat::Pubkey, u8> {
+        container: &mut Vec<solana_program::account_info::AccountInfo>,
+    ) -> HashMap<solana_program::pubkey::Pubkey, u8> {
         let mut map = HashMap::new();
         container.retain(|el| match map.entry(*el.key) {
             Entry::Occupied(_) => false,

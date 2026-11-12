@@ -39,11 +39,8 @@
 //!     .resize(2000)?;
 //! ```
 
-use crate::{
-    compat::{self, AsModern, Compat, Modern},
-    consts::MAGIC_PROGRAM_ID,
-};
-use magicblock_magic_program_api_unreleased::{
+use crate::consts::MAGIC_PROGRAM_ID;
+use magicblock_magic_program_api::{
     instruction::MagicBlockInstruction, MAGIC_ACCOUNT_RENT_PER_BYTE,
 };
 use solana_program::{
@@ -83,9 +80,9 @@ pub const fn rent(data_len: u32) -> u64 {
 ///
 /// Use [`crate::consts::MAGIC_ACCOUNT_VAULT_ID`] when setting up your account structs.
 pub struct MagicAccount<'a, 'info> {
-    sponsor: &'a compat::AccountInfo<'info>,
-    magic: &'a compat::AccountInfo<'info>,
-    vault: &'a compat::AccountInfo<'info>,
+    sponsor: &'a solana_program::account_info::AccountInfo<'info>,
+    magic: &'a solana_program::account_info::AccountInfo<'info>,
+    vault: &'a solana_program::account_info::AccountInfo<'info>,
     signer_seeds: &'a [&'a [&'a [u8]]],
 }
 
@@ -98,9 +95,9 @@ impl<'a, 'info> MagicAccount<'a, 'info> {
     /// * `magic` - Account to create/modify (must be signer only on create)
     /// * `vault` - Rent vault ([`crate::consts::MAGIC_ACCOUNT_VAULT_ID`])
     pub fn new(
-        sponsor: &'a compat::AccountInfo<'info>,
-        magic: &'a compat::AccountInfo<'info>,
-        vault: &'a compat::AccountInfo<'info>,
+        sponsor: &'a solana_program::account_info::AccountInfo<'info>,
+        magic: &'a solana_program::account_info::AccountInfo<'info>,
+        vault: &'a solana_program::account_info::AccountInfo<'info>,
     ) -> Self {
         Self {
             sponsor,
@@ -126,7 +123,7 @@ impl<'a, 'info> MagicAccount<'a, 'info> {
     ///
     /// **Note:** The Magic account must be a signer to prevent pubkey squatting.
     /// Provide seeds via [`Self::with_signer_seeds`] if it is a PDA.
-    pub fn create(&self, data_len: u32) -> compat::ProgramResult {
+    pub fn create(&self, data_len: u32) -> solana_program::entrypoint_deprecated::ProgramResult {
         self.invoke(
             MagicBlockInstruction::CreateMagicAccount { data_len },
             true, // the Magic account must sign on create
@@ -137,7 +134,10 @@ impl<'a, 'info> MagicAccount<'a, 'info> {
     ///
     /// Growing: sponsor pays additional rent to vault.
     /// Shrinking: vault refunds excess rent to sponsor.
-    pub fn resize(&self, new_data_len: u32) -> compat::ProgramResult {
+    pub fn resize(
+        &self,
+        new_data_len: u32,
+    ) -> solana_program::entrypoint_deprecated::ProgramResult {
         self.invoke(
             MagicBlockInstruction::ResizeMagicAccount { new_data_len },
             false,
@@ -147,7 +147,7 @@ impl<'a, 'info> MagicAccount<'a, 'info> {
     /// Closes a Magic account.
     ///
     /// All rent is refunded from vault to sponsor.
-    pub fn close(&self) -> compat::ProgramResult {
+    pub fn close(&self) -> solana_program::entrypoint_deprecated::ProgramResult {
         self.invoke(MagicBlockInstruction::CloseMagicAccount, false)
     }
 
@@ -155,27 +155,22 @@ impl<'a, 'info> MagicAccount<'a, 'info> {
         &self,
         instruction: MagicBlockInstruction,
         magic_is_signer: bool,
-    ) -> compat::ProgramResult {
+    ) -> solana_program::entrypoint_deprecated::ProgramResult {
         let ix = Instruction::new_with_bincode(
-            *MAGIC_PROGRAM_ID.as_modern(),
+            MAGIC_PROGRAM_ID,
             &instruction,
             vec![
-                AccountMeta::new(*self.sponsor.key.as_modern(), true),
-                AccountMeta::new(*self.magic.key.as_modern(), magic_is_signer),
-                AccountMeta::new(*self.vault.key.as_modern(), false),
+                AccountMeta::new(*self.sponsor.key, true),
+                AccountMeta::new(*self.magic.key, magic_is_signer),
+                AccountMeta::new(*self.vault.key, false),
             ],
         );
 
         invoke_signed(
             &ix,
-            &[
-                self.sponsor.modern(),
-                self.magic.modern(),
-                self.vault.modern(),
-            ],
+            &[self.sponsor.clone(), self.magic.clone(), self.vault.clone()],
             self.signer_seeds,
         )
-        .compat()
     }
 }
 
@@ -185,36 +180,33 @@ pub use self::MagicAccount as EphemeralAccount;
 
 #[cfg(test)]
 mod tests {
-    use magicblock_magic_program_api::instruction::MagicBlockInstruction as LegacyInstruction;
-    use magicblock_magic_program_api_unreleased::instruction::MagicBlockInstruction;
+    use magicblock_magic_program_api::instruction::MagicBlockInstruction;
 
     #[test]
     fn magic_account_instructions_keep_the_existing_wire_encoding() {
-        let old_create = LegacyInstruction::CreateEphemeralAccount { data_len: 123 };
-        let new_create = MagicBlockInstruction::CreateMagicAccount { data_len: 123 };
         assert_eq!(
-            bincode::serialize(&old_create).unwrap(),
-            bincode::serialize(&new_create).unwrap()
-        );
-
-        let old_resize = LegacyInstruction::ResizeEphemeralAccount { new_data_len: 456 };
-        let new_resize = MagicBlockInstruction::ResizeMagicAccount { new_data_len: 456 };
-        assert_eq!(
-            bincode::serialize(&old_resize).unwrap(),
-            bincode::serialize(&new_resize).unwrap()
+            bincode::serialize(&MagicBlockInstruction::CreateMagicAccount { data_len: 123 })
+                .unwrap(),
+            [12, 0, 0, 0, 123, 0, 0, 0]
         );
 
         assert_eq!(
-            bincode::serialize(&LegacyInstruction::CloseEphemeralAccount).unwrap(),
-            bincode::serialize(&MagicBlockInstruction::CloseMagicAccount).unwrap()
+            bincode::serialize(&MagicBlockInstruction::ResizeMagicAccount { new_data_len: 456 })
+                .unwrap(),
+            [13, 0, 0, 0, 200, 1, 0, 0]
+        );
+
+        assert_eq!(
+            bincode::serialize(&MagicBlockInstruction::CloseMagicAccount).unwrap(),
+            [14, 0, 0, 0]
         );
     }
 
     #[test]
     fn magic_account_vault_address_is_unchanged() {
         assert_eq!(
-            magicblock_magic_program_api::EPHEMERAL_VAULT_PUBKEY.to_bytes(),
-            magicblock_magic_program_api_unreleased::MAGIC_ACCOUNT_VAULT_PUBKEY.to_bytes()
+            crate::consts::MAGIC_ACCOUNT_VAULT_ID,
+            solana_program::pubkey!("MagicVau1t999999999999999999999999999999999")
         );
     }
 }

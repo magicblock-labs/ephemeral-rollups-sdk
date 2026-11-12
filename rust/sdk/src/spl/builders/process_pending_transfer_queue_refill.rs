@@ -4,7 +4,6 @@ use crate::pda::{
 };
 
 use crate::{
-    compat,
     consts::ESPL_TOKEN_PROGRAM_ID,
     cpi::DELEGATION_PROGRAM_ID,
     spl::{
@@ -14,12 +13,12 @@ use crate::{
 };
 
 pub struct ProcessPendingTransferQueueRefillBuilder {
-    pub queue: compat::Pubkey,
+    pub queue: solana_program::pubkey::Pubkey,
 }
 
 impl ProcessPendingTransferQueueRefillBuilder {
     #[inline(always)]
-    pub fn instruction(&self) -> compat::Instruction {
+    pub fn instruction(&self) -> solana_program::instruction::Instruction {
         let (rent_pda, _rent_bump) = find_rent_pda();
         let queue_bytes = self.queue.to_bytes();
         let (refill_state, _refill_state_bump) = find_transfer_queue_refill_state(&self.queue);
@@ -33,23 +32,34 @@ impl ProcessPendingTransferQueueRefillBuilder {
         let delegation_metadata = delegation_metadata_pda_from_delegated_account(&lamports_pda);
         let queue_delegation_record = delegation_record_pda_from_delegated_account(&self.queue);
 
-        compat::Instruction {
+        solana_program::instruction::Instruction {
             program_id: ESPL_TOKEN_PROGRAM_ID,
             accounts: vec![
-                compat::AccountMeta::new(refill_state, false),
-                compat::AccountMeta::new(self.queue, false),
-                compat::AccountMeta::new(rent_pda, false),
-                compat::AccountMeta::new(lamports_pda, false),
-                compat::AccountMeta::new_readonly(ESPL_TOKEN_PROGRAM_ID, false),
-                compat::AccountMeta::new(delegation_buffer, false),
-                compat::AccountMeta::new(delegation_record, false),
-                compat::AccountMeta::new(delegation_metadata, false),
-                compat::AccountMeta::new_readonly(DELEGATION_PROGRAM_ID, false),
-                compat::AccountMeta::new_readonly(
-                    compat::Pubkey::new_from_array(solana_system_interface::program::ID.to_bytes()),
+                solana_program::instruction::AccountMeta::new(refill_state, false),
+                solana_program::instruction::AccountMeta::new(self.queue, false),
+                solana_program::instruction::AccountMeta::new(rent_pda, false),
+                solana_program::instruction::AccountMeta::new(lamports_pda, false),
+                solana_program::instruction::AccountMeta::new_readonly(
+                    ESPL_TOKEN_PROGRAM_ID,
                     false,
                 ),
-                compat::AccountMeta::new_readonly(queue_delegation_record, false),
+                solana_program::instruction::AccountMeta::new(delegation_buffer, false),
+                solana_program::instruction::AccountMeta::new(delegation_record, false),
+                solana_program::instruction::AccountMeta::new(delegation_metadata, false),
+                solana_program::instruction::AccountMeta::new_readonly(
+                    DELEGATION_PROGRAM_ID,
+                    false,
+                ),
+                solana_program::instruction::AccountMeta::new_readonly(
+                    solana_program::pubkey::Pubkey::new_from_array(
+                        solana_system_interface::program::ID.to_bytes(),
+                    ),
+                    false,
+                ),
+                solana_program::instruction::AccountMeta::new_readonly(
+                    queue_delegation_record,
+                    false,
+                ),
             ],
             data: vec![EphemeralSplDiscriminator::ProcessPendingTransferQueueRefill as u8],
         }

@@ -1,7 +1,7 @@
-use crate::compat::borsh::{self, BorshDeserialize, BorshSerialize};
+use borsh::{self, BorshDeserialize, BorshSerialize};
 
 use crate::access_control::structs::UndelegateArgs;
-use crate::compat::{self, Compat, Modern};
+
 use crate::consts::PERMISSION_PROGRAM_ID;
 use solana_program::program::{invoke, invoke_signed};
 
@@ -10,17 +10,20 @@ pub const UNDELEGATE_PERMISSION_DISCRIMINATOR: u64 = 12048014319693667524;
 /// Accounts.
 #[derive(Debug)]
 pub struct UndelegatePermission {
-    pub delegated_permission: compat::Pubkey,
+    pub delegated_permission: solana_program::pubkey::Pubkey,
 
-    pub delegation_buffer: compat::Pubkey,
+    pub delegation_buffer: solana_program::pubkey::Pubkey,
 
-    pub validator: compat::Pubkey,
+    pub validator: solana_program::pubkey::Pubkey,
 
-    pub system_program: compat::Pubkey,
+    pub system_program: solana_program::pubkey::Pubkey,
 }
 
 impl UndelegatePermission {
-    pub fn instruction(&self, args: UndelegatePermissionInstructionArgs) -> compat::Instruction {
+    pub fn instruction(
+        &self,
+        args: UndelegatePermissionInstructionArgs,
+    ) -> solana_program::instruction::Instruction {
         self.instruction_with_remaining_accounts(args, &[])
     }
     #[allow(clippy::arithmetic_side_effects)]
@@ -28,13 +31,22 @@ impl UndelegatePermission {
     pub fn instruction_with_remaining_accounts(
         &self,
         args: UndelegatePermissionInstructionArgs,
-        remaining_accounts: &[compat::AccountMeta],
-    ) -> compat::Instruction {
+        remaining_accounts: &[solana_program::instruction::AccountMeta],
+    ) -> solana_program::instruction::Instruction {
         let mut accounts = Vec::with_capacity(4 + remaining_accounts.len());
-        accounts.push(compat::AccountMeta::new(self.delegated_permission, false));
-        accounts.push(compat::AccountMeta::new(self.delegation_buffer, false));
-        accounts.push(compat::AccountMeta::new_readonly(self.validator, true));
-        accounts.push(compat::AccountMeta::new_readonly(
+        accounts.push(solana_program::instruction::AccountMeta::new(
+            self.delegated_permission,
+            false,
+        ));
+        accounts.push(solana_program::instruction::AccountMeta::new(
+            self.delegation_buffer,
+            false,
+        ));
+        accounts.push(solana_program::instruction::AccountMeta::new_readonly(
+            self.validator,
+            true,
+        ));
+        accounts.push(solana_program::instruction::AccountMeta::new_readonly(
             self.system_program,
             false,
         ));
@@ -45,7 +57,7 @@ impl UndelegatePermission {
         let mut args = args.try_to_vec().unwrap();
         data.append(&mut args);
 
-        compat::Instruction {
+        solana_program::instruction::Instruction {
             program_id: PERMISSION_PROGRAM_ID,
             accounts,
             data,
@@ -54,10 +66,7 @@ impl UndelegatePermission {
 }
 
 #[derive(BorshSerialize, BorshDeserialize, Clone, Debug, Eq, PartialEq)]
-#[cfg_attr(
-    not(feature = "backward-compat"),
-    borsh(crate = "crate::compat::borsh")
-)]
+#[borsh(crate = "borsh")]
 pub struct UndelegatePermissionInstructionData {
     discriminator: u64,
 }
@@ -81,10 +90,7 @@ impl Default for UndelegatePermissionInstructionData {
 }
 
 #[derive(BorshSerialize, BorshDeserialize, Clone, Debug, Eq, PartialEq)]
-#[cfg_attr(
-    not(feature = "backward-compat"),
-    borsh(crate = "crate::compat::borsh")
-)]
+#[borsh(crate = "borsh")]
 pub struct UndelegatePermissionInstructionArgs {
     pub args: UndelegateArgs,
 }
@@ -95,7 +101,7 @@ impl UndelegatePermissionInstructionArgs {
     }
 }
 
-/// compat::Instruction builder for `UndelegatePermission`.
+/// solana_program::instruction::Instruction builder for `UndelegatePermission`.
 ///
 /// ### Accounts:
 ///
@@ -105,12 +111,12 @@ impl UndelegatePermissionInstructionArgs {
 ///   3. `[]` system_program
 #[derive(Clone, Debug, Default)]
 pub struct UndelegatePermissionBuilder {
-    delegated_permission: Option<compat::Pubkey>,
-    delegation_buffer: Option<compat::Pubkey>,
-    validator: Option<compat::Pubkey>,
-    system_program: Option<compat::Pubkey>,
+    delegated_permission: Option<solana_program::pubkey::Pubkey>,
+    delegation_buffer: Option<solana_program::pubkey::Pubkey>,
+    validator: Option<solana_program::pubkey::Pubkey>,
+    system_program: Option<solana_program::pubkey::Pubkey>,
     args: Option<UndelegateArgs>,
-    __remaining_accounts: Vec<compat::AccountMeta>,
+    __remaining_accounts: Vec<solana_program::instruction::AccountMeta>,
 }
 
 impl UndelegatePermissionBuilder {
@@ -118,22 +124,28 @@ impl UndelegatePermissionBuilder {
         Self::default()
     }
     #[inline(always)]
-    pub fn delegated_permission(&mut self, delegated_permission: compat::Pubkey) -> &mut Self {
+    pub fn delegated_permission(
+        &mut self,
+        delegated_permission: solana_program::pubkey::Pubkey,
+    ) -> &mut Self {
         self.delegated_permission = Some(delegated_permission);
         self
     }
     #[inline(always)]
-    pub fn delegation_buffer(&mut self, delegation_buffer: compat::Pubkey) -> &mut Self {
+    pub fn delegation_buffer(
+        &mut self,
+        delegation_buffer: solana_program::pubkey::Pubkey,
+    ) -> &mut Self {
         self.delegation_buffer = Some(delegation_buffer);
         self
     }
     #[inline(always)]
-    pub fn validator(&mut self, validator: compat::Pubkey) -> &mut Self {
+    pub fn validator(&mut self, validator: solana_program::pubkey::Pubkey) -> &mut Self {
         self.validator = Some(validator);
         self
     }
     #[inline(always)]
-    pub fn system_program(&mut self, system_program: compat::Pubkey) -> &mut Self {
+    pub fn system_program(&mut self, system_program: solana_program::pubkey::Pubkey) -> &mut Self {
         self.system_program = Some(system_program);
         self
     }
@@ -144,18 +156,24 @@ impl UndelegatePermissionBuilder {
     }
     /// Add an additional account to the instruction.
     #[inline(always)]
-    pub fn add_remaining_account(&mut self, account: compat::AccountMeta) -> &mut Self {
+    pub fn add_remaining_account(
+        &mut self,
+        account: solana_program::instruction::AccountMeta,
+    ) -> &mut Self {
         self.__remaining_accounts.push(account);
         self
     }
     /// Add additional accounts to the instruction.
     #[inline(always)]
-    pub fn add_remaining_accounts(&mut self, accounts: &[compat::AccountMeta]) -> &mut Self {
+    pub fn add_remaining_accounts(
+        &mut self,
+        accounts: &[solana_program::instruction::AccountMeta],
+    ) -> &mut Self {
         self.__remaining_accounts.extend_from_slice(accounts);
         self
     }
     #[allow(clippy::clone_on_copy)]
-    pub fn instruction(&self) -> compat::Instruction {
+    pub fn instruction(&self) -> solana_program::instruction::Instruction {
         let accounts = UndelegatePermission {
             delegated_permission: self
                 .delegated_permission
@@ -176,34 +194,34 @@ impl UndelegatePermissionBuilder {
 
 /// `undelegate_permission` CPI accounts.
 pub struct UndelegatePermissionCpiAccounts<'a, 'b> {
-    pub delegated_permission: &'b compat::AccountInfo<'a>,
+    pub delegated_permission: &'b solana_program::account_info::AccountInfo<'a>,
 
-    pub delegation_buffer: &'b compat::AccountInfo<'a>,
+    pub delegation_buffer: &'b solana_program::account_info::AccountInfo<'a>,
 
-    pub validator: &'b compat::AccountInfo<'a>,
+    pub validator: &'b solana_program::account_info::AccountInfo<'a>,
 
-    pub system_program: &'b compat::AccountInfo<'a>,
+    pub system_program: &'b solana_program::account_info::AccountInfo<'a>,
 }
 
 /// `undelegate_permission` CPI instruction.
 pub struct UndelegatePermissionCpi<'a, 'b> {
     /// The program to invoke.
-    pub __program: &'b compat::AccountInfo<'a>,
+    pub __program: &'b solana_program::account_info::AccountInfo<'a>,
 
-    pub delegated_permission: &'b compat::AccountInfo<'a>,
+    pub delegated_permission: &'b solana_program::account_info::AccountInfo<'a>,
 
-    pub delegation_buffer: &'b compat::AccountInfo<'a>,
+    pub delegation_buffer: &'b solana_program::account_info::AccountInfo<'a>,
 
-    pub validator: &'b compat::AccountInfo<'a>,
+    pub validator: &'b solana_program::account_info::AccountInfo<'a>,
 
-    pub system_program: &'b compat::AccountInfo<'a>,
+    pub system_program: &'b solana_program::account_info::AccountInfo<'a>,
     /// The arguments for the instruction.
     pub __args: UndelegatePermissionInstructionArgs,
 }
 
 impl<'a, 'b> UndelegatePermissionCpi<'a, 'b> {
     pub fn new(
-        program: &'b compat::AccountInfo<'a>,
+        program: &'b solana_program::account_info::AccountInfo<'a>,
         accounts: UndelegatePermissionCpiAccounts<'a, 'b>,
         args: UndelegatePermissionInstructionArgs,
     ) -> Self {
@@ -217,18 +235,25 @@ impl<'a, 'b> UndelegatePermissionCpi<'a, 'b> {
         }
     }
     #[inline(always)]
-    pub fn invoke(&self) -> compat::ProgramResult {
+    pub fn invoke(&self) -> solana_program::entrypoint_deprecated::ProgramResult {
         self.invoke_signed_with_remaining_accounts(&[], &[])
     }
     #[inline(always)]
     pub fn invoke_with_remaining_accounts(
         &self,
-        remaining_accounts: &[(&'b compat::AccountInfo<'a>, bool, bool)],
-    ) -> compat::ProgramResult {
+        remaining_accounts: &[(
+            &'b solana_program::account_info::AccountInfo<'a>,
+            bool,
+            bool,
+        )],
+    ) -> solana_program::entrypoint_deprecated::ProgramResult {
         self.invoke_signed_with_remaining_accounts(&[], remaining_accounts)
     }
     #[inline(always)]
-    pub fn invoke_signed(&self, signers_seeds: &[&[&[u8]]]) -> compat::ProgramResult {
+    pub fn invoke_signed(
+        &self,
+        signers_seeds: &[&[&[u8]]],
+    ) -> solana_program::entrypoint_deprecated::ProgramResult {
         self.invoke_signed_with_remaining_accounts(signers_seeds, &[])
     }
     #[allow(clippy::arithmetic_side_effects)]
@@ -237,21 +262,31 @@ impl<'a, 'b> UndelegatePermissionCpi<'a, 'b> {
     pub fn invoke_signed_with_remaining_accounts(
         &self,
         signers_seeds: &[&[&[u8]]],
-        remaining_accounts: &[(&'b compat::AccountInfo<'a>, bool, bool)],
-    ) -> compat::ProgramResult {
+        remaining_accounts: &[(
+            &'b solana_program::account_info::AccountInfo<'a>,
+            bool,
+            bool,
+        )],
+    ) -> solana_program::entrypoint_deprecated::ProgramResult {
         let mut accounts = Vec::with_capacity(4 + remaining_accounts.len());
-        accounts.push(compat::AccountMeta::new(
+        accounts.push(solana_program::instruction::AccountMeta::new(
             *self.delegated_permission.key,
             false,
         ));
-        accounts.push(compat::AccountMeta::new(*self.delegation_buffer.key, false));
-        accounts.push(compat::AccountMeta::new_readonly(*self.validator.key, true));
-        accounts.push(compat::AccountMeta::new_readonly(
+        accounts.push(solana_program::instruction::AccountMeta::new(
+            *self.delegation_buffer.key,
+            false,
+        ));
+        accounts.push(solana_program::instruction::AccountMeta::new_readonly(
+            *self.validator.key,
+            true,
+        ));
+        accounts.push(solana_program::instruction::AccountMeta::new_readonly(
             *self.system_program.key,
             false,
         ));
         remaining_accounts.iter().for_each(|remaining_account| {
-            accounts.push(compat::AccountMeta {
+            accounts.push(solana_program::instruction::AccountMeta {
                 pubkey: *remaining_account.0.key,
                 is_signer: remaining_account.2,
                 is_writable: remaining_account.1,
@@ -263,7 +298,7 @@ impl<'a, 'b> UndelegatePermissionCpi<'a, 'b> {
         let mut args = self.__args.try_to_vec().unwrap();
         data.append(&mut args);
 
-        let instruction = compat::Instruction {
+        let instruction = solana_program::instruction::Instruction {
             program_id: PERMISSION_PROGRAM_ID,
             accounts,
             data,
@@ -279,19 +314,14 @@ impl<'a, 'b> UndelegatePermissionCpi<'a, 'b> {
             .for_each(|remaining_account| account_infos.push(remaining_account.0.clone()));
 
         if signers_seeds.is_empty() {
-            invoke(&instruction.modern(), &account_infos.modern()).compat()
+            invoke(&instruction, &account_infos)
         } else {
-            invoke_signed(
-                &instruction.modern(),
-                &account_infos.modern(),
-                signers_seeds,
-            )
-            .compat()
+            invoke_signed(&instruction, &account_infos, signers_seeds)
         }
     }
 }
 
-/// compat::Instruction builder for `UndelegatePermission` via CPI.
+/// solana_program::instruction::Instruction builder for `UndelegatePermission` via CPI.
 ///
 /// ### Accounts:
 ///
@@ -305,7 +335,7 @@ pub struct UndelegatePermissionCpiBuilder<'a, 'b> {
 }
 
 impl<'a, 'b> UndelegatePermissionCpiBuilder<'a, 'b> {
-    pub fn new(program: &'b compat::AccountInfo<'a>) -> Self {
+    pub fn new(program: &'b solana_program::account_info::AccountInfo<'a>) -> Self {
         let instruction = Box::new(UndelegatePermissionCpiBuilderInstruction {
             __program: program,
             delegated_permission: None,
@@ -320,7 +350,7 @@ impl<'a, 'b> UndelegatePermissionCpiBuilder<'a, 'b> {
     #[inline(always)]
     pub fn delegated_permission(
         &mut self,
-        delegated_permission: &'b compat::AccountInfo<'a>,
+        delegated_permission: &'b solana_program::account_info::AccountInfo<'a>,
     ) -> &mut Self {
         self.instruction.delegated_permission = Some(delegated_permission);
         self
@@ -328,18 +358,24 @@ impl<'a, 'b> UndelegatePermissionCpiBuilder<'a, 'b> {
     #[inline(always)]
     pub fn delegation_buffer(
         &mut self,
-        delegation_buffer: &'b compat::AccountInfo<'a>,
+        delegation_buffer: &'b solana_program::account_info::AccountInfo<'a>,
     ) -> &mut Self {
         self.instruction.delegation_buffer = Some(delegation_buffer);
         self
     }
     #[inline(always)]
-    pub fn validator(&mut self, validator: &'b compat::AccountInfo<'a>) -> &mut Self {
+    pub fn validator(
+        &mut self,
+        validator: &'b solana_program::account_info::AccountInfo<'a>,
+    ) -> &mut Self {
         self.instruction.validator = Some(validator);
         self
     }
     #[inline(always)]
-    pub fn system_program(&mut self, system_program: &'b compat::AccountInfo<'a>) -> &mut Self {
+    pub fn system_program(
+        &mut self,
+        system_program: &'b solana_program::account_info::AccountInfo<'a>,
+    ) -> &mut Self {
         self.instruction.system_program = Some(system_program);
         self
     }
@@ -352,7 +388,7 @@ impl<'a, 'b> UndelegatePermissionCpiBuilder<'a, 'b> {
     #[inline(always)]
     pub fn add_remaining_account(
         &mut self,
-        account: &'b compat::AccountInfo<'a>,
+        account: &'b solana_program::account_info::AccountInfo<'a>,
         is_writable: bool,
         is_signer: bool,
     ) -> &mut Self {
@@ -363,12 +399,16 @@ impl<'a, 'b> UndelegatePermissionCpiBuilder<'a, 'b> {
     }
     /// Add additional accounts to the instruction.
     ///
-    /// Each account is represented by a tuple of the `compat::AccountInfo`, a `bool` indicating whether the account is writable or not,
+    /// Each account is represented by a tuple of the `solana_program::account_info::AccountInfo`, a `bool` indicating whether the account is writable or not,
     /// and a `bool` indicating whether the account is a signer or not.
     #[inline(always)]
     pub fn add_remaining_accounts(
         &mut self,
-        accounts: &[(&'b compat::AccountInfo<'a>, bool, bool)],
+        accounts: &[(
+            &'b solana_program::account_info::AccountInfo<'a>,
+            bool,
+            bool,
+        )],
     ) -> &mut Self {
         self.instruction
             .__remaining_accounts
@@ -376,12 +416,15 @@ impl<'a, 'b> UndelegatePermissionCpiBuilder<'a, 'b> {
         self
     }
     #[inline(always)]
-    pub fn invoke(&self) -> compat::ProgramResult {
+    pub fn invoke(&self) -> solana_program::entrypoint_deprecated::ProgramResult {
         self.invoke_signed(&[])
     }
     #[allow(clippy::clone_on_copy)]
     #[allow(clippy::vec_init_then_push)]
-    pub fn invoke_signed(&self, signers_seeds: &[&[&[u8]]]) -> compat::ProgramResult {
+    pub fn invoke_signed(
+        &self,
+        signers_seeds: &[&[&[u8]]],
+    ) -> solana_program::entrypoint_deprecated::ProgramResult {
         let args = UndelegatePermissionInstructionArgs {
             args: self.instruction.args.clone().expect("args is not set"),
         };
@@ -415,12 +458,16 @@ impl<'a, 'b> UndelegatePermissionCpiBuilder<'a, 'b> {
 
 #[derive(Clone, Debug)]
 struct UndelegatePermissionCpiBuilderInstruction<'a, 'b> {
-    __program: &'b compat::AccountInfo<'a>,
-    delegated_permission: Option<&'b compat::AccountInfo<'a>>,
-    delegation_buffer: Option<&'b compat::AccountInfo<'a>>,
-    validator: Option<&'b compat::AccountInfo<'a>>,
-    system_program: Option<&'b compat::AccountInfo<'a>>,
+    __program: &'b solana_program::account_info::AccountInfo<'a>,
+    delegated_permission: Option<&'b solana_program::account_info::AccountInfo<'a>>,
+    delegation_buffer: Option<&'b solana_program::account_info::AccountInfo<'a>>,
+    validator: Option<&'b solana_program::account_info::AccountInfo<'a>>,
+    system_program: Option<&'b solana_program::account_info::AccountInfo<'a>>,
     args: Option<UndelegateArgs>,
-    /// Additional instruction accounts `(compat::AccountInfo, is_writable, is_signer)`.
-    __remaining_accounts: Vec<(&'b compat::AccountInfo<'a>, bool, bool)>,
+    /// Additional instruction accounts `(solana_program::account_info::AccountInfo, is_writable, is_signer)`.
+    __remaining_accounts: Vec<(
+        &'b solana_program::account_info::AccountInfo<'a>,
+        bool,
+        bool,
+    )>,
 }

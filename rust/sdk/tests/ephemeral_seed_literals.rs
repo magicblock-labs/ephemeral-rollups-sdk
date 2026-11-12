@@ -1,9 +1,7 @@
 //! Compile the public macro with heterogeneous PDA seed literals.
-#![cfg(feature = "anchor-modern")]
+#![cfg(feature = "anchor")]
 #![allow(unexpected_cfgs)]
 #![allow(deprecated)]
-
-extern crate anchor_lang_current as anchor_lang;
 
 use anchor_lang::prelude::*;
 use ephemeral_rollups_sdk::anchor::{ephemeral_accounts, magic_accounts};

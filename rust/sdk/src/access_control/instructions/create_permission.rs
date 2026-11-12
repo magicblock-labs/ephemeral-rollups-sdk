@@ -1,8 +1,8 @@
-use crate::compat::borsh::{self, BorshDeserialize, BorshSerialize};
+use borsh::{self, BorshDeserialize, BorshSerialize};
 
 use crate::access_control::structs::MembersArgs;
 use crate::access_control::structs::Permission;
-use crate::compat::{self, Compat, Modern};
+
 use crate::consts::PERMISSION_PROGRAM_ID;
 use solana_program::program::{invoke, invoke_signed};
 
@@ -11,17 +11,20 @@ pub const CREATE_PERMISSION_DISCRIMINATOR: u64 = 0;
 /// Accounts.
 #[derive(Debug)]
 pub struct CreatePermission {
-    pub permissioned_account: compat::Pubkey,
+    pub permissioned_account: solana_program::pubkey::Pubkey,
 
-    pub permission: compat::Pubkey,
+    pub permission: solana_program::pubkey::Pubkey,
 
-    pub payer: compat::Pubkey,
+    pub payer: solana_program::pubkey::Pubkey,
 
-    pub system_program: compat::Pubkey,
+    pub system_program: solana_program::pubkey::Pubkey,
 }
 
 impl CreatePermission {
-    pub fn instruction(&self, args: CreatePermissionInstructionArgs) -> compat::Instruction {
+    pub fn instruction(
+        &self,
+        args: CreatePermissionInstructionArgs,
+    ) -> solana_program::instruction::Instruction {
         self.instruction_with_remaining_accounts(args, &[])
     }
     #[allow(clippy::arithmetic_side_effects)]
@@ -29,16 +32,21 @@ impl CreatePermission {
     pub fn instruction_with_remaining_accounts(
         &self,
         args: CreatePermissionInstructionArgs,
-        remaining_accounts: &[compat::AccountMeta],
-    ) -> compat::Instruction {
+        remaining_accounts: &[solana_program::instruction::AccountMeta],
+    ) -> solana_program::instruction::Instruction {
         let mut accounts = Vec::with_capacity(4 + remaining_accounts.len());
-        accounts.push(compat::AccountMeta::new_readonly(
+        accounts.push(solana_program::instruction::AccountMeta::new_readonly(
             self.permissioned_account,
             true,
         ));
-        accounts.push(compat::AccountMeta::new(self.permission, false));
-        accounts.push(compat::AccountMeta::new(self.payer, true));
-        accounts.push(compat::AccountMeta::new_readonly(
+        accounts.push(solana_program::instruction::AccountMeta::new(
+            self.permission,
+            false,
+        ));
+        accounts.push(solana_program::instruction::AccountMeta::new(
+            self.payer, true,
+        ));
+        accounts.push(solana_program::instruction::AccountMeta::new_readonly(
             self.system_program,
             false,
         ));
@@ -47,7 +55,7 @@ impl CreatePermission {
         let mut args = args.try_to_vec().unwrap();
         data.append(&mut args);
 
-        compat::Instruction {
+        solana_program::instruction::Instruction {
             program_id: PERMISSION_PROGRAM_ID,
             accounts,
             data,
@@ -56,10 +64,7 @@ impl CreatePermission {
 }
 
 #[derive(BorshSerialize, BorshDeserialize, Clone, Debug, Eq, PartialEq)]
-#[cfg_attr(
-    not(feature = "backward-compat"),
-    borsh(crate = "crate::compat::borsh")
-)]
+#[borsh(crate = "borsh")]
 pub struct CreatePermissionInstructionData {
     discriminator: u64,
 }
@@ -83,10 +88,7 @@ impl Default for CreatePermissionInstructionData {
 }
 
 #[derive(BorshSerialize, BorshDeserialize, Clone, Debug, Eq, PartialEq)]
-#[cfg_attr(
-    not(feature = "backward-compat"),
-    borsh(crate = "crate::compat::borsh")
-)]
+#[borsh(crate = "borsh")]
 pub struct CreatePermissionInstructionArgs {
     pub args: MembersArgs,
 }
@@ -97,7 +99,7 @@ impl CreatePermissionInstructionArgs {
     }
 }
 
-/// compat::Instruction builder for `CreatePermission`.
+/// solana_program::instruction::Instruction builder for `CreatePermission`.
 ///
 /// ### Accounts:
 ///
@@ -107,12 +109,12 @@ impl CreatePermissionInstructionArgs {
 ///   3. `[]` system_program
 #[derive(Clone, Debug, Default)]
 pub struct CreatePermissionBuilder {
-    permissioned_account: Option<compat::Pubkey>,
-    permission: Option<compat::Pubkey>,
-    payer: Option<compat::Pubkey>,
-    system_program: Option<compat::Pubkey>,
+    permissioned_account: Option<solana_program::pubkey::Pubkey>,
+    permission: Option<solana_program::pubkey::Pubkey>,
+    payer: Option<solana_program::pubkey::Pubkey>,
+    system_program: Option<solana_program::pubkey::Pubkey>,
     args: Option<MembersArgs>,
-    __remaining_accounts: Vec<compat::AccountMeta>,
+    __remaining_accounts: Vec<solana_program::instruction::AccountMeta>,
 }
 
 impl CreatePermissionBuilder {
@@ -120,7 +122,10 @@ impl CreatePermissionBuilder {
         Self::default()
     }
     #[inline(always)]
-    pub fn permissioned_account(&mut self, permissioned_account: compat::Pubkey) -> &mut Self {
+    pub fn permissioned_account(
+        &mut self,
+        permissioned_account: solana_program::pubkey::Pubkey,
+    ) -> &mut Self {
         self.permissioned_account = Some(permissioned_account);
         // Automatically derive and set the permission PDA
         let (permission_pda, _bump) = Permission::find_pda(&permissioned_account);
@@ -128,17 +133,17 @@ impl CreatePermissionBuilder {
         self
     }
     #[inline(always)]
-    pub fn permission(&mut self, permission: compat::Pubkey) -> &mut Self {
+    pub fn permission(&mut self, permission: solana_program::pubkey::Pubkey) -> &mut Self {
         self.permission = Some(permission);
         self
     }
     #[inline(always)]
-    pub fn payer(&mut self, payer: compat::Pubkey) -> &mut Self {
+    pub fn payer(&mut self, payer: solana_program::pubkey::Pubkey) -> &mut Self {
         self.payer = Some(payer);
         self
     }
     #[inline(always)]
-    pub fn system_program(&mut self, system_program: compat::Pubkey) -> &mut Self {
+    pub fn system_program(&mut self, system_program: solana_program::pubkey::Pubkey) -> &mut Self {
         self.system_program = Some(system_program);
         self
     }
@@ -149,18 +154,24 @@ impl CreatePermissionBuilder {
     }
     /// Add an additional account to the instruction.
     #[inline(always)]
-    pub fn add_remaining_account(&mut self, account: compat::AccountMeta) -> &mut Self {
+    pub fn add_remaining_account(
+        &mut self,
+        account: solana_program::instruction::AccountMeta,
+    ) -> &mut Self {
         self.__remaining_accounts.push(account);
         self
     }
     /// Add additional accounts to the instruction.
     #[inline(always)]
-    pub fn add_remaining_accounts(&mut self, accounts: &[compat::AccountMeta]) -> &mut Self {
+    pub fn add_remaining_accounts(
+        &mut self,
+        accounts: &[solana_program::instruction::AccountMeta],
+    ) -> &mut Self {
         self.__remaining_accounts.extend_from_slice(accounts);
         self
     }
     #[allow(clippy::clone_on_copy)]
-    pub fn instruction(&self) -> compat::Instruction {
+    pub fn instruction(&self) -> solana_program::instruction::Instruction {
         let accounts = CreatePermission {
             permissioned_account: self
                 .permissioned_account
@@ -179,34 +190,34 @@ impl CreatePermissionBuilder {
 
 /// `create_permission` CPI accounts.
 pub struct CreatePermissionCpiAccounts<'a, 'b> {
-    pub permissioned_account: &'b compat::AccountInfo<'a>,
+    pub permissioned_account: &'b solana_program::account_info::AccountInfo<'a>,
 
-    pub permission: &'b compat::AccountInfo<'a>,
+    pub permission: &'b solana_program::account_info::AccountInfo<'a>,
 
-    pub payer: &'b compat::AccountInfo<'a>,
+    pub payer: &'b solana_program::account_info::AccountInfo<'a>,
 
-    pub system_program: &'b compat::AccountInfo<'a>,
+    pub system_program: &'b solana_program::account_info::AccountInfo<'a>,
 }
 
 /// `create_permission` CPI instruction.
 pub struct CreatePermissionCpi<'a, 'b> {
     /// The program to invoke.
-    pub __program: &'b compat::AccountInfo<'a>,
+    pub __program: &'b solana_program::account_info::AccountInfo<'a>,
 
-    pub permissioned_account: &'b compat::AccountInfo<'a>,
+    pub permissioned_account: &'b solana_program::account_info::AccountInfo<'a>,
 
-    pub permission: &'b compat::AccountInfo<'a>,
+    pub permission: &'b solana_program::account_info::AccountInfo<'a>,
 
-    pub payer: &'b compat::AccountInfo<'a>,
+    pub payer: &'b solana_program::account_info::AccountInfo<'a>,
 
-    pub system_program: &'b compat::AccountInfo<'a>,
+    pub system_program: &'b solana_program::account_info::AccountInfo<'a>,
     /// The arguments for the instruction.
     pub __args: CreatePermissionInstructionArgs,
 }
 
 impl<'a, 'b> CreatePermissionCpi<'a, 'b> {
     pub fn new(
-        program: &'b compat::AccountInfo<'a>,
+        program: &'b solana_program::account_info::AccountInfo<'a>,
         accounts: CreatePermissionCpiAccounts<'a, 'b>,
         args: CreatePermissionInstructionArgs,
     ) -> Self {
@@ -220,18 +231,25 @@ impl<'a, 'b> CreatePermissionCpi<'a, 'b> {
         }
     }
     #[inline(always)]
-    pub fn invoke(&self) -> compat::ProgramResult {
+    pub fn invoke(&self) -> solana_program::entrypoint_deprecated::ProgramResult {
         self.invoke_signed_with_remaining_accounts(&[], &[])
     }
     #[inline(always)]
     pub fn invoke_with_remaining_accounts(
         &self,
-        remaining_accounts: &[(&'b compat::AccountInfo<'a>, bool, bool)],
-    ) -> compat::ProgramResult {
+        remaining_accounts: &[(
+            &'b solana_program::account_info::AccountInfo<'a>,
+            bool,
+            bool,
+        )],
+    ) -> solana_program::entrypoint_deprecated::ProgramResult {
         self.invoke_signed_with_remaining_accounts(&[], remaining_accounts)
     }
     #[inline(always)]
-    pub fn invoke_signed(&self, signers_seeds: &[&[&[u8]]]) -> compat::ProgramResult {
+    pub fn invoke_signed(
+        &self,
+        signers_seeds: &[&[&[u8]]],
+    ) -> solana_program::entrypoint_deprecated::ProgramResult {
         self.invoke_signed_with_remaining_accounts(signers_seeds, &[])
     }
     #[allow(clippy::arithmetic_side_effects)]
@@ -240,21 +258,31 @@ impl<'a, 'b> CreatePermissionCpi<'a, 'b> {
     pub fn invoke_signed_with_remaining_accounts(
         &self,
         signers_seeds: &[&[&[u8]]],
-        remaining_accounts: &[(&'b compat::AccountInfo<'a>, bool, bool)],
-    ) -> compat::ProgramResult {
+        remaining_accounts: &[(
+            &'b solana_program::account_info::AccountInfo<'a>,
+            bool,
+            bool,
+        )],
+    ) -> solana_program::entrypoint_deprecated::ProgramResult {
         let mut accounts = Vec::with_capacity(4 + remaining_accounts.len());
-        accounts.push(compat::AccountMeta::new_readonly(
+        accounts.push(solana_program::instruction::AccountMeta::new_readonly(
             *self.permissioned_account.key,
             true,
         ));
-        accounts.push(compat::AccountMeta::new(*self.permission.key, false));
-        accounts.push(compat::AccountMeta::new(*self.payer.key, true));
-        accounts.push(compat::AccountMeta::new_readonly(
+        accounts.push(solana_program::instruction::AccountMeta::new(
+            *self.permission.key,
+            false,
+        ));
+        accounts.push(solana_program::instruction::AccountMeta::new(
+            *self.payer.key,
+            true,
+        ));
+        accounts.push(solana_program::instruction::AccountMeta::new_readonly(
             *self.system_program.key,
             false,
         ));
         remaining_accounts.iter().for_each(|remaining_account| {
-            accounts.push(compat::AccountMeta {
+            accounts.push(solana_program::instruction::AccountMeta {
                 pubkey: *remaining_account.0.key,
                 is_signer: remaining_account.2,
                 is_writable: remaining_account.1,
@@ -264,7 +292,7 @@ impl<'a, 'b> CreatePermissionCpi<'a, 'b> {
         let mut args = self.__args.try_to_vec().unwrap();
         data.append(&mut args);
 
-        let instruction = compat::Instruction {
+        let instruction = solana_program::instruction::Instruction {
             program_id: PERMISSION_PROGRAM_ID,
             accounts,
             data,
@@ -280,19 +308,14 @@ impl<'a, 'b> CreatePermissionCpi<'a, 'b> {
             .for_each(|remaining_account| account_infos.push(remaining_account.0.clone()));
 
         if signers_seeds.is_empty() {
-            invoke(&instruction.modern(), &account_infos.modern()).compat()
+            invoke(&instruction, &account_infos)
         } else {
-            invoke_signed(
-                &instruction.modern(),
-                &account_infos.modern(),
-                signers_seeds,
-            )
-            .compat()
+            invoke_signed(&instruction, &account_infos, signers_seeds)
         }
     }
 }
 
-/// compat::Instruction builder for `CreatePermission` via CPI.
+/// solana_program::instruction::Instruction builder for `CreatePermission` via CPI.
 ///
 /// ### Accounts:
 ///
@@ -306,7 +329,7 @@ pub struct CreatePermissionCpiBuilder<'a, 'b> {
 }
 
 impl<'a, 'b> CreatePermissionCpiBuilder<'a, 'b> {
-    pub fn new(program: &'b compat::AccountInfo<'a>) -> Self {
+    pub fn new(program: &'b solana_program::account_info::AccountInfo<'a>) -> Self {
         let instruction = Box::new(CreatePermissionCpiBuilderInstruction {
             __program: program,
             permissioned_account: None,
@@ -321,23 +344,29 @@ impl<'a, 'b> CreatePermissionCpiBuilder<'a, 'b> {
     #[inline(always)]
     pub fn permissioned_account(
         &mut self,
-        permissioned_account: &'b compat::AccountInfo<'a>,
+        permissioned_account: &'b solana_program::account_info::AccountInfo<'a>,
     ) -> &mut Self {
         self.instruction.permissioned_account = Some(permissioned_account);
         self
     }
     #[inline(always)]
-    pub fn permission(&mut self, permission: &'b compat::AccountInfo<'a>) -> &mut Self {
+    pub fn permission(
+        &mut self,
+        permission: &'b solana_program::account_info::AccountInfo<'a>,
+    ) -> &mut Self {
         self.instruction.permission = Some(permission);
         self
     }
     #[inline(always)]
-    pub fn payer(&mut self, payer: &'b compat::AccountInfo<'a>) -> &mut Self {
+    pub fn payer(&mut self, payer: &'b solana_program::account_info::AccountInfo<'a>) -> &mut Self {
         self.instruction.payer = Some(payer);
         self
     }
     #[inline(always)]
-    pub fn system_program(&mut self, system_program: &'b compat::AccountInfo<'a>) -> &mut Self {
+    pub fn system_program(
+        &mut self,
+        system_program: &'b solana_program::account_info::AccountInfo<'a>,
+    ) -> &mut Self {
         self.instruction.system_program = Some(system_program);
         self
     }
@@ -350,7 +379,7 @@ impl<'a, 'b> CreatePermissionCpiBuilder<'a, 'b> {
     #[inline(always)]
     pub fn add_remaining_account(
         &mut self,
-        account: &'b compat::AccountInfo<'a>,
+        account: &'b solana_program::account_info::AccountInfo<'a>,
         is_writable: bool,
         is_signer: bool,
     ) -> &mut Self {
@@ -361,12 +390,16 @@ impl<'a, 'b> CreatePermissionCpiBuilder<'a, 'b> {
     }
     /// Add additional accounts to the instruction.
     ///
-    /// Each account is represented by a tuple of the `compat::AccountInfo`, a `bool` indicating whether the account is writable or not,
+    /// Each account is represented by a tuple of the `solana_program::account_info::AccountInfo`, a `bool` indicating whether the account is writable or not,
     /// and a `bool` indicating whether the account is a signer or not.
     #[inline(always)]
     pub fn add_remaining_accounts(
         &mut self,
-        accounts: &[(&'b compat::AccountInfo<'a>, bool, bool)],
+        accounts: &[(
+            &'b solana_program::account_info::AccountInfo<'a>,
+            bool,
+            bool,
+        )],
     ) -> &mut Self {
         self.instruction
             .__remaining_accounts
@@ -374,12 +407,15 @@ impl<'a, 'b> CreatePermissionCpiBuilder<'a, 'b> {
         self
     }
     #[inline(always)]
-    pub fn invoke(&self) -> compat::ProgramResult {
+    pub fn invoke(&self) -> solana_program::entrypoint_deprecated::ProgramResult {
         self.invoke_signed(&[])
     }
     #[allow(clippy::clone_on_copy)]
     #[allow(clippy::vec_init_then_push)]
-    pub fn invoke_signed(&self, signers_seeds: &[&[&[u8]]]) -> compat::ProgramResult {
+    pub fn invoke_signed(
+        &self,
+        signers_seeds: &[&[&[u8]]],
+    ) -> solana_program::entrypoint_deprecated::ProgramResult {
         let args = CreatePermissionInstructionArgs {
             args: self.instruction.args.clone().expect("args is not set"),
         };
@@ -410,12 +446,16 @@ impl<'a, 'b> CreatePermissionCpiBuilder<'a, 'b> {
 
 #[derive(Clone, Debug)]
 struct CreatePermissionCpiBuilderInstruction<'a, 'b> {
-    __program: &'b compat::AccountInfo<'a>,
-    permissioned_account: Option<&'b compat::AccountInfo<'a>>,
-    permission: Option<&'b compat::AccountInfo<'a>>,
-    payer: Option<&'b compat::AccountInfo<'a>>,
-    system_program: Option<&'b compat::AccountInfo<'a>>,
+    __program: &'b solana_program::account_info::AccountInfo<'a>,
+    permissioned_account: Option<&'b solana_program::account_info::AccountInfo<'a>>,
+    permission: Option<&'b solana_program::account_info::AccountInfo<'a>>,
+    payer: Option<&'b solana_program::account_info::AccountInfo<'a>>,
+    system_program: Option<&'b solana_program::account_info::AccountInfo<'a>>,
     args: Option<MembersArgs>,
-    /// Additional instruction accounts `(compat::AccountInfo, is_writable, is_signer)`.
-    __remaining_accounts: Vec<(&'b compat::AccountInfo<'a>, bool, bool)>,
+    /// Additional instruction accounts `(solana_program::account_info::AccountInfo, is_writable, is_signer)`.
+    __remaining_accounts: Vec<(
+        &'b solana_program::account_info::AccountInfo<'a>,
+        bool,
+        bool,
+    )>,
 }

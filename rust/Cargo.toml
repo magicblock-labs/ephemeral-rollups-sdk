@@ -37,14 +37,11 @@ ephemeral-vrf-sdk-vrf-macro = { path = "vrf-macro", version = "=0.17.3", default
 
 # Magicblock
 magicblock-delegation-program-api = { version = "3.1.0", default-features = false }
-magicblock-magic-program-api = { version = "0.10.1", default-features = false }
-magicblock-magic-program-api-unreleased = { package = "magicblock-magic-program-api", git = "https://github.com/magicblock-labs/magicblock-validator", rev = "ba412ebb6cccab2d6972891e5aa9970029e5913b", default-features = false }
+magicblock-magic-program-api = { git = "https://github.com/magicblock-labs/magicblock-validator", rev = "ba412ebb6cccab2d6972891e5aa9970029e5913b", default-features = false }
 hydra-api = "0.2.1"
 
 ## External crates
-anchor-lang-compat = { package = "anchor-lang", version = ">=0.28.0, <1.0.0" }
-anchor-lang-current = { package = "anchor-lang", version = "1.0" }
-anchor-lang = { version = ">=0.28.0" }
+anchor-lang = { version = "1.0" }
 proc-macro2 = "1.0"
 syn = { version = "1.0.60", features = ["full"] }
 quote = "1.0"
@@ -91,21 +88,17 @@ solana-address = { version = "2.0.0", features = [
 solana-cpi = { version = "3.0" }
 solana-pubkey = { version = "3.0" }
 solana-program-error = { version = "3.0" }
+solana-commitment-config = { version = "3.1" }
 solana-program-memory = { version = "3.0" }
 solana-system-interface = { version = "2.0.0", features = ["bincode"] }
 solana-instruction = "3.1.0"
 solana-sysvar = { version = "3.1" }
 spl-associated-token-account-interface = { version = "1.0.0" }
 
-# backward-compat
-solana-account-info-compat = { package = "solana-account-info", version = "2.0" }
-solana-program-error-compat = { package = "solana-program-error", version = "2.0" }
-solana-program-compat = { package = "solana-program", version = ">=1.16, <3", default-features = false }
-
 # solana alias
-sdk = { package = "solana-sdk", version = ">=1.16, <3" }
-rpc = { package = "solana-rpc-client", version = ">=1.16, <3" }
-rpc-api = { package = "solana-rpc-client-api", version = ">=1.16, <3" }
+sdk = { package = "solana-sdk", version = "3.0" }
+rpc = { package = "solana-rpc-client", version = "3.0" }
+rpc-api = { package = "solana-rpc-client-api", version = "3.0" }
 
 # serialization/parsing
 bytemuck = "1.25"

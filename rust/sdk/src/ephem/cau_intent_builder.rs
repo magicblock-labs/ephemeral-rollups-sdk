@@ -1,4 +1,3 @@
-use crate::compat;
 use crate::ephem::action_builder::ActionBuilder;
 use crate::ephem::{
     ActionCallback, CallHandler, CommitAndUndelegate, CommitType, FoldableIntentBuilder,
@@ -12,7 +11,7 @@ use crate::ephem::{
 /// and returns it (or a sibling sub-builder) on every transition/terminal call.
 pub struct CommitAndUndelegateIntentBuilder<'info> {
     pub(in crate::ephem) parent: MagicIntentBundleBuilder<'info>,
-    pub(in crate::ephem) accounts: Vec<compat::AccountInfo<'info>>,
+    pub(in crate::ephem) accounts: Vec<solana_program::account_info::AccountInfo<'info>>,
     pub(in crate::ephem) post_commit_actions: Vec<CallHandler<'info>>,
     pub(in crate::ephem) post_commit_callbacks: Vec<Option<ActionCallback>>,
     pub(in crate::ephem) post_undelegate_actions: Vec<CallHandler<'info>>,

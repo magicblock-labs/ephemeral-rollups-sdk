@@ -14,34 +14,11 @@ readme = "README.md"
 [features]
 default = ["solana-system-interface"]
 
-# =============== modern ===============
-# 
-# As long as neither anchor-compat nor backward-compat is 
-# specified, all features support Solana 3.0 and Anchor 1.0.
-#
-# To get backward compatability, combine any flag with backward-compat. 
-# However, for anchor <1.0 support, use anchor-compat (and backward-compat is implied). 
-#
+# Anchor 1.0 support.
+anchor = ["dep:anchor-lang", "ephemeral-vrf-sdk?/anchor"]
+anchor-debug = ["anchor", "anchor-lang/anchor-debug"]
 
-# anchor 1.0 support (CANNOT be combined with backward-compat) 
-anchor = ["anchor-modern"]
-anchor-modern = [
-    "anchor-support",
-    "anchor-lang-current",
-    "ephemeral-vrf-sdk?/anchor-modern",
-]
-anchor-debug = ["anchor-lang-current/anchor-debug"]
-
-# anchor >=0.28.0, <1.0 support (backward-compat is implied)
-anchor-compat = [
-    "anchor-support",
-    "backward-compat",
-    "anchor-lang-compat",
-    "ephemeral-vrf-sdk?/anchor-compat",
-]
-anchor-compat-debug = ["anchor-lang-compat/anchor-debug"]
-
-# access-control support (can be combined with [anchor-compat | anchor | backward-compat]) 
+# Access-control support.
 access-control = ["num-derive", "num-traits", "thiserror"]
 
 # spl support.
@@ -51,18 +28,6 @@ instruction = ["magicblock-delegation-program-api/instruction"]
 
 encryption = ["magicblock-delegation-program-api/encryption", "instruction"]
 
-# backward compatability support (can be combined with [access-control | encryption])
-backward-compat = [
-    "magicblock-delegation-program-api/backward-compat",
-    "magicblock-magic-program-api/backward-compat",
-    "ephemeral-rollups-sdk-attribute-commit/backward-compat",
-    "ephemeral-rollups-sdk-attribute-delegate/backward-compat",
-    "ephemeral-rollups-sdk-attribute-ephemeral/backward-compat",
-    "ephemeral-rollups-sdk-attribute-ephemeral-accounts/backward-compat",
-    "ephemeral-vrf-sdk-vrf-macro?/backward-compat",
-    "ephemeral-vrf-sdk?/backward-compat",
-]
-
 # Enable VRF re-exports and generate macro paths through ephemeral-rollups-sdk.
 vrf = [
     "dep:ephemeral-vrf-sdk",
@@ -70,7 +35,6 @@ vrf = [
 ]
 crank = ["hydra-api"]
 modular-sdk = [
-    "dep:magicblock-magic-program-api-unreleased",
     "solana-account",
     "solana-account-info",
     "solana-cpi",
@@ -82,14 +46,10 @@ modular-sdk = [
     "solana-system-interface",
 ]
 
-# =========== internal features ===========
-anchor-support = ["dep:magicblock-magic-program-api-unreleased"]
-#anchor-compat-idl-build = ["anchor-compat", "anchor-lang-compat/idl-build"]
 
 [dependencies]
-anchor-lang-compat = { workspace = true, optional = true }
-anchor-lang-current = { workspace = true, optional = true }
-# borsh = "0.10.4"
+anchor-lang = { workspace = true, optional = true }
+borsh = { workspace = true }
 
 bincode = { workspace = true }
 bytemuck = { workspace = true }
@@ -117,15 +77,10 @@ solana-system-interface = { workspace = true, optional = true }
 solana-sysvar = { workspace = true, optional = true }
 spl-associated-token-account-interface = { workspace = true, optional = true }
 magicblock-magic-program-api = { workspace = true }
-magicblock-magic-program-api-unreleased = { workspace = true, optional = true }
 magicblock-delegation-program-api = { workspace = true, default-features = false }
 num-derive = { workspace = true, optional = true }
 num-traits = { workspace = true, optional = true }
 thiserror = { workspace = true, optional = true }
-
-solana-account-info-compat = { workspace = true }
-solana-program-error-compat = { workspace = true }
-solana-program-compat = { workspace = true }
 
 # Fix for older toolchain
 base64ct = { workspace = true }
@@ -171,7 +126,7 @@ required-features = ["spl", "access-control", "modular-sdk"]
 [[test]]
 name = "ephemeral_accounts"
 path = "../tests/ephemeral_accounts.rs"
-required-features = ["anchor-support"]
+required-features = ["anchor"]
 
 [dev-dependencies]
 bincode = { workspace = true }

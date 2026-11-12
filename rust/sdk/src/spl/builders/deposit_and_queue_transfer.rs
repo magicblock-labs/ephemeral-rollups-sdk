@@ -2,7 +2,6 @@ use core::fmt;
 
 use crate::{
     access_control::structs::Permission,
-    compat,
     consts::{
         ESPL_TOKEN_PROGRAM_ID, MAGIC_ACCOUNT_VAULT_ID, MAGIC_PROGRAM_ID, PERMISSION_PROGRAM_ID,
         TOKEN_PROGRAM_ID,
@@ -42,14 +41,14 @@ impl fmt::Display for DepositAndQueueTransferBuilderError {
 /// accounts, so the receipt stays private to the sender and the program can
 /// close the permission once every split has settled.
 pub struct DepositAndQueueTransferBuilder {
-    pub queue: compat::Pubkey,
-    pub vault: compat::Pubkey,
-    pub mint: compat::Pubkey,
-    pub source: compat::Pubkey,
-    pub vault_ata: compat::Pubkey,
-    pub destination: compat::Pubkey,
-    pub owner: compat::Pubkey,
-    pub reimbursement_token_info: Option<compat::Pubkey>,
+    pub queue: solana_program::pubkey::Pubkey,
+    pub vault: solana_program::pubkey::Pubkey,
+    pub mint: solana_program::pubkey::Pubkey,
+    pub source: solana_program::pubkey::Pubkey,
+    pub vault_ata: solana_program::pubkey::Pubkey,
+    pub destination: solana_program::pubkey::Pubkey,
+    pub owner: solana_program::pubkey::Pubkey,
+    pub reimbursement_token_info: Option<solana_program::pubkey::Pubkey>,
     pub amount: u64,
     pub min_delay_ms: u64,
     pub max_delay_ms: u64,
@@ -59,7 +58,9 @@ pub struct DepositAndQueueTransferBuilder {
 
 impl DepositAndQueueTransferBuilder {
     #[inline(always)]
-    pub fn instruction(&self) -> Result<compat::Instruction, DepositAndQueueTransferBuilderError> {
+    pub fn instruction(
+        &self,
+    ) -> Result<solana_program::instruction::Instruction, DepositAndQueueTransferBuilderError> {
         if self.split == 0 {
             return Err(DepositAndQueueTransferBuilderError::InvalidSplit(
                 self.split,
@@ -88,23 +89,26 @@ impl DepositAndQueueTransferBuilder {
             find_transfer_group_receipt(&self.queue, &self.owner, group_id);
         let (group_receipt_permission, _permission_bump) = Permission::find_pda(&group_receipt);
 
-        Ok(compat::Instruction {
+        Ok(solana_program::instruction::Instruction {
             program_id: ESPL_TOKEN_PROGRAM_ID,
             accounts: vec![
-                compat::AccountMeta::new(self.queue, false),
-                compat::AccountMeta::new_readonly(self.vault, false),
-                compat::AccountMeta::new_readonly(self.mint, false),
-                compat::AccountMeta::new(self.source, false),
-                compat::AccountMeta::new(self.vault_ata, false),
-                compat::AccountMeta::new_readonly(self.destination, false),
-                compat::AccountMeta::new_readonly(self.owner, true),
-                compat::AccountMeta::new_readonly(TOKEN_PROGRAM_ID, false),
-                compat::AccountMeta::new(reimbursement_token_info, false),
-                compat::AccountMeta::new(group_receipt, false),
-                compat::AccountMeta::new(MAGIC_ACCOUNT_VAULT_ID, false),
-                compat::AccountMeta::new_readonly(MAGIC_PROGRAM_ID, false),
-                compat::AccountMeta::new(group_receipt_permission, false),
-                compat::AccountMeta::new_readonly(PERMISSION_PROGRAM_ID, false),
+                solana_program::instruction::AccountMeta::new(self.queue, false),
+                solana_program::instruction::AccountMeta::new_readonly(self.vault, false),
+                solana_program::instruction::AccountMeta::new_readonly(self.mint, false),
+                solana_program::instruction::AccountMeta::new(self.source, false),
+                solana_program::instruction::AccountMeta::new(self.vault_ata, false),
+                solana_program::instruction::AccountMeta::new_readonly(self.destination, false),
+                solana_program::instruction::AccountMeta::new_readonly(self.owner, true),
+                solana_program::instruction::AccountMeta::new_readonly(TOKEN_PROGRAM_ID, false),
+                solana_program::instruction::AccountMeta::new(reimbursement_token_info, false),
+                solana_program::instruction::AccountMeta::new(group_receipt, false),
+                solana_program::instruction::AccountMeta::new(MAGIC_ACCOUNT_VAULT_ID, false),
+                solana_program::instruction::AccountMeta::new_readonly(MAGIC_PROGRAM_ID, false),
+                solana_program::instruction::AccountMeta::new(group_receipt_permission, false),
+                solana_program::instruction::AccountMeta::new_readonly(
+                    PERMISSION_PROGRAM_ID,
+                    false,
+                ),
             ],
             data,
         })

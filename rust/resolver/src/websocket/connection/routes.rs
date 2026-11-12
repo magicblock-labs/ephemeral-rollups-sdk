@@ -5,6 +5,7 @@ use std::{sync::Arc, time::Duration};
 use borsh::BorshDeserialize;
 use mdp::state::record::ErRecord;
 use rpc::nonblocking::rpc_client::RpcClient;
+use solana_address::Address;
 
 use crate::{
     account::ProgramAccountValue,
@@ -133,9 +134,10 @@ impl WsRoutesConnection {
 
     fn update_routing_table(routes: &RoutingTable, record: ErRecord) {
         let identity = record.identity();
+        let identity_address = Address::new_from_array(identity.to_bytes());
         let address_is_the_same = routes
             .read()
-            .get(identity)
+            .get(&identity_address)
             .map(|client| client.url() == record.addr())
             .unwrap_or_default();
         if address_is_the_same {
@@ -143,7 +145,7 @@ impl WsRoutesConnection {
         }
 
         let client = Arc::new(RpcClient::new(record.addr().to_owned()));
-        routes.write().insert(*identity, client);
+        routes.write().insert(identity_address, client);
     }
 
     fn generate_subscription() -> String {

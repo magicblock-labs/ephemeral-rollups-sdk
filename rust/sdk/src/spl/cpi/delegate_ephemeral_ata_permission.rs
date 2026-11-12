@@ -1,50 +1,55 @@
-use crate::{
-    compat::{self, Compat, Modern},
-    consts::ESPL_TOKEN_PROGRAM_ID,
-    spl::EphemeralSplDiscriminator,
-};
+use crate::{consts::ESPL_TOKEN_PROGRAM_ID, spl::EphemeralSplDiscriminator};
 use solana_program::program::{invoke, invoke_signed};
 
 /// Delegate an ephemeral ATA permission.
 pub struct DelegateEphemeralAtaPermission<'a> {
-    pub payer: compat::AccountInfo<'a>,
-    pub eata: compat::AccountInfo<'a>,
-    pub permission_program: compat::AccountInfo<'a>,
-    pub permission: compat::AccountInfo<'a>,
-    pub system_program: compat::AccountInfo<'a>,
-    pub delegation_buffer: compat::AccountInfo<'a>,
-    pub delegation_record: compat::AccountInfo<'a>,
-    pub delegation_metadata: compat::AccountInfo<'a>,
-    pub delegation_program: compat::AccountInfo<'a>,
-    pub validator: compat::AccountInfo<'a>,
+    pub payer: solana_program::account_info::AccountInfo<'a>,
+    pub eata: solana_program::account_info::AccountInfo<'a>,
+    pub permission_program: solana_program::account_info::AccountInfo<'a>,
+    pub permission: solana_program::account_info::AccountInfo<'a>,
+    pub system_program: solana_program::account_info::AccountInfo<'a>,
+    pub delegation_buffer: solana_program::account_info::AccountInfo<'a>,
+    pub delegation_record: solana_program::account_info::AccountInfo<'a>,
+    pub delegation_metadata: solana_program::account_info::AccountInfo<'a>,
+    pub delegation_program: solana_program::account_info::AccountInfo<'a>,
+    pub validator: solana_program::account_info::AccountInfo<'a>,
     pub eata_bump: u8,
 }
 
 impl<'a> DelegateEphemeralAtaPermission<'a> {
     #[inline(always)]
-    pub fn instruction(&self) -> compat::Instruction {
-        compat::Instruction {
+    pub fn instruction(&self) -> solana_program::instruction::Instruction {
+        solana_program::instruction::Instruction {
             program_id: ESPL_TOKEN_PROGRAM_ID,
             accounts: vec![
-                compat::AccountMeta::new(*self.payer.key, true),
-                compat::AccountMeta::new(*self.eata.key, false),
-                compat::AccountMeta::new_readonly(*self.permission_program.key, false),
-                compat::AccountMeta::new(*self.permission.key, false),
-                compat::AccountMeta::new_readonly(*self.system_program.key, false),
-                compat::AccountMeta::new(*self.delegation_buffer.key, false),
-                compat::AccountMeta::new(*self.delegation_record.key, false),
-                compat::AccountMeta::new(*self.delegation_metadata.key, false),
-                compat::AccountMeta::new_readonly(*self.delegation_program.key, false),
-                compat::AccountMeta::new_readonly(*self.validator.key, false),
+                solana_program::instruction::AccountMeta::new(*self.payer.key, true),
+                solana_program::instruction::AccountMeta::new(*self.eata.key, false),
+                solana_program::instruction::AccountMeta::new_readonly(
+                    *self.permission_program.key,
+                    false,
+                ),
+                solana_program::instruction::AccountMeta::new(*self.permission.key, false),
+                solana_program::instruction::AccountMeta::new_readonly(
+                    *self.system_program.key,
+                    false,
+                ),
+                solana_program::instruction::AccountMeta::new(*self.delegation_buffer.key, false),
+                solana_program::instruction::AccountMeta::new(*self.delegation_record.key, false),
+                solana_program::instruction::AccountMeta::new(*self.delegation_metadata.key, false),
+                solana_program::instruction::AccountMeta::new_readonly(
+                    *self.delegation_program.key,
+                    false,
+                ),
+                solana_program::instruction::AccountMeta::new_readonly(*self.validator.key, false),
             ],
             data: vec![EphemeralSplDiscriminator::DelegateEphemeralAtaPermission as u8],
         }
     }
 
     #[inline(always)]
-    pub fn invoke(&self) -> compat::ProgramResult {
+    pub fn invoke(&self) -> solana_program::entrypoint_deprecated::ProgramResult {
         invoke(
-            &self.instruction().modern(),
+            &self.instruction(),
             &[
                 self.payer.clone(),
                 self.eata.clone(),
@@ -56,16 +61,17 @@ impl<'a> DelegateEphemeralAtaPermission<'a> {
                 self.delegation_metadata.clone(),
                 self.delegation_program.clone(),
                 self.validator.clone(),
-            ]
-            .modern(),
+            ],
         )
-        .compat()
     }
 
     #[inline(always)]
-    pub fn invoke_signed(&self, signers_seeds: &[&[&[u8]]]) -> compat::ProgramResult {
+    pub fn invoke_signed(
+        &self,
+        signers_seeds: &[&[&[u8]]],
+    ) -> solana_program::entrypoint_deprecated::ProgramResult {
         invoke_signed(
-            &self.instruction().modern(),
+            &self.instruction(),
             &[
                 self.payer.clone(),
                 self.eata.clone(),
@@ -77,10 +83,8 @@ impl<'a> DelegateEphemeralAtaPermission<'a> {
                 self.delegation_metadata.clone(),
                 self.delegation_program.clone(),
                 self.validator.clone(),
-            ]
-            .modern(),
+            ],
             signers_seeds,
         )
-        .compat()
     }
 }

@@ -4,25 +4,18 @@ use solana_program::{
     sysvar::Sysvar,
 };
 
-use crate::{
-    compat::{self, AsModern, Compat},
-    modernize,
-};
-
 /// Creates a new pda
 #[inline(always)]
 pub fn create_pda<'a, 'info>(
-    target_account: &'a compat::AccountInfo<'info>,
-    owner: &compat::Pubkey,
+    target_account: &'a solana_program::account_info::AccountInfo<'info>,
+    owner: &solana_program::pubkey::Pubkey,
     space: usize,
     pda_seeds: &[&[&[u8]]],
-    system_program: &'a compat::AccountInfo<'info>,
-    payer: &'a compat::AccountInfo<'info>,
+    system_program: &'a solana_program::account_info::AccountInfo<'info>,
+    payer: &'a solana_program::account_info::AccountInfo<'info>,
     rent_exempt: bool,
-) -> compat::ProgramResult {
-    modernize!(target_account, owner, system_program, payer);
-
-    let rent = Rent::get().map_err(|err| err.compat())?;
+) -> solana_program::entrypoint_deprecated::ProgramResult {
+    let rent = Rent::get().map_err(|err| err)?;
     if target_account.lamports().eq(&0) {
         let lamports = if rent_exempt {
             rent.minimum_balance(space)
@@ -44,8 +37,7 @@ pub fn create_pda<'a, 'info>(
                 system_program.clone(),
             ],
             pda_seeds,
-        )
-        .compat()?;
+        )?;
     } else {
         // Otherwise, if balance is nonzero:
         // 1) transfer sufficient lamports for rent exemption
@@ -65,8 +57,7 @@ pub fn create_pda<'a, 'info>(
                         target_account.as_ref().clone(),
                         system_program.as_ref().clone(),
                     ],
-                )
-                .compat()?;
+                )?;
             }
         }
 
@@ -78,8 +69,7 @@ pub fn create_pda<'a, 'info>(
                 system_program.as_ref().clone(),
             ],
             pda_seeds,
-        )
-        .compat()?;
+        )?;
 
         // 3) assign our program as the owner
         invoke_signed(
@@ -89,8 +79,7 @@ pub fn create_pda<'a, 'info>(
                 system_program.as_ref().clone(),
             ],
             pda_seeds,
-        )
-        .compat()?;
+        )?;
     }
 
     Ok(())
@@ -99,11 +88,9 @@ pub fn create_pda<'a, 'info>(
 /// Close PDA
 #[inline(always)]
 pub fn close_pda<'a, 'info>(
-    target_account: &'a compat::AccountInfo<'info>,
-    destination: &'a compat::AccountInfo<'info>,
-) -> compat::ProgramResult {
-    modernize!(target_account, destination);
-
+    target_account: &'a solana_program::account_info::AccountInfo<'info>,
+    destination: &'a solana_program::account_info::AccountInfo<'info>,
+) -> solana_program::entrypoint_deprecated::ProgramResult {
     // Transfer tokens from the account to the destination.
     let dest_starting_lamports = destination.lamports();
     **destination.lamports.borrow_mut() = dest_starting_lamports
@@ -113,20 +100,18 @@ pub fn close_pda<'a, 'info>(
 
     target_account.assign(&solana_system_interface::program::id());
 
-    target_account.resize(0).compat()
+    target_account.resize(0)
 }
 
 /// Close PDA with transfer
 #[inline(always)]
 pub fn close_pda_with_system_transfer<'a, 'info>(
-    target_account: &'a compat::AccountInfo<'info>,
+    target_account: &'a solana_program::account_info::AccountInfo<'info>,
     seeds: &[&[&[u8]]],
-    destination: &'a compat::AccountInfo<'info>,
-    system_program: &'a compat::AccountInfo<'info>,
-) -> compat::ProgramResult {
-    modernize!(target_account, destination, system_program);
-
-    target_account.resize(0).compat()?;
+    destination: &'a solana_program::account_info::AccountInfo<'info>,
+    system_program: &'a solana_program::account_info::AccountInfo<'info>,
+) -> solana_program::entrypoint_deprecated::ProgramResult {
+    target_account.resize(0)?;
 
     target_account.assign(&solana_system_interface::program::id());
     if target_account.lamports() > 0 {
@@ -143,8 +128,7 @@ pub fn close_pda_with_system_transfer<'a, 'info>(
                 system_program.clone(),
             ],
             seeds,
-        )
-        .compat()?;
+        )?;
     }
 
     Ok(())

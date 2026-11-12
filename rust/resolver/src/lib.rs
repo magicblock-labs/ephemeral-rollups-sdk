@@ -9,13 +9,15 @@ use std::{
 };
 
 use parking_lot::RwLock;
+use solana_address::Address;
+use solana_commitment_config::CommitmentConfig;
 
 use config::Configuration;
 use error::Error;
 use http::{fetch_account_state, fetch_domain_records, update_account_state};
 use rpc::nonblocking::rpc_client::RpcClient;
 use scc::{hash_cache::Entry, HashCache};
-use sdk::{commitment_config::CommitmentConfig, pubkey::Pubkey, transaction::Transaction};
+use sdk::{pubkey::Pubkey, transaction::Transaction};
 use tokio::sync::mpsc::{unbounded_channel, UnboundedSender};
 use websocket::{
     connection::{delegations::WsDelegationsConnection, routes::WsRoutesConnection},
@@ -26,7 +28,7 @@ use websocket::{
 /// configured with the URL, via which the this particular ER can be reached
 /// NOTE: we use RwLock with std::HashMap instead of concurrent HashMap, as this table is not
 /// supposed to be modified too often, so RwLock is faster for mostly read workload
-type RoutingTable = Arc<RwLock<HashMap<Pubkey, Arc<RpcClient>>>>;
+type RoutingTable = Arc<RwLock<HashMap<Address, Arc<RpcClient>>>>;
 /// Limited capacity (LRU) cache, mapping between an account's
 /// pubkey and it's current delegation status as observed by resolver
 type DelegationsDB = Arc<HashCache<Pubkey, DelegationRecord>>;
@@ -88,13 +90,13 @@ impl Resolver {
         };
         let chain = Arc::new(RpcClient::new(config.chain.to_string()));
 
-        let mut routes: HashMap<_, _> = if use_on_chain_routes {
+        let mut routes: HashMap<Address, _> = if use_on_chain_routes {
             fetch_domain_records(&chain)
                 .await?
                 .into_iter()
                 .map(|record| {
                     (
-                        *record.identity(),
+                        Address::new_from_array(record.identity().to_bytes()),
                         RpcClient::new_with_commitment(record.addr().to_string(), commitment)
                             .into(),
                     )
@@ -104,12 +106,12 @@ impl Resolver {
             Default::default()
         };
 
-        routes.extend(
-            custom_routes
-                .into_iter()
-                .flatten()
-                .map(|(k, v)| (k, RpcClient::new_with_commitment(v, commitment).into())),
-        );
+        routes.extend(custom_routes.into_iter().flatten().map(|(k, v)| {
+            (
+                Address::new_from_array(k.to_bytes()),
+                RpcClient::new_with_commitment(v, commitment).into(),
+            )
+        }));
 
         let routes = Arc::new(RwLock::new(routes));
 
@@ -239,6 +241,7 @@ impl Resolver {
         match status {
             DelegationStatus::Delegated(validator) => {
                 let guard = self.routes.read();
+                let validator = Address::new_from_array(validator.to_bytes());
                 let client = guard.get(&validator).ok_or(Error::Resolver(format!(
                     "url not found for validator: {validator}"
                 )))?;

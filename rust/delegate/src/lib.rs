@@ -5,11 +5,7 @@ use syn::spanned::Spanned;
 use syn::ItemStruct;
 
 fn generated_unchecked_account_type() -> TokenStream2 {
-    if cfg!(feature = "backward-compat") {
-        quote! { AccountInfo<'info> }
-    } else {
-        quote! { UncheckedAccount<'info> }
-    }
+    quote! { UncheckedAccount<'info> }
 }
 
 /// Anchor re-serializes typed accounts after the handler returns. By then a delegated
