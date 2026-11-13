@@ -244,6 +244,58 @@ describe("settlement receipt parsing", () => {
     expect(receipt?.result.errorMessage).toBe("action failed");
   });
 
+  it("matches instruction keys from another web3.js copy", () => {
+    const tx = makeCompletion(42);
+    const instruction = tx.transaction.message.instructions[0];
+    const foreignPublicKey = (key: PublicKey) => ({
+      toBase58: () => key.toBase58(),
+    });
+    const crossCopyTx = {
+      ...tx,
+      transaction: {
+        message: {
+          instructions: [
+            {
+              ...instruction,
+              programId: foreignPublicKey(program),
+              accounts: instruction.accounts.map(foreignPublicKey),
+            },
+          ],
+        },
+      },
+    };
+
+    const receipt = receiptFromCompletion(crossCopyTx, outbox);
+    expect(receipt?.signatures).toEqual(["real-signature"]);
+  });
+
+  it("rejects completion instructions for a different program or outbox", () => {
+    const tx = makeCompletion(42);
+    const instruction = tx.transaction.message.instructions[0];
+    const withInstruction = (replacement: typeof instruction) => ({
+      ...tx,
+      transaction: {
+        message: { instructions: [replacement] },
+      },
+    });
+
+    expect(
+      receiptFromCompletion(
+        withInstruction({ ...instruction, programId: validator }),
+        outbox,
+      ),
+    ).toBeNull();
+    expect(
+      receiptFromCompletion(
+        withInstruction({
+          ...instruction,
+          accounts: [validator, validator],
+        }),
+        outbox,
+      ),
+    ).toBeNull();
+  });
+
   it("rejects spoofed logs, mismatched intent IDs, and failed transactions", () => {
     const tx = makeCompletion(42);
     tx.meta.logMessages = [
