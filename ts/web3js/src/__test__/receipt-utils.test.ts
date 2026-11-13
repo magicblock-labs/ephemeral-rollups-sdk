@@ -6,6 +6,7 @@ import {
   GetCommitmentSignature,
   receiptFromCompletion,
   receiptFromLogs,
+  waitForIntent,
 } from "../utils";
 
 const validator = new PublicKey("11111111111111111111111111111111");
@@ -45,6 +46,43 @@ function makeCompletion(id: number, instructionId = id, err: unknown = null) {
 }
 
 describe("settlement receipt parsing", () => {
+  it("allows v1 transactions while scanning outbox history", async () => {
+    const connection = new Connection("http://localhost");
+    vi.spyOn(connection, "getSignaturesForAddress").mockResolvedValue([
+      { signature: "maintenance" },
+      { signature: "completion" },
+    ] as unknown as Awaited<
+      ReturnType<typeof connection.getSignaturesForAddress>
+    >);
+    const getParsedTransaction = vi
+      .spyOn(connection, "getParsedTransaction")
+      .mockResolvedValueOnce({
+        version: 1,
+        meta: { err: null, logMessages: ["Engine maintenance"] },
+      } as unknown as Awaited<
+        ReturnType<typeof connection.getParsedTransaction>
+      >)
+      .mockResolvedValueOnce({
+        ...makeCompletion(42),
+        version: "legacy",
+      } as unknown as Awaited<
+        ReturnType<typeof connection.getParsedTransaction>
+      >);
+
+    await expect(
+      waitForIntent(outbox.toBase58(), connection, {
+        timeoutMs: 100,
+        pollIntervalMs: 1,
+      }),
+    ).resolves.toMatchObject({ signatures: ["real-signature"] });
+    expect(getParsedTransaction).toHaveBeenNthCalledWith(1, "maintenance", {
+      maxSupportedTransactionVersion: 1,
+    });
+    expect(getParsedTransaction).toHaveBeenNthCalledWith(2, "completion", {
+      maxSupportedTransactionVersion: 1,
+    });
+  });
+
   it("retries a missing scheduling transaction and parses an unprefixed Magic program log", async () => {
     const magicProgram = MAGIC_PROGRAM_ID.toBase58();
     const outboxAddress = new PublicKey(
@@ -204,6 +242,58 @@ describe("settlement receipt parsing", () => {
     expect(receipt?.outboxAddress).toBe(outbox.toBase58());
     expect(receipt?.signatures).toEqual(["real-signature"]);
     expect(receipt?.result.errorMessage).toBe("action failed");
+  });
+
+  it("matches instruction keys from another web3.js copy", () => {
+    const tx = makeCompletion(42);
+    const instruction = tx.transaction.message.instructions[0];
+    const foreignPublicKey = (key: PublicKey) => ({
+      toBase58: () => key.toBase58(),
+    });
+    const crossCopyTx = {
+      ...tx,
+      transaction: {
+        message: {
+          instructions: [
+            {
+              ...instruction,
+              programId: foreignPublicKey(program),
+              accounts: instruction.accounts.map(foreignPublicKey),
+            },
+          ],
+        },
+      },
+    };
+
+    const receipt = receiptFromCompletion(crossCopyTx, outbox);
+    expect(receipt?.signatures).toEqual(["real-signature"]);
+  });
+
+  it("rejects completion instructions for a different program or outbox", () => {
+    const tx = makeCompletion(42);
+    const instruction = tx.transaction.message.instructions[0];
+    const withInstruction = (replacement: typeof instruction) => ({
+      ...tx,
+      transaction: {
+        message: { instructions: [replacement] },
+      },
+    });
+
+    expect(
+      receiptFromCompletion(
+        withInstruction({ ...instruction, programId: validator }),
+        outbox,
+      ),
+    ).toBeNull();
+    expect(
+      receiptFromCompletion(
+        withInstruction({
+          ...instruction,
+          accounts: [validator, validator],
+        }),
+        outbox,
+      ),
+    ).toBeNull();
   });
 
   it("rejects spoofed logs, mismatched intent IDs, and failed transactions", () => {

@@ -18,7 +18,7 @@ export async function GetCommitmentSignature(
   const txSchedulingSgn = await getTransactionWithRetry(
     async () =>
       ephemeralConnection.getTransaction(transactionSignature, {
-        maxSupportedTransactionVersion: 0,
+        maxSupportedTransactionVersion: 1,
       }),
     transactionLookupTimeoutMs,
   );
@@ -69,8 +69,15 @@ export interface ReceiptWaitOptions {
 }
 const OUTBOX_PREFIX = "Outbox for scheduled intent: ";
 const OUTBOX_PROGRAM_ID = "outboxintent1111111111111111111111111111111";
-const OUTBOX_PROGRAM = new PublicKey(OUTBOX_PROGRAM_ID);
 const SCHEDULED_COMMIT_SENT_TAG = 2;
+
+type AddressLike = string | { toBase58(): string };
+
+// The supplied Connection may return PublicKeys from another installed web3.js copy.
+function addressToBase58(address: AddressLike | undefined): string | null {
+  if (typeof address === "string") return address;
+  return address?.toBase58() ?? null;
+}
 
 async function withDeadline<T>(
   promise: Promise<T>,
@@ -183,7 +190,7 @@ export async function waitForSettlement(
   options: ReceiptWaitOptions = {},
 ): Promise<SettlementReceipt[]> {
   const tx = await connection.getTransaction(schedulingSignature, {
-    maxSupportedTransactionVersion: 0,
+    maxSupportedTransactionVersion: 1,
   });
   if (!tx?.meta) throw new Error("Scheduling transaction not found");
   if (tx.meta.err !== null)
@@ -233,7 +240,7 @@ export async function waitForIntent(
       try {
         tx = await withDeadline(
           connection.getParsedTransaction(item.signature, {
-            maxSupportedTransactionVersion: 0,
+            maxSupportedTransactionVersion: 1,
           }),
           deadline,
         );
@@ -268,8 +275,8 @@ export function receiptFromCompletion(
     transaction?: {
       message?: {
         instructions?: Array<{
-          programId?: PublicKey | string;
-          accounts?: PublicKey[];
+          programId?: AddressLike;
+          accounts?: AddressLike[];
           data?: string;
         }>;
       };
@@ -301,10 +308,11 @@ export function receiptFromCompletion(
     if (!idMatch) continue;
     const intentId = BigInt(idMatch[1]);
     const isCompletion = (message.instructions ?? []).some((instruction) => {
+      const programId = addressToBase58(instruction.programId);
+      const outboxAccount = addressToBase58(instruction.accounts?.[1]);
       if (
-        !(instruction.programId instanceof PublicKey) ||
-        !instruction.programId.equals(OUTBOX_PROGRAM) ||
-        instruction.accounts?.[1]?.equals(outboxAddress) !== true ||
+        programId !== OUTBOX_PROGRAM_ID ||
+        outboxAccount !== outboxAddress.toBase58() ||
         instruction.data == null
       )
         return false;
