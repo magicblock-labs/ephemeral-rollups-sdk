@@ -32,15 +32,96 @@ import { waitForRecentTransactionConfirmationUntilTimeout } from "./confirmation
 import {
   getWritableAccounts,
   isRouter,
-  parseCommitsLogsMessage,
-  parseScheduleCommitsLogsMessage,
+  logsFromProgram,
+  parseOutboxAddresses,
+  receiptFromCompletion,
+  ReceiptWaitOptions,
+  SettlementReceipt,
 } from "./utils";
+import { MAGIC_PROGRAM_ID } from "./constants";
 
 /** Type representing a recent blockhash and its lifetime validity. */
 type LatestBlockhash = Readonly<{
   blockhash: Blockhash;
   lastValidBlockHeight: bigint;
 }>;
+
+async function withDeadline<T>(
+  promise: Promise<T>,
+  deadline: number,
+  cancel?: () => void,
+  timeoutMessage = "Timed out waiting for settlement receipt",
+): Promise<T> {
+  const remaining = deadline - Date.now();
+  if (remaining <= 0) {
+    void promise.catch(() => undefined);
+    cancel?.();
+    return Promise.reject(new Error(timeoutMessage));
+  }
+  return new Promise<T>((resolve, reject) => {
+    const cleanup = () => {
+      clearTimeout(timer);
+    };
+    const timer = setTimeout(() => {
+      cancel?.();
+      cleanup();
+      reject(new Error(timeoutMessage));
+    }, remaining);
+    promise.then(
+      (value) => {
+        cleanup();
+        resolve(value);
+      },
+      (error) => {
+        cleanup();
+        reject(error);
+      },
+    );
+  });
+}
+
+const TRANSACTION_LOOKUP_POLL_INTERVAL_MS = 1_000;
+const TRANSACTION_LOOKUP_TIMEOUT_MESSAGE =
+  "Timed out waiting for transaction lookup";
+
+async function getTransactionWithRetry<T>(
+  getTransaction: (abortSignal: AbortSignal) => Promise<T | null>,
+  timeoutMs: number,
+): Promise<T> {
+  if (!Number.isFinite(timeoutMs) || timeoutMs < 0) {
+    throw new RangeError(
+      "Transaction lookup timeout must be a non-negative number",
+    );
+  }
+
+  const deadline = Date.now() + timeoutMs;
+  while (true) {
+    const request = new AbortController();
+    const transaction = await withDeadline(
+      getTransaction(request.signal),
+      deadline,
+      () => {
+        request.abort();
+      },
+      TRANSACTION_LOOKUP_TIMEOUT_MESSAGE,
+    );
+    if (transaction !== null) return transaction;
+
+    const remaining = deadline - Date.now();
+    if (remaining <= 0) {
+      throw new Error(`Transaction not found after waiting ${timeoutMs}ms`);
+    }
+    await new Promise((resolve) =>
+      setTimeout(
+        resolve,
+        Math.min(TRANSACTION_LOOKUP_POLL_INTERVAL_MS, remaining),
+      ),
+    );
+    if (Date.now() >= deadline) {
+      throw new Error(`Transaction not found after waiting ${timeoutMs}ms`);
+    }
+  }
+}
 
 /**
  * Represents a connection to a Solana cluster (HTTP + WebSocket).
@@ -350,6 +431,7 @@ export class Connection {
    * The ephemeral rollup connection is required to access the scheduling and commit logs.
    *
    * @param signature - The transaction signature of the accounts commitment transaction to the base layer.
+   * @param transactionLookupTimeoutMs - Maximum time to wait for either transaction lookup (default: 30 seconds).
    * @returns A `Promise<string>` that resolves with the commitment signature found in the commit logs.
    *
    * @throws {Error} If the transaction or its metadata cannot be found, if the
@@ -358,56 +440,137 @@ export class Connection {
    */
   public async getCommitmentSignature(
     signature: Signature,
+    transactionLookupTimeoutMs = 30_000,
   ): Promise<Signature> {
-    const txSchedulingSgn = await this.rpc
+    const txSchedulingSgn = await getTransactionWithRetry(
+      async (abortSignal) =>
+        this.rpc
+          .getTransaction(signature, {
+            encoding: "base64",
+            maxSupportedTransactionVersion: 0,
+          })
+          .send({ abortSignal }),
+      transactionLookupTimeoutMs,
+    );
+
+    if (txSchedulingSgn?.meta == null) {
+      throw new Error("Transaction not found or meta is null");
+    }
+    // A later instruction can fail after the Magic program logs an outbox address.
+    // In that case the overall transaction fails and nothing was scheduled.
+    if (txSchedulingSgn.meta.err !== null) {
+      throw new Error(
+        "Transaction failed; commitment was not scheduled (outbox logs from earlier instructions are not reliable when the transaction errors)",
+      );
+    }
+    const schedulingLogs = logsFromProgram(
+      txSchedulingSgn.meta.logMessages ?? [],
+      MAGIC_PROGRAM_ID,
+    );
+    const outboxAddresses = parseOutboxAddresses(schedulingLogs);
+    if (outboxAddresses.length === 1) {
+      const receipt = await this.waitForIntent(outboxAddresses[0] as Address);
+      if (receipt.signatures.length === 0)
+        throw new Error("Settlement receipt contains no base-chain signature");
+      return receipt.signatures[0] as Signature;
+    }
+    if (outboxAddresses.length > 1)
+      throw new Error(
+        "Scheduling transaction created multiple intents; use waitForSettlement",
+      );
+    throw new Error("Settlement outbox address not found in scheduling logs");
+  }
+
+  /** Wait for receipts for every intent created by a successful scheduling transaction. */
+  public async waitForSettlement(
+    signature: Signature,
+    options: ReceiptWaitOptions = {},
+  ): Promise<SettlementReceipt[]> {
+    const tx = await this.rpc
       .getTransaction(signature, {
         encoding: "base64",
         maxSupportedTransactionVersion: 0,
       })
       .send();
-
-    if (txSchedulingSgn?.meta == null) {
-      throw new Error("Transaction not found or meta is null");
-    }
-    // A later instruction can fail after magic-program logs ScheduledCommitSent.
-    // In that case the overall transaction fails and nothing was scheduled, so
-    // we must not return a signature that will never land on the ER.
-    if (txSchedulingSgn.meta.err != null) {
+    if (tx?.meta == null) throw new Error("Scheduling transaction not found");
+    if (tx.meta.err !== null)
       throw new Error(
-        "Transaction failed; commitment was not scheduled (ScheduledCommitSent logs from earlier instructions are not reliable when the transaction errors)",
+        "Scheduling transaction failed; no settlement receipt exists",
+      );
+    const logs = logsFromProgram(tx.meta.logMessages ?? [], MAGIC_PROGRAM_ID);
+    const outboxAddresses = parseOutboxAddresses(logs);
+    if (outboxAddresses.length > 0)
+      return Promise.all(
+        outboxAddresses.map(async (outboxAddress) =>
+          this.waitForIntentUntil(outboxAddress as Address, options),
+        ),
+      );
+    throw new Error("Settlement outbox address not found in scheduling logs");
+  }
+
+  /** Wait for a completion transaction in an outbox address's history. */
+  public async waitForIntent(
+    outboxAddress: Address,
+    options: ReceiptWaitOptions = {},
+  ): Promise<SettlementReceipt> {
+    return this.waitForIntentUntil(outboxAddress, options);
+  }
+
+  private async waitForIntentUntil(
+    outboxAddress: Address,
+    options: ReceiptWaitOptions,
+  ): Promise<SettlementReceipt> {
+    const deadline = Date.now() + (options.timeoutMs ?? 120_000);
+    const interval = options.pollIntervalMs ?? 1_000;
+    const inspected = new Set<string>();
+    while (Date.now() <= deadline) {
+      const historyRequest = new AbortController();
+      const history = await withDeadline(
+        this.rpc
+          .getSignaturesForAddress(outboxAddress, { limit: 1000 })
+          .send({ abortSignal: historyRequest.signal }),
+        deadline,
+        () => {
+          historyRequest.abort();
+        },
+      );
+      for (const item of history) {
+        if (inspected.has(item.signature)) continue;
+        let tx;
+        const txRequest = new AbortController();
+        try {
+          tx = await withDeadline(
+            this.rpc
+              .getTransaction(item.signature, {
+                encoding: "jsonParsed",
+                maxSupportedTransactionVersion: 0,
+              })
+              .send({ abortSignal: txRequest.signal }),
+            deadline,
+            () => {
+              txRequest.abort();
+            },
+          );
+        } catch (error) {
+          if (Date.now() >= deadline) throw error;
+          continue;
+        }
+        if (tx?.meta != null) inspected.add(item.signature);
+        if (tx?.meta?.err === null) {
+          const receipt = receiptFromCompletion(tx, outboxAddress);
+          if (receipt != null) return receipt;
+        }
+      }
+      await new Promise<void>((resolve) =>
+        setTimeout(
+          resolve,
+          Math.min(interval, Math.max(0, deadline - Date.now())),
+        ),
       );
     }
-    const scheduledCommitSgn = parseScheduleCommitsLogsMessage(
-      txSchedulingSgn.meta.logMessages ?? [],
+    throw new Error(
+      `Timed out waiting for settlement outbox ${outboxAddress}; transaction history may be unavailable`,
     );
-    if (scheduledCommitSgn == null) {
-      throw new Error("ScheduledCommitSent signature not found");
-    }
-    await this.confirmTransaction(scheduledCommitSgn);
-
-    const txCommitInfo = await this.rpc
-      .getTransaction(scheduledCommitSgn, {
-        encoding: "base64",
-        maxSupportedTransactionVersion: 0,
-      })
-      .send();
-
-    if (txCommitInfo?.meta == null) {
-      throw new Error("Transaction not found or meta is null");
-    }
-    if (txCommitInfo.meta.err != null) {
-      throw new Error(
-        "Scheduled commit transaction failed; commitment signature is not available",
-      );
-    }
-
-    const commitSignature = parseCommitsLogsMessage(
-      txCommitInfo.meta.logMessages ?? [],
-    );
-    if (commitSignature == null) {
-      throw new Error("Unable to find Commitment signature");
-    }
-    return commitSignature;
   }
 
   /**

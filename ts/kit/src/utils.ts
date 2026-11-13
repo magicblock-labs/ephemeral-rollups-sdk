@@ -1,4 +1,8 @@
-import { AccountRole, Signature, TransactionMessage } from "@solana/kit";
+import { AccountRole, TransactionMessage } from "@solana/kit";
+import bs58 from "bs58";
+
+const OUTBOX_PROGRAM_ID = "outboxintent1111111111111111111111111111111";
+const SCHEDULED_COMMIT_SENT_TAG = 2;
 
 /**
  * Extracts all writable accounts from a transaction message.
@@ -54,44 +58,145 @@ export async function isRouter(clusterUrlHttp: string): Promise<boolean> {
   );
 }
 
-/**
- * Parses log messages from a scheduling transaction to extract the scheduled commit signature.
- *
- * This function looks for log messages containing the prefix `"ScheduledCommitSent signature: "`
- * and returns the signature following it.
- *
- * @param logMessages - An array of log messages from a transaction's meta.
- * @returns The extracted `Signature` if found, or `null` if no matching log message exists.
- */
-export function parseScheduleCommitsLogsMessage(
-  logMessages: readonly string[],
-): Signature | null {
-  for (const message of logMessages) {
-    const signaturePrefix = "ScheduledCommitSent signature: ";
-    if (message.includes(signaturePrefix)) {
-      return message.split(signaturePrefix)[1] as Signature;
-    }
-  }
-  return null;
+export interface SettlementReceipt {
+  /** Outbox PDA associated with the receipt, when available. */
+  outboxAddress: string | null;
+  /** @deprecated Use outboxAddress instead. */
+  intentAddress: string | null;
+  result: { errorMessage: string | null; logs: string[] };
+  signatures: string[];
 }
 
-/**
- * Parses log messages from a commit transaction to extract the commitment signature.
- *
- * This function looks for log messages containing the prefix `"ScheduledCommitSent signature[0]: "`
- * and returns the signature following it.
- *
- * @param logMessages - An array of log messages from a transaction's meta.
- * @returns The extracted `Signature` if found, or `null` if no matching log message exists.
- */
-export function parseCommitsLogsMessage(
+export interface ReceiptWaitOptions {
+  timeoutMs?: number;
+  pollIntervalMs?: number;
+}
+
+export function parseOutboxAddresses(logMessages: readonly string[]): string[] {
+  const prefix = "Outbox for scheduled intent: ";
+  return logMessages.flatMap((line) => {
+    const i = line.indexOf(prefix);
+    return i < 0 ? [] : [line.slice(i + prefix.length).trim()];
+  });
+}
+
+export function receiptFromLogs(
+  outboxAddress: string | null,
   logMessages: readonly string[],
-): Signature | null {
-  for (const message of logMessages) {
-    const signaturePrefix = "ScheduledCommitSent signature[0]: ";
-    if (message.includes(signaturePrefix)) {
-      return message.split(signaturePrefix)[1] as Signature;
+): SettlementReceipt {
+  const logs = [...logMessages];
+  const signatures = logs.flatMap((line) => {
+    const match = line.match(/Settlement receipt signature\[\d+\]: (.+)$/);
+    return match ? [match[1].trim()] : [];
+  });
+  const errorLine = logs.find((line) =>
+    line.includes("Settlement receipt error message:"),
+  );
+  return {
+    outboxAddress,
+    intentAddress: outboxAddress,
+    result: {
+      errorMessage:
+        errorLine?.split("Settlement receipt error message:")[1]?.trim() ??
+        null,
+      logs,
+    },
+    signatures,
+  };
+}
+
+export function logsFromProgram(
+  logs: readonly string[],
+  programId: string,
+): string[] {
+  const stack: string[] = [];
+  const programLogs: string[] = [];
+  for (const line of logs) {
+    const invoke = line.match(/^Program (\S+) invoke \[\d+\]$/);
+    if (invoke) {
+      stack.push(invoke[1]);
+      continue;
     }
+    const end = line.match(/^Program (\S+) (?:success|failed:.*)$/);
+    if (end) {
+      const index = stack.lastIndexOf(end[1]);
+      if (index >= 0) stack.length = index;
+      continue;
+    }
+    if (
+      stack[stack.length - 1] === programId &&
+      (line.startsWith("Program log: ") || !line.startsWith("Program "))
+    )
+      programLogs.push(line);
+  }
+  return programLogs;
+}
+
+export function receiptFromCompletion(
+  tx: unknown,
+  outboxAddress: string,
+): SettlementReceipt | null {
+  if (tx == null || typeof tx !== "object") return null;
+  const transaction = tx as {
+    transaction?: {
+      message?: {
+        instructions?: Array<{
+          programId?: string;
+          accounts?: string[];
+          data?: string;
+        }>;
+      };
+    };
+    meta?: {
+      err?: unknown;
+      logMessages?: string[] | null;
+    } | null;
+  };
+  const message = transaction.transaction?.message;
+  const meta = transaction.meta;
+  if (!message || meta == null || meta.err !== null) return null;
+  // A successful Outbox instruction has already checked the validator signer and PDA.
+  const logs = logsFromProgram(meta.logMessages ?? [], OUTBOX_PROGRAM_ID);
+  const groups: string[][] = [];
+  const receiptStart =
+    /^(?:Program log: )?Settlement receipt intent id: (\d+),/;
+  for (const line of logs) {
+    if (receiptStart.test(line)) groups.push([line]);
+    else if (groups.length > 0) groups[groups.length - 1].push(line);
+  }
+
+  for (const group of groups) {
+    const idMatch = group[0]?.match(receiptStart);
+    if (!idMatch) continue;
+    const intentId = BigInt(idMatch[1]);
+    const isCompletion = (message.instructions ?? []).some((instruction) => {
+      if (
+        instruction.programId !== OUTBOX_PROGRAM_ID ||
+        instruction.accounts?.[1] !== outboxAddress ||
+        instruction.data == null
+      )
+        return false;
+      let data: Uint8Array;
+      try {
+        data = bs58.decode(instruction.data);
+      } catch {
+        return false;
+      }
+      if (
+        data.length < 12 ||
+        // wincode encodes this enum tag as u32, followed by message_id as u64.
+        data[0] !== SCHEDULED_COMMIT_SENT_TAG ||
+        data[1] !== 0 ||
+        data[2] !== 0 ||
+        data[3] !== 0
+      )
+        return false;
+      let instructionId = 0n;
+      for (let byte = 7; byte >= 0; byte--)
+        instructionId = (instructionId << 8n) | BigInt(data[4 + byte]);
+      return instructionId === intentId;
+    });
+    if (isCompletion) return receiptFromLogs(outboxAddress, group);
   }
   return null;
 }
