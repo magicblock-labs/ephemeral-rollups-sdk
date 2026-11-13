@@ -18,7 +18,7 @@ export async function GetCommitmentSignature(
   const txSchedulingSgn = await getTransactionWithRetry(
     async () =>
       ephemeralConnection.getTransaction(transactionSignature, {
-        maxSupportedTransactionVersion: 0,
+        maxSupportedTransactionVersion: 1,
       }),
     transactionLookupTimeoutMs,
   );
@@ -183,7 +183,7 @@ export async function waitForSettlement(
   options: ReceiptWaitOptions = {},
 ): Promise<SettlementReceipt[]> {
   const tx = await connection.getTransaction(schedulingSignature, {
-    maxSupportedTransactionVersion: 0,
+    maxSupportedTransactionVersion: 1,
   });
   if (!tx?.meta) throw new Error("Scheduling transaction not found");
   if (tx.meta.err !== null)
@@ -233,7 +233,7 @@ export async function waitForIntent(
       try {
         tx = await withDeadline(
           connection.getParsedTransaction(item.signature, {
-            maxSupportedTransactionVersion: 0,
+            maxSupportedTransactionVersion: 1,
           }),
           deadline,
         );

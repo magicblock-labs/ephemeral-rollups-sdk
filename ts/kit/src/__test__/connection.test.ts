@@ -128,7 +128,6 @@ describe("Connection", () => {
     vi.mocked(solanaKit.partiallySignTransaction).mockResolvedValue({
       messageBytes: mockTxBytes,
       signatures: {},
-      lifetimeConstraint: mockLifetimeConstraint, // <- now type-safe
     });
     vi.mocked(solanaKit.compileTransaction).mockReturnValue({
       messageBytes: mockTxBytes,
@@ -230,7 +229,6 @@ describe("Connection", () => {
     vi.mocked(solanaKit.partiallySignTransaction).mockResolvedValue({
       messageBytes: mockTxBytes,
       signatures: {},
-      lifetimeConstraint: mockLifetimeConstraint,
     });
 
     const sig = await connection.sendTransaction(unsignedTx, mockSigners);
@@ -514,6 +512,52 @@ describe("Connection", () => {
         pollIntervalMs: 1,
       }),
     ).rejects.toThrow(/Timed out waiting for settlement/);
+  });
+
+  it("allows v1 transactions while scanning outbox history", async () => {
+    const connection = await Connection.create("http://localhost");
+    const send = vi
+      .fn()
+      .mockResolvedValueOnce({
+        version: 1,
+        meta: { err: null, logMessages: ["Engine maintenance"] },
+      })
+      .mockResolvedValueOnce({
+        version: "legacy",
+        meta: { err: null, logMessages: ["settlement receipt"] },
+      });
+    vi.mocked(mockRpc.getSignaturesForAddress).mockReturnValue({
+      send: vi.fn(async () => [
+        { signature: "maintenance" },
+        { signature: "completion" },
+      ]),
+    } as unknown as ReturnType<typeof mockRpc.getSignaturesForAddress>);
+    vi.mocked(mockRpc.getTransaction).mockReturnValue({
+      send,
+    } as unknown as ReturnType<typeof mockRpc.getTransaction>);
+    vi.mocked(utils.receiptFromCompletion)
+      .mockReturnValueOnce(null)
+      .mockReturnValue({
+        outboxAddress: "outbox" as solanaKit.Address,
+        intentAddress: "outbox" as solanaKit.Address,
+        result: { errorMessage: null, logs: [] },
+        signatures: ["base-signature"],
+      });
+
+    await expect(
+      connection.waitForIntent("outbox" as solanaKit.Address, {
+        timeoutMs: 100,
+        pollIntervalMs: 1,
+      }),
+    ).resolves.toMatchObject({ signatures: ["base-signature"] });
+    expect(mockRpc.getTransaction).toHaveBeenNthCalledWith(1, "maintenance", {
+      encoding: "jsonParsed",
+      maxSupportedTransactionVersion: 1,
+    });
+    expect(mockRpc.getTransaction).toHaveBeenNthCalledWith(2, "completion", {
+      encoding: "jsonParsed",
+      maxSupportedTransactionVersion: 1,
+    });
   });
 
   it("should getBalance", async () => {

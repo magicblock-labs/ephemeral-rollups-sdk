@@ -447,7 +447,7 @@ export class Connection {
         this.rpc
           .getTransaction(signature, {
             encoding: "base64",
-            maxSupportedTransactionVersion: 0,
+            maxSupportedTransactionVersion: 1,
           })
           .send({ abortSignal }),
       transactionLookupTimeoutMs,
@@ -489,7 +489,7 @@ export class Connection {
     const tx = await this.rpc
       .getTransaction(signature, {
         encoding: "base64",
-        maxSupportedTransactionVersion: 0,
+        maxSupportedTransactionVersion: 1,
       })
       .send();
     if (tx?.meta == null) throw new Error("Scheduling transaction not found");
@@ -543,7 +543,7 @@ export class Connection {
             this.rpc
               .getTransaction(item.signature, {
                 encoding: "jsonParsed",
-                maxSupportedTransactionVersion: 0,
+                maxSupportedTransactionVersion: 1,
               })
               .send({ abortSignal: txRequest.signal }),
             deadline,
