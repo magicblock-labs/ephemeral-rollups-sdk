@@ -33,11 +33,8 @@ import {
   getWritableAccounts,
   isRouter,
   logsFromProgram,
-  parseCommitsLogsMessage,
   parseOutboxAddresses,
-  parseScheduleCommitsLogsMessage,
   receiptFromCompletion,
-  receiptFromLogs,
   ReceiptWaitOptions,
   SettlementReceipt,
 } from "./utils";
@@ -459,64 +456,29 @@ export class Connection {
     if (txSchedulingSgn?.meta == null) {
       throw new Error("Transaction not found or meta is null");
     }
-    // A later instruction can fail after magic-program logs ScheduledCommitSent.
-    // In that case the overall transaction fails and nothing was scheduled, so
-    // we must not return a signature that will never land on the ER.
+    // A later instruction can fail after the Magic program logs an outbox address.
+    // In that case the overall transaction fails and nothing was scheduled.
     if (txSchedulingSgn.meta.err !== null) {
       throw new Error(
-        "Transaction failed; commitment was not scheduled (ScheduledCommitSent logs from earlier instructions are not reliable when the transaction errors)",
+        "Transaction failed; commitment was not scheduled (outbox logs from earlier instructions are not reliable when the transaction errors)",
       );
     }
     const schedulingLogs = logsFromProgram(
       txSchedulingSgn.meta.logMessages ?? [],
       MAGIC_PROGRAM_ID,
     );
-    const scheduledCommitSgn = parseScheduleCommitsLogsMessage(schedulingLogs);
-    if (scheduledCommitSgn == null) {
-      const outboxAddresses = parseOutboxAddresses(schedulingLogs);
-      if (outboxAddresses.length === 1) {
-        const receipt = await this.waitForIntent(outboxAddresses[0] as Address);
-        if (receipt.signatures.length === 0)
-          throw new Error(
-            "Settlement receipt contains no base-chain signature",
-          );
-        return receipt.signatures[0] as Signature;
-      }
-      if (outboxAddresses.length > 1)
-        throw new Error(
-          "Scheduling transaction created multiple intents; use waitForSettlement",
-        );
-      throw new Error("ScheduledCommitSent signature not found");
+    const outboxAddresses = parseOutboxAddresses(schedulingLogs);
+    if (outboxAddresses.length === 1) {
+      const receipt = await this.waitForIntent(outboxAddresses[0] as Address);
+      if (receipt.signatures.length === 0)
+        throw new Error("Settlement receipt contains no base-chain signature");
+      return receipt.signatures[0] as Signature;
     }
-    await this.confirmTransaction(scheduledCommitSgn);
-
-    const txCommitInfo = await getTransactionWithRetry(
-      async (abortSignal) =>
-        this.rpc
-          .getTransaction(scheduledCommitSgn, {
-            encoding: "base64",
-            maxSupportedTransactionVersion: 0,
-          })
-          .send({ abortSignal }),
-      transactionLookupTimeoutMs,
-    );
-
-    if (txCommitInfo?.meta == null) {
-      throw new Error("Transaction not found or meta is null");
-    }
-    if (txCommitInfo.meta.err !== null) {
+    if (outboxAddresses.length > 1)
       throw new Error(
-        "Scheduled commit transaction failed; commitment signature is not available",
+        "Scheduling transaction created multiple intents; use waitForSettlement",
       );
-    }
-
-    const commitSignature = parseCommitsLogsMessage(
-      logsFromProgram(txCommitInfo.meta.logMessages ?? [], MAGIC_PROGRAM_ID),
-    );
-    if (commitSignature == null) {
-      throw new Error("Unable to find Commitment signature");
-    }
-    return commitSignature;
+    throw new Error("Settlement outbox address not found in scheduling logs");
   }
 
   /** Wait for receipts for every intent created by a successful scheduling transaction. */
@@ -543,24 +505,7 @@ export class Connection {
           this.waitForIntentUntil(outboxAddress as Address, options),
         ),
       );
-    const legacy = parseScheduleCommitsLogsMessage(logs);
-    if (legacy == null)
-      throw new Error("No settlement receipt found in scheduling logs");
-    await this.confirmTransaction(legacy);
-    const legacyTx = await this.rpc
-      .getTransaction(legacy, {
-        encoding: "base64",
-        maxSupportedTransactionVersion: 0,
-      })
-      .send();
-    if (legacyTx?.meta == null || legacyTx.meta.err !== null)
-      throw new Error("Legacy settlement notification unavailable or failed");
-    return [
-      receiptFromLogs(
-        null,
-        logsFromProgram(legacyTx.meta.logMessages ?? [], MAGIC_PROGRAM_ID),
-      ),
-    ];
+    throw new Error("Settlement outbox address not found in scheduling logs");
   }
 
   /** Wait for a completion transaction in an outbox address's history. */

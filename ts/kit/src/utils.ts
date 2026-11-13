@@ -1,4 +1,4 @@
-import { AccountRole, Signature, TransactionMessage } from "@solana/kit";
+import { AccountRole, TransactionMessage } from "@solana/kit";
 import bs58 from "bs58";
 
 const OUTBOX_PROGRAM_ID = "outboxintent1111111111111111111111111111111";
@@ -58,50 +58,8 @@ export async function isRouter(clusterUrlHttp: string): Promise<boolean> {
   );
 }
 
-/**
- * Parses log messages from a scheduling transaction to extract the scheduled commit signature.
- *
- * This function looks for log messages containing the prefix `"ScheduledCommitSent signature: "`
- * and returns the signature following it.
- *
- * @param logMessages - An array of log messages from a transaction's meta.
- * @returns The extracted `Signature` if found, or `null` if no matching log message exists.
- */
-export function parseScheduleCommitsLogsMessage(
-  logMessages: readonly string[],
-): Signature | null {
-  for (const message of logMessages) {
-    const signaturePrefix = "ScheduledCommitSent signature: ";
-    if (message.includes(signaturePrefix)) {
-      return message.split(signaturePrefix)[1] as Signature;
-    }
-  }
-  return null;
-}
-
-/**
- * Parses log messages from a commit transaction to extract the commitment signature.
- *
- * This function looks for log messages containing the prefix `"ScheduledCommitSent signature[0]: "`
- * and returns the signature following it.
- *
- * @param logMessages - An array of log messages from a transaction's meta.
- * @returns The extracted `Signature` if found, or `null` if no matching log message exists.
- */
-export function parseCommitsLogsMessage(
-  logMessages: readonly string[],
-): Signature | null {
-  for (const message of logMessages) {
-    const signaturePrefix = "ScheduledCommitSent signature[0]: ";
-    if (message.includes(signaturePrefix)) {
-      return message.split(signaturePrefix)[1] as Signature;
-    }
-  }
-  return null;
-}
-
 export interface SettlementReceipt {
-  /** Outbox PDA for outbox receipts; null for legacy receipts. */
+  /** Outbox PDA associated with the receipt, when available. */
   outboxAddress: string | null;
   /** @deprecated Use outboxAddress instead. */
   intentAddress: string | null;
@@ -115,7 +73,7 @@ export interface ReceiptWaitOptions {
 }
 
 export function parseOutboxAddresses(logMessages: readonly string[]): string[] {
-  const prefix = "ScheduledCommitSent outbox: ";
+  const prefix = "Outbox for scheduled intent: ";
   return logMessages.flatMap((line) => {
     const i = line.indexOf(prefix);
     return i < 0 ? [] : [line.slice(i + prefix.length).trim()];
@@ -128,18 +86,18 @@ export function receiptFromLogs(
 ): SettlementReceipt {
   const logs = [...logMessages];
   const signatures = logs.flatMap((line) => {
-    const match = line.match(/ScheduledCommitSent signature\[\d+\]: (.+)$/);
+    const match = line.match(/Settlement receipt signature\[\d+\]: (.+)$/);
     return match ? [match[1].trim()] : [];
   });
   const errorLine = logs.find((line) =>
-    line.includes("ScheduledCommitSent error message:"),
+    line.includes("Settlement receipt error message:"),
   );
   return {
     outboxAddress,
     intentAddress: outboxAddress,
     result: {
       errorMessage:
-        errorLine?.split("ScheduledCommitSent error message:")[1]?.trim() ??
+        errorLine?.split("Settlement receipt error message:")[1]?.trim() ??
         null,
       logs,
     },
@@ -200,14 +158,15 @@ export function receiptFromCompletion(
   // A successful Outbox instruction has already checked the validator signer and PDA.
   const logs = logsFromProgram(meta.logMessages ?? [], OUTBOX_PROGRAM_ID);
   const groups: string[][] = [];
+  const receiptStart =
+    /^(?:Program log: )?Settlement receipt intent id: (\d+),/;
   for (const line of logs) {
-    if (/^(?:Program log: )?ScheduledCommitSent id: \d+,/.test(line))
-      groups.push([line]);
+    if (receiptStart.test(line)) groups.push([line]);
     else if (groups.length > 0) groups[groups.length - 1].push(line);
   }
 
   for (const group of groups) {
-    const idMatch = group[0]?.match(/id: (\d+),/);
+    const idMatch = group[0]?.match(receiptStart);
     if (!idMatch) continue;
     const intentId = BigInt(idMatch[1]);
     const isCompletion = (message.instructions ?? []).some((instruction) => {

@@ -35,8 +35,7 @@ export async function waitForRecentTransactionConfirmationUntilTimeout(
  * Configuration for waiting for a transaction confirmation using
  * a time-based blockhash lifetime.
  */
-export interface WaitForRecentTransactionWithTimeBasedLifetimeConfirmationConfig
-  extends BaseTransactionConfirmationStrategyConfig {
+export interface WaitForRecentTransactionWithTimeBasedLifetimeConfirmationConfig extends BaseTransactionConfirmationStrategyConfig {
   /** Factory function for creating a timeout promise for transaction confirmation */
   getTimeoutPromise: typeof getTimeoutPromise;
 

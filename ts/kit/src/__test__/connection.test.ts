@@ -100,11 +100,8 @@ vi.mock("@solana/kit", () => ({
 vi.mock("../utils", () => ({
   isRouter: vi.fn(),
   getWritableAccounts: vi.fn(),
-  parseCommitsLogsMessage: vi.fn(),
   parseOutboxAddresses: vi.fn(),
-  parseScheduleCommitsLogsMessage: vi.fn(),
   logsFromProgram: vi.fn((logs) => logs),
-  receiptFromLogs: vi.fn(),
   receiptFromCompletion: vi.fn(),
 }));
 
@@ -148,17 +145,7 @@ describe("Connection", () => {
       confirmation.waitForRecentTransactionConfirmationUntilTimeout,
     ).mockResolvedValue(undefined);
     vi.mocked(utils.getWritableAccounts).mockReturnValue(["account1"]);
-    vi.mocked(utils.parseScheduleCommitsLogsMessage).mockReturnValue(
-      mockSignature,
-    );
-    vi.mocked(utils.parseCommitsLogsMessage).mockReturnValue(mockSignature);
     vi.mocked(utils.parseOutboxAddresses).mockReturnValue([]);
-    vi.mocked(utils.receiptFromLogs).mockReturnValue({
-      outboxAddress: "outbox",
-      intentAddress: "outbox",
-      result: { errorMessage: null, logs: [] },
-      signatures: ["base-signature"],
-    });
     vi.mocked(utils.receiptFromCompletion).mockReturnValue({
       outboxAddress: "outbox",
       intentAddress: "outbox",
@@ -332,12 +319,20 @@ describe("Connection", () => {
 
   it("should getCommitmentSignature", async () => {
     const connection = await Connection.create("http://localhost");
+    vi.mocked(utils.parseOutboxAddresses).mockReturnValue(["outbox"]);
+    vi.mocked(mockRpc.getSignaturesForAddress).mockReturnValue({
+      send: vi.fn(async () => [{ signature: "completion" }]),
+    } as unknown as ReturnType<typeof mockRpc.getSignaturesForAddress>);
     const sig = await connection.getCommitmentSignature(mockSignature);
-    expect(sig).toBe(mockSignature);
+    expect(sig).toBe("base-signature");
   });
 
   it("retries a missing scheduling transaction", async () => {
     const connection = await Connection.create("http://localhost");
+    vi.mocked(utils.parseOutboxAddresses).mockReturnValue(["outbox"]);
+    vi.mocked(mockRpc.getSignaturesForAddress).mockReturnValue({
+      send: vi.fn(async () => [{ signature: "completion" }]),
+    } as unknown as ReturnType<typeof mockRpc.getSignaturesForAddress>);
     const send = vi
       .fn()
       .mockResolvedValueOnce(null)
@@ -348,28 +343,25 @@ describe("Connection", () => {
 
     await expect(
       connection.getCommitmentSignature(mockSignature, 1_500),
-    ).resolves.toBe(mockSignature);
+    ).resolves.toBe("base-signature");
     expect(mockRpc.getTransaction).toHaveBeenCalledTimes(3);
   });
 
-  it("retries a missing scheduled commit transaction", async () => {
+  it("does not accept legacy signature-only scheduling logs", async () => {
     const connection = await Connection.create("http://localhost");
-    const transactions = [
-      { meta: { err: null, logMessages: ["schedule"] } },
-      null,
-      { meta: { err: null, logMessages: ["commit"] } },
-    ];
-    vi.mocked(mockRpc.getTransaction).mockImplementation(
-      () =>
-        ({
-          send: vi.fn(async () => transactions.shift()),
-        }) as unknown as ReturnType<typeof mockRpc.getTransaction>,
-    );
+    vi.mocked(mockRpc.getTransaction).mockReturnValueOnce({
+      send: vi.fn(async () => ({
+        meta: {
+          err: null,
+          logMessages: ["Program log: ScheduledCommitSent signature: legacy"],
+        },
+      })),
+    } as unknown as ReturnType<typeof mockRpc.getTransaction>);
 
     await expect(
-      connection.getCommitmentSignature(mockSignature, 1_500),
-    ).resolves.toBe(mockSignature);
-    expect(mockRpc.getTransaction).toHaveBeenCalledTimes(3);
+      connection.getCommitmentSignature(mockSignature),
+    ).rejects.toThrow("Settlement outbox address not found in scheduling logs");
+    expect(mockRpc.getTransaction).toHaveBeenCalledTimes(1);
   });
 
   it("times out when the transaction lookup keeps returning null", async () => {
@@ -416,7 +408,7 @@ describe("Connection", () => {
         meta: {
           err: { InstructionError: [1, "Custom"] },
           logMessages: [
-            "Program log: ScheduledCommitSent signature: would-look-valid",
+            "Program log: Outbox for scheduled intent: would-look-valid",
           ],
         },
       })),
@@ -444,7 +436,7 @@ describe("Connection", () => {
       send: vi.fn(async () => ({
         meta: {
           err: null,
-          logMessages: ["Program log: ScheduledCommitSent id: 1"],
+          logMessages: ["Program log: Settlement receipt intent id: 1"],
         },
         transaction: {
           message: {
@@ -472,7 +464,6 @@ describe("Connection", () => {
 
   it("adapts the existing signature helper for one new-format intent", async () => {
     const connection = await Connection.create("http://localhost");
-    vi.mocked(utils.parseScheduleCommitsLogsMessage).mockReturnValue(null);
     vi.mocked(utils.parseOutboxAddresses).mockReturnValue(["outbox-1"]);
     vi.mocked(mockRpc.getSignaturesForAddress).mockReturnValue({
       send: vi.fn(async () => [{ signature: "completion" }]),
@@ -481,7 +472,7 @@ describe("Connection", () => {
       send: vi.fn(async () => ({
         meta: {
           err: null,
-          logMessages: ["Program log: ScheduledCommitSent id: 1"],
+          logMessages: ["Program log: Settlement receipt intent id: 1"],
         },
         transaction: {
           message: {
@@ -503,7 +494,6 @@ describe("Connection", () => {
 
   it("rejects the single-signature adapter when scheduling created multiple intents", async () => {
     const connection = await Connection.create("http://localhost");
-    vi.mocked(utils.parseScheduleCommitsLogsMessage).mockReturnValue(null);
     vi.mocked(utils.parseOutboxAddresses).mockReturnValue([
       "outbox-1",
       "outbox-2",

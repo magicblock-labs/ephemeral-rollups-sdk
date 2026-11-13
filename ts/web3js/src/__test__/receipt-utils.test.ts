@@ -4,8 +4,6 @@ import { describe, expect, it, vi } from "vitest";
 import { MAGIC_PROGRAM_ID } from "../constants";
 import {
   GetCommitmentSignature,
-  parseCommitsLogsMessage,
-  parseScheduleCommitsLogsMessage,
   receiptFromCompletion,
   receiptFromLogs,
 } from "../utils";
@@ -34,12 +32,12 @@ function makeCompletion(id: number, instructionId = id, err: unknown = null) {
       err,
       logMessages: [
         `Program ${program.toBase58()} invoke [1]`,
-        `Program log: ScheduledCommitSent id: ${id}, slot: 10, blockhash: hash`,
-        "Program log: ScheduledCommitSent signature[0]: real-signature",
-        "Program log: ScheduledCommitSent error message: action failed",
+        `Program log: Settlement receipt intent id: ${id}, slot: 10, blockhash: hash`,
+        "Program log: Settlement receipt signature[0]: real-signature",
+        "Program log: Settlement receipt error message: action failed",
         `Program ${program.toBase58()} success`,
         "Program attacker111 invoke [1]",
-        "Program log: ScheduledCommitSent signature[0]: forged-signature",
+        "Program log: Settlement receipt signature[0]: forged-signature",
         "Program attacker111 success",
       ],
     },
@@ -68,10 +66,10 @@ describe("settlement receipt parsing", () => {
           "Program parent111 invoke [1]",
           `Program ${magicProgram} invoke [2]`,
           "ScheduleCommit: parent program id: parent111",
-          "Scheduled commit with ID: 0",
-          `ScheduledCommitSent outbox: ${outboxAddress.toBase58()}`,
+          "Scheduled intent id: 0",
+          `Outbox for scheduled intent: ${outboxAddress.toBase58()}`,
           "Program attacker111 invoke [3]",
-          "ScheduledCommitSent outbox: spoofed-address",
+          "Outbox for scheduled intent: spoofed-address",
           "Program attacker111 success",
           `Program ${magicProgram} success`,
           "Program parent111 success",
@@ -98,8 +96,8 @@ describe("settlement receipt parsing", () => {
         err: null,
         logMessages: [
           `Program ${program.toBase58()} invoke [1]`,
-          "Program log: ScheduledCommitSent id: 0, slot: 10, blockhash: hash",
-          "Program log: ScheduledCommitSent signature[0]: base-signature",
+          "Program log: Settlement receipt intent id: 0, slot: 10, blockhash: hash",
+          "Program log: Settlement receipt signature[0]: base-signature",
           `Program ${program.toBase58()} success`,
         ],
       },
@@ -116,7 +114,7 @@ describe("settlement receipt parsing", () => {
     );
   });
 
-  it("retries a missing scheduled commit transaction", async () => {
+  it("does not accept legacy signature-only scheduling logs", async () => {
     const magicProgram = MAGIC_PROGRAM_ID.toBase58();
     const connection = new Connection("http://localhost");
     const schedulingTransaction = {
@@ -129,39 +127,14 @@ describe("settlement receipt parsing", () => {
         ],
       },
     } as unknown as Awaited<ReturnType<typeof connection.getTransaction>>;
-    const commitTransaction = {
-      meta: {
-        err: null,
-        logMessages: [
-          `Program ${magicProgram} invoke [1]`,
-          "Program log: ScheduledCommitSent signature[0]: base-signature",
-          `Program ${magicProgram} success`,
-        ],
-      },
-    } as unknown as Awaited<ReturnType<typeof connection.getTransaction>>;
     const getTransaction = vi
       .spyOn(connection, "getTransaction")
-      .mockResolvedValueOnce(schedulingTransaction)
-      .mockResolvedValueOnce(null)
-      .mockResolvedValueOnce(commitTransaction);
-    vi.spyOn(connection, "getLatestBlockhash").mockResolvedValue({
-      blockhash: "11111111111111111111111111111111",
-      lastValidBlockHeight: 1,
-    } as unknown as Awaited<ReturnType<typeof connection.getLatestBlockhash>>);
-    const confirmationResponse: Awaited<
-      ReturnType<typeof connection.confirmTransaction>
-    > = {
-      context: { slot: 1 },
-      value: { err: null },
-    };
-    vi.spyOn(connection, "confirmTransaction").mockResolvedValue(
-      confirmationResponse,
-    );
+      .mockResolvedValueOnce(schedulingTransaction);
 
     await expect(
       GetCommitmentSignature("scheduling", connection, 1_500),
-    ).resolves.toBe("base-signature");
-    expect(getTransaction).toHaveBeenCalledTimes(3);
+    ).rejects.toThrow("Settlement outbox address not found in scheduling logs");
+    expect(getTransaction).toHaveBeenCalledTimes(1);
   });
 
   it("times out when the transaction lookup keeps returning null", async () => {
@@ -203,24 +176,11 @@ describe("settlement receipt parsing", () => {
     expect(getTransaction).toHaveBeenCalledTimes(1);
   });
 
-  it("keeps the legacy signature receipt parsers working", () => {
-    expect(
-      parseScheduleCommitsLogsMessage([
-        "Program log: ScheduledCommitSent signature: old",
-      ]),
-    ).toBe("old");
-    expect(
-      parseCommitsLogsMessage([
-        "Program log: ScheduledCommitSent signature[0]: base",
-      ]),
-    ).toBe("base");
-  });
-
   it("extracts result details from a new-format receipt", () => {
     const receipt = receiptFromLogs("outbox", [
-      "Program log: ScheduledCommitSent signature[0]: base-1",
-      "Program log: ScheduledCommitSent signature[1]: base-2",
-      "Program log: ScheduledCommitSent error message: action failed",
+      "Program log: Settlement receipt signature[0]: base-1",
+      "Program log: Settlement receipt signature[1]: base-2",
+      "Program log: Settlement receipt error message: action failed",
     ]);
     expect(receipt.outboxAddress).toBe("outbox");
     // Keep the previous public field available for existing consumers.
@@ -229,13 +189,14 @@ describe("settlement receipt parsing", () => {
     expect(receipt.result.errorMessage).toBe("action failed");
   });
 
-  it("keeps both outbox address fields null for a legacy receipt", () => {
+  it("ignores old signature labels", () => {
     const receipt = receiptFromLogs(null, [
       "Program log: ScheduledCommitSent signature[0]: base-signature",
     ]);
 
     expect(receipt.outboxAddress).toBeNull();
     expect(receipt.intentAddress).toBeNull();
+    expect(receipt.signatures).toEqual([]);
   });
 
   it("accepts only matching outbox completion logs", () => {
@@ -249,8 +210,8 @@ describe("settlement receipt parsing", () => {
     const tx = makeCompletion(42);
     tx.meta.logMessages = [
       "Program attacker111 invoke [1]",
-      "Program log: ScheduledCommitSent id: 42, slot: 10, blockhash: hash",
-      "Program log: ScheduledCommitSent signature[0]: forged-signature",
+      "Program log: Settlement receipt intent id: 42, slot: 10, blockhash: hash",
+      "Program log: Settlement receipt signature[0]: forged-signature",
       "Program attacker111 success",
     ];
     expect(receiptFromCompletion(tx, outbox)).toBeNull();

@@ -27,12 +27,11 @@ export async function GetCommitmentSignature(
   if (txSchedulingSgn?.meta == null) {
     throw new Error("Transaction not found or meta is null");
   }
-  // A later instruction can fail after magic-program logs ScheduledCommitSent.
-  // In that case the overall transaction fails and nothing was scheduled, so
-  // we must not return a signature that will never land on the ER.
+  // A later instruction can fail after the Magic program logs an outbox address.
+  // In that case the overall transaction fails and nothing was scheduled.
   if (txSchedulingSgn.meta.err !== null) {
     throw new Error(
-      "Transaction failed; commitment was not scheduled (ScheduledCommitSent logs from earlier instructions are not reliable when the transaction errors)",
+      "Transaction failed; commitment was not scheduled (outbox logs from earlier instructions are not reliable when the transaction errors)",
     );
   }
 
@@ -40,62 +39,25 @@ export async function GetCommitmentSignature(
     txSchedulingSgn.meta.logMessages ?? [],
     MAGIC_PROGRAM_ID.toBase58(),
   );
-  const scheduledCommitSgn = parseScheduleCommitsLogsMessage(schedulingLogs);
-  if (scheduledCommitSgn == null) {
-    const outboxAddresses = parseOutboxAddresses(schedulingLogs);
-    if (outboxAddresses.length === 1) {
-      const receipt = await waitForIntent(
-        outboxAddresses[0],
-        ephemeralConnection,
-      );
-      if (receipt.signatures.length === 0)
-        throw new Error("Settlement receipt contains no base-chain signature");
-      return receipt.signatures[0];
-    }
-    if (outboxAddresses.length > 1)
-      throw new Error(
-        "Scheduling transaction created multiple intents; use waitForSettlement",
-      );
-    throw new Error("ScheduledCommitSent signature not found");
-  }
-
-  const latestBlockhash = await ephemeralConnection.getLatestBlockhash();
-  await ephemeralConnection.confirmTransaction({
-    signature: scheduledCommitSgn,
-    ...latestBlockhash,
-  });
-
-  const txCommitInfo = await getTransactionWithRetry(
-    async () =>
-      ephemeralConnection.getTransaction(scheduledCommitSgn, {
-        maxSupportedTransactionVersion: 0,
-      }),
-    transactionLookupTimeoutMs,
-  );
-  if (txCommitInfo?.meta == null) {
-    throw new Error("Transaction not found or meta is null");
-  }
-  if (txCommitInfo.meta.err !== null) {
-    throw new Error(
-      "Scheduled commit transaction failed; commitment signature is not available",
+  const outboxAddresses = parseOutboxAddresses(schedulingLogs);
+  if (outboxAddresses.length === 1) {
+    const receipt = await waitForIntent(
+      outboxAddresses[0],
+      ephemeralConnection,
     );
+    if (receipt.signatures.length === 0)
+      throw new Error("Settlement receipt contains no base-chain signature");
+    return receipt.signatures[0];
   }
-
-  const commitSignature = parseCommitsLogsMessage(
-    logsFromProgram(
-      txCommitInfo.meta.logMessages ?? [],
-      MAGIC_PROGRAM_ID.toBase58(),
-    ),
-  );
-  if (commitSignature == null) {
-    throw new Error("Unable to find Commitment signature");
-  }
-
-  return commitSignature;
+  if (outboxAddresses.length > 1)
+    throw new Error(
+      "Scheduling transaction created multiple intents; use waitForSettlement",
+    );
+  throw new Error("Settlement outbox address not found in scheduling logs");
 }
 
 export interface SettlementReceipt {
-  /** Outbox PDA for outbox receipts; null for legacy receipts. */
+  /** Outbox PDA associated with the receipt, when available. */
   outboxAddress: string | null;
   /** @deprecated Use outboxAddress instead. */
   intentAddress: string | null;
@@ -107,7 +69,7 @@ export interface ReceiptWaitOptions {
   timeoutMs?: number;
   pollIntervalMs?: number;
 }
-const OUTBOX_PREFIX = "ScheduledCommitSent outbox: ";
+const OUTBOX_PREFIX = "Outbox for scheduled intent: ";
 const OUTBOX_PROGRAM_ID = "outboxintent1111111111111111111111111111111";
 const OUTBOX_PROGRAM = new PublicKey(OUTBOX_PROGRAM_ID);
 const SCHEDULED_COMMIT_SENT_TAG = 2;
@@ -241,11 +203,7 @@ export async function waitForSettlement(
         waitForIntent(outboxAddress, connection, options),
       ),
     );
-  const legacy = parseScheduleCommitsLogsMessage(logs);
-  if (legacy == null)
-    throw new Error("No settlement receipt found in scheduling logs");
-  await connection.confirmTransaction(legacy);
-  return [await readLegacyReceipt(legacy, connection)];
+  throw new Error("Settlement outbox address not found in scheduling logs");
 }
 
 /** Wait for a settlement completion recorded in an outbox address's history. */
@@ -384,14 +342,15 @@ export function receiptFromCompletion(
   // A successful Outbox instruction has already checked the validator signer and PDA.
   const logs = logsFromProgram(meta.logMessages ?? [], OUTBOX_PROGRAM_ID);
   const groups: string[][] = [];
+  const receiptStart =
+    /^(?:Program log: )?Settlement receipt intent id: (\d+),/;
   for (const line of logs) {
-    if (/^(?:Program log: )?ScheduledCommitSent id: \d+,/.test(line))
-      groups.push([line]);
+    if (receiptStart.test(line)) groups.push([line]);
     else if (groups.length > 0) groups[groups.length - 1].push(line);
   }
 
   for (const group of groups) {
-    const idMatch = group[0]?.match(/id: (\d+),/);
+    const idMatch = group[0]?.match(receiptStart);
     if (!idMatch) continue;
     const intentId = BigInt(idMatch[1]);
     const isCompletion = (message.instructions ?? []).some((instruction) => {
@@ -427,64 +386,26 @@ export function receiptFromCompletion(
   return null;
 }
 
-async function readLegacyReceipt(
-  signature: string,
-  connection: Connection,
-): Promise<SettlementReceipt> {
-  const tx = await connection.getTransaction(signature, {
-    maxSupportedTransactionVersion: 0,
-  });
-  if (!tx?.meta) throw new Error("Legacy settlement notification not found");
-  if (tx.meta.err !== null)
-    throw new Error("Legacy settlement notification failed");
-  return receiptFromLogs(
-    null,
-    logsFromProgram(tx.meta.logMessages ?? [], MAGIC_PROGRAM_ID.toBase58()),
-  );
-}
-
 export function receiptFromLogs(
   outboxAddress: string | null,
   logs: string[],
 ): SettlementReceipt {
   const signatures = logs.flatMap((line) => {
-    const match = line.match(/ScheduledCommitSent signature\[\d+\]: (.+)$/);
+    const match = line.match(/Settlement receipt signature\[\d+\]: (.+)$/);
     return match ? [match[1].trim()] : [];
   });
   const errorLine = logs.find((line) =>
-    line.includes("ScheduledCommitSent error message:"),
+    line.includes("Settlement receipt error message:"),
   );
   return {
     outboxAddress,
     intentAddress: outboxAddress,
     result: {
       errorMessage:
-        errorLine?.split("ScheduledCommitSent error message:")[1]?.trim() ??
+        errorLine?.split("Settlement receipt error message:")[1]?.trim() ??
         null,
       logs,
     },
     signatures,
   };
-}
-
-export function parseScheduleCommitsLogsMessage(
-  logMessages: string[],
-): string | null {
-  for (const message of logMessages) {
-    const signaturePrefix = "ScheduledCommitSent signature: ";
-    if (message.includes(signaturePrefix)) {
-      return message.split(signaturePrefix)[1];
-    }
-  }
-  return null;
-}
-
-export function parseCommitsLogsMessage(logMessages: string[]): string | null {
-  for (const message of logMessages) {
-    const signaturePrefix = "ScheduledCommitSent signature[0]: ";
-    if (message.includes(signaturePrefix)) {
-      return message.split(signaturePrefix)[1];
-    }
-  }
-  return null;
 }
