@@ -53,14 +53,13 @@ async function withDeadline<T>(
   promise: Promise<T>,
   deadline: number,
   cancel?: () => void,
+  timeoutMessage = "Timed out waiting for settlement receipt",
 ): Promise<T> {
   const remaining = deadline - Date.now();
   if (remaining <= 0) {
     void promise.catch(() => undefined);
     cancel?.();
-    return Promise.reject(
-      new Error("Timed out waiting for settlement receipt"),
-    );
+    return Promise.reject(new Error(timeoutMessage));
   }
   return new Promise<T>((resolve, reject) => {
     const cleanup = () => {
@@ -69,7 +68,7 @@ async function withDeadline<T>(
     const timer = setTimeout(() => {
       cancel?.();
       cleanup();
-      reject(new Error("Timed out waiting for settlement receipt"));
+      reject(new Error(timeoutMessage));
     }, remaining);
     promise.then(
       (value) => {
@@ -82,6 +81,49 @@ async function withDeadline<T>(
       },
     );
   });
+}
+
+const TRANSACTION_LOOKUP_POLL_INTERVAL_MS = 1_000;
+const TRANSACTION_LOOKUP_TIMEOUT_MESSAGE =
+  "Timed out waiting for transaction lookup";
+
+async function getTransactionWithRetry<T>(
+  getTransaction: (abortSignal: AbortSignal) => Promise<T | null>,
+  timeoutMs: number,
+): Promise<T> {
+  if (!Number.isFinite(timeoutMs) || timeoutMs < 0) {
+    throw new RangeError(
+      "Transaction lookup timeout must be a non-negative number",
+    );
+  }
+
+  const deadline = Date.now() + timeoutMs;
+  while (true) {
+    const request = new AbortController();
+    const transaction = await withDeadline(
+      getTransaction(request.signal),
+      deadline,
+      () => {
+        request.abort();
+      },
+      TRANSACTION_LOOKUP_TIMEOUT_MESSAGE,
+    );
+    if (transaction !== null) return transaction;
+
+    const remaining = deadline - Date.now();
+    if (remaining <= 0) {
+      throw new Error(`Transaction not found after waiting ${timeoutMs}ms`);
+    }
+    await new Promise((resolve) =>
+      setTimeout(
+        resolve,
+        Math.min(TRANSACTION_LOOKUP_POLL_INTERVAL_MS, remaining),
+      ),
+    );
+    if (Date.now() >= deadline) {
+      throw new Error(`Transaction not found after waiting ${timeoutMs}ms`);
+    }
+  }
 }
 
 /**
@@ -392,6 +434,7 @@ export class Connection {
    * The ephemeral rollup connection is required to access the scheduling and commit logs.
    *
    * @param signature - The transaction signature of the accounts commitment transaction to the base layer.
+   * @param transactionLookupTimeoutMs - Maximum time to wait for either transaction lookup (default: 30 seconds).
    * @returns A `Promise<string>` that resolves with the commitment signature found in the commit logs.
    *
    * @throws {Error} If the transaction or its metadata cannot be found, if the
@@ -400,13 +443,18 @@ export class Connection {
    */
   public async getCommitmentSignature(
     signature: Signature,
+    transactionLookupTimeoutMs = 30_000,
   ): Promise<Signature> {
-    const txSchedulingSgn = await this.rpc
-      .getTransaction(signature, {
-        encoding: "base64",
-        maxSupportedTransactionVersion: 0,
-      })
-      .send();
+    const txSchedulingSgn = await getTransactionWithRetry(
+      async (abortSignal) =>
+        this.rpc
+          .getTransaction(signature, {
+            encoding: "base64",
+            maxSupportedTransactionVersion: 0,
+          })
+          .send({ abortSignal }),
+      transactionLookupTimeoutMs,
+    );
 
     if (txSchedulingSgn?.meta == null) {
       throw new Error("Transaction not found or meta is null");
@@ -425,16 +473,16 @@ export class Connection {
     );
     const scheduledCommitSgn = parseScheduleCommitsLogsMessage(schedulingLogs);
     if (scheduledCommitSgn == null) {
-      const addresses = parseOutboxAddresses(schedulingLogs);
-      if (addresses.length === 1) {
-        const receipt = await this.waitForIntent(addresses[0] as Address);
+      const outboxAddresses = parseOutboxAddresses(schedulingLogs);
+      if (outboxAddresses.length === 1) {
+        const receipt = await this.waitForIntent(outboxAddresses[0] as Address);
         if (receipt.signatures.length === 0)
           throw new Error(
             "Settlement receipt contains no base-chain signature",
           );
         return receipt.signatures[0] as Signature;
       }
-      if (addresses.length > 1)
+      if (outboxAddresses.length > 1)
         throw new Error(
           "Scheduling transaction created multiple intents; use waitForSettlement",
         );
@@ -442,12 +490,16 @@ export class Connection {
     }
     await this.confirmTransaction(scheduledCommitSgn);
 
-    const txCommitInfo = await this.rpc
-      .getTransaction(scheduledCommitSgn, {
-        encoding: "base64",
-        maxSupportedTransactionVersion: 0,
-      })
-      .send();
+    const txCommitInfo = await getTransactionWithRetry(
+      async (abortSignal) =>
+        this.rpc
+          .getTransaction(scheduledCommitSgn, {
+            encoding: "base64",
+            maxSupportedTransactionVersion: 0,
+          })
+          .send({ abortSignal }),
+      transactionLookupTimeoutMs,
+    );
 
     if (txCommitInfo?.meta == null) {
       throw new Error("Transaction not found or meta is null");
@@ -484,11 +536,11 @@ export class Connection {
         "Scheduling transaction failed; no settlement receipt exists",
       );
     const logs = logsFromProgram(tx.meta.logMessages ?? [], MAGIC_PROGRAM_ID);
-    const addresses = parseOutboxAddresses(logs);
-    if (addresses.length > 0)
+    const outboxAddresses = parseOutboxAddresses(logs);
+    if (outboxAddresses.length > 0)
       return Promise.all(
-        addresses.map(async (address) =>
-          this.waitForIntentUntil(address as Address, options),
+        outboxAddresses.map(async (outboxAddress) =>
+          this.waitForIntentUntil(outboxAddress as Address, options),
         ),
       );
     const legacy = parseScheduleCommitsLogsMessage(logs);
@@ -511,16 +563,16 @@ export class Connection {
     ];
   }
 
-  /** Wait for a completion transaction in an outbox intent address's history. */
+  /** Wait for a completion transaction in an outbox address's history. */
   public async waitForIntent(
-    intentAddress: Address,
+    outboxAddress: Address,
     options: ReceiptWaitOptions = {},
   ): Promise<SettlementReceipt> {
-    return this.waitForIntentUntil(intentAddress, options);
+    return this.waitForIntentUntil(outboxAddress, options);
   }
 
   private async waitForIntentUntil(
-    intentAddress: Address,
+    outboxAddress: Address,
     options: ReceiptWaitOptions,
   ): Promise<SettlementReceipt> {
     const deadline = Date.now() + (options.timeoutMs ?? 120_000);
@@ -530,7 +582,7 @@ export class Connection {
       const historyRequest = new AbortController();
       const history = await withDeadline(
         this.rpc
-          .getSignaturesForAddress(intentAddress, { limit: 1000 })
+          .getSignaturesForAddress(outboxAddress, { limit: 1000 })
           .send({ abortSignal: historyRequest.signal }),
         deadline,
         () => {
@@ -560,7 +612,7 @@ export class Connection {
         }
         if (tx?.meta != null) inspected.add(item.signature);
         if (tx?.meta?.err === null) {
-          const receipt = receiptFromCompletion(tx, intentAddress);
+          const receipt = receiptFromCompletion(tx, outboxAddress);
           if (receipt != null) return receipt;
         }
       }
@@ -572,7 +624,7 @@ export class Connection {
       );
     }
     throw new Error(
-      `Timed out waiting for settlement intent ${intentAddress}; transaction history may be unavailable`,
+      `Timed out waiting for settlement outbox ${outboxAddress}; transaction history may be unavailable`,
     );
   }
 

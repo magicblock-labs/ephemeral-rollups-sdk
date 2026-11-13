@@ -122,6 +122,7 @@ vi.mock("@solana/transaction-confirmation", () => ({
 // ----------------------
 describe("Connection", () => {
   beforeEach(() => {
+    vi.mocked(mockRpc.getTransaction).mockClear();
     vi.mocked(utils.isRouter).mockResolvedValue(false);
     vi.mocked(solanaKit.createSolanaRpc).mockReturnValue(mockRpc);
     vi.mocked(solanaKit.createSolanaRpcSubscriptions).mockReturnValue(
@@ -153,11 +154,13 @@ describe("Connection", () => {
     vi.mocked(utils.parseCommitsLogsMessage).mockReturnValue(mockSignature);
     vi.mocked(utils.parseOutboxAddresses).mockReturnValue([]);
     vi.mocked(utils.receiptFromLogs).mockReturnValue({
+      outboxAddress: "outbox",
       intentAddress: "outbox",
       result: { errorMessage: null, logs: [] },
       signatures: ["base-signature"],
     });
     vi.mocked(utils.receiptFromCompletion).mockReturnValue({
+      outboxAddress: "outbox",
       intentAddress: "outbox",
       result: { errorMessage: null, logs: [] },
       signatures: ["base-signature"],
@@ -331,6 +334,79 @@ describe("Connection", () => {
     const connection = await Connection.create("http://localhost");
     const sig = await connection.getCommitmentSignature(mockSignature);
     expect(sig).toBe(mockSignature);
+  });
+
+  it("retries a missing scheduling transaction", async () => {
+    const connection = await Connection.create("http://localhost");
+    const send = vi
+      .fn()
+      .mockResolvedValueOnce(null)
+      .mockResolvedValue({ meta: { err: null, logMessages: ["log1"] } });
+    vi.mocked(mockRpc.getTransaction).mockReturnValue({
+      send,
+    } as unknown as ReturnType<typeof mockRpc.getTransaction>);
+
+    await expect(
+      connection.getCommitmentSignature(mockSignature, 1_500),
+    ).resolves.toBe(mockSignature);
+    expect(mockRpc.getTransaction).toHaveBeenCalledTimes(3);
+  });
+
+  it("retries a missing scheduled commit transaction", async () => {
+    const connection = await Connection.create("http://localhost");
+    const transactions = [
+      { meta: { err: null, logMessages: ["schedule"] } },
+      null,
+      { meta: { err: null, logMessages: ["commit"] } },
+    ];
+    vi.mocked(mockRpc.getTransaction).mockImplementation(
+      () =>
+        ({
+          send: vi.fn(async () => transactions.shift()),
+        }) as unknown as ReturnType<typeof mockRpc.getTransaction>,
+    );
+
+    await expect(
+      connection.getCommitmentSignature(mockSignature, 1_500),
+    ).resolves.toBe(mockSignature);
+    expect(mockRpc.getTransaction).toHaveBeenCalledTimes(3);
+  });
+
+  it("times out when the transaction lookup keeps returning null", async () => {
+    const connection = await Connection.create("http://localhost");
+    vi.mocked(mockRpc.getTransaction).mockReturnValue({
+      send: vi.fn(async () => null),
+    } as unknown as ReturnType<typeof mockRpc.getTransaction>);
+
+    await expect(
+      connection.getCommitmentSignature(mockSignature, 10),
+    ).rejects.toThrow("Transaction not found after waiting 10ms");
+    expect(mockRpc.getTransaction).toHaveBeenCalled();
+  });
+
+  it("does not retry a transaction whose metadata is null", async () => {
+    const connection = await Connection.create("http://localhost");
+    vi.mocked(mockRpc.getTransaction).mockReturnValue({
+      send: vi.fn(async () => ({ meta: null })),
+    } as unknown as ReturnType<typeof mockRpc.getTransaction>);
+
+    await expect(
+      connection.getCommitmentSignature(mockSignature, 10_000),
+    ).rejects.toThrow("Transaction not found or meta is null");
+    expect(mockRpc.getTransaction).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not retry a failed transaction lookup RPC", async () => {
+    const connection = await Connection.create("http://localhost");
+    const rpcError = new Error("RPC unavailable");
+    vi.mocked(mockRpc.getTransaction).mockReturnValue({
+      send: vi.fn().mockRejectedValue(rpcError),
+    } as unknown as ReturnType<typeof mockRpc.getTransaction>);
+
+    await expect(
+      connection.getCommitmentSignature(mockSignature, 10_000),
+    ).rejects.toBe(rpcError);
+    expect(mockRpc.getTransaction).toHaveBeenCalledTimes(1);
   });
 
   it("should reject getCommitmentSignature when the scheduling transaction failed", async () => {

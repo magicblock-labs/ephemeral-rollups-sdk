@@ -58,18 +58,24 @@ describe("settlement receipt parsing", () => {
         [
           "Program magic111 invoke [1]",
           "Program log: real",
+          "ScheduledCommitSent outbox: real-address",
           "Program attacker111 invoke [2]",
           "Program log: spoofed",
+          "ScheduledCommitSent outbox: spoofed-address",
           "Program attacker111 success",
           "Program magic111 success",
         ],
         "magic111",
       ),
-    ).toEqual(["Program log: real"]);
+    ).toEqual([
+      "Program log: real",
+      "ScheduledCommitSent outbox: real-address",
+    ]);
   });
 
   it("extracts completion results without accepting logs from other programs", () => {
     const receipt = receiptFromCompletion(makeCompletion(42), outbox);
+    expect(receipt?.outboxAddress).toBe(outbox);
     expect(receipt?.signatures).toEqual(["real-signature"]);
     expect(receipt?.result.errorMessage).toBe("action failed");
   });
@@ -97,7 +103,19 @@ describe("settlement receipt parsing", () => {
       "Program log: ScheduledCommitSent signature[0]: base-1",
       "Program log: ScheduledCommitSent error message: action failed",
     ]);
+    expect(receipt.outboxAddress).toBe("address-1");
+    // Keep the previous public field available for existing consumers.
+    expect(receipt.intentAddress).toBe("address-1");
     expect(receipt.signatures).toEqual(["base-1"]);
     expect(receipt.result.errorMessage).toBe("action failed");
+  });
+
+  it("keeps both outbox address fields null for a legacy receipt", () => {
+    const receipt = receiptFromLogs(null, [
+      "Program log: ScheduledCommitSent signature[0]: base-signature",
+    ]);
+
+    expect(receipt.outboxAddress).toBeNull();
+    expect(receipt.intentAddress).toBeNull();
   });
 });

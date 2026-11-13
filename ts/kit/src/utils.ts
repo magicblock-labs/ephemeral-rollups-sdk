@@ -101,6 +101,9 @@ export function parseCommitsLogsMessage(
 }
 
 export interface SettlementReceipt {
+  /** Outbox PDA for outbox receipts; null for legacy receipts. */
+  outboxAddress: string | null;
+  /** @deprecated Use outboxAddress instead. */
   intentAddress: string | null;
   result: { errorMessage: string | null; logs: string[] };
   signatures: string[];
@@ -120,7 +123,7 @@ export function parseOutboxAddresses(logMessages: readonly string[]): string[] {
 }
 
 export function receiptFromLogs(
-  intentAddress: string | null,
+  outboxAddress: string | null,
   logMessages: readonly string[],
 ): SettlementReceipt {
   const logs = [...logMessages];
@@ -132,7 +135,8 @@ export function receiptFromLogs(
     line.includes("ScheduledCommitSent error message:"),
   );
   return {
-    intentAddress,
+    outboxAddress,
+    intentAddress: outboxAddress,
     result: {
       errorMessage:
         errorLine?.split("ScheduledCommitSent error message:")[1]?.trim() ??
@@ -163,7 +167,7 @@ export function logsFromProgram(
     }
     if (
       stack[stack.length - 1] === programId &&
-      line.startsWith("Program log: ")
+      (line.startsWith("Program log: ") || !line.startsWith("Program "))
     )
       programLogs.push(line);
   }
@@ -172,7 +176,7 @@ export function logsFromProgram(
 
 export function receiptFromCompletion(
   tx: unknown,
-  outbox: string,
+  outboxAddress: string,
 ): SettlementReceipt | null {
   if (tx == null || typeof tx !== "object") return null;
   const transaction = tx as {
@@ -197,7 +201,7 @@ export function receiptFromCompletion(
   const logs = logsFromProgram(meta.logMessages ?? [], OUTBOX_PROGRAM_ID);
   const groups: string[][] = [];
   for (const line of logs) {
-    if (/^Program log: ScheduledCommitSent id: \d+,/.test(line))
+    if (/^(?:Program log: )?ScheduledCommitSent id: \d+,/.test(line))
       groups.push([line]);
     else if (groups.length > 0) groups[groups.length - 1].push(line);
   }
@@ -209,7 +213,7 @@ export function receiptFromCompletion(
     const isCompletion = (message.instructions ?? []).some((instruction) => {
       if (
         instruction.programId !== OUTBOX_PROGRAM_ID ||
-        instruction.accounts?.[1] !== outbox ||
+        instruction.accounts?.[1] !== outboxAddress ||
         instruction.data == null
       )
         return false;
@@ -233,7 +237,7 @@ export function receiptFromCompletion(
         instructionId = (instructionId << 8n) | BigInt(data[4 + byte]);
       return instructionId === intentId;
     });
-    if (isCompletion) return receiptFromLogs(outbox, group);
+    if (isCompletion) return receiptFromLogs(outboxAddress, group);
   }
   return null;
 }

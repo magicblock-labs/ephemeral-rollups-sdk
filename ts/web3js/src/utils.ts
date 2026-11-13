@@ -7,16 +7,23 @@ import { MAGIC_PROGRAM_ID } from "./constants";
  * Get the signature of the accounts commitment transaction to the base layer
  * @param transactionSignature
  * @param ephemeralConnection
+ * @param transactionLookupTimeoutMs Maximum time to wait for either transaction lookup (default: 30 seconds).
  * @constructor
  */
 export async function GetCommitmentSignature(
   transactionSignature: string,
   ephemeralConnection: Connection,
+  transactionLookupTimeoutMs = 30_000,
 ): Promise<string> {
-  const txSchedulingSgn = await ephemeralConnection.getTransaction(
-    transactionSignature,
-    { maxSupportedTransactionVersion: 0 },
+  const txSchedulingSgn = await getTransactionWithRetry(
+    async () =>
+      ephemeralConnection.getTransaction(transactionSignature, {
+        maxSupportedTransactionVersion: 0,
+      }),
+    transactionLookupTimeoutMs,
   );
+  console.log("> txSchedulingSgn: ", txSchedulingSgn);
+
   if (txSchedulingSgn?.meta == null) {
     throw new Error("Transaction not found or meta is null");
   }
@@ -35,14 +42,17 @@ export async function GetCommitmentSignature(
   );
   const scheduledCommitSgn = parseScheduleCommitsLogsMessage(schedulingLogs);
   if (scheduledCommitSgn == null) {
-    const addresses = parseOutboxAddresses(schedulingLogs);
-    if (addresses.length === 1) {
-      const receipt = await waitForIntent(addresses[0], ephemeralConnection);
+    const outboxAddresses = parseOutboxAddresses(schedulingLogs);
+    if (outboxAddresses.length === 1) {
+      const receipt = await waitForIntent(
+        outboxAddresses[0],
+        ephemeralConnection,
+      );
       if (receipt.signatures.length === 0)
         throw new Error("Settlement receipt contains no base-chain signature");
       return receipt.signatures[0];
     }
-    if (addresses.length > 1)
+    if (outboxAddresses.length > 1)
       throw new Error(
         "Scheduling transaction created multiple intents; use waitForSettlement",
       );
@@ -55,9 +65,12 @@ export async function GetCommitmentSignature(
     ...latestBlockhash,
   });
 
-  const txCommitInfo = await ephemeralConnection.getTransaction(
-    scheduledCommitSgn,
-    { maxSupportedTransactionVersion: 0 },
+  const txCommitInfo = await getTransactionWithRetry(
+    async () =>
+      ephemeralConnection.getTransaction(scheduledCommitSgn, {
+        maxSupportedTransactionVersion: 0,
+      }),
+    transactionLookupTimeoutMs,
   );
   if (txCommitInfo?.meta == null) {
     throw new Error("Transaction not found or meta is null");
@@ -82,6 +95,9 @@ export async function GetCommitmentSignature(
 }
 
 export interface SettlementReceipt {
+  /** Outbox PDA for outbox receipts; null for legacy receipts. */
+  outboxAddress: string | null;
+  /** @deprecated Use outboxAddress instead. */
   intentAddress: string | null;
   result: { errorMessage: string | null; logs: string[] };
   signatures: string[];
@@ -99,13 +115,12 @@ const SCHEDULED_COMMIT_SENT_TAG = 2;
 async function withDeadline<T>(
   promise: Promise<T>,
   deadline: number,
+  timeoutMessage = "Timed out waiting for settlement receipt",
 ): Promise<T> {
   const remaining = deadline - Date.now();
   if (remaining <= 0) {
     void promise.catch(() => undefined);
-    return Promise.reject(
-      new Error("Timed out waiting for settlement receipt"),
-    );
+    return Promise.reject(new Error(timeoutMessage));
   }
   return new Promise<T>((resolve, reject) => {
     const cleanup = () => {
@@ -113,7 +128,7 @@ async function withDeadline<T>(
     };
     const timer = setTimeout(() => {
       cleanup();
-      reject(new Error("Timed out waiting for settlement receipt"));
+      reject(new Error(timeoutMessage));
     }, remaining);
     promise.then(
       (value) => {
@@ -126,6 +141,45 @@ async function withDeadline<T>(
       },
     );
   });
+}
+
+const TRANSACTION_LOOKUP_POLL_INTERVAL_MS = 1_000;
+const TRANSACTION_LOOKUP_TIMEOUT_MESSAGE =
+  "Timed out waiting for transaction lookup";
+
+async function getTransactionWithRetry<T>(
+  getTransaction: () => Promise<T | null>,
+  timeoutMs: number,
+): Promise<T> {
+  if (!Number.isFinite(timeoutMs) || timeoutMs < 0) {
+    throw new RangeError(
+      "Transaction lookup timeout must be a non-negative number",
+    );
+  }
+
+  const deadline = Date.now() + timeoutMs;
+  while (true) {
+    const transaction = await withDeadline(
+      getTransaction(),
+      deadline,
+      TRANSACTION_LOOKUP_TIMEOUT_MESSAGE,
+    );
+    if (transaction !== null) return transaction;
+
+    const remaining = deadline - Date.now();
+    if (remaining <= 0) {
+      throw new Error(`Transaction not found after waiting ${timeoutMs}ms`);
+    }
+    await new Promise((resolve) =>
+      setTimeout(
+        resolve,
+        Math.min(TRANSACTION_LOOKUP_POLL_INTERVAL_MS, remaining),
+      ),
+    );
+    if (Date.now() >= deadline) {
+      throw new Error(`Transaction not found after waiting ${timeoutMs}ms`);
+    }
+  }
 }
 
 export function logsFromProgram(
@@ -148,7 +202,7 @@ export function logsFromProgram(
     }
     if (
       stack[stack.length - 1] === programId &&
-      line.startsWith("Program log: ")
+      (line.startsWith("Program log: ") || !line.startsWith("Program "))
     )
       programLogs.push(line);
   }
@@ -180,11 +234,11 @@ export async function waitForSettlement(
     tx.meta.logMessages ?? [],
     MAGIC_PROGRAM_ID.toBase58(),
   );
-  const addresses = parseOutboxAddresses(logs);
-  if (addresses.length > 0)
+  const outboxAddresses = parseOutboxAddresses(logs);
+  if (outboxAddresses.length > 0)
     return Promise.all(
-      addresses.map(async (address) =>
-        waitForIntent(address, connection, options),
+      outboxAddresses.map(async (outboxAddress) =>
+        waitForIntent(outboxAddress, connection, options),
       ),
     );
   const legacy = parseScheduleCommitsLogsMessage(logs);
@@ -196,25 +250,52 @@ export async function waitForSettlement(
 
 /** Wait for a settlement completion recorded in an outbox address's history. */
 export async function waitForIntent(
-  intentAddress: string,
+  outboxAddress: string,
   connection: Connection,
   options: ReceiptWaitOptions = {},
 ): Promise<SettlementReceipt> {
-  let address: PublicKey;
+  let outboxPublicKey: PublicKey;
   try {
-    address = new PublicKey(intentAddress);
+    outboxPublicKey = new PublicKey(outboxAddress);
   } catch {
-    throw new Error(`Invalid settlement intent address: ${intentAddress}`);
+    throw new Error(`Invalid settlement outbox address: ${outboxAddress}`);
   }
   const timeoutMs = options.timeoutMs ?? 120_000;
   const pollIntervalMs = options.pollIntervalMs ?? 1_000;
   const deadline = Date.now() + timeoutMs;
   const inspected = new Set<string>();
+  let pollCount = 0;
+  let previousSignatureList: string | null = null;
+  console.log("[waitForIntent] started", { outboxAddress });
+
   while (Date.now() <= deadline) {
-    const signatures = await withDeadline(
-      connection.getSignaturesForAddress(address, { limit: 1000 }),
-      deadline,
-    );
+    pollCount++;
+    let signatures;
+    try {
+      signatures = await withDeadline(
+        connection.getSignaturesForAddress(outboxPublicKey, { limit: 1000 }),
+        deadline,
+      );
+    } catch (error) {
+      console.error("[waitForIntent] getSignaturesForAddress failed", {
+        outboxAddress,
+        pollCount,
+        error,
+      });
+      throw error;
+    }
+    const signatureList = signatures.map((item) => item.signature);
+    const signatureListKey = signatureList.join(",");
+    if (signatureListKey !== previousSignatureList) {
+      console.log("[waitForIntent] getSignaturesForAddress completed", {
+        outboxAddress,
+        pollCount,
+        signatureCount: signatures.length,
+        signatures: signatureList,
+      });
+      previousSignatureList = signatureListKey;
+    }
+
     for (const item of signatures) {
       if (inspected.has(item.signature)) continue;
       let tx;
@@ -226,12 +307,33 @@ export async function waitForIntent(
           deadline,
         );
       } catch (error) {
+        console.error("[waitForIntent] getParsedTransaction failed", {
+          outboxAddress,
+          signature: item.signature,
+          error,
+        });
         if (Date.now() >= deadline) throw error;
         continue;
       }
       if (tx?.meta != null) inspected.add(item.signature);
+      const transactionLogs = tx?.meta?.logMessages ?? [];
+      console.log("[waitForIntent] getParsedTransaction completed", {
+        outboxAddress,
+        signature: item.signature,
+        transactionFound: tx != null,
+        metaAvailable: tx?.meta != null,
+        transactionError: tx?.meta?.err,
+        ...(transactionLogs.length > 0 ? { transactionLogs } : {}),
+      });
       if (tx?.meta?.err === null) {
-        const receipt = receiptFromCompletion(tx, address);
+        const receipt = receiptFromCompletion(tx, outboxPublicKey);
+        console.log("[waitForIntent] receipt parsing completed", {
+          outboxAddress,
+          signature: item.signature,
+          matched: receipt != null,
+          receiptSignatureCount: receipt?.signatures.length ?? 0,
+          receiptSignatures: receipt?.signatures ?? [],
+        });
         if (receipt != null) return receipt;
       }
     }
@@ -242,14 +344,19 @@ export async function waitForIntent(
       ),
     );
   }
+  console.warn("[waitForIntent] timed out without finding a receipt", {
+    outboxAddress,
+    pollCount,
+    inspectedTransactionCount: inspected.size,
+  });
   throw new Error(
-    `Timed out waiting for settlement intent ${intentAddress}; transaction history may be unavailable`,
+    `Timed out waiting for settlement outbox ${outboxAddress}; transaction history may be unavailable`,
   );
 }
 
 export function receiptFromCompletion(
   tx: unknown,
-  outbox: PublicKey,
+  outboxAddress: PublicKey,
 ): SettlementReceipt | null {
   if (tx == null || typeof tx !== "object") return null;
   const confirmedTx = tx as {
@@ -278,7 +385,7 @@ export function receiptFromCompletion(
   const logs = logsFromProgram(meta.logMessages ?? [], OUTBOX_PROGRAM_ID);
   const groups: string[][] = [];
   for (const line of logs) {
-    if (/^Program log: ScheduledCommitSent id: \d+,/.test(line))
+    if (/^(?:Program log: )?ScheduledCommitSent id: \d+,/.test(line))
       groups.push([line]);
     else if (groups.length > 0) groups[groups.length - 1].push(line);
   }
@@ -291,7 +398,7 @@ export function receiptFromCompletion(
       if (
         !(instruction.programId instanceof PublicKey) ||
         !instruction.programId.equals(OUTBOX_PROGRAM) ||
-        instruction.accounts?.[1]?.equals(outbox) !== true ||
+        instruction.accounts?.[1]?.equals(outboxAddress) !== true ||
         instruction.data == null
       )
         return false;
@@ -315,7 +422,7 @@ export function receiptFromCompletion(
         instructionId = (instructionId << 8n) | BigInt(data[4 + byte]);
       return instructionId === intentId;
     });
-    if (isCompletion) return receiptFromLogs(outbox.toBase58(), group);
+    if (isCompletion) return receiptFromLogs(outboxAddress.toBase58(), group);
   }
   return null;
 }
@@ -337,7 +444,7 @@ async function readLegacyReceipt(
 }
 
 export function receiptFromLogs(
-  intentAddress: string | null,
+  outboxAddress: string | null,
   logs: string[],
 ): SettlementReceipt {
   const signatures = logs.flatMap((line) => {
@@ -348,7 +455,8 @@ export function receiptFromLogs(
     line.includes("ScheduledCommitSent error message:"),
   );
   return {
-    intentAddress,
+    outboxAddress,
+    intentAddress: outboxAddress,
     result: {
       errorMessage:
         errorLine?.split("ScheduledCommitSent error message:")[1]?.trim() ??
