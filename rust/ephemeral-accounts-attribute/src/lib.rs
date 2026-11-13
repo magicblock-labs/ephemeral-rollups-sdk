@@ -14,11 +14,7 @@ const ATTR_SEEDS: &str = "seeds";
 const ATTR_INIT: &str = "init";
 
 fn generated_unchecked_account_type() -> TokenStream2 {
-    if cfg!(feature = "backward-compat") {
-        quote! { AccountInfo<'info> }
-    } else {
-        quote! { UncheckedAccount<'info> }
-    }
+    quote! { UncheckedAccount<'info> }
 }
 
 #[derive(Clone, Copy)]

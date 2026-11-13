@@ -7,6 +7,7 @@ use mdp::state::record::ErRecord;
 use rpc::nonblocking::rpc_client::RpcClient;
 use rpc_api::{client_error::ErrorKind, request::RpcError};
 use sdk::{account::ReadableAccount, pubkey::Pubkey};
+use solana_address::Address;
 
 use crate::{
     account, DelegationStatus, DelegationsDB, ResolverResult, DELEGATION_PROGRAM_ID,
@@ -78,7 +79,7 @@ pub async fn fetch_account_state(
 /// Returns list of all available ER node records
 pub async fn fetch_domain_records(chain: &RpcClient) -> ResolverResult<Vec<ErRecord>> {
     let accounts = chain
-        .get_program_accounts(&mdp::id())
+        .get_program_accounts(&Address::new_from_array(mdp::id().to_bytes()))
         .await
         .map_err(Box::new)?;
     let mut records = Vec::with_capacity(accounts.len());

@@ -1,4 +1,3 @@
-use crate::compat::{self, AsModern, Compat, Modern};
 use magicblock_magic_program_api::instruction::MagicBlockInstruction;
 use solana_program::instruction::{AccountMeta, Instruction};
 use solana_program::program::invoke;
@@ -10,12 +9,12 @@ use solana_program::program::invoke;
 /// no fee collection is required (e.g. the payer is not delegated).
 #[inline(always)]
 pub fn commit_accounts<'a, 'info>(
-    payer: &'a compat::AccountInfo<'info>,
-    account_infos: Vec<&'a compat::AccountInfo<'info>>,
-    magic_context: &'a compat::AccountInfo<'info>,
-    magic_program: &'a compat::AccountInfo<'info>,
-    magic_fee_vault: Option<&'a compat::AccountInfo<'info>>,
-) -> compat::ProgramResult {
+    payer: &'a solana_program::account_info::AccountInfo<'info>,
+    account_infos: Vec<&'a solana_program::account_info::AccountInfo<'info>>,
+    magic_context: &'a solana_program::account_info::AccountInfo<'info>,
+    magic_program: &'a solana_program::account_info::AccountInfo<'info>,
+    magic_fee_vault: Option<&'a solana_program::account_info::AccountInfo<'info>>,
+) -> solana_program::entrypoint_deprecated::ProgramResult {
     let ix = create_schedule_commit_ix(
         payer,
         &account_infos,
@@ -29,19 +28,19 @@ pub fn commit_accounts<'a, 'info>(
         all_accounts.push(vault.clone());
     }
     all_accounts.extend(account_infos.into_iter().cloned());
-    invoke(&ix.modern(), &all_accounts.modern()).compat()
+    invoke(&ix, &all_accounts)
 }
 
 /// CPI to trigger a commit and undelegate one or more accounts in the ER.
 /// Pass `magic_fee_vault` when the payer is a delegated ephemeral balance account.
 #[inline(always)]
 pub fn commit_and_undelegate_accounts<'a, 'info>(
-    payer: &'a compat::AccountInfo<'info>,
-    account_infos: Vec<&'a compat::AccountInfo<'info>>,
-    magic_context: &'a compat::AccountInfo<'info>,
-    magic_program: &'a compat::AccountInfo<'info>,
-    magic_fee_vault: Option<&'a compat::AccountInfo<'info>>,
-) -> compat::ProgramResult {
+    payer: &'a solana_program::account_info::AccountInfo<'info>,
+    account_infos: Vec<&'a solana_program::account_info::AccountInfo<'info>>,
+    magic_context: &'a solana_program::account_info::AccountInfo<'info>,
+    magic_program: &'a solana_program::account_info::AccountInfo<'info>,
+    magic_fee_vault: Option<&'a solana_program::account_info::AccountInfo<'info>>,
+) -> solana_program::entrypoint_deprecated::ProgramResult {
     let ix = create_schedule_commit_ix(
         payer,
         &account_infos,
@@ -55,17 +54,17 @@ pub fn commit_and_undelegate_accounts<'a, 'info>(
         all_accounts.push(vault.clone());
     }
     all_accounts.extend(account_infos.into_iter().cloned());
-    invoke(&ix.modern(), &all_accounts.modern()).compat()
+    invoke(&ix, &all_accounts)
 }
 
 pub fn create_schedule_commit_ix<'a, 'info>(
-    payer: &'a compat::AccountInfo<'info>,
-    account_infos: &[&'a compat::AccountInfo<'info>],
-    magic_context: &'a compat::AccountInfo<'info>,
-    magic_program: &'a compat::AccountInfo<'info>,
-    magic_fee_vault: Option<&'a compat::AccountInfo<'info>>,
+    payer: &'a solana_program::account_info::AccountInfo<'info>,
+    account_infos: &[&'a solana_program::account_info::AccountInfo<'info>],
+    magic_context: &'a solana_program::account_info::AccountInfo<'info>,
+    magic_program: &'a solana_program::account_info::AccountInfo<'info>,
+    magic_fee_vault: Option<&'a solana_program::account_info::AccountInfo<'info>>,
     allow_undelegation: bool,
-) -> compat::Instruction {
+) -> solana_program::instruction::Instruction {
     let instruction = if allow_undelegation {
         MagicBlockInstruction::ScheduleCommitAndUndelegate
     } else {
@@ -73,28 +72,27 @@ pub fn create_schedule_commit_ix<'a, 'info>(
     };
     let mut account_metas = vec![
         AccountMeta {
-            pubkey: *payer.key.as_modern(),
+            pubkey: *payer.key,
             is_signer: true,
             is_writable: true,
         },
         AccountMeta {
-            pubkey: *magic_context.key.as_modern(),
+            pubkey: *magic_context.key,
             is_signer: false,
             is_writable: true,
         },
     ];
     if let Some(vault) = magic_fee_vault {
         account_metas.push(AccountMeta {
-            pubkey: *vault.key.as_modern(),
+            pubkey: *vault.key,
             is_signer: false,
             is_writable: true,
         });
     }
     account_metas.extend(account_infos.iter().map(|x| AccountMeta {
-        pubkey: *x.key.as_modern(),
+        pubkey: *x.key,
         is_signer: x.is_signer,
         is_writable: x.is_writable,
     }));
-    Instruction::new_with_bincode(*magic_program.key.as_modern(), &instruction, account_metas)
-        .compat()
+    Instruction::new_with_bincode(*magic_program.key, &instruction, account_metas)
 }

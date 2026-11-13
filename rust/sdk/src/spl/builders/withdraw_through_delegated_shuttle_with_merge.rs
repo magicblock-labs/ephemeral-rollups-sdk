@@ -4,7 +4,6 @@ use crate::pda::{
 };
 
 use crate::{
-    compat,
     consts::{ASSOCIATED_TOKEN_PROGRAM_ID, ESPL_TOKEN_PROGRAM_ID, TOKEN_PROGRAM_ID},
     cpi::DELEGATION_PROGRAM_ID,
     spl::{
@@ -14,18 +13,18 @@ use crate::{
 };
 
 pub struct WithdrawThroughDelegatedShuttleWithMergeBuilder {
-    pub payer: compat::Pubkey,
-    pub owner: compat::Pubkey,
-    pub owner_ata: compat::Pubkey,
-    pub mint: compat::Pubkey,
+    pub payer: solana_program::pubkey::Pubkey,
+    pub owner: solana_program::pubkey::Pubkey,
+    pub owner_ata: solana_program::pubkey::Pubkey,
+    pub mint: solana_program::pubkey::Pubkey,
     pub shuttle_id: u32,
     pub amount: u64,
-    pub validator: Option<compat::Pubkey>,
+    pub validator: Option<solana_program::pubkey::Pubkey>,
 }
 
 impl WithdrawThroughDelegatedShuttleWithMergeBuilder {
     #[inline(always)]
-    pub fn instruction(&self) -> compat::Instruction {
+    pub fn instruction(&self) -> solana_program::instruction::Instruction {
         let (rent_pda, _rent_bump) = find_rent_pda();
         let (shuttle_ephemeral_ata, _shuttle_bump) =
             find_shuttle_ephemeral_ata(&self.owner, &self.mint, self.shuttle_id);
@@ -46,28 +45,39 @@ impl WithdrawThroughDelegatedShuttleWithMergeBuilder {
             data.extend_from_slice(validator.as_ref());
         }
 
-        compat::Instruction {
+        solana_program::instruction::Instruction {
             program_id: ESPL_TOKEN_PROGRAM_ID,
             accounts: vec![
-                compat::AccountMeta::new(self.payer, true),
-                compat::AccountMeta::new(rent_pda, false),
-                compat::AccountMeta::new(shuttle_ephemeral_ata, false),
-                compat::AccountMeta::new(shuttle_ata, false),
-                compat::AccountMeta::new(shuttle_wallet_ata, false),
-                compat::AccountMeta::new_readonly(self.owner, true),
-                compat::AccountMeta::new_readonly(ESPL_TOKEN_PROGRAM_ID, false),
-                compat::AccountMeta::new(delegation_buffer, false),
-                compat::AccountMeta::new(delegation_record, false),
-                compat::AccountMeta::new(delegation_metadata, false),
-                compat::AccountMeta::new_readonly(DELEGATION_PROGRAM_ID, false),
-                compat::AccountMeta::new_readonly(ASSOCIATED_TOKEN_PROGRAM_ID, false),
-                compat::AccountMeta::new_readonly(
-                    compat::Pubkey::new_from_array(solana_system_interface::program::ID.to_bytes()),
+                solana_program::instruction::AccountMeta::new(self.payer, true),
+                solana_program::instruction::AccountMeta::new(rent_pda, false),
+                solana_program::instruction::AccountMeta::new(shuttle_ephemeral_ata, false),
+                solana_program::instruction::AccountMeta::new(shuttle_ata, false),
+                solana_program::instruction::AccountMeta::new(shuttle_wallet_ata, false),
+                solana_program::instruction::AccountMeta::new_readonly(self.owner, true),
+                solana_program::instruction::AccountMeta::new_readonly(
+                    ESPL_TOKEN_PROGRAM_ID,
                     false,
                 ),
-                compat::AccountMeta::new(self.owner_ata, false),
-                compat::AccountMeta::new_readonly(self.mint, false),
-                compat::AccountMeta::new_readonly(TOKEN_PROGRAM_ID, false),
+                solana_program::instruction::AccountMeta::new(delegation_buffer, false),
+                solana_program::instruction::AccountMeta::new(delegation_record, false),
+                solana_program::instruction::AccountMeta::new(delegation_metadata, false),
+                solana_program::instruction::AccountMeta::new_readonly(
+                    DELEGATION_PROGRAM_ID,
+                    false,
+                ),
+                solana_program::instruction::AccountMeta::new_readonly(
+                    ASSOCIATED_TOKEN_PROGRAM_ID,
+                    false,
+                ),
+                solana_program::instruction::AccountMeta::new_readonly(
+                    solana_program::pubkey::Pubkey::new_from_array(
+                        solana_system_interface::program::ID.to_bytes(),
+                    ),
+                    false,
+                ),
+                solana_program::instruction::AccountMeta::new(self.owner_ata, false),
+                solana_program::instruction::AccountMeta::new_readonly(self.mint, false),
+                solana_program::instruction::AccountMeta::new_readonly(TOKEN_PROGRAM_ID, false),
             ],
             data,
         }

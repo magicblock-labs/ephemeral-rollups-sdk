@@ -1,5 +1,4 @@
 use crate::{
-    compat,
     consts::{
         ASSOCIATED_TOKEN_PROGRAM_ID, ESPL_TOKEN_PROGRAM_ID, PERMISSION_PROGRAM_ID, TOKEN_PROGRAM_ID,
     },
@@ -18,20 +17,21 @@ use crate::{
 const PERMISSION_SEED: &[u8] = b"permission:";
 
 pub struct InitializeTransferQueueBuilder {
-    pub payer: compat::Pubkey,
-    pub mint: compat::Pubkey,
-    pub validator: compat::Pubkey,
+    pub payer: solana_program::pubkey::Pubkey,
+    pub mint: solana_program::pubkey::Pubkey,
+    pub validator: solana_program::pubkey::Pubkey,
     pub requested_items: Option<u32>,
 }
 
 impl InitializeTransferQueueBuilder {
     #[inline(always)]
-    pub fn instruction(&self) -> compat::Instruction {
+    pub fn instruction(&self) -> solana_program::instruction::Instruction {
         let (queue, _queue_bump) = find_transfer_queue(&self.mint, &self.validator);
-        let (queue_permission, _permission_bump) = compat::Pubkey::find_program_address(
-            &[PERMISSION_SEED, queue.as_ref()],
-            &PERMISSION_PROGRAM_ID,
-        );
+        let (queue_permission, _permission_bump) =
+            solana_program::pubkey::Pubkey::find_program_address(
+                &[PERMISSION_SEED, queue.as_ref()],
+                &PERMISSION_PROGRAM_ID,
+            );
         let (queue_ephemeral_ata, _queue_eata_bump) =
             find_transfer_queue_ephemeral_ata(&self.mint, &self.validator);
         let queue_vault_ata =
@@ -50,28 +50,42 @@ impl InitializeTransferQueueBuilder {
             data.extend_from_slice(&requested_items.to_le_bytes());
         }
 
-        compat::Instruction {
+        solana_program::instruction::Instruction {
             program_id: ESPL_TOKEN_PROGRAM_ID,
             accounts: vec![
-                compat::AccountMeta::new(self.payer, true),
-                compat::AccountMeta::new(queue, false),
-                compat::AccountMeta::new(queue_permission, false),
-                compat::AccountMeta::new_readonly(self.mint, false),
-                compat::AccountMeta::new_readonly(self.validator, false),
-                compat::AccountMeta::new_readonly(
-                    compat::Pubkey::new_from_array(solana_system_interface::program::ID.to_bytes()),
+                solana_program::instruction::AccountMeta::new(self.payer, true),
+                solana_program::instruction::AccountMeta::new(queue, false),
+                solana_program::instruction::AccountMeta::new(queue_permission, false),
+                solana_program::instruction::AccountMeta::new_readonly(self.mint, false),
+                solana_program::instruction::AccountMeta::new_readonly(self.validator, false),
+                solana_program::instruction::AccountMeta::new_readonly(
+                    solana_program::pubkey::Pubkey::new_from_array(
+                        solana_system_interface::program::ID.to_bytes(),
+                    ),
                     false,
                 ),
-                compat::AccountMeta::new_readonly(PERMISSION_PROGRAM_ID, false),
-                compat::AccountMeta::new(queue_ephemeral_ata, false),
-                compat::AccountMeta::new(queue_vault_ata, false),
-                compat::AccountMeta::new_readonly(TOKEN_PROGRAM_ID, false),
-                compat::AccountMeta::new_readonly(ASSOCIATED_TOKEN_PROGRAM_ID, false),
-                compat::AccountMeta::new_readonly(ESPL_TOKEN_PROGRAM_ID, false),
-                compat::AccountMeta::new(delegation_buffer, false),
-                compat::AccountMeta::new(delegation_record, false),
-                compat::AccountMeta::new(delegation_metadata, false),
-                compat::AccountMeta::new_readonly(DELEGATION_PROGRAM_ID, false),
+                solana_program::instruction::AccountMeta::new_readonly(
+                    PERMISSION_PROGRAM_ID,
+                    false,
+                ),
+                solana_program::instruction::AccountMeta::new(queue_ephemeral_ata, false),
+                solana_program::instruction::AccountMeta::new(queue_vault_ata, false),
+                solana_program::instruction::AccountMeta::new_readonly(TOKEN_PROGRAM_ID, false),
+                solana_program::instruction::AccountMeta::new_readonly(
+                    ASSOCIATED_TOKEN_PROGRAM_ID,
+                    false,
+                ),
+                solana_program::instruction::AccountMeta::new_readonly(
+                    ESPL_TOKEN_PROGRAM_ID,
+                    false,
+                ),
+                solana_program::instruction::AccountMeta::new(delegation_buffer, false),
+                solana_program::instruction::AccountMeta::new(delegation_record, false),
+                solana_program::instruction::AccountMeta::new(delegation_metadata, false),
+                solana_program::instruction::AccountMeta::new_readonly(
+                    DELEGATION_PROGRAM_ID,
+                    false,
+                ),
             ],
             data,
         }

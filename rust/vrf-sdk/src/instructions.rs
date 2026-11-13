@@ -1,6 +1,6 @@
-use crate::compat::{self, Compat, Modern, Pubkey};
 use crate::consts;
 use crate::types::{RequestRandomness, SerializableAccountMeta};
+use solana_program::pubkey::Pubkey;
 
 /// Parameters for creating a request randomness instruction
 #[derive(Clone, Default)]
@@ -15,12 +15,7 @@ pub struct RequestRandomnessParams {
 }
 
 fn find_program_identity(callback_program_id: &Pubkey) -> Pubkey {
-    crate::compat::latest::Pubkey::find_program_address(
-        &[consts::IDENTITY],
-        &callback_program_id.modern(),
-    )
-    .0
-    .compat()
+    solana_program::pubkey::Pubkey::find_program_address(&[consts::IDENTITY], callback_program_id).0
 }
 
 /// Build the base request-randomness instruction (discriminator defaults to high-priority `3`;
@@ -28,19 +23,23 @@ fn find_program_identity(callback_program_id: &Pubkey) -> Pubkey {
 fn build_request_ix(
     params: RequestRandomnessParams,
     program_identity: Pubkey,
-) -> compat::Instruction {
-    let payer = params.payer.modern();
-    let oracle_queue = params.oracle_queue.modern();
-    let program_identity = program_identity.modern();
-
-    compat::latest::Instruction {
-        program_id: consts::VRF_PROGRAM_ID.modern(),
+) -> solana_program::instruction::Instruction {
+    let payer = params.payer;
+    let oracle_queue = params.oracle_queue;
+    solana_program::instruction::Instruction {
+        program_id: consts::VRF_PROGRAM_ID,
         accounts: vec![
-            compat::latest::AccountMeta::new(payer, true),
-            compat::latest::AccountMeta::new_readonly(program_identity, true),
-            compat::latest::AccountMeta::new(oracle_queue, false),
-            compat::latest::AccountMeta::new_readonly(compat::latest::system_program::ID, false),
-            compat::latest::AccountMeta::new_readonly(compat::latest::slot_hashes::ID, false),
+            solana_program::instruction::AccountMeta::new(payer, true),
+            solana_program::instruction::AccountMeta::new_readonly(program_identity, true),
+            solana_program::instruction::AccountMeta::new(oracle_queue, false),
+            solana_program::instruction::AccountMeta::new_readonly(
+                solana_system_interface::program::ID,
+                false,
+            ),
+            solana_program::instruction::AccountMeta::new_readonly(
+                solana_program::sysvar::slot_hashes::ID,
+                false,
+            ),
         ],
         data: RequestRandomness {
             caller_seed: params.caller_seed,
@@ -51,7 +50,6 @@ fn build_request_ix(
         }
         .to_bytes(),
     }
-    .compat()
 }
 
 /// Requests randomness using the scoped (per-callback-program) VRF identity, regular priority.
@@ -62,7 +60,9 @@ fn build_request_ix(
 #[deprecated(
     note = "Derives the program identity PDA at runtime via find_program_address. Use `create_request_randomness_ix_const` with `program_identity_pubkey(&crate::ID)` instead."
 )]
-pub fn create_request_randomness_ix(params: RequestRandomnessParams) -> compat::Instruction {
+pub fn create_request_randomness_ix(
+    params: RequestRandomnessParams,
+) -> solana_program::instruction::Instruction {
     let program_identity = find_program_identity(&params.callback_program_id);
     let mut ix = build_request_ix(params, program_identity);
     ix.data[0] = 10;
@@ -83,7 +83,7 @@ pub fn create_request_randomness_ix(params: RequestRandomnessParams) -> compat::
 pub fn create_request_randomness_ix_const(
     params: RequestRandomnessParams,
     program_identity: Pubkey,
-) -> compat::Instruction {
+) -> solana_program::instruction::Instruction {
     let mut ix = build_request_ix(params, program_identity);
     ix.data[0] = 10;
     ix
@@ -93,7 +93,9 @@ pub fn create_request_randomness_ix_const(
 #[deprecated(
     note = "Legacy global-identity request (high priority). Use create_request_randomness_ix_const with program_identity_pubkey(&crate::ID)."
 )]
-pub fn create_request_legacy_randomness_ix(params: RequestRandomnessParams) -> compat::Instruction {
+pub fn create_request_legacy_randomness_ix(
+    params: RequestRandomnessParams,
+) -> solana_program::instruction::Instruction {
     let program_identity = find_program_identity(&params.callback_program_id);
     build_request_ix(params, program_identity)
 }
@@ -104,7 +106,7 @@ pub fn create_request_legacy_randomness_ix(params: RequestRandomnessParams) -> c
 )]
 pub fn create_request_regular_randomness_ix(
     params: RequestRandomnessParams,
-) -> compat::Instruction {
+) -> solana_program::instruction::Instruction {
     let program_identity = find_program_identity(&params.callback_program_id);
     let mut ix = build_request_ix(params, program_identity);
     ix.data[0] = 8;
@@ -117,7 +119,7 @@ pub fn create_request_regular_randomness_ix(
 )]
 pub fn create_request_high_priority_scoped_randomness_ix(
     params: RequestRandomnessParams,
-) -> compat::Instruction {
+) -> solana_program::instruction::Instruction {
     let program_identity = find_program_identity(&params.callback_program_id);
     let mut ix = build_request_ix(params, program_identity);
     ix.data[0] = 11;
@@ -129,7 +131,7 @@ pub fn create_request_high_priority_scoped_randomness_ix(
 pub fn create_request_high_priority_scoped_randomness_ix_const(
     params: RequestRandomnessParams,
     program_identity: Pubkey,
-) -> compat::Instruction {
+) -> solana_program::instruction::Instruction {
     let mut ix = build_request_ix(params, program_identity);
     ix.data[0] = 11;
     ix

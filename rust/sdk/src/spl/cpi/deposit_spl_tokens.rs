@@ -1,47 +1,49 @@
-use crate::{
-    compat::{self, Compat, Modern},
-    consts::ESPL_TOKEN_PROGRAM_ID,
-    spl::EphemeralSplDiscriminator,
-};
+use crate::{consts::ESPL_TOKEN_PROGRAM_ID, spl::EphemeralSplDiscriminator};
 use solana_program::program::{invoke, invoke_signed};
 
 /// Deposit SPL tokens into an ephemeral ATA.
 pub struct DepositSplTokens<'a> {
-    pub authority: compat::AccountInfo<'a>,
-    pub eata: compat::AccountInfo<'a>,
-    pub vault: compat::AccountInfo<'a>,
-    pub mint: compat::AccountInfo<'a>,
-    pub user_source_token_acc: compat::AccountInfo<'a>,
-    pub vault_token_acc: compat::AccountInfo<'a>,
-    pub token_program: compat::AccountInfo<'a>,
+    pub authority: solana_program::account_info::AccountInfo<'a>,
+    pub eata: solana_program::account_info::AccountInfo<'a>,
+    pub vault: solana_program::account_info::AccountInfo<'a>,
+    pub mint: solana_program::account_info::AccountInfo<'a>,
+    pub user_source_token_acc: solana_program::account_info::AccountInfo<'a>,
+    pub vault_token_acc: solana_program::account_info::AccountInfo<'a>,
+    pub token_program: solana_program::account_info::AccountInfo<'a>,
     pub amount: u64,
 }
 
 impl<'a> DepositSplTokens<'a> {
     #[inline(always)]
-    pub fn instruction(&self) -> compat::Instruction {
+    pub fn instruction(&self) -> solana_program::instruction::Instruction {
         let mut data = Vec::with_capacity(9);
         data.push(EphemeralSplDiscriminator::DepositSplTokens as u8);
         data.extend_from_slice(self.amount.to_le_bytes().as_ref());
-        compat::Instruction {
+        solana_program::instruction::Instruction {
             program_id: ESPL_TOKEN_PROGRAM_ID,
             accounts: vec![
-                compat::AccountMeta::new(*self.eata.key, false),
-                compat::AccountMeta::new_readonly(*self.vault.key, false),
-                compat::AccountMeta::new_readonly(*self.mint.key, false),
-                compat::AccountMeta::new(*self.user_source_token_acc.key, false),
-                compat::AccountMeta::new(*self.vault_token_acc.key, false),
-                compat::AccountMeta::new_readonly(*self.authority.key, true),
-                compat::AccountMeta::new_readonly(*self.token_program.key, false),
+                solana_program::instruction::AccountMeta::new(*self.eata.key, false),
+                solana_program::instruction::AccountMeta::new_readonly(*self.vault.key, false),
+                solana_program::instruction::AccountMeta::new_readonly(*self.mint.key, false),
+                solana_program::instruction::AccountMeta::new(
+                    *self.user_source_token_acc.key,
+                    false,
+                ),
+                solana_program::instruction::AccountMeta::new(*self.vault_token_acc.key, false),
+                solana_program::instruction::AccountMeta::new_readonly(*self.authority.key, true),
+                solana_program::instruction::AccountMeta::new_readonly(
+                    *self.token_program.key,
+                    false,
+                ),
             ],
             data,
         }
     }
 
     #[inline(always)]
-    pub fn invoke(&self) -> compat::ProgramResult {
+    pub fn invoke(&self) -> solana_program::entrypoint_deprecated::ProgramResult {
         invoke(
-            &self.instruction().modern(),
+            &self.instruction(),
             &[
                 self.eata.clone(),
                 self.vault.clone(),
@@ -50,16 +52,17 @@ impl<'a> DepositSplTokens<'a> {
                 self.vault_token_acc.clone(),
                 self.authority.clone(),
                 self.token_program.clone(),
-            ]
-            .modern(),
+            ],
         )
-        .compat()
     }
 
     #[inline(always)]
-    pub fn invoke_signed(&self, signers_seeds: &[&[&[u8]]]) -> compat::ProgramResult {
+    pub fn invoke_signed(
+        &self,
+        signers_seeds: &[&[&[u8]]],
+    ) -> solana_program::entrypoint_deprecated::ProgramResult {
         invoke_signed(
-            &self.instruction().modern(),
+            &self.instruction(),
             &[
                 self.eata.clone(),
                 self.vault.clone(),
@@ -68,10 +71,8 @@ impl<'a> DepositSplTokens<'a> {
                 self.vault_token_acc.clone(),
                 self.authority.clone(),
                 self.token_program.clone(),
-            ]
-            .modern(),
+            ],
             signers_seeds,
         )
-        .compat()
     }
 }

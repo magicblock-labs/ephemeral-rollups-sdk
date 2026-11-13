@@ -1,38 +1,28 @@
 use bytemuck::{Pod, Zeroable};
 
-use crate::compat::{self, Pubkey};
+use solana_program::pubkey::Pubkey;
 
-#[cfg(feature = "anchor-support")]
+#[cfg(feature = "anchor")]
 #[allow(unused_imports)]
-use crate::compat::anchor_lang;
+use anchor_lang;
 
-#[cfg(feature = "anchor-support")]
-use crate::compat::anchor_lang::{
-    solana_program::program_error::ProgramError, AnchorDeserialize, AnchorSerialize,
-};
+#[cfg(feature = "anchor")]
+use anchor_lang::{AnchorDeserialize, AnchorSerialize};
 
-//#[cfg(feature = "anchor-support")]
+//#[cfg(feature = "anchor")]
 #[allow(unused_imports)]
-use crate::compat::borsh;
+use borsh;
 
-#[cfg(not(feature = "anchor-support"))]
-use crate::compat::{
-    borsh::{BorshDeserialize, BorshSerialize},
-    ProgramError,
-};
+#[cfg(not(feature = "anchor"))]
+use borsh::{BorshDeserialize, BorshSerialize};
+use solana_program::program_error::ProgramError;
 
 // IMPORTANT: Keep Pubkey unqualified in Anchor IDL-derived structs. Anchor's
 // idl-build recognizes bare Pubkey as the native IDL pubkey type, while
-// compat::Pubkey is treated as a custom type that must implement IdlBuild.
-#[cfg_attr(feature = "anchor-support", derive(AnchorSerialize, AnchorDeserialize))]
-#[cfg_attr(
-    not(feature = "anchor-support"),
-    derive(BorshSerialize, BorshDeserialize)
-)]
-#[cfg_attr(
-    all(not(feature = "anchor-support"), not(feature = "backward-compat")),
-    borsh(crate = "crate::compat::borsh")
-)]
+// solana_program::pubkey::Pubkey is treated as a custom type that must implement IdlBuild.
+#[cfg_attr(feature = "anchor", derive(AnchorSerialize, AnchorDeserialize))]
+#[cfg_attr(not(feature = "anchor"), derive(BorshSerialize, BorshDeserialize))]
+#[cfg_attr(not(feature = "anchor"), borsh(crate = "borsh"))]
 #[repr(C)]
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Pod, Zeroable)]
 pub struct Member {
@@ -44,15 +34,9 @@ impl Member {
     pub const SIZE: usize = core::mem::size_of::<Self>();
 }
 
-#[cfg_attr(feature = "anchor-support", derive(AnchorSerialize, AnchorDeserialize))]
-#[cfg_attr(
-    not(feature = "anchor-support"),
-    derive(BorshSerialize, BorshDeserialize)
-)]
-#[cfg_attr(
-    all(not(feature = "anchor-support"), not(feature = "backward-compat")),
-    borsh(crate = "crate::compat::borsh")
-)]
+#[cfg_attr(feature = "anchor", derive(AnchorSerialize, AnchorDeserialize))]
+#[cfg_attr(not(feature = "anchor"), derive(BorshSerialize, BorshDeserialize))]
+#[cfg_attr(not(feature = "anchor"), borsh(crate = "borsh"))]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct MembersArgs {
     pub members: Option<Vec<Member>>,
@@ -66,15 +50,15 @@ pub const TX_MESSAGE_FLAG: u8 = 1 << 3; // Member can see transaction messages
 pub const ACCOUNT_SIGNATURES_FLAG: u8 = 1 << 4; // Member can see account signatures
 
 impl Member {
-    pub fn is_authority(&self, user: &compat::Pubkey) -> bool {
+    pub fn is_authority(&self, user: &solana_program::pubkey::Pubkey) -> bool {
         self.flags & AUTHORITY_FLAG != 0 && &self.pubkey == user
     }
 
-    pub fn can_see_tx_logs(&self, user: &compat::Pubkey) -> bool {
+    pub fn can_see_tx_logs(&self, user: &solana_program::pubkey::Pubkey) -> bool {
         self.flags & TX_LOGS_FLAG != 0 && &self.pubkey == user
     }
 
-    pub fn can_see_tx_balances(&self, user: &compat::Pubkey) -> bool {
+    pub fn can_see_tx_balances(&self, user: &solana_program::pubkey::Pubkey) -> bool {
         self.flags & TX_BALANCES_FLAG != 0 && &self.pubkey == user
     }
 

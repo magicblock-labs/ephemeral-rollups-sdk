@@ -8,7 +8,7 @@ pub use ephemeral_rollups_sdk_attribute_ephemeral_accounts::magic_accounts;
 #[cfg(feature = "vrf")]
 pub use ephemeral_vrf_sdk_vrf_macro::{vrf, vrf_callback};
 
-use crate::compat::anchor_lang;
+use anchor_lang;
 
 pub struct DelegationProgram;
 

@@ -58,7 +58,6 @@ Tests for ephemeral-rollups-sdk:
 - `test_anchor_module` - Anchor integration
 - `test_delegate_args_structure` - Delegation parameters
 - `test_ephem_module` - Ephemeral instructions
-- `test_solana_compat_module` - Solana compatibility layer
 
 ### 7. **macros_test.rs** - Procedural Macros (12 tests)
 Tests for all macro crates:

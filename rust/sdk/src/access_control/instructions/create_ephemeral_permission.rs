@@ -1,34 +1,36 @@
 use solana_program::program::invoke_signed;
 
 use crate::access_control::structs::EphemeralMembersArgs;
-use crate::compat::{self, Compat, Modern};
 
 pub const CREATE_EPHEMERAL_PERMISSION_DISCRIMINATOR: u64 = 6;
 
 #[derive(Debug)]
 pub struct CreateEphemeralPermission<'a> {
-    pub permissioned_account: compat::Pubkey,
-    pub permission: compat::Pubkey,
-    pub payer: compat::Pubkey,
-    pub vault: compat::Pubkey,
-    pub magic_program: compat::Pubkey,
-    pub permission_program: compat::Pubkey,
+    pub permissioned_account: solana_program::pubkey::Pubkey,
+    pub permission: solana_program::pubkey::Pubkey,
+    pub payer: solana_program::pubkey::Pubkey,
+    pub vault: solana_program::pubkey::Pubkey,
+    pub magic_program: solana_program::pubkey::Pubkey,
+    pub permission_program: solana_program::pubkey::Pubkey,
     pub args: &'a EphemeralMembersArgs,
 }
 
 impl<'a> CreateEphemeralPermission<'a> {
-    pub fn instruction(&self) -> Result<compat::Instruction, compat::ProgramError> {
+    pub fn instruction(
+        &self,
+    ) -> Result<solana_program::instruction::Instruction, solana_program::program_error::ProgramError>
+    {
         let accounts = vec![
-            compat::AccountMeta::new(self.payer, true),
-            compat::AccountMeta::new_readonly(self.permissioned_account, true),
-            compat::AccountMeta::new(self.permission, false),
-            compat::AccountMeta::new(self.vault, false),
-            compat::AccountMeta::new_readonly(self.magic_program, false),
+            solana_program::instruction::AccountMeta::new(self.payer, true),
+            solana_program::instruction::AccountMeta::new_readonly(self.permissioned_account, true),
+            solana_program::instruction::AccountMeta::new(self.permission, false),
+            solana_program::instruction::AccountMeta::new(self.vault, false),
+            solana_program::instruction::AccountMeta::new_readonly(self.magic_program, false),
         ];
         let mut bytes = vec![0; EphemeralMembersArgs::required_bytes(self.args.members.len())];
         self.args
             .to_bytes(&mut bytes)
-            .map_err(|_| compat::ProgramError::InvalidInstructionData)?;
+            .map_err(|_| solana_program::program_error::ProgramError::InvalidInstructionData)?;
         let data = [
             CREATE_EPHEMERAL_PERMISSION_DISCRIMINATOR
                 .to_le_bytes()
@@ -37,7 +39,7 @@ impl<'a> CreateEphemeralPermission<'a> {
         ]
         .concat();
 
-        Ok(compat::Instruction {
+        Ok(solana_program::instruction::Instruction {
             program_id: self.permission_program,
             accounts,
             data,
@@ -46,21 +48,24 @@ impl<'a> CreateEphemeralPermission<'a> {
 }
 
 pub struct CreateEphemeralPermissionCpi<'a> {
-    pub permissioned_account: compat::AccountInfo<'a>,
-    pub permission: compat::AccountInfo<'a>,
-    pub payer: compat::AccountInfo<'a>,
-    pub vault: compat::AccountInfo<'a>,
-    pub magic_program: compat::AccountInfo<'a>,
-    pub permission_program: compat::AccountInfo<'a>,
+    pub permissioned_account: solana_program::account_info::AccountInfo<'a>,
+    pub permission: solana_program::account_info::AccountInfo<'a>,
+    pub payer: solana_program::account_info::AccountInfo<'a>,
+    pub vault: solana_program::account_info::AccountInfo<'a>,
+    pub magic_program: solana_program::account_info::AccountInfo<'a>,
+    pub permission_program: solana_program::account_info::AccountInfo<'a>,
     pub args: EphemeralMembersArgs,
 }
 
 impl<'a> CreateEphemeralPermissionCpi<'a> {
-    pub fn invoke(self) -> compat::ProgramResult {
+    pub fn invoke(self) -> solana_program::entrypoint_deprecated::ProgramResult {
         self.invoke_signed(&[])
     }
 
-    pub fn invoke_signed(self, signers: &[&[&[u8]]]) -> compat::ProgramResult {
+    pub fn invoke_signed(
+        self,
+        signers: &[&[&[u8]]],
+    ) -> solana_program::entrypoint_deprecated::ProgramResult {
         let ix = CreateEphemeralPermission {
             permissioned_account: *self.permissioned_account.key,
             permission: *self.permission.key,
@@ -70,20 +75,18 @@ impl<'a> CreateEphemeralPermissionCpi<'a> {
             permission_program: *self.permission_program.key,
             args: &self.args,
         }
-        .instruction()?
-        .modern();
+        .instruction()?;
 
         invoke_signed(
             &ix,
             &[
-                self.payer.modern(),
-                self.permissioned_account.modern(),
-                self.permission.modern(),
-                self.vault.modern(),
-                self.magic_program.modern(),
+                self.payer,
+                self.permissioned_account,
+                self.permission,
+                self.vault,
+                self.magic_program,
             ],
             signers,
         )
-        .compat()
     }
 }

@@ -6,7 +6,6 @@ use crate::pda::{
 };
 
 use crate::{
-    compat,
     consts::{ASSOCIATED_TOKEN_PROGRAM_ID, ESPL_TOKEN_PROGRAM_ID, TOKEN_PROGRAM_ID},
     cpi::DELEGATION_PROGRAM_ID,
     spl::{
@@ -49,18 +48,18 @@ impl fmt::Display for DepositAndDelegateShuttleEphemeralAtaWithMergeAndPrivateTr
 }
 
 pub struct DepositAndDelegateShuttleEphemeralAtaWithMergeAndPrivateTransferBuilder {
-    pub payer: compat::Pubkey,
-    pub owner: compat::Pubkey,
-    pub mint: compat::Pubkey,
-    pub source_ata: compat::Pubkey,
-    pub destination_owner: compat::Pubkey,
+    pub payer: solana_program::pubkey::Pubkey,
+    pub owner: solana_program::pubkey::Pubkey,
+    pub mint: solana_program::pubkey::Pubkey,
+    pub source_ata: solana_program::pubkey::Pubkey,
+    pub destination_owner: solana_program::pubkey::Pubkey,
     pub shuttle_id: u32,
     pub amount: u64,
     pub min_delay_ms: u64,
     pub max_delay_ms: u64,
     pub split: u32,
     pub client_ref_id: Option<u64>,
-    pub validator: Option<compat::Pubkey>,
+    pub validator: Option<solana_program::pubkey::Pubkey>,
 }
 
 impl DepositAndDelegateShuttleEphemeralAtaWithMergeAndPrivateTransferBuilder {
@@ -68,7 +67,7 @@ impl DepositAndDelegateShuttleEphemeralAtaWithMergeAndPrivateTransferBuilder {
     pub fn instruction(
         &self,
     ) -> Result<
-        compat::Instruction,
+        solana_program::instruction::Instruction,
         DepositAndDelegateShuttleEphemeralAtaWithMergeAndPrivateTransferBuilderError,
     > {
         let (rent_pda, _rent_bump) = find_rent_pda();
@@ -111,31 +110,42 @@ impl DepositAndDelegateShuttleEphemeralAtaWithMergeAndPrivateTransferBuilder {
         push_length_prefixed(&mut data, &encrypted_destination)?;
         push_length_prefixed(&mut data, &encrypted_suffix)?;
 
-        Ok(compat::Instruction {
+        Ok(solana_program::instruction::Instruction {
             program_id: ESPL_TOKEN_PROGRAM_ID,
             accounts: vec![
-                compat::AccountMeta::new(self.payer, true),
-                compat::AccountMeta::new(rent_pda, false),
-                compat::AccountMeta::new(shuttle_ephemeral_ata, false),
-                compat::AccountMeta::new(shuttle_ata, false),
-                compat::AccountMeta::new(shuttle_wallet_ata, false),
-                compat::AccountMeta::new_readonly(self.owner, true),
-                compat::AccountMeta::new_readonly(ESPL_TOKEN_PROGRAM_ID, false),
-                compat::AccountMeta::new(delegation_buffer, false),
-                compat::AccountMeta::new(delegation_record, false),
-                compat::AccountMeta::new(delegation_metadata, false),
-                compat::AccountMeta::new_readonly(DELEGATION_PROGRAM_ID, false),
-                compat::AccountMeta::new_readonly(ASSOCIATED_TOKEN_PROGRAM_ID, false),
-                compat::AccountMeta::new_readonly(
-                    compat::Pubkey::new_from_array(solana_system_interface::program::ID.to_bytes()),
+                solana_program::instruction::AccountMeta::new(self.payer, true),
+                solana_program::instruction::AccountMeta::new(rent_pda, false),
+                solana_program::instruction::AccountMeta::new(shuttle_ephemeral_ata, false),
+                solana_program::instruction::AccountMeta::new(shuttle_ata, false),
+                solana_program::instruction::AccountMeta::new(shuttle_wallet_ata, false),
+                solana_program::instruction::AccountMeta::new_readonly(self.owner, true),
+                solana_program::instruction::AccountMeta::new_readonly(
+                    ESPL_TOKEN_PROGRAM_ID,
                     false,
                 ),
-                compat::AccountMeta::new_readonly(self.mint, false),
-                compat::AccountMeta::new_readonly(TOKEN_PROGRAM_ID, false),
-                compat::AccountMeta::new_readonly(vault, false),
-                compat::AccountMeta::new(self.source_ata, false),
-                compat::AccountMeta::new(vault_ata, false),
-                compat::AccountMeta::new(queue, false),
+                solana_program::instruction::AccountMeta::new(delegation_buffer, false),
+                solana_program::instruction::AccountMeta::new(delegation_record, false),
+                solana_program::instruction::AccountMeta::new(delegation_metadata, false),
+                solana_program::instruction::AccountMeta::new_readonly(
+                    DELEGATION_PROGRAM_ID,
+                    false,
+                ),
+                solana_program::instruction::AccountMeta::new_readonly(
+                    ASSOCIATED_TOKEN_PROGRAM_ID,
+                    false,
+                ),
+                solana_program::instruction::AccountMeta::new_readonly(
+                    solana_program::pubkey::Pubkey::new_from_array(
+                        solana_system_interface::program::ID.to_bytes(),
+                    ),
+                    false,
+                ),
+                solana_program::instruction::AccountMeta::new_readonly(self.mint, false),
+                solana_program::instruction::AccountMeta::new_readonly(TOKEN_PROGRAM_ID, false),
+                solana_program::instruction::AccountMeta::new_readonly(vault, false),
+                solana_program::instruction::AccountMeta::new(self.source_ata, false),
+                solana_program::instruction::AccountMeta::new(vault_ata, false),
+                solana_program::instruction::AccountMeta::new(queue, false),
             ],
             data,
         })
@@ -145,7 +155,7 @@ impl DepositAndDelegateShuttleEphemeralAtaWithMergeAndPrivateTransferBuilder {
     fn require_validator(
         &self,
     ) -> Result<
-        &compat::Pubkey,
+        &solana_program::pubkey::Pubkey,
         DepositAndDelegateShuttleEphemeralAtaWithMergeAndPrivateTransferBuilderError,
     > {
         self.validator.as_ref().ok_or(
@@ -190,7 +200,7 @@ fn push_length_prefixed(
 #[inline(always)]
 fn encrypt_private_transfer_field(
     plaintext: &[u8],
-    validator: &compat::Pubkey,
+    validator: &solana_program::pubkey::Pubkey,
 ) -> Result<Vec<u8>, DepositAndDelegateShuttleEphemeralAtaWithMergeAndPrivateTransferBuilderError> {
     dlp_api::encryption::encrypt_ed25519_recipient(plaintext, validator.as_array()).map_err(
         DepositAndDelegateShuttleEphemeralAtaWithMergeAndPrivateTransferBuilderError::Encryption,
@@ -201,7 +211,7 @@ fn encrypt_private_transfer_field(
 #[inline(always)]
 fn encrypt_private_transfer_field(
     _plaintext: &[u8],
-    _validator: &compat::Pubkey,
+    _validator: &solana_program::pubkey::Pubkey,
 ) -> Result<Vec<u8>, DepositAndDelegateShuttleEphemeralAtaWithMergeAndPrivateTransferBuilderError> {
     Err(
         DepositAndDelegateShuttleEphemeralAtaWithMergeAndPrivateTransferBuilderError::EncryptionFeatureDisabled,

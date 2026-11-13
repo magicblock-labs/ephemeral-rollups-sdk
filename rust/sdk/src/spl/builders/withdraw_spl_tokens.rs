@@ -1,5 +1,4 @@
 use crate::{
-    compat,
     consts::{ESPL_TOKEN_PROGRAM_ID, TOKEN_PROGRAM_ID},
     spl::{
         find_associated_token_address_with_bump, find_vault_ata, EphemeralAta,
@@ -8,15 +7,15 @@ use crate::{
 };
 
 pub struct WithdrawSplTokensBuilder {
-    pub payer: compat::Pubkey,
-    pub user: compat::Pubkey,
-    pub mint: compat::Pubkey,
+    pub payer: solana_program::pubkey::Pubkey,
+    pub user: solana_program::pubkey::Pubkey,
+    pub mint: solana_program::pubkey::Pubkey,
     pub amount: u64,
 }
 
 impl WithdrawSplTokensBuilder {
     #[inline(always)]
-    pub fn instruction(&self) -> compat::Instruction {
+    pub fn instruction(&self) -> solana_program::instruction::Instruction {
         let (eata, _eata_bump) = EphemeralAta::find_pda(&self.user, &self.mint);
         let (vault, _vault_bump) = GlobalVault::find_pda(&self.mint);
         let vault_ata = find_vault_ata(&self.mint, &vault);
@@ -27,16 +26,16 @@ impl WithdrawSplTokensBuilder {
         data.push(EphemeralSplDiscriminator::WithdrawSplTokens as u8);
         data.extend_from_slice(&self.amount.to_le_bytes());
 
-        compat::Instruction {
+        solana_program::instruction::Instruction {
             program_id: ESPL_TOKEN_PROGRAM_ID,
             accounts: vec![
-                compat::AccountMeta::new(eata, false),
-                compat::AccountMeta::new_readonly(vault, false),
-                compat::AccountMeta::new_readonly(self.mint, false),
-                compat::AccountMeta::new(vault_ata, false),
-                compat::AccountMeta::new(user_ata, false),
-                compat::AccountMeta::new_readonly(self.payer, true),
-                compat::AccountMeta::new_readonly(TOKEN_PROGRAM_ID, false),
+                solana_program::instruction::AccountMeta::new(eata, false),
+                solana_program::instruction::AccountMeta::new_readonly(vault, false),
+                solana_program::instruction::AccountMeta::new_readonly(self.mint, false),
+                solana_program::instruction::AccountMeta::new(vault_ata, false),
+                solana_program::instruction::AccountMeta::new(user_ata, false),
+                solana_program::instruction::AccountMeta::new_readonly(self.payer, true),
+                solana_program::instruction::AccountMeta::new_readonly(TOKEN_PROGRAM_ID, false),
             ],
             data,
         }

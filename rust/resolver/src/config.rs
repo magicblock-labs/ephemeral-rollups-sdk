@@ -3,8 +3,8 @@
 use std::time::Duration;
 
 use json::Deserialize;
-pub use sdk::commitment_config::CommitmentLevel;
 use serde::{de::Error, Deserializer};
+pub use solana_commitment_config::CommitmentLevel;
 use url::Url;
 
 /// General router configuration

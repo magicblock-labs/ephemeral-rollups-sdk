@@ -5,11 +5,7 @@ use quote::quote;
 use syn::{parse_macro_input, ItemMod};
 
 fn generated_unchecked_account_type() -> TokenStream2 {
-    if cfg!(feature = "backward-compat") {
-        quote! { AccountInfo<'info> }
-    } else {
-        quote! { UncheckedAccount<'info> }
-    }
+    quote! { UncheckedAccount<'info> }
 }
 
 /// This macro attribute is used to inject instructions and struct needed from the delegation program.

@@ -14,8 +14,7 @@ cargo test -p ephemeral-rollups-sdk --features spl,access-control,modular-sdk --
 ```
 
 Feature-gated targets are skipped unless their required features are enabled.
-Do not use `--all-features`: the modern and compatibility Anchor features are
-mutually exclusive. For the feature build matrix, run
+For the feature build matrix, run
 `./scripts/test-combinations.sh --no-color` from `rust/sdk/`.
 
 Some targets, including `macros_test`, contain placeholder tests; a passing suite

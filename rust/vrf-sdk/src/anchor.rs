@@ -1,4 +1,4 @@
-use crate::compat::anchor_lang;
+use anchor_lang;
 
 pub use ephemeral_vrf_sdk_vrf_macro::{vrf, vrf_callback};
 

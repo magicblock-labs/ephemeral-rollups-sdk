@@ -99,7 +99,7 @@ pub fn vrf(_attr: TokenStream, item: TokenStream) -> TokenStream {
     if !has_slot_hashes {
         new_fields.push(quote! {
             /// CHECK: Slot hashes sysvar
-            #[account(address = #vrf::compat::slot_hashes::ID)]
+            #[account(address = anchor_lang::solana_program::sysvar::slot_hashes::ID)]
             pub slot_hashes: #unchecked_account,
         });
     }
@@ -117,7 +117,7 @@ pub fn vrf(_attr: TokenStream, item: TokenStream) -> TokenStream {
         }
 
         impl<'info> #struct_name<'info> {
-            fn invoke_signed_vrf<'a>(&self, payer: &'a AccountInfo<'info>, ix: &#vrf::compat::Instruction) -> #vrf::compat::anchor_lang::solana_program::entrypoint::ProgramResult {
+            fn invoke_signed_vrf<'a>(&self, payer: &'a AccountInfo<'info>, ix: &anchor_lang::solana_program::instruction::Instruction) -> anchor_lang::solana_program::entrypoint::ProgramResult {
                 const PROGRAM_IDENTITY: ([u8; 32], u8) = #vrf::consts::program_identity_pda(&crate::ID);
                 // `#[vrf]` issues scoped randomness requests by default: the fulfillment signs
                 // the callback with the per-program scoped identity PDA, which the callback
@@ -127,7 +127,7 @@ pub fn vrf(_attr: TokenStream, item: TokenStream) -> TokenStream {
                 if let Some(disc) = ix.data.first_mut() {
                     *disc = if *disc == 3 || *disc == 11 { 11 } else { 10 };
                 }
-                #vrf::compat::anchor_lang::solana_program::program::invoke_signed(
+                anchor_lang::solana_program::program::invoke_signed(
                     &ix,
                     &[
                         payer.clone(),
@@ -205,9 +205,5 @@ pub fn vrf_callback(_attr: TokenStream, item: TokenStream) -> TokenStream {
 }
 
 fn generated_unchecked_account_type() -> proc_macro2::TokenStream {
-    if cfg!(feature = "backward-compat") {
-        quote! { AccountInfo<'info> }
-    } else {
-        quote! { UncheckedAccount<'info> }
-    }
+    quote! { UncheckedAccount<'info> }
 }

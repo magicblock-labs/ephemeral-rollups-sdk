@@ -6,11 +6,7 @@ use syn::parse::Parser;
 use syn::{parse_macro_input, Field, Fields, ItemStruct};
 
 fn generated_unchecked_account_type() -> TokenStream2 {
-    if cfg!(feature = "backward-compat") {
-        quote! { AccountInfo<'info> }
-    } else {
-        quote! { UncheckedAccount<'info> }
-    }
+    quote! { UncheckedAccount<'info> }
 }
 
 #[proc_macro_attribute]

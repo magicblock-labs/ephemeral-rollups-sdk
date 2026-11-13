@@ -1,4 +1,3 @@
-use crate::modernize;
 use crate::types::DelegateAccountArgs;
 use crate::utils::{close_pda_with_system_transfer, create_pda, seeds_with_bump};
 use dlp_api::args::{DelegateArgs, DelegateWithActionsArgs, PostDelegationActions};
@@ -7,40 +6,38 @@ use dlp_api::discriminator::DlpDiscriminator;
 use solana_program::instruction::{AccountMeta, Instruction};
 use solana_program::program_error::ProgramError;
 
-use crate::compat::{
-    self,
-    borsh::{self, BorshSerialize},
-    AsModern, Compat, Modern,
-};
+use borsh::{self, BorshSerialize};
 
 use solana_address::Address;
 use solana_program::{program::invoke_signed, program_memory::sol_memset};
 
-pub const DELEGATION_PROGRAM_ID: compat::Pubkey =
-    compat::Pubkey::new_from_array(dlp_api::consts::DELEGATION_PROGRAM_ID.to_bytes());
+pub const DELEGATION_PROGRAM_ID: solana_program::pubkey::Pubkey =
+    solana_program::pubkey::Pubkey::new_from_array(
+        dlp_api::consts::DELEGATION_PROGRAM_ID.to_bytes(),
+    );
 
 #[inline]
 fn is_canonical_undelegation_buffer(
-    delegated_account: &compat::Pubkey,
-    buffer: &compat::Pubkey,
+    delegated_account: &solana_program::pubkey::Pubkey,
+    buffer: &solana_program::pubkey::Pubkey,
 ) -> bool {
     buffer == &dlp_api::pda::undelegate_buffer_pda_from_delegated_account(delegated_account)
 }
 
 pub struct DelegateAccounts<'a, 'info> {
-    pub payer: &'a compat::AccountInfo<'info>,
-    pub pda: &'a compat::AccountInfo<'info>,
-    pub owner_program: &'a compat::AccountInfo<'info>,
-    pub buffer: &'a compat::AccountInfo<'info>,
-    pub delegation_record: &'a compat::AccountInfo<'info>,
-    pub delegation_metadata: &'a compat::AccountInfo<'info>,
-    pub delegation_program: &'a compat::AccountInfo<'info>,
-    pub system_program: &'a compat::AccountInfo<'info>,
+    pub payer: &'a solana_program::account_info::AccountInfo<'info>,
+    pub pda: &'a solana_program::account_info::AccountInfo<'info>,
+    pub owner_program: &'a solana_program::account_info::AccountInfo<'info>,
+    pub buffer: &'a solana_program::account_info::AccountInfo<'info>,
+    pub delegation_record: &'a solana_program::account_info::AccountInfo<'info>,
+    pub delegation_metadata: &'a solana_program::account_info::AccountInfo<'info>,
+    pub delegation_program: &'a solana_program::account_info::AccountInfo<'info>,
+    pub system_program: &'a solana_program::account_info::AccountInfo<'info>,
 }
 
 pub struct DelegateConfig {
     pub commit_frequency_ms: u32,
-    pub validator: Option<compat::Pubkey>,
+    pub validator: Option<solana_program::pubkey::Pubkey>,
 }
 
 impl Default for DelegateConfig {
@@ -57,7 +54,7 @@ pub fn delegate_account<'a, 'info>(
     accounts: DelegateAccounts<'a, 'info>,
     pda_seeds: &[&[u8]],
     config: DelegateConfig,
-) -> compat::ProgramResult {
+) -> solana_program::entrypoint_deprecated::ProgramResult {
     delegate_account_inner(accounts, pda_seeds, config, false)
 }
 
@@ -66,7 +63,7 @@ pub fn delegate_account_with_any_validator<'a, 'info>(
     accounts: DelegateAccounts<'a, 'info>,
     pda_seeds: &[&[u8]],
     config: DelegateConfig,
-) -> compat::ProgramResult {
+) -> solana_program::entrypoint_deprecated::ProgramResult {
     delegate_account_inner(accounts, pda_seeds, config, true)
 }
 
@@ -76,14 +73,14 @@ fn delegate_account_inner<'a, 'info>(
     pda_seeds: &[&[u8]],
     config: DelegateConfig,
     any_validator: bool,
-) -> compat::ProgramResult {
+) -> solana_program::entrypoint_deprecated::ProgramResult {
     let buffer_seeds: &[&[u8]] = delegate_buffer_seeds_from_delegated_account!(accounts.pda.key);
 
     let (_, delegate_account_bump) =
-        Address::find_program_address(pda_seeds, accounts.owner_program.key.as_modern());
+        Address::find_program_address(pda_seeds, accounts.owner_program.key);
 
     let (_, buffer_pda_bump) =
-        Address::find_program_address(buffer_seeds, accounts.owner_program.key.as_modern());
+        Address::find_program_address(buffer_seeds, accounts.owner_program.key);
 
     // Pda signer seeds
     let delegate_account_bump_slice: &[u8] = &[delegate_account_bump];
@@ -130,13 +127,12 @@ fn delegate_account_inner<'a, 'info>(
     if accounts.pda.owner != accounts.delegation_program.key {
         invoke_signed(
             &solana_system_interface::instruction::assign(
-                accounts.pda.key.as_modern(),
-                accounts.delegation_program.key.as_modern(),
+                accounts.pda.key,
+                accounts.delegation_program.key,
             ),
-            &[accounts.pda.modern(), accounts.system_program.modern()],
+            &[accounts.pda.clone(), accounts.system_program.clone()],
             pda_signer_seeds,
-        )
-        .compat()?;
+        )?;
     }
 
     let seeds_vec: Vec<Vec<u8>> = pda_seeds.iter().map(|&slice| slice.to_vec()).collect();
@@ -188,15 +184,15 @@ pub fn delegate_account_with_actions<'a, 'info>(
     pda_seeds: &[&[u8]],
     config: DelegateConfig,
     actions: PostDelegationActions,
-    action_signer_infos: &'a [&'a compat::AccountInfo<'info>],
-) -> compat::ProgramResult {
+    action_signer_infos: &'a [&'a solana_program::account_info::AccountInfo<'info>],
+) -> solana_program::entrypoint_deprecated::ProgramResult {
     let buffer_seeds: &[&[u8]] = delegate_buffer_seeds_from_delegated_account!(accounts.pda.key);
 
     let (_, delegate_account_bump) =
-        Address::find_program_address(pda_seeds, accounts.owner_program.key.as_modern());
+        Address::find_program_address(pda_seeds, accounts.owner_program.key);
 
     let (_, buffer_pda_bump) =
-        Address::find_program_address(buffer_seeds, accounts.owner_program.key.as_modern());
+        Address::find_program_address(buffer_seeds, accounts.owner_program.key);
 
     // Pda signer seeds
     let delegate_account_bump_slice: &[u8] = &[delegate_account_bump];
@@ -243,13 +239,12 @@ pub fn delegate_account_with_actions<'a, 'info>(
     if accounts.pda.owner != accounts.delegation_program.key {
         invoke_signed(
             &solana_system_interface::instruction::assign(
-                accounts.pda.key.as_modern(),
-                accounts.delegation_program.key.as_modern(),
+                accounts.pda.key,
+                accounts.delegation_program.key,
             ),
-            &[accounts.pda.modern(), accounts.system_program.modern()],
+            &[accounts.pda.clone(), accounts.system_program.clone()],
             pda_signer_seeds,
-        )
-        .compat()?;
+        )?;
     }
 
     let seeds_vec: Vec<Vec<u8>> = pda_seeds.iter().map(|&slice| slice.to_vec()).collect();
@@ -288,27 +283,26 @@ pub fn delegate_account_with_actions<'a, 'info>(
 
 /// Undelegate an account
 pub fn undelegate_account<'a, 'info>(
-    delegated_account: &'a compat::AccountInfo<'info>,
-    owner_program: &compat::Pubkey,
-    buffer: &'a compat::AccountInfo<'info>,
-    payer: &'a compat::AccountInfo<'info>,
-    system_program: &'a compat::AccountInfo<'info>,
+    delegated_account: &'a solana_program::account_info::AccountInfo<'info>,
+    owner_program: &solana_program::pubkey::Pubkey,
+    buffer: &'a solana_program::account_info::AccountInfo<'info>,
+    payer: &'a solana_program::account_info::AccountInfo<'info>,
+    system_program: &'a solana_program::account_info::AccountInfo<'info>,
     account_signer_seeds: Vec<Vec<u8>>,
-) -> compat::ProgramResult {
+) -> solana_program::entrypoint_deprecated::ProgramResult {
     if !buffer.is_signer {
-        return Err(ProgramError::MissingRequiredSignature.compat());
+        return Err(ProgramError::MissingRequiredSignature);
     }
     if buffer.owner != &DELEGATION_PROGRAM_ID {
-        return Err(ProgramError::InvalidAccountOwner.compat());
+        return Err(ProgramError::InvalidAccountOwner);
     }
     if !is_canonical_undelegation_buffer(delegated_account.key, buffer.key) {
-        return Err(ProgramError::InvalidSeeds.compat());
+        return Err(ProgramError::InvalidSeeds);
     }
 
     let account_seeds: Vec<&[u8]> = account_signer_seeds.iter().map(|v| v.as_slice()).collect();
 
-    let (_, account_bump) =
-        Address::find_program_address(account_seeds.as_ref(), owner_program.as_modern());
+    let (_, account_bump) = Address::find_program_address(account_seeds.as_ref(), owner_program);
 
     // Account signer seeds
     let account_bump_slice: &[u8] = &[account_bump];
@@ -337,16 +331,16 @@ pub fn undelegate_account<'a, 'info>(
 /// CPI to the delegation program to delegate the account
 #[allow(clippy::too_many_arguments)]
 pub fn cpi_delegate<'a, 'info>(
-    payer: &'a compat::AccountInfo<'info>,
-    delegate_account: &'a compat::AccountInfo<'info>,
-    owner_program: &'a compat::AccountInfo<'info>,
-    buffer: &'a compat::AccountInfo<'info>,
-    delegation_record: &'a compat::AccountInfo<'info>,
-    delegation_metadata: &'a compat::AccountInfo<'info>,
-    system_program: &'a compat::AccountInfo<'info>,
+    payer: &'a solana_program::account_info::AccountInfo<'info>,
+    delegate_account: &'a solana_program::account_info::AccountInfo<'info>,
+    owner_program: &'a solana_program::account_info::AccountInfo<'info>,
+    buffer: &'a solana_program::account_info::AccountInfo<'info>,
+    delegation_record: &'a solana_program::account_info::AccountInfo<'info>,
+    delegation_metadata: &'a solana_program::account_info::AccountInfo<'info>,
+    system_program: &'a solana_program::account_info::AccountInfo<'info>,
     signers_seeds: &[&[&[u8]]],
     args: DelegateAccountArgs,
-) -> compat::ProgramResult {
+) -> solana_program::entrypoint_deprecated::ProgramResult {
     cpi_delegate_with_discriminator(
         0,
         payer,
@@ -364,16 +358,16 @@ pub fn cpi_delegate<'a, 'info>(
 /// CPI to the delegation program to delegate the account
 #[allow(clippy::too_many_arguments)]
 pub fn cpi_delegate_with_any_validator<'a, 'info>(
-    payer: &'a compat::AccountInfo<'info>,
-    delegate_account: &'a compat::AccountInfo<'info>,
-    owner_program: &'a compat::AccountInfo<'info>,
-    buffer: &'a compat::AccountInfo<'info>,
-    delegation_record: &'a compat::AccountInfo<'info>,
-    delegation_metadata: &'a compat::AccountInfo<'info>,
-    system_program: &'a compat::AccountInfo<'info>,
+    payer: &'a solana_program::account_info::AccountInfo<'info>,
+    delegate_account: &'a solana_program::account_info::AccountInfo<'info>,
+    owner_program: &'a solana_program::account_info::AccountInfo<'info>,
+    buffer: &'a solana_program::account_info::AccountInfo<'info>,
+    delegation_record: &'a solana_program::account_info::AccountInfo<'info>,
+    delegation_metadata: &'a solana_program::account_info::AccountInfo<'info>,
+    system_program: &'a solana_program::account_info::AccountInfo<'info>,
     signers_seeds: &[&[&[u8]]],
     args: DelegateAccountArgs,
-) -> compat::ProgramResult {
+) -> solana_program::entrypoint_deprecated::ProgramResult {
     cpi_delegate_with_discriminator(
         19,
         payer,
@@ -391,29 +385,19 @@ pub fn cpi_delegate_with_any_validator<'a, 'info>(
 #[allow(clippy::too_many_arguments)]
 fn cpi_delegate_with_discriminator<'a, 'info>(
     discriminator: u64,
-    payer: &'a compat::AccountInfo<'info>,
-    delegate_account: &'a compat::AccountInfo<'info>,
-    owner_program: &'a compat::AccountInfo<'info>,
-    buffer: &'a compat::AccountInfo<'info>,
-    delegation_record: &'a compat::AccountInfo<'info>,
-    delegation_metadata: &'a compat::AccountInfo<'info>,
-    system_program: &'a compat::AccountInfo<'info>,
+    payer: &'a solana_program::account_info::AccountInfo<'info>,
+    delegate_account: &'a solana_program::account_info::AccountInfo<'info>,
+    owner_program: &'a solana_program::account_info::AccountInfo<'info>,
+    buffer: &'a solana_program::account_info::AccountInfo<'info>,
+    delegation_record: &'a solana_program::account_info::AccountInfo<'info>,
+    delegation_metadata: &'a solana_program::account_info::AccountInfo<'info>,
+    system_program: &'a solana_program::account_info::AccountInfo<'info>,
     signers_seeds: &[&[&[u8]]],
     args: DelegateAccountArgs,
-) -> compat::ProgramResult {
-    modernize!(
-        payer,
-        delegate_account,
-        owner_program,
-        buffer,
-        delegation_record,
-        delegation_metadata,
-        system_program
-    );
-
+) -> solana_program::entrypoint_deprecated::ProgramResult {
     let mut data: Vec<u8> = discriminator.to_le_bytes().to_vec();
     args.serialize(&mut data)
-        .map_err(|_| compat::latest::ProgramError::BorshIoError.compat())?;
+        .map_err(|_| ProgramError::BorshIoError)?;
 
     let delegation_instruction = Instruction {
         program_id: crate::id().to_bytes().into(),
@@ -442,36 +426,24 @@ fn cpi_delegate_with_discriminator<'a, 'info>(
         ],
         signers_seeds,
     )
-    .compat()
 }
 
 /// CPI to the delegation program to delegate the account with actions
 #[allow(clippy::too_many_arguments)]
 pub fn cpi_delegate_with_actions<'a, 'info>(
-    payer: &'a compat::AccountInfo<'info>,
-    delegate_account: &'a compat::AccountInfo<'info>,
-    owner_program: &'a compat::AccountInfo<'info>,
-    buffer: &'a compat::AccountInfo<'info>,
-    delegation_record: &'a compat::AccountInfo<'info>,
-    delegation_metadata: &'a compat::AccountInfo<'info>,
-    system_program: &'a compat::AccountInfo<'info>,
+    payer: &'a solana_program::account_info::AccountInfo<'info>,
+    delegate_account: &'a solana_program::account_info::AccountInfo<'info>,
+    owner_program: &'a solana_program::account_info::AccountInfo<'info>,
+    buffer: &'a solana_program::account_info::AccountInfo<'info>,
+    delegation_record: &'a solana_program::account_info::AccountInfo<'info>,
+    delegation_metadata: &'a solana_program::account_info::AccountInfo<'info>,
+    system_program: &'a solana_program::account_info::AccountInfo<'info>,
     signers_seeds: &[&[&[u8]]],
     args: DelegateWithActionsArgs,
-    action_signer_infos: &'a [&'a compat::AccountInfo<'info>],
-) -> compat::ProgramResult {
-    modernize!(
-        payer,
-        delegate_account,
-        owner_program,
-        buffer,
-        delegation_record,
-        delegation_metadata,
-        system_program
-    );
-
+    action_signer_infos: &'a [&'a solana_program::account_info::AccountInfo<'info>],
+) -> solana_program::entrypoint_deprecated::ProgramResult {
     let mut data = DlpDiscriminator::DelegateWithActions.to_vec();
-    let payload =
-        borsh::to_vec(&args).map_err(|_| ProgramError::InvalidInstructionData.compat())?;
+    let payload = borsh::to_vec(&args).map_err(|_| ProgramError::InvalidInstructionData)?;
     data.extend_from_slice(&payload);
 
     let mut accounts = vec![
@@ -489,8 +461,7 @@ pub fn cpi_delegate_with_actions<'a, 'info>(
         let info = action_signer_infos
             .iter()
             .find(|ai| *ai.key.as_array() == *signer)
-            .ok_or(ProgramError::NotEnoughAccountKeys.compat())?
-            .as_modern();
+            .ok_or(ProgramError::NotEnoughAccountKeys)?;
         accounts.push(AccountMeta::new_readonly(*info.key, true));
         signer_infos.push((*info).clone());
     }
@@ -512,7 +483,7 @@ pub fn cpi_delegate_with_actions<'a, 'info>(
     ];
     invoke_accounts.extend(signer_infos);
 
-    invoke_signed(&delegation_instruction, &invoke_accounts, signers_seeds).compat()
+    invoke_signed(&delegation_instruction, &invoke_accounts, signers_seeds)
 }
 
 #[cfg(test)]
@@ -521,10 +492,10 @@ mod tests {
 
     #[test]
     fn validates_canonical_undelegation_buffer() {
-        let delegated_account = compat::Pubkey::new_from_array([1; 32]);
+        let delegated_account = solana_program::pubkey::Pubkey::new_from_array([1; 32]);
         let canonical_buffer =
             dlp_api::pda::undelegate_buffer_pda_from_delegated_account(&delegated_account);
-        let unrelated_buffer = compat::Pubkey::new_from_array([2; 32]);
+        let unrelated_buffer = solana_program::pubkey::Pubkey::new_from_array([2; 32]);
 
         assert!(is_canonical_undelegation_buffer(
             &delegated_account,

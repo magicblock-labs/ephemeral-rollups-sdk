@@ -1,14 +1,4 @@
-#[cfg(all(feature = "anchor-modern", feature = "anchor-compat"))]
-compile_error!("features `anchor-modern` and `anchor-compat` are mutually exclusive");
-
-#[cfg(all(
-    feature = "anchor-modern",
-    feature = "backward-compat",
-    not(feature = "anchor-compat")
-))]
-compile_error!("feature `anchor-modern` cannot be combined with `backward-compat`; use `anchor-compat` instead");
-
-#[cfg(feature = "anchor-support")]
+#[cfg(feature = "anchor")]
 pub mod anchor;
 pub mod consts;
 pub mod cpi;
@@ -16,17 +6,15 @@ pub mod cpi;
 pub mod crank;
 pub mod delegate_args;
 pub mod ephem;
-#[cfg(any(feature = "anchor-support", feature = "modular-sdk",))]
+#[cfg(any(feature = "anchor", feature = "modular-sdk",))]
 pub mod magic_accounts;
-#[cfg(any(feature = "anchor-support", feature = "modular-sdk",))]
+#[cfg(any(feature = "anchor", feature = "modular-sdk",))]
 #[deprecated(note = "use `magic_accounts` instead")]
 pub use self::magic_accounts as ephemeral_accounts;
 pub mod types;
 pub mod utils;
 #[cfg(feature = "vrf")]
 pub mod vrf;
-
-pub mod compat;
 
 #[cfg(feature = "access-control")]
 pub mod access_control;
@@ -51,6 +39,6 @@ pub use magicblock_magic_program_api::args::{
     ShortAccountMeta, UndelegateTypeArgs,
 };
 
-pub const fn id() -> compat::Pubkey {
-    compat::Pubkey::new_from_array(consts::DELEGATION_PROGRAM_ID.to_bytes())
+pub const fn id() -> solana_program::pubkey::Pubkey {
+    solana_program::pubkey::Pubkey::new_from_array(consts::DELEGATION_PROGRAM_ID.to_bytes())
 }

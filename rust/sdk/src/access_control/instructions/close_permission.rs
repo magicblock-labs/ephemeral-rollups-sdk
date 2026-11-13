@@ -1,7 +1,7 @@
-use crate::compat::borsh::{self, BorshDeserialize, BorshSerialize};
+use borsh::{self, BorshDeserialize, BorshSerialize};
 
 use crate::access_control::structs::Permission;
-use crate::compat::{self, Compat, Modern};
+
 use crate::consts::PERMISSION_PROGRAM_ID;
 use solana_program::program::{invoke, invoke_signed};
 
@@ -10,40 +10,45 @@ pub const CLOSE_PERMISSION_DISCRIMINATOR: u64 = 2;
 /// Accounts.
 #[derive(Debug)]
 pub struct ClosePermission {
-    pub payer: compat::Pubkey,
+    pub payer: solana_program::pubkey::Pubkey,
 
-    pub authority: (compat::Pubkey, bool),
+    pub authority: (solana_program::pubkey::Pubkey, bool),
 
-    pub permissioned_account: (compat::Pubkey, bool),
+    pub permissioned_account: (solana_program::pubkey::Pubkey, bool),
 
-    pub permission: compat::Pubkey,
+    pub permission: solana_program::pubkey::Pubkey,
 }
 
 impl ClosePermission {
-    pub fn instruction(&self) -> compat::Instruction {
+    pub fn instruction(&self) -> solana_program::instruction::Instruction {
         self.instruction_with_remaining_accounts(&[])
     }
     #[allow(clippy::arithmetic_side_effects)]
     #[allow(clippy::vec_init_then_push)]
     pub fn instruction_with_remaining_accounts(
         &self,
-        remaining_accounts: &[compat::AccountMeta],
-    ) -> compat::Instruction {
+        remaining_accounts: &[solana_program::instruction::AccountMeta],
+    ) -> solana_program::instruction::Instruction {
         let mut accounts = Vec::with_capacity(4 + remaining_accounts.len());
-        accounts.push(compat::AccountMeta::new(self.payer, true));
-        accounts.push(compat::AccountMeta::new_readonly(
+        accounts.push(solana_program::instruction::AccountMeta::new(
+            self.payer, true,
+        ));
+        accounts.push(solana_program::instruction::AccountMeta::new_readonly(
             self.authority.0,
             self.authority.1,
         ));
-        accounts.push(compat::AccountMeta::new_readonly(
+        accounts.push(solana_program::instruction::AccountMeta::new_readonly(
             self.permissioned_account.0,
             self.permissioned_account.1,
         ));
-        accounts.push(compat::AccountMeta::new(self.permission, false));
+        accounts.push(solana_program::instruction::AccountMeta::new(
+            self.permission,
+            false,
+        ));
         accounts.extend_from_slice(remaining_accounts);
         let data = ClosePermissionInstructionData::new().try_to_vec().unwrap();
 
-        compat::Instruction {
+        solana_program::instruction::Instruction {
             program_id: PERMISSION_PROGRAM_ID,
             accounts,
             data,
@@ -52,10 +57,7 @@ impl ClosePermission {
 }
 
 #[derive(BorshSerialize, BorshDeserialize, Clone, Debug, Eq, PartialEq)]
-#[cfg_attr(
-    not(feature = "backward-compat"),
-    borsh(crate = "crate::compat::borsh")
-)]
+#[borsh(crate = "borsh")]
 pub struct ClosePermissionInstructionData {
     discriminator: u64,
 }
@@ -78,7 +80,7 @@ impl Default for ClosePermissionInstructionData {
     }
 }
 
-/// compat::Instruction builder for `ClosePermission`.
+/// solana_program::instruction::Instruction builder for `ClosePermission`.
 ///
 /// ### Accounts:
 ///
@@ -88,11 +90,11 @@ impl Default for ClosePermissionInstructionData {
 ///   3. `[writable]` permission
 #[derive(Clone, Debug, Default)]
 pub struct ClosePermissionBuilder {
-    payer: Option<compat::Pubkey>,
-    authority: Option<(compat::Pubkey, bool)>,
-    permissioned_account: Option<(compat::Pubkey, bool)>,
-    permission: Option<compat::Pubkey>,
-    __remaining_accounts: Vec<compat::AccountMeta>,
+    payer: Option<solana_program::pubkey::Pubkey>,
+    authority: Option<(solana_program::pubkey::Pubkey, bool)>,
+    permissioned_account: Option<(solana_program::pubkey::Pubkey, bool)>,
+    permission: Option<solana_program::pubkey::Pubkey>,
+    __remaining_accounts: Vec<solana_program::instruction::AccountMeta>,
 }
 
 impl ClosePermissionBuilder {
@@ -100,19 +102,23 @@ impl ClosePermissionBuilder {
         Self::default()
     }
     #[inline(always)]
-    pub fn payer(&mut self, payer: compat::Pubkey) -> &mut Self {
+    pub fn payer(&mut self, payer: solana_program::pubkey::Pubkey) -> &mut Self {
         self.payer = Some(payer);
         self
     }
     #[inline(always)]
-    pub fn authority(&mut self, authority: compat::Pubkey, as_signer: bool) -> &mut Self {
+    pub fn authority(
+        &mut self,
+        authority: solana_program::pubkey::Pubkey,
+        as_signer: bool,
+    ) -> &mut Self {
         self.authority = Some((authority, as_signer));
         self
     }
     #[inline(always)]
     pub fn permissioned_account(
         &mut self,
-        permissioned_account: compat::Pubkey,
+        permissioned_account: solana_program::pubkey::Pubkey,
         as_signer: bool,
     ) -> &mut Self {
         self.permissioned_account = Some((permissioned_account, as_signer));
@@ -122,24 +128,30 @@ impl ClosePermissionBuilder {
         self
     }
     #[inline(always)]
-    pub fn permission(&mut self, permission: compat::Pubkey) -> &mut Self {
+    pub fn permission(&mut self, permission: solana_program::pubkey::Pubkey) -> &mut Self {
         self.permission = Some(permission);
         self
     }
     /// Add an additional account to the instruction.
     #[inline(always)]
-    pub fn add_remaining_account(&mut self, account: compat::AccountMeta) -> &mut Self {
+    pub fn add_remaining_account(
+        &mut self,
+        account: solana_program::instruction::AccountMeta,
+    ) -> &mut Self {
         self.__remaining_accounts.push(account);
         self
     }
     /// Add additional accounts to the instruction.
     #[inline(always)]
-    pub fn add_remaining_accounts(&mut self, accounts: &[compat::AccountMeta]) -> &mut Self {
+    pub fn add_remaining_accounts(
+        &mut self,
+        accounts: &[solana_program::instruction::AccountMeta],
+    ) -> &mut Self {
         self.__remaining_accounts.extend_from_slice(accounts);
         self
     }
     #[allow(clippy::clone_on_copy)]
-    pub fn instruction(&self) -> compat::Instruction {
+    pub fn instruction(&self) -> solana_program::instruction::Instruction {
         let accounts = ClosePermission {
             payer: self.payer.expect("payer is not set"),
             authority: self.authority.expect("authority is not set"),
@@ -155,32 +167,32 @@ impl ClosePermissionBuilder {
 
 /// `close_permission` CPI accounts.
 pub struct ClosePermissionCpiAccounts<'a, 'b> {
-    pub payer: &'b compat::AccountInfo<'a>,
+    pub payer: &'b solana_program::account_info::AccountInfo<'a>,
 
-    pub authority: (&'b compat::AccountInfo<'a>, bool),
+    pub authority: (&'b solana_program::account_info::AccountInfo<'a>, bool),
 
-    pub permissioned_account: (&'b compat::AccountInfo<'a>, bool),
+    pub permissioned_account: (&'b solana_program::account_info::AccountInfo<'a>, bool),
 
-    pub permission: &'b compat::AccountInfo<'a>,
+    pub permission: &'b solana_program::account_info::AccountInfo<'a>,
 }
 
 /// `close_permission` CPI instruction.
 pub struct ClosePermissionCpi<'a, 'b> {
     /// The program to invoke.
-    pub __program: &'b compat::AccountInfo<'a>,
+    pub __program: &'b solana_program::account_info::AccountInfo<'a>,
 
-    pub payer: &'b compat::AccountInfo<'a>,
+    pub payer: &'b solana_program::account_info::AccountInfo<'a>,
 
-    pub authority: (&'b compat::AccountInfo<'a>, bool),
+    pub authority: (&'b solana_program::account_info::AccountInfo<'a>, bool),
 
-    pub permissioned_account: (&'b compat::AccountInfo<'a>, bool),
+    pub permissioned_account: (&'b solana_program::account_info::AccountInfo<'a>, bool),
 
-    pub permission: &'b compat::AccountInfo<'a>,
+    pub permission: &'b solana_program::account_info::AccountInfo<'a>,
 }
 
 impl<'a, 'b> ClosePermissionCpi<'a, 'b> {
     pub fn new(
-        program: &'b compat::AccountInfo<'a>,
+        program: &'b solana_program::account_info::AccountInfo<'a>,
         accounts: ClosePermissionCpiAccounts<'a, 'b>,
     ) -> Self {
         Self {
@@ -192,18 +204,25 @@ impl<'a, 'b> ClosePermissionCpi<'a, 'b> {
         }
     }
     #[inline(always)]
-    pub fn invoke(&self) -> compat::ProgramResult {
+    pub fn invoke(&self) -> solana_program::entrypoint_deprecated::ProgramResult {
         self.invoke_signed_with_remaining_accounts(&[], &[])
     }
     #[inline(always)]
     pub fn invoke_with_remaining_accounts(
         &self,
-        remaining_accounts: &[(&'b compat::AccountInfo<'a>, bool, bool)],
-    ) -> compat::ProgramResult {
+        remaining_accounts: &[(
+            &'b solana_program::account_info::AccountInfo<'a>,
+            bool,
+            bool,
+        )],
+    ) -> solana_program::entrypoint_deprecated::ProgramResult {
         self.invoke_signed_with_remaining_accounts(&[], remaining_accounts)
     }
     #[inline(always)]
-    pub fn invoke_signed(&self, signers_seeds: &[&[&[u8]]]) -> compat::ProgramResult {
+    pub fn invoke_signed(
+        &self,
+        signers_seeds: &[&[&[u8]]],
+    ) -> solana_program::entrypoint_deprecated::ProgramResult {
         self.invoke_signed_with_remaining_accounts(signers_seeds, &[])
     }
     #[allow(clippy::arithmetic_side_effects)]
@@ -212,21 +231,31 @@ impl<'a, 'b> ClosePermissionCpi<'a, 'b> {
     pub fn invoke_signed_with_remaining_accounts(
         &self,
         signers_seeds: &[&[&[u8]]],
-        remaining_accounts: &[(&'b compat::AccountInfo<'a>, bool, bool)],
-    ) -> compat::ProgramResult {
+        remaining_accounts: &[(
+            &'b solana_program::account_info::AccountInfo<'a>,
+            bool,
+            bool,
+        )],
+    ) -> solana_program::entrypoint_deprecated::ProgramResult {
         let mut accounts = Vec::with_capacity(4 + remaining_accounts.len());
-        accounts.push(compat::AccountMeta::new(*self.payer.key, true));
-        accounts.push(compat::AccountMeta::new_readonly(
+        accounts.push(solana_program::instruction::AccountMeta::new(
+            *self.payer.key,
+            true,
+        ));
+        accounts.push(solana_program::instruction::AccountMeta::new_readonly(
             *self.authority.0.key,
             self.authority.1,
         ));
-        accounts.push(compat::AccountMeta::new_readonly(
+        accounts.push(solana_program::instruction::AccountMeta::new_readonly(
             *self.permissioned_account.0.key,
             self.permissioned_account.1,
         ));
-        accounts.push(compat::AccountMeta::new(*self.permission.key, false));
+        accounts.push(solana_program::instruction::AccountMeta::new(
+            *self.permission.key,
+            false,
+        ));
         remaining_accounts.iter().for_each(|remaining_account| {
-            accounts.push(compat::AccountMeta {
+            accounts.push(solana_program::instruction::AccountMeta {
                 pubkey: *remaining_account.0.key,
                 is_signer: remaining_account.2,
                 is_writable: remaining_account.1,
@@ -234,7 +263,7 @@ impl<'a, 'b> ClosePermissionCpi<'a, 'b> {
         });
         let data = ClosePermissionInstructionData::new().try_to_vec().unwrap();
 
-        let instruction = compat::Instruction {
+        let instruction = solana_program::instruction::Instruction {
             program_id: PERMISSION_PROGRAM_ID,
             accounts,
             data,
@@ -250,19 +279,14 @@ impl<'a, 'b> ClosePermissionCpi<'a, 'b> {
             .for_each(|remaining_account| account_infos.push(remaining_account.0.clone()));
 
         if signers_seeds.is_empty() {
-            invoke(&instruction.modern(), &account_infos.modern()).compat()
+            invoke(&instruction, &account_infos)
         } else {
-            invoke_signed(
-                &instruction.modern(),
-                &account_infos.modern(),
-                signers_seeds,
-            )
-            .compat()
+            invoke_signed(&instruction, &account_infos, signers_seeds)
         }
     }
 }
 
-/// compat::Instruction builder for `ClosePermission` via CPI.
+/// solana_program::instruction::Instruction builder for `ClosePermission` via CPI.
 ///
 /// ### Accounts:
 ///
@@ -276,7 +300,7 @@ pub struct ClosePermissionCpiBuilder<'a, 'b> {
 }
 
 impl<'a, 'b> ClosePermissionCpiBuilder<'a, 'b> {
-    pub fn new(program: &'b compat::AccountInfo<'a>) -> Self {
+    pub fn new(program: &'b solana_program::account_info::AccountInfo<'a>) -> Self {
         let instruction = Box::new(ClosePermissionCpiBuilderInstruction {
             __program: program,
             payer: None,
@@ -288,14 +312,14 @@ impl<'a, 'b> ClosePermissionCpiBuilder<'a, 'b> {
         Self { instruction }
     }
     #[inline(always)]
-    pub fn payer(&mut self, payer: &'b compat::AccountInfo<'a>) -> &mut Self {
+    pub fn payer(&mut self, payer: &'b solana_program::account_info::AccountInfo<'a>) -> &mut Self {
         self.instruction.payer = Some(payer);
         self
     }
     #[inline(always)]
     pub fn authority(
         &mut self,
-        authority: &'b compat::AccountInfo<'a>,
+        authority: &'b solana_program::account_info::AccountInfo<'a>,
         as_signer: bool,
     ) -> &mut Self {
         self.instruction.authority = Some((authority, as_signer));
@@ -304,14 +328,17 @@ impl<'a, 'b> ClosePermissionCpiBuilder<'a, 'b> {
     #[inline(always)]
     pub fn permissioned_account(
         &mut self,
-        permissioned_account: &'b compat::AccountInfo<'a>,
+        permissioned_account: &'b solana_program::account_info::AccountInfo<'a>,
         as_signer: bool,
     ) -> &mut Self {
         self.instruction.permissioned_account = Some((permissioned_account, as_signer));
         self
     }
     #[inline(always)]
-    pub fn permission(&mut self, permission: &'b compat::AccountInfo<'a>) -> &mut Self {
+    pub fn permission(
+        &mut self,
+        permission: &'b solana_program::account_info::AccountInfo<'a>,
+    ) -> &mut Self {
         self.instruction.permission = Some(permission);
         self
     }
@@ -319,7 +346,7 @@ impl<'a, 'b> ClosePermissionCpiBuilder<'a, 'b> {
     #[inline(always)]
     pub fn add_remaining_account(
         &mut self,
-        account: &'b compat::AccountInfo<'a>,
+        account: &'b solana_program::account_info::AccountInfo<'a>,
         is_writable: bool,
         is_signer: bool,
     ) -> &mut Self {
@@ -330,12 +357,16 @@ impl<'a, 'b> ClosePermissionCpiBuilder<'a, 'b> {
     }
     /// Add additional accounts to the instruction.
     ///
-    /// Each account is represented by a tuple of the `compat::AccountInfo`, a `bool` indicating whether the account is writable or not,
+    /// Each account is represented by a tuple of the `solana_program::account_info::AccountInfo`, a `bool` indicating whether the account is writable or not,
     /// and a `bool` indicating whether the account is a signer or not.
     #[inline(always)]
     pub fn add_remaining_accounts(
         &mut self,
-        accounts: &[(&'b compat::AccountInfo<'a>, bool, bool)],
+        accounts: &[(
+            &'b solana_program::account_info::AccountInfo<'a>,
+            bool,
+            bool,
+        )],
     ) -> &mut Self {
         self.instruction
             .__remaining_accounts
@@ -343,12 +374,15 @@ impl<'a, 'b> ClosePermissionCpiBuilder<'a, 'b> {
         self
     }
     #[inline(always)]
-    pub fn invoke(&self) -> compat::ProgramResult {
+    pub fn invoke(&self) -> solana_program::entrypoint_deprecated::ProgramResult {
         self.invoke_signed(&[])
     }
     #[allow(clippy::clone_on_copy)]
     #[allow(clippy::vec_init_then_push)]
-    pub fn invoke_signed(&self, signers_seeds: &[&[&[u8]]]) -> compat::ProgramResult {
+    pub fn invoke_signed(
+        &self,
+        signers_seeds: &[&[&[u8]]],
+    ) -> solana_program::entrypoint_deprecated::ProgramResult {
         let instruction = ClosePermissionCpi {
             __program: self.instruction.__program,
 
@@ -372,11 +406,15 @@ impl<'a, 'b> ClosePermissionCpiBuilder<'a, 'b> {
 
 #[derive(Clone, Debug)]
 struct ClosePermissionCpiBuilderInstruction<'a, 'b> {
-    __program: &'b compat::AccountInfo<'a>,
-    payer: Option<&'b compat::AccountInfo<'a>>,
-    authority: Option<(&'b compat::AccountInfo<'a>, bool)>,
-    permissioned_account: Option<(&'b compat::AccountInfo<'a>, bool)>,
-    permission: Option<&'b compat::AccountInfo<'a>>,
-    /// Additional instruction accounts `(compat::AccountInfo, is_writable, is_signer)`.
-    __remaining_accounts: Vec<(&'b compat::AccountInfo<'a>, bool, bool)>,
+    __program: &'b solana_program::account_info::AccountInfo<'a>,
+    payer: Option<&'b solana_program::account_info::AccountInfo<'a>>,
+    authority: Option<(&'b solana_program::account_info::AccountInfo<'a>, bool)>,
+    permissioned_account: Option<(&'b solana_program::account_info::AccountInfo<'a>, bool)>,
+    permission: Option<&'b solana_program::account_info::AccountInfo<'a>>,
+    /// Additional instruction accounts `(solana_program::account_info::AccountInfo, is_writable, is_signer)`.
+    __remaining_accounts: Vec<(
+        &'b solana_program::account_info::AccountInfo<'a>,
+        bool,
+        bool,
+    )>,
 }
