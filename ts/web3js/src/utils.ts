@@ -22,8 +22,6 @@ export async function GetCommitmentSignature(
       }),
     transactionLookupTimeoutMs,
   );
-  console.log("> txSchedulingSgn: ", txSchedulingSgn);
-
   if (txSchedulingSgn?.meta == null) {
     throw new Error("Transaction not found or meta is null");
   }
@@ -222,37 +220,12 @@ export async function waitForIntent(
   const pollIntervalMs = options.pollIntervalMs ?? 1_000;
   const deadline = Date.now() + timeoutMs;
   const inspected = new Set<string>();
-  let pollCount = 0;
-  let previousSignatureList: string | null = null;
-  console.log("[waitForIntent] started", { outboxAddress });
 
   while (Date.now() <= deadline) {
-    pollCount++;
-    let signatures;
-    try {
-      signatures = await withDeadline(
-        connection.getSignaturesForAddress(outboxPublicKey, { limit: 1000 }),
-        deadline,
-      );
-    } catch (error) {
-      console.error("[waitForIntent] getSignaturesForAddress failed", {
-        outboxAddress,
-        pollCount,
-        error,
-      });
-      throw error;
-    }
-    const signatureList = signatures.map((item) => item.signature);
-    const signatureListKey = signatureList.join(",");
-    if (signatureListKey !== previousSignatureList) {
-      console.log("[waitForIntent] getSignaturesForAddress completed", {
-        outboxAddress,
-        pollCount,
-        signatureCount: signatures.length,
-        signatures: signatureList,
-      });
-      previousSignatureList = signatureListKey;
-    }
+    const signatures = await withDeadline(
+      connection.getSignaturesForAddress(outboxPublicKey, { limit: 1000 }),
+      deadline,
+    );
 
     for (const item of signatures) {
       if (inspected.has(item.signature)) continue;
@@ -265,33 +238,12 @@ export async function waitForIntent(
           deadline,
         );
       } catch (error) {
-        console.error("[waitForIntent] getParsedTransaction failed", {
-          outboxAddress,
-          signature: item.signature,
-          error,
-        });
         if (Date.now() >= deadline) throw error;
         continue;
       }
       if (tx?.meta != null) inspected.add(item.signature);
-      const transactionLogs = tx?.meta?.logMessages ?? [];
-      console.log("[waitForIntent] getParsedTransaction completed", {
-        outboxAddress,
-        signature: item.signature,
-        transactionFound: tx != null,
-        metaAvailable: tx?.meta != null,
-        transactionError: tx?.meta?.err,
-        ...(transactionLogs.length > 0 ? { transactionLogs } : {}),
-      });
       if (tx?.meta?.err === null) {
         const receipt = receiptFromCompletion(tx, outboxPublicKey);
-        console.log("[waitForIntent] receipt parsing completed", {
-          outboxAddress,
-          signature: item.signature,
-          matched: receipt != null,
-          receiptSignatureCount: receipt?.signatures.length ?? 0,
-          receiptSignatures: receipt?.signatures ?? [],
-        });
         if (receipt != null) return receipt;
       }
     }
@@ -302,11 +254,6 @@ export async function waitForIntent(
       ),
     );
   }
-  console.warn("[waitForIntent] timed out without finding a receipt", {
-    outboxAddress,
-    pollCount,
-    inspectedTransactionCount: inspected.size,
-  });
   throw new Error(
     `Timed out waiting for settlement outbox ${outboxAddress}; transaction history may be unavailable`,
   );
