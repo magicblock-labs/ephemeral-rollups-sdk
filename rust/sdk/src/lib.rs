@@ -17,7 +17,10 @@ pub mod crank;
 pub mod delegate_args;
 pub mod ephem;
 #[cfg(any(feature = "anchor-support", feature = "modular-sdk",))]
-pub mod ephemeral_accounts;
+pub mod magic_accounts;
+#[cfg(any(feature = "anchor-support", feature = "modular-sdk",))]
+#[deprecated(note = "use `magic_accounts` instead")]
+pub use self::magic_accounts as ephemeral_accounts;
 pub mod types;
 pub mod utils;
 #[cfg(feature = "vrf")]

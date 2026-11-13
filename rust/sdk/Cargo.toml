@@ -70,6 +70,7 @@ vrf = [
 ]
 crank = ["hydra-api"]
 modular-sdk = [
+    "dep:magicblock-magic-program-api-unreleased",
     "solana-account",
     "solana-account-info",
     "solana-cpi",
@@ -82,7 +83,7 @@ modular-sdk = [
 ]
 
 # =========== internal features ===========
-anchor-support = []
+anchor-support = ["dep:magicblock-magic-program-api-unreleased"]
 #anchor-compat-idl-build = ["anchor-compat", "anchor-lang-compat/idl-build"]
 
 [dependencies]
@@ -116,6 +117,7 @@ solana-system-interface = { workspace = true, optional = true }
 solana-sysvar = { workspace = true, optional = true }
 spl-associated-token-account-interface = { workspace = true, optional = true }
 magicblock-magic-program-api = { workspace = true }
+magicblock-magic-program-api-unreleased = { workspace = true, optional = true }
 magicblock-delegation-program-api = { workspace = true, default-features = false }
 num-derive = { workspace = true, optional = true }
 num-traits = { workspace = true, optional = true }
@@ -169,7 +171,7 @@ required-features = ["spl", "access-control", "modular-sdk"]
 [[test]]
 name = "ephemeral_accounts"
 path = "../tests/ephemeral_accounts.rs"
-required-features = ["anchor"]
+required-features = ["anchor-support"]
 
 [dev-dependencies]
 bincode = { workspace = true }

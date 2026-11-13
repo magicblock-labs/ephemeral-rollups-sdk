@@ -38,6 +38,7 @@ ephemeral-vrf-sdk-vrf-macro = { path = "vrf-macro", version = "=0.17.3", default
 # Magicblock
 magicblock-delegation-program-api = { version = "3.1.0", default-features = false }
 magicblock-magic-program-api = { version = "0.10.1", default-features = false }
+magicblock-magic-program-api-unreleased = { package = "magicblock-magic-program-api", git = "https://github.com/magicblock-labs/magicblock-validator", rev = "ba412ebb6cccab2d6972891e5aa9970029e5913b", default-features = false }
 hydra-api = "0.2.1"
 
 ## External crates

@@ -1,4 +1,4 @@
-//! Compile-time tests for the `#[ephemeral_accounts]` macro.
+//! Compile-time compatibility tests for the deprecated `#[ephemeral_accounts]` macro.
 //!
 //! These tests verify that:
 //! 1. The macro generates the expected methods
@@ -8,9 +8,15 @@
 //! If any method or field is missing, the code won't compile.
 
 #![allow(unexpected_cfgs)]
+#![allow(deprecated)]
+
+#[cfg(feature = "anchor-compat")]
+extern crate anchor_lang_compat as anchor_lang;
+#[cfg(feature = "anchor-modern")]
+extern crate anchor_lang_current as anchor_lang;
 
 use anchor_lang::prelude::*;
-use ephemeral_rollups_sdk::anchor::ephemeral_accounts;
+use ephemeral_rollups_sdk::anchor::{ephemeral_accounts, magic_accounts};
 
 declare_id!("11111111111111111111111111111111");
 
@@ -61,6 +67,18 @@ pub struct MultiEphemeral<'info> {
 
     #[account(mut, eph, seeds = [b"game", payer.key().as_ref()], bump)]
     pub game_state: AccountInfo<'info>,
+}
+
+/// New API syntax is also typechecked with Anchor's compatibility types.
+#[magic_accounts]
+#[derive(Accounts)]
+pub struct CreateMagicAccount<'info> {
+    #[account(mut, sponsor)]
+    pub payer: Signer<'info>,
+
+    /// CHECK: Magic account PDA.
+    #[account(mut, magic, seeds = [b"magic", payer.key().as_ref()], bump)]
+    pub state: AccountInfo<'info>,
 }
 
 // ============ Compile-Time Verification Functions ============
@@ -140,6 +158,17 @@ fn verify_multi(ctx: &MultiEphemeral<'_>) {
     let _: Result<()> = ctx.close_ephemeral_game_state();
 }
 
+fn verify_magic(ctx: &CreateMagicAccount<'_>) {
+    let _: &AccountInfo<'_> = &ctx.state;
+    let _: &AccountInfo<'_> = &ctx.vault;
+    let _: &Program<'_, ephemeral_rollups_sdk::anchor::MagicProgram> = &ctx.magic_program;
+
+    let _: Result<()> = ctx.create_magic_state(1000u32);
+    let _: Result<()> = ctx.init_if_needed_magic_state(1000u32);
+    let _: Result<()> = ctx.resize_magic_state(2000u32);
+    let _: Result<()> = ctx.close_magic_state();
+}
+
 // ============ Test ============
 
 #[cfg(test)]
@@ -153,5 +182,6 @@ mod tests {
         let _ = verify_pda_sponsor as fn(&CreateGamePdaSponsor<'_>);
         let _ = verify_oncurve as fn(&CreateTempOncurve<'_>);
         let _ = verify_multi as fn(&MultiEphemeral<'_>);
+        let _ = verify_magic as fn(&CreateMagicAccount<'_>);
     }
 }

@@ -2,7 +2,9 @@ pub use ephemeral_rollups_sdk_attribute_action::action;
 pub use ephemeral_rollups_sdk_attribute_commit::commit;
 pub use ephemeral_rollups_sdk_attribute_delegate::delegate;
 pub use ephemeral_rollups_sdk_attribute_ephemeral::ephemeral;
+#[deprecated(note = "use `magic_accounts` instead")]
 pub use ephemeral_rollups_sdk_attribute_ephemeral_accounts::ephemeral_accounts;
+pub use ephemeral_rollups_sdk_attribute_ephemeral_accounts::magic_accounts;
 #[cfg(feature = "vrf")]
 pub use ephemeral_vrf_sdk_vrf_macro::{vrf, vrf_callback};
 

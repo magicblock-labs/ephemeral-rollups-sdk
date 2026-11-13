@@ -4,7 +4,7 @@ use crate::{
     access_control::structs::Permission,
     compat,
     consts::{
-        EPHEMERAL_VAULT_ID, ESPL_TOKEN_PROGRAM_ID, MAGIC_PROGRAM_ID, PERMISSION_PROGRAM_ID,
+        ESPL_TOKEN_PROGRAM_ID, MAGIC_ACCOUNT_VAULT_ID, MAGIC_PROGRAM_ID, PERMISSION_PROGRAM_ID,
         TOKEN_PROGRAM_ID,
     },
     spl::{find_transfer_group_receipt, EphemeralSplDiscriminator},
@@ -101,7 +101,7 @@ impl DepositAndQueueTransferBuilder {
                 compat::AccountMeta::new_readonly(TOKEN_PROGRAM_ID, false),
                 compat::AccountMeta::new(reimbursement_token_info, false),
                 compat::AccountMeta::new(group_receipt, false),
-                compat::AccountMeta::new(EPHEMERAL_VAULT_ID, false),
+                compat::AccountMeta::new(MAGIC_ACCOUNT_VAULT_ID, false),
                 compat::AccountMeta::new_readonly(MAGIC_PROGRAM_ID, false),
                 compat::AccountMeta::new(group_receipt_permission, false),
                 compat::AccountMeta::new_readonly(PERMISSION_PROGRAM_ID, false),

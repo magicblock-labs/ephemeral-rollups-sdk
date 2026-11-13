@@ -5,7 +5,9 @@ extern crate alloc;
 pub mod acl;
 pub mod consts;
 pub mod crank;
-pub mod ephemeral_accounts;
+pub mod magic_accounts;
+#[deprecated(note = "use `magic_accounts` instead")]
+pub use self::magic_accounts as ephemeral_accounts;
 pub mod instruction;
 pub mod intent_bundle;
 pub mod pda;

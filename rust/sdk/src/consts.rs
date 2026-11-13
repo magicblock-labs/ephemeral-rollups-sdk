@@ -11,9 +11,13 @@ pub const MAGIC_PROGRAM_ID: compat::Pubkey =
 pub const MAGIC_CONTEXT_ID: compat::Pubkey =
     compat::Pubkey::new_from_array(MAGIC_CONTEXT_PUBKEY.to_bytes());
 
-/// The ephemeral vault ID (collects rent for ephemeral accounts).
-pub const EPHEMERAL_VAULT_ID: compat::Pubkey =
+/// The vault ID that collects rent for Magic accounts.
+pub const MAGIC_ACCOUNT_VAULT_ID: compat::Pubkey =
     compat::Pubkey::new_from_array(EPHEMERAL_VAULT_PUBKEY.to_bytes());
+
+/// Legacy name for [`MAGIC_ACCOUNT_VAULT_ID`].
+#[deprecated(note = "use `MAGIC_ACCOUNT_VAULT_ID` instead")]
+pub const EPHEMERAL_VAULT_ID: compat::Pubkey = MAGIC_ACCOUNT_VAULT_ID;
 
 /// The permission program ID.
 pub const PERMISSION_PROGRAM_ID: compat::Pubkey =

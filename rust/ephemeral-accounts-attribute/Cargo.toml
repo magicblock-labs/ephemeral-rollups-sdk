@@ -1,6 +1,6 @@
 [package]
 name = "ephemeral-rollups-sdk-attribute-ephemeral-accounts"
-description = "Procedural macro for ephemeral accounts in Ephemeral Rollups"
+description = "Procedural macro for Magic account helpers in Ephemeral Rollups"
 version = { workspace = true }
 authors = { workspace = true }
 repository = { workspace = true }
