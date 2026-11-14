@@ -28,7 +28,7 @@ pub fn create_game(ctx: Context<CreateGame>) -> Result<()> {
 }
 ```
 
-The macro adds missing `vault` and `magic_program` fields and generates these
+The macro adds missing `vault` and `magic_account_program` fields and generates these
 methods for each `magic` field:
 
 | Method | Behavior |

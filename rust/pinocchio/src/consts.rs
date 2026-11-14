@@ -8,6 +8,10 @@ pub const DELEGATION_PROGRAM_ID: Address = address!("DELeGGvXpWV2fqJUhqcF5ZSYMS4
 /// The magic program ID.
 pub const MAGIC_PROGRAM_ID: Address = address!("Magic11111111111111111111111111111111111111");
 
+/// The built-in program that creates, resizes, and closes Magic accounts.
+pub const MAGIC_ACCOUNT_PROGRAM_ID: Address =
+    address!("EphSystem1111111111111111111111111111111111");
+
 /// The magic context ID.
 pub const MAGIC_CONTEXT_ID: Address = address!("MagicContext1111111111111111111111111111111");
 

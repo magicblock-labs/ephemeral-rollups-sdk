@@ -26,6 +26,14 @@ impl anchor_lang::Id for MagicProgram {
     }
 }
 
+pub struct MagicAccountProgram;
+
+impl anchor_lang::Id for MagicAccountProgram {
+    fn id() -> anchor_lang::prelude::Pubkey {
+        crate::consts::MAGIC_ACCOUNT_PROGRAM_ID.to_bytes().into()
+    }
+}
+
 #[cfg(feature = "access-control")]
 pub struct PermissionProgram;
 

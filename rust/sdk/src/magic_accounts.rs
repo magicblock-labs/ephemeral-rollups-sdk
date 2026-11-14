@@ -38,10 +38,14 @@
 //! MagicAccount::new(&ctx.sponsor, &ctx.magic, &ctx.vault)
 //!     .resize(2000)?;
 //! ```
+//!
+//! Anchor account contexts using `#[magic_accounts]` include the dedicated
+//! Magic Account program automatically. Other callers must include
+//! [`crate::consts::MAGIC_ACCOUNT_PROGRAM_ID`] in the parent instruction.
 
-use crate::consts::MAGIC_PROGRAM_ID;
+use crate::consts::MAGIC_ACCOUNT_PROGRAM_ID;
 use magicblock_magic_program_api::{
-    instruction::MagicBlockInstruction, MAGIC_ACCOUNT_RENT_PER_BYTE,
+    instruction::MagicAccountInstruction, MAGIC_ACCOUNT_RENT_PER_BYTE,
 };
 use solana_program::{
     instruction::{AccountMeta, Instruction},
@@ -125,7 +129,7 @@ impl<'a, 'info> MagicAccount<'a, 'info> {
     /// Provide seeds via [`Self::with_signer_seeds`] if it is a PDA.
     pub fn create(&self, data_len: u32) -> solana_program::entrypoint_deprecated::ProgramResult {
         self.invoke(
-            MagicBlockInstruction::CreateMagicAccount { data_len },
+            MagicAccountInstruction::CreateMagicAccount { data_len },
             true, // the Magic account must sign on create
         )
     }
@@ -139,7 +143,7 @@ impl<'a, 'info> MagicAccount<'a, 'info> {
         new_data_len: u32,
     ) -> solana_program::entrypoint_deprecated::ProgramResult {
         self.invoke(
-            MagicBlockInstruction::ResizeMagicAccount { new_data_len },
+            MagicAccountInstruction::ResizeMagicAccount { new_data_len },
             false,
         )
     }
@@ -148,16 +152,16 @@ impl<'a, 'info> MagicAccount<'a, 'info> {
     ///
     /// All rent is refunded from vault to sponsor.
     pub fn close(&self) -> solana_program::entrypoint_deprecated::ProgramResult {
-        self.invoke(MagicBlockInstruction::CloseMagicAccount, false)
+        self.invoke(MagicAccountInstruction::CloseMagicAccount, false)
     }
 
     fn invoke(
         &self,
-        instruction: MagicBlockInstruction,
+        instruction: MagicAccountInstruction,
         magic_is_signer: bool,
     ) -> solana_program::entrypoint_deprecated::ProgramResult {
         let ix = Instruction::new_with_bincode(
-            MAGIC_PROGRAM_ID,
+            MAGIC_ACCOUNT_PROGRAM_ID,
             &instruction,
             vec![
                 AccountMeta::new(*self.sponsor.key, true),
@@ -180,25 +184,25 @@ pub use self::MagicAccount as EphemeralAccount;
 
 #[cfg(test)]
 mod tests {
-    use magicblock_magic_program_api::instruction::MagicBlockInstruction;
+    use magicblock_magic_program_api::instruction::MagicAccountInstruction;
 
     #[test]
-    fn magic_account_instructions_keep_the_existing_wire_encoding() {
+    fn magic_account_instructions_use_dedicated_wire_encoding() {
         assert_eq!(
-            bincode::serialize(&MagicBlockInstruction::CreateMagicAccount { data_len: 123 })
+            bincode::serialize(&MagicAccountInstruction::CreateMagicAccount { data_len: 123 })
                 .unwrap(),
-            [12, 0, 0, 0, 123, 0, 0, 0]
+            [0, 0, 0, 0, 123, 0, 0, 0]
         );
 
         assert_eq!(
-            bincode::serialize(&MagicBlockInstruction::ResizeMagicAccount { new_data_len: 456 })
+            bincode::serialize(&MagicAccountInstruction::ResizeMagicAccount { new_data_len: 456 })
                 .unwrap(),
-            [13, 0, 0, 0, 200, 1, 0, 0]
+            [1, 0, 0, 0, 200, 1, 0, 0]
         );
 
         assert_eq!(
-            bincode::serialize(&MagicBlockInstruction::CloseMagicAccount).unwrap(),
-            [14, 0, 0, 0]
+            bincode::serialize(&MagicAccountInstruction::CloseMagicAccount).unwrap(),
+            [2, 0, 0, 0]
         );
     }
 
@@ -207,6 +211,14 @@ mod tests {
         assert_eq!(
             crate::consts::MAGIC_ACCOUNT_VAULT_ID,
             solana_program::pubkey!("MagicVau1t999999999999999999999999999999999")
+        );
+    }
+
+    #[test]
+    fn magic_account_program_address_is_unchanged() {
+        assert_eq!(
+            crate::consts::MAGIC_ACCOUNT_PROGRAM_ID,
+            solana_program::pubkey!("EphSystem1111111111111111111111111111111111")
         );
     }
 }
