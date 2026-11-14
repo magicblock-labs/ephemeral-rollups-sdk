@@ -71,7 +71,7 @@ const OUTBOX_PREFIX = "Outbox for scheduled intent: ";
 const OUTBOX_PROGRAM_ID = "outboxintent1111111111111111111111111111111";
 const SCHEDULED_COMMIT_SENT_TAG = 2;
 
-type AddressLike = string | { toBase58(): string };
+type AddressLike = string | { toBase58: () => string };
 
 // The supplied Connection may return PublicKeys from another installed web3.js copy.
 function addressToBase58(address: AddressLike | undefined): string | null {
