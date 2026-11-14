@@ -63,7 +63,7 @@ pub struct MultiEphemeral<'info> {
     pub game_state: AccountInfo<'info>,
 }
 
-/// New API syntax is also typechecked with Anchor 1.0 types.
+/// New API syntax is also typechecked with Anchor 1.2.2 types.
 #[magic_accounts]
 #[derive(Accounts)]
 pub struct CreateMagicAccount<'info> {

@@ -14,9 +14,8 @@ pub struct DelegatePlayer<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
 
-    /// CHECK: PDA address is constrained; left untyped because delegation changes ownership.
     #[account(mut, del, seeds = [b"player", payer.key().as_ref()], bump)]
-    pub player: UncheckedAccount<'info>,
+    pub player: Account<'info, Player>,
 }
 
 pub fn delegate_player(ctx: Context<DelegatePlayer>) -> Result<()> {
@@ -33,10 +32,18 @@ Pass PDA seeds **without the bump**; the CPI helper derives it. The macro adds
 `buffer_player`, `delegation_record_player`, `delegation_metadata_player`, plus
 shared `owner_program`, `delegation_program`, and `system_program` fields.
 
-`del` fields must be `UncheckedAccount` or `AccountInfo`; typed accounts such as
-`Account<T>` are rejected. Anchor serializes typed accounts after the handler,
-when delegation has already changed ownership, causing writes to fail under
-direct mapping. To update and delegate in one instruction, load a local typed
-wrapper, mutate it, and call `.exit(&crate::ID)` **before** delegating.
+`del` fields may use typed accounts such as `Account<T>` with Anchor 1.2.2 or
+later. If delegation changes ownership during the instruction, Anchor permits
+account exit when the data is unchanged and rejects pending data changes. To
+update and delegate in one instruction, call `.exit(&crate::ID)` **before**
+delegating so the updated data is written while the account is still owned by
+your program.
+
+```rust
+#[account]
+pub struct Player {
+    pub score: u64,
+}
+```
 
 [Integration guides](https://docs.magicblock.gg/)

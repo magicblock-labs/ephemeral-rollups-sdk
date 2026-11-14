@@ -12,11 +12,11 @@ ephemeral-rollups-sdk = { version = "0.17", features = ["anchor"] }
 
 | Integration | Feature |
 |-------------|---------|
-| Anchor 1.0 | `anchor` |
+| Anchor 1.2.2+ | `anchor` |
 | Modular Solana crates | `modular-sdk` |
 | Permissions, tokens, randomness, scheduled tasks | `access-control`, `spl`, `vrf`, `crank`, respectively |
 
-The SDK targets Solana 3.0. Anchor integration requires Anchor 1.0.
+The SDK targets Solana 3.0. Anchor integration requires Anchor 1.2.2 or later.
 `spl` also enables `encryption` and `instruction`.
 
 ## Anchor macros

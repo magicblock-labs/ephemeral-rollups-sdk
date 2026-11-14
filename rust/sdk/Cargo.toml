@@ -14,7 +14,7 @@ readme = "README.md"
 [features]
 default = ["solana-system-interface"]
 
-# Anchor 1.0 support.
+# Anchor 1.2.2+ support.
 anchor = ["dep:anchor-lang", "ephemeral-vrf-sdk?/anchor"]
 anchor-debug = ["anchor", "anchor-lang/anchor-debug"]
 
@@ -126,6 +126,11 @@ required-features = ["spl", "access-control", "modular-sdk"]
 [[test]]
 name = "ephemeral_accounts"
 path = "../tests/ephemeral_accounts.rs"
+required-features = ["anchor"]
+
+[[test]]
+name = "anchor_delegate"
+path = "../tests/anchor_delegate.rs"
 required-features = ["anchor"]
 
 [dev-dependencies]

@@ -8,24 +8,6 @@ fn generated_unchecked_account_type() -> TokenStream2 {
     quote! { UncheckedAccount<'info> }
 }
 
-/// Anchor re-serializes typed accounts after the handler returns. By then a delegated
-/// account is owned by the delegation program, so that write fails with
-/// `ExternalAccountDataModified` once direct mapping (SIMD-0460) is active.
-/// Only `UncheckedAccount` and `AccountInfo` are exempt from that exit.
-/// This is a syntactic guard: a proc macro cannot resolve type aliases, so it catches the
-/// common mistake rather than a deliberate alias that shadows one of those names.
-fn is_untyped_anchor_account(ty: &syn::Type) -> bool {
-    let syn::Type::Path(path) = ty else {
-        return false;
-    };
-    path.path.segments.last().is_some_and(|segment| {
-        matches!(
-            segment.ident.to_string().as_str(),
-            "UncheckedAccount" | "AccountInfo"
-        )
-    })
-}
-
 /// Splits `#[account(...)]` into its top-level comma-separated constraints.
 /// Nested groups such as `seeds = [a, b]` stay intact because they are single token trees.
 fn account_constraints(attr: &syn::Attribute) -> Option<Vec<TokenStream2>> {
@@ -118,19 +100,6 @@ fn expand(item: TokenStream2) -> TokenStream2 {
             if attr.path.is_ident("account") {
                 has_del |= strip_del_marker(attr);
             }
-        }
-
-        if has_del && !is_untyped_anchor_account(&field.ty) {
-            return syn::Error::new_spanned(
-                &field.ty,
-                "`del` accounts must be `UncheckedAccount<'info>` or `AccountInfo<'info>`. \
-                 Anchor re-serializes typed accounts after the handler returns, but by then the \
-                 account is owned by the delegation program, so the write fails with \
-                 ExternalAccountDataModified once direct mapping (SIMD-0460) is active. \
-                 Load the account into a local typed wrapper (e.g. `Account::<T>::try_from`) \
-                 inside the handler and call `.exit(&crate::ID)` on it before delegating.",
-            )
-            .to_compile_error();
         }
 
         if has_del {
@@ -309,7 +278,7 @@ mod tests {
     }
 
     #[test]
-    fn typed_del_field_is_rejected() {
+    fn typed_del_field_generates_delegate_helper() {
         let output = expand_str(
             r#"
             pub struct Delegate<'info> {
@@ -318,6 +287,7 @@ mod tests {
             }
             "#,
         );
-        assert!(output.contains("compile_error"), "{output}");
+        assert!(!output.contains("compile_error"), "{output}");
+        assert!(output.contains("delegate_player"), "{output}");
     }
 }
