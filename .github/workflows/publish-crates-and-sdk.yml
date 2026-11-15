@@ -36,6 +36,56 @@ jobs:
         shell: "bash"
         run: rustup toolchain install ${{ env.rust_version }} --profile minimal
 
+      - name: Validate release version
+        shell: bash
+        run: |
+          case "${GITHUB_REF}" in
+            refs/heads/release/v*) expected_version="${GITHUB_REF#refs/heads/release/v}" ;;
+            refs/tags/v*) expected_version="${GITHUB_REF#refs/tags/v}" ;;
+            *)
+              echo "Expected a release/v* branch or a v* tag, got ${GITHUB_REF}" >&2
+              exit 1
+              ;;
+          esac
+
+          export EXPECTED_VERSION="${expected_version}"
+          cargo metadata --manifest-path rust/Cargo.toml --locked --no-deps --format-version 1 > "${RUNNER_TEMP}/cargo-metadata.json"
+          python3 - "${RUNNER_TEMP}/cargo-metadata.json" <<'PY'
+          import json
+          import os
+          import pathlib
+          import sys
+          import tomllib
+
+          expected = os.environ["EXPECTED_VERSION"]
+          for manifest in ("ts/kit/package.json", "ts/web3js/package.json"):
+              version = json.loads(pathlib.Path(manifest).read_text())["version"]
+              if version != expected:
+                  raise SystemExit(f"{manifest} has version {version}; expected {expected}")
+
+          cargo_toml = tomllib.loads(pathlib.Path("rust/Cargo.toml").read_text())
+          if cargo_toml["workspace"]["package"]["version"] != expected:
+              raise SystemExit(f"rust/Cargo.toml workspace version must be {expected}")
+          stale_dependencies = [
+              name
+              for name, dependency in cargo_toml["workspace"]["dependencies"].items()
+              if isinstance(dependency, dict)
+              and dependency.get("path")
+              and dependency.get("version") != f"={expected}"
+          ]
+          if stale_dependencies:
+              raise SystemExit(f"Rust workspace dependency pins must be ={expected}: {', '.join(stale_dependencies)}")
+
+          metadata = json.loads(pathlib.Path(sys.argv[1]).read_text())
+          workspace_ids = set(metadata["workspace_members"])
+          workspace_packages = [package for package in metadata["packages"] if package["id"] in workspace_ids]
+          mismatches = [f"{package['name']}={package['version']}" for package in workspace_packages if package["version"] != expected]
+          if mismatches:
+              raise SystemExit(f"Rust workspace versions must all be {expected}: {', '.join(mismatches)}")
+
+          print(f"Release version {expected} matches all TypeScript and Rust workspace packages")
+          PY
+
       - name: Cache rust
         uses: Swatinem/rust-cache@v2
 
@@ -78,6 +128,12 @@ jobs:
           PACKAGE_NAME=$(node -p "require('./package.json').name")
           PACKAGE_VERSION=$(node -p "require('./package.json').version")
 
+          NPM_TAG=""
+          if [[ "${PACKAGE_VERSION}" == *-* ]]; then
+            NPM_TAG="${PACKAGE_VERSION#*-}"
+            NPM_TAG="${NPM_TAG%%.*}"
+          fi
+
           if npm view "${PACKAGE_NAME}@${PACKAGE_VERSION}" version >/dev/null 2>&1; then
             echo "${PACKAGE_NAME}@${PACKAGE_VERSION} is already published, skipping"
             exit 0
@@ -92,9 +148,17 @@ jobs:
           npm run build && npm run lint:fix
           if [ "${DRY_RUN}" = "true" ]; then
             echo "Running npm publish in dry-run mode"
-            npm publish --access public --dry-run
+            if [ -n "${NPM_TAG}" ]; then
+              npm publish --access public --tag "${NPM_TAG}" --dry-run
+            else
+              npm publish --access public --dry-run
+            fi
           else
-            npm publish --access public
+            if [ -n "${NPM_TAG}" ]; then
+              npm publish --access public --tag "${NPM_TAG}"
+            else
+              npm publish --access public
+            fi
           fi
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
@@ -106,6 +170,12 @@ jobs:
           PACKAGE_NAME=$(node -p "require('./package.json').name")
           PACKAGE_VERSION=$(node -p "require('./package.json').version")
 
+          NPM_TAG=""
+          if [[ "${PACKAGE_VERSION}" == *-* ]]; then
+            NPM_TAG="${PACKAGE_VERSION#*-}"
+            NPM_TAG="${NPM_TAG%%.*}"
+          fi
+
           if npm view "${PACKAGE_NAME}@${PACKAGE_VERSION}" version >/dev/null 2>&1; then
             echo "${PACKAGE_NAME}@${PACKAGE_VERSION} is already published, skipping"
             exit 0
@@ -120,9 +190,17 @@ jobs:
           npm run build && npm run lint:fix
           if [ "${DRY_RUN}" = "true" ]; then
             echo "Running npm publish in dry-run mode"
-            npm publish --access public --dry-run
+            if [ -n "${NPM_TAG}" ]; then
+              npm publish --access public --tag "${NPM_TAG}" --dry-run
+            else
+              npm publish --access public --dry-run
+            fi
           else
-            npm publish --access public
+            if [ -n "${NPM_TAG}" ]; then
+              npm publish --access public --tag "${NPM_TAG}"
+            else
+              npm publish --access public
+            fi
           fi
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
