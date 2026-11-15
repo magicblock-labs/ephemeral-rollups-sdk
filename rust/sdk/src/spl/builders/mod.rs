@@ -4,6 +4,7 @@ pub mod delegate_ephemeral_ata;
 pub mod delegate_shuttle_ephemeral_ata;
 pub mod delegate_transfer_queue;
 pub mod deposit_and_delegate_shuttle_ephemeral_ata_with_merge_and_private_transfer;
+#[cfg(feature = "access-control")]
 pub mod deposit_and_queue_transfer;
 pub mod deposit_spl_tokens;
 pub mod ensure_transfer_queue_crank;
@@ -37,6 +38,7 @@ pub use delegate_ephemeral_ata::*;
 pub use delegate_shuttle_ephemeral_ata::*;
 pub use delegate_transfer_queue::*;
 pub use deposit_and_delegate_shuttle_ephemeral_ata_with_merge_and_private_transfer::*;
+#[cfg(feature = "access-control")]
 pub use deposit_and_queue_transfer::*;
 pub use deposit_spl_tokens::*;
 pub use ensure_transfer_queue_crank::*;
