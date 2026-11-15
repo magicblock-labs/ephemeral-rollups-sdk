@@ -13,7 +13,7 @@ and committing state back to Solana.
 | [@magicblock-labs/ephemeral-rollups-sdk](ts/web3js/README.md) | TypeScript clients using `@solana/web3.js` | [![npm](https://img.shields.io/npm/v/@magicblock-labs/ephemeral-rollups-sdk.svg?color=blue)](https://www.npmjs.com/package/@magicblock-labs/ephemeral-rollups-sdk) |
 | [@magicblock-labs/ephemeral-rollups-kit](ts/kit/README.md) | TypeScript clients using `@solana/kit` | [![npm](https://img.shields.io/npm/v/@magicblock-labs/ephemeral-rollups-kit.svg?color=blue)](https://www.npmjs.com/package/@magicblock-labs/ephemeral-rollups-kit) |
 
-The Rust SDK targets Solana 3. Anchor integration uses Anchor 1.0; enable the
+The Rust SDK targets Solana 3. Anchor integration requires Anchor 1.2.2 or later; enable the
 `anchor` feature when integrating with an Anchor program.
 Delegated accounts and [ephemeral-only accounts](rust/ephemeral-accounts-attribute/README.md)
 have different lifecycles; ephemeral-only accounts do not persist on Solana.
