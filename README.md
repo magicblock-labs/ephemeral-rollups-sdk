@@ -13,6 +13,12 @@ and committing state back to Solana.
 | [@magicblock-labs/ephemeral-rollups-sdk](ts/web3js/README.md) | TypeScript clients using `@solana/web3.js` | [![npm](https://img.shields.io/npm/v/@magicblock-labs/ephemeral-rollups-sdk.svg?color=blue)](https://www.npmjs.com/package/@magicblock-labs/ephemeral-rollups-sdk) |
 | [@magicblock-labs/ephemeral-rollups-kit](ts/kit/README.md) | TypeScript clients using `@solana/kit` | [![npm](https://img.shields.io/npm/v/@magicblock-labs/ephemeral-rollups-kit.svg?color=blue)](https://www.npmjs.com/package/@magicblock-labs/ephemeral-rollups-kit) |
 
+## SDK versioning for Validator v1 and v2
+
+The Rust and TypeScript SDKs share a version number. The current `0.17.x` line supports MagicBlock Validator v1. The `0.18.x` and `0.19.x` slots are reserved for future v1-compatible releases if breaking SDK changes are needed.
+
+The `0.20.x` line is separate and targets Validator v2; `0.20.0-alpha.1` is its first release. Version `1.0.0` is reserved for the planned major SDK redesign.
+
 For Rust, choose the [compatibility features](rust/sdk/README.md#features) before
 integrating: `anchor` targets Anchor 1.0; older Anchor versions use `anchor-compat`.
 Delegated accounts and [ephemeral-only accounts](rust/ephemeral-accounts-attribute/README.md)
