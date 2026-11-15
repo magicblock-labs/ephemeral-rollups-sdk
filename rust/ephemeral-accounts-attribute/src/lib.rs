@@ -480,7 +480,7 @@ struct MacroContext {
     field_names: Vec<Ident>,
     sponsor: Option<SponsorInfo>,
     has_vault: bool,
-    has_magic_program: bool,
+    has_magic_account_program: bool,
     has_magic: bool,
 }
 
@@ -492,7 +492,7 @@ fn validate(input: &ItemStruct, naming: AccountNaming) -> Result<MacroContext, T
         field_names,
         sponsor: None,
         has_vault: false,
-        has_magic_program: false,
+        has_magic_account_program: false,
         has_magic: false,
     };
 
@@ -538,8 +538,8 @@ fn validate(input: &ItemStruct, naming: AccountNaming) -> Result<MacroContext, T
         if *name == "vault" {
             ctx.has_vault = true;
         }
-        if *name == "magic_program" {
-            ctx.has_magic_program = true;
+        if *name == "magic_account_program" {
+            ctx.has_magic_account_program = true;
         }
     }
 
@@ -630,9 +630,9 @@ fn expand_accounts(item: TokenStream, naming: AccountNaming) -> TokenStream {
                 pub vault: #unchecked_account,
             });
         }
-        if !ctx.has_magic_program {
+        if !ctx.has_magic_account_program {
             new_fields.push(quote! {
-                pub magic_program: Program<'info, ephemeral_rollups_sdk::anchor::MagicProgram>,
+                pub magic_account_program: Program<'info, ephemeral_rollups_sdk::anchor::MagicAccountProgram>,
             });
         }
     }

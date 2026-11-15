@@ -2,7 +2,7 @@
 //!
 //! These tests verify that:
 //! 1. The macro generates the expected methods
-//! 2. Auto-injected fields (vault, magic_program) exist
+//! 2. Auto-injected fields (vault, magic_account_program) exist
 //! 3. Method signatures are correct
 //!
 //! If any method or field is missing, the code won't compile.
@@ -85,7 +85,8 @@ fn verify_wallet_sponsor(ctx: &CreateGameWalletSponsor<'_>) {
 
     // Auto-injected fields exist
     let _: &AccountInfo<'_> = &ctx.vault;
-    let _: &Program<'_, ephemeral_rollups_sdk::anchor::MagicProgram> = &ctx.magic_program;
+    let _: &Program<'_, ephemeral_rollups_sdk::anchor::MagicAccountProgram> =
+        &ctx.magic_account_program;
 
     // Methods exist with correct signatures
     let _: Result<()> = ctx.create_ephemeral_game_state(1000u32);
@@ -102,7 +103,8 @@ fn verify_pda_sponsor(ctx: &CreateGamePdaSponsor<'_>) {
 
     // Auto-injected fields exist
     let _: &AccountInfo<'_> = &ctx.vault;
-    let _: &Program<'_, ephemeral_rollups_sdk::anchor::MagicProgram> = &ctx.magic_program;
+    let _: &Program<'_, ephemeral_rollups_sdk::anchor::MagicAccountProgram> =
+        &ctx.magic_account_program;
 
     // Methods exist with correct signatures
     let _: Result<()> = ctx.create_ephemeral_game_state(1000u32);
@@ -119,7 +121,8 @@ fn verify_oncurve(ctx: &CreateTempOncurve<'_>) {
 
     // Auto-injected fields exist
     let _: &AccountInfo<'_> = &ctx.vault;
-    let _: &Program<'_, ephemeral_rollups_sdk::anchor::MagicProgram> = &ctx.magic_program;
+    let _: &Program<'_, ephemeral_rollups_sdk::anchor::MagicAccountProgram> =
+        &ctx.magic_account_program;
 
     // Methods exist with correct signatures (named after temp_account field)
     let _: Result<()> = ctx.create_ephemeral_temp_account(1000u32);
@@ -137,7 +140,8 @@ fn verify_multi(ctx: &MultiEphemeral<'_>) {
 
     // Auto-injected fields exist
     let _: &AccountInfo<'_> = &ctx.vault;
-    let _: &Program<'_, ephemeral_rollups_sdk::anchor::MagicProgram> = &ctx.magic_program;
+    let _: &Program<'_, ephemeral_rollups_sdk::anchor::MagicAccountProgram> =
+        &ctx.magic_account_program;
 
     // Methods for player_state field
     let _: Result<()> = ctx.create_ephemeral_player_state(100u32);
@@ -155,7 +159,8 @@ fn verify_multi(ctx: &MultiEphemeral<'_>) {
 fn verify_magic(ctx: &CreateMagicAccount<'_>) {
     let _: &AccountInfo<'_> = &ctx.state;
     let _: &AccountInfo<'_> = &ctx.vault;
-    let _: &Program<'_, ephemeral_rollups_sdk::anchor::MagicProgram> = &ctx.magic_program;
+    let _: &Program<'_, ephemeral_rollups_sdk::anchor::MagicAccountProgram> =
+        &ctx.magic_account_program;
 
     let _: Result<()> = ctx.create_magic_state(1000u32);
     let _: Result<()> = ctx.init_if_needed_magic_state(1000u32);

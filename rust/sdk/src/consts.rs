@@ -1,6 +1,12 @@
 pub use dlp_api::consts::*;
 use magicblock_magic_program_api::{MAGIC_ACCOUNT_VAULT_PUBKEY, MAGIC_CONTEXT_PUBKEY};
 
+/// The built-in program that creates, resizes, and closes Magic accounts.
+pub const MAGIC_ACCOUNT_PROGRAM_ID: solana_program::pubkey::Pubkey =
+    solana_program::pubkey::Pubkey::new_from_array(
+        magicblock_magic_program_api::MAGIC_ACCOUNT_PROGRAM_ID.to_bytes(),
+    );
+
 /// The magic program ID.
 pub const MAGIC_PROGRAM_ID: solana_program::pubkey::Pubkey =
     solana_program::pubkey::Pubkey::new_from_array(magicblock_magic_program_api::ID.to_bytes());

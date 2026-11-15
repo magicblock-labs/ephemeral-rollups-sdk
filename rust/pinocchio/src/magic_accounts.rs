@@ -20,38 +20,41 @@
 //! use ephemeral_rollups_pinocchio::magic_accounts::MagicAccount;
 //!
 //! // Create: both sponsor and Magic account are PDAs - provide seeds for both
-//! MagicAccount::new(&ctx.sponsor, &ctx.magic, &ctx.vault, &ctx.magic_program)
+//! MagicAccount::new(&ctx.sponsor, &ctx.magic, &ctx.vault, &ctx.magic_account_program)
 //!     .with_signers(&[&sponsor_signer, &magic_signer])
 //!     .create(1000)?;
 //!
 //! // Resize/Close: only sponsor needs to sign - only sponsor seeds needed
-//! MagicAccount::new(&ctx.sponsor, &ctx.magic, &ctx.vault, &ctx.magic_program)
+//! MagicAccount::new(&ctx.sponsor, &ctx.magic, &ctx.vault, &ctx.magic_account_program)
 //!     .with_signers(&[&sponsor_signer])
 //!     .resize(2000)?;
 //!
 //! // Create with oncurve sponsor (signed tx), Magic account is a PDA
-//! MagicAccount::new(&ctx.sponsor, &ctx.magic, &ctx.vault, &ctx.magic_program)
+//! MagicAccount::new(&ctx.sponsor, &ctx.magic, &ctx.vault, &ctx.magic_account_program)
 //!     .with_signers(&[&magic_signer])
 //!     .create(1000)?;
 //!
 //! // Resize/Close with oncurve sponsor - no seeds needed
-//! MagicAccount::new(&ctx.sponsor, &ctx.magic, &ctx.vault, &ctx.magic_program)
+//! MagicAccount::new(&ctx.sponsor, &ctx.magic, &ctx.vault, &ctx.magic_account_program)
 //!     .resize(2000)?;
 //! ```
 
 use pinocchio::{
     cpi::{invoke_signed, Signer},
+    error::ProgramError,
     instruction::{InstructionAccount, InstructionView},
-    AccountView, ProgramResult,
+    AccountView, Address, ProgramResult,
 };
+
+use crate::consts::MAGIC_ACCOUNT_PROGRAM_ID;
 
 /// Redefined constants to avoid importing the std magicblock-magic-program-api crate.
 const ACCOUNT_OVERHEAD: u32 = 60;
 const MAGIC_ACCOUNT_RENT_PER_BYTE: u64 = 32;
 
-const CREATE_MAGIC_ACCOUNT_DISCRIMINATOR: u32 = 12;
-const RESIZE_MAGIC_ACCOUNT_DISCRIMINATOR: u32 = 13;
-const CLOSE_MAGIC_ACCOUNT_DISCRIMINATOR: u32 = 14;
+const CREATE_MAGIC_ACCOUNT_DISCRIMINATOR: u32 = 0;
+const RESIZE_MAGIC_ACCOUNT_DISCRIMINATOR: u32 = 1;
+const CLOSE_MAGIC_ACCOUNT_DISCRIMINATOR: u32 = 2;
 
 // -----------------
 // Utility Functions
@@ -85,7 +88,7 @@ pub struct MagicAccount<'a> {
     sponsor: &'a AccountView,
     magic: &'a AccountView,
     vault: &'a AccountView,
-    magic_program: &'a AccountView,
+    magic_account_program: &'a AccountView,
     signer_seeds: &'a [Signer<'a, 'a>],
 }
 
@@ -97,18 +100,18 @@ impl<'a> MagicAccount<'a> {
     /// * `sponsor` - Account paying rent (must be signer for all operations)
     /// * `magic` - Account to create/modify (must be signer only on create)
     /// * `vault` - Rent vault ([`crate::consts::MAGIC_ACCOUNT_VAULT_ID`])
-    /// * `magic_program` - Magic program ([`crate::consts::MAGIC_PROGRAM_ID`])
+    /// * `magic_account_program` - Magic Account program ([`crate::consts::MAGIC_ACCOUNT_PROGRAM_ID`])
     pub fn new(
         sponsor: &'a AccountView,
         magic: &'a AccountView,
         vault: &'a AccountView,
-        magic_program: &'a AccountView,
+        magic_account_program: &'a AccountView,
     ) -> Self {
         Self {
             sponsor,
             magic,
             vault,
-            magic_program,
+            magic_account_program,
             signer_seeds: &[],
         }
     }
@@ -157,8 +160,10 @@ impl<'a> MagicAccount<'a> {
     }
 
     fn invoke(&self, data: &[u8], magic_is_signer: bool) -> ProgramResult {
+        validate_magic_account_program(self.magic_account_program.address())?;
+
         let ix = InstructionView {
-            program_id: self.magic_program.address(),
+            program_id: self.magic_account_program.address(),
             data,
             accounts: &[
                 InstructionAccount::writable_signer(self.sponsor.address()),
@@ -175,6 +180,14 @@ impl<'a> MagicAccount<'a> {
     }
 }
 
+fn validate_magic_account_program(program_id: &Address) -> ProgramResult {
+    if program_id == &MAGIC_ACCOUNT_PROGRAM_ID {
+        Ok(())
+    } else {
+        Err(ProgramError::IncorrectProgramId)
+    }
+}
+
 /// Legacy name for [`MagicAccount`].
 #[deprecated(note = "use `MagicAccount` instead")]
 pub use self::MagicAccount as EphemeralAccount;
@@ -187,9 +200,29 @@ mod tests {
     };
 
     #[test]
-    fn magic_account_discriminators_keep_the_existing_wire_values() {
-        assert_eq!(CREATE_MAGIC_ACCOUNT_DISCRIMINATOR, 12);
-        assert_eq!(RESIZE_MAGIC_ACCOUNT_DISCRIMINATOR, 13);
-        assert_eq!(CLOSE_MAGIC_ACCOUNT_DISCRIMINATOR, 14);
+    fn magic_account_discriminators_use_dedicated_wire_values() {
+        assert_eq!(CREATE_MAGIC_ACCOUNT_DISCRIMINATOR, 0);
+        assert_eq!(RESIZE_MAGIC_ACCOUNT_DISCRIMINATOR, 1);
+        assert_eq!(CLOSE_MAGIC_ACCOUNT_DISCRIMINATOR, 2);
+    }
+
+    #[test]
+    fn rejects_the_main_magic_program_as_the_magic_account_program() {
+        assert_eq!(
+            super::validate_magic_account_program(&pinocchio::Address::new_from_array([0; 32])),
+            Err(pinocchio::error::ProgramError::IncorrectProgramId)
+        );
+        assert_eq!(
+            super::validate_magic_account_program(&crate::consts::MAGIC_ACCOUNT_PROGRAM_ID),
+            Ok(())
+        );
+    }
+
+    #[test]
+    fn magic_account_program_id_matches_the_validator_api() {
+        assert_eq!(
+            crate::consts::MAGIC_ACCOUNT_PROGRAM_ID.to_bytes(),
+            magicblock_magic_program_api::MAGIC_ACCOUNT_PROGRAM_ID.to_bytes()
+        );
     }
 }
