@@ -2369,11 +2369,13 @@ dependencies = [
 
 [[package]]
 name = "magicblock-magic-program-api"
-version = "2.0.0-rc.2"
-source = "git+https://github.com/magicblock-labs/magicblock-validator?rev=ba412ebb6cccab2d6972891e5aa9970029e5913b#ba412ebb6cccab2d6972891e5aa9970029e5913b"
+version = "2.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "119d4ac756b66f5380d7aa0df1c37df53f6d51fd82b4b2087747753b20e5958c"
 dependencies = [
  "const-crypto",
  "serde",
+ "solana-address 2.6.1",
  "solana-hash 4.4.0",
  "solana-instruction 3.4.0",
  "solana-program 4.0.0",
