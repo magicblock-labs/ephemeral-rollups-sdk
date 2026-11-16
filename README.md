@@ -17,7 +17,7 @@ and committing state back to Solana.
 
 The Rust and TypeScript SDKs share a version number. The current `0.17.x` line supports MagicBlock Validator v1. The `0.18.x` and `0.19.x` slots are reserved for future v1-compatible releases if breaking SDK changes are needed.
 
-The `0.20.x` line is separate and targets Validator v2; `0.20.0-alpha.1` is its first release. Version `1.0.0` is reserved for the planned major SDK redesign.
+The `0.20.x` line is separate and targets Validator v2. Version `1.0.0` is reserved for the planned major SDK redesign.
 
 The Rust SDK targets Solana 3. Anchor integration requires Anchor 1.2.2 or later; enable the
 `anchor` feature when integrating with an Anchor program.
