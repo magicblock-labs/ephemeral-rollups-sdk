@@ -5,8 +5,17 @@ and Magic accounts.
 
 ```toml
 [dependencies]
-ephemeral-rollups-sdk = { version = "0.17", features = ["anchor"] }
+ephemeral-rollups-sdk = { version = "0.20.0-alpha.3", features = ["anchor"] }
 ```
+
+## SDK versioning for Validator v1 and v2
+
+The Rust and TypeScript SDKs share a version number. The `0.17.x` line targets
+MagicBlock Validator v1. The `0.18.x` and `0.19.x` slots are reserved for
+future v1-compatible releases if breaking SDK changes are needed.
+
+The `0.20.x` line is separate and targets Validator v2. Version `1.0.0` is
+reserved for the planned major SDK redesign.
 
 ## Features
 
