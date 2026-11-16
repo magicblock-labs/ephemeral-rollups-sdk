@@ -5,7 +5,7 @@ and Magic accounts.
 
 ```toml
 [dependencies]
-ephemeral-rollups-sdk = { version = "0.20.0-alpha.3", features = ["anchor"] }
+ephemeral-rollups-sdk = { version = "0.20.0", features = ["anchor"] }
 ```
 
 ## SDK versioning for Validator v1 and v2
