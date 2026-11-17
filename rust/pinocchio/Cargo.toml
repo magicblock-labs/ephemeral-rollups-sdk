@@ -33,6 +33,7 @@ ephemeral-vrf-sdk = { workspace = true }
 
 [features]
 default = []
+magic-accounts = []
 delegation-actions = [
     "pinocchio/alloc",
     "pinocchio/cpi",

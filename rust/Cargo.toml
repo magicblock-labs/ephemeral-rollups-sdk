@@ -38,6 +38,7 @@ ephemeral-vrf-sdk-vrf-macro = { path = "vrf-macro", version = "=0.17.3", default
 # Magicblock
 magicblock-delegation-program-api = { version = "3.1.0", default-features = false }
 magicblock-magic-program-api = { version = "0.10.1", default-features = false }
+magicblock-magic-program-api-v2 = { package = "magicblock-magic-program-api", version = "2.0.0", default-features = false }
 hydra-api = "0.2.1"
 
 ## External crates

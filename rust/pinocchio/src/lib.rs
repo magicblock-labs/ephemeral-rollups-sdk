@@ -8,6 +8,8 @@ pub mod crank;
 pub mod ephemeral_accounts;
 pub mod instruction;
 pub mod intent_bundle;
+#[cfg(feature = "magic-accounts")]
+pub mod magic_accounts;
 pub mod pda;
 pub mod seeds;
 pub mod spl;
