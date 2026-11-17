@@ -99,49 +99,21 @@ export async function GetCommitmentSignature(
     );
   }
 
-  return waitForOutboxSignature(
-    outboxAddresses[0],
-    ephemeralConnection,
-  );
+  return waitForOutboxSignature(outboxAddresses[0], ephemeralConnection);
 }
 
 /**
- * web3.js 1.x rejects v1 transaction responses before returning their logs.
- * Use its configured RPC transport and read only the response metadata needed here.
+ * Use web3.js's v1-capable transaction decoder to read logs and the parsed
+ * instruction accounts used to match an outbox receipt to this intent.
  */
 async function getTransactionWithLogs(
   connection: Connection,
   signature: string,
 ): Promise<TransactionWithLogs | null> {
-  const commitment = connection._commitment;
-  if (
-    commitment != null &&
-    commitment !== "confirmed" &&
-    commitment !== "finalized"
-  ) {
-    throw new Error(
-      `getTransaction requires confirmed or finalized commitment, received ${commitment}`,
-    );
-  }
-
-  const config = {
-    encoding: "jsonParsed",
+  return connection.getParsedTransaction(signature, {
     // Version 1 includes legacy and version 0 transactions as well.
     maxSupportedTransactionVersion: 1,
-    ...(commitment == null ? {} : { commitment }),
-  };
-  const response = (await connection._rpcRequest("getTransaction", [
-    signature,
-    config,
-  ])) as {
-    result?: TransactionWithLogs | null;
-    error?: { message?: string };
-  };
-
-  if (response.error != null) {
-    throw new Error(response.error.message ?? "Failed to get transaction");
-  }
-  return response.result ?? null;
+  });
 }
 
 async function waitForOutboxSignature(
