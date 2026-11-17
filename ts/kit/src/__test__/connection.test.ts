@@ -82,6 +82,7 @@ const mockSigners = [
 // Vitest Mocks
 // ----------------------
 vi.mock("@solana/kit", () => ({
+  address: vi.fn((value: string) => value),
   createSolanaRpc: vi.fn(),
   createSolanaRpcSubscriptions: vi.fn(),
   partiallySignTransaction: vi.fn(),
@@ -123,7 +124,6 @@ describe("Connection", () => {
     vi.mocked(solanaKit.partiallySignTransaction).mockResolvedValue({
       messageBytes: mockTxBytes,
       signatures: {},
-      lifetimeConstraint: mockLifetimeConstraint, // <- now type-safe
     });
     vi.mocked(solanaKit.compileTransaction).mockReturnValue({
       messageBytes: mockTxBytes,
@@ -222,7 +222,6 @@ describe("Connection", () => {
     vi.mocked(solanaKit.partiallySignTransaction).mockResolvedValue({
       messageBytes: mockTxBytes,
       signatures: {},
-      lifetimeConstraint: mockLifetimeConstraint,
     });
 
     const sig = await connection.sendTransaction(unsignedTx, mockSigners);
