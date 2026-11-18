@@ -48,6 +48,69 @@ type LatestBlockhash = Readonly<{
   lastValidBlockHeight: bigint;
 }>;
 
+const TRANSACTION_LOOKUP_TIMEOUT_MS = 30_000;
+const TRANSACTION_LOOKUP_POLL_INTERVAL_MS = 1_000;
+const TRANSACTION_LOOKUP_TIMEOUT_MESSAGE =
+  "Timed out waiting for transaction lookup";
+
+async function withDeadline<T>(
+  promise: Promise<T>,
+  deadline: number,
+  cancel: () => void,
+): Promise<T> {
+  const remaining = deadline - Date.now();
+  if (remaining <= 0) {
+    void promise.catch(() => undefined);
+    cancel();
+    throw new Error(TRANSACTION_LOOKUP_TIMEOUT_MESSAGE);
+  }
+
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => {
+      cancel();
+      reject(new Error(TRANSACTION_LOOKUP_TIMEOUT_MESSAGE));
+    }, remaining);
+    promise.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (error: unknown) => {
+        clearTimeout(timer);
+        reject(error);
+      },
+    );
+  });
+}
+
+async function getTransactionWithRetry<T>(
+  getTransaction: (abortSignal: AbortSignal) => Promise<T | null>,
+  hasMetadata: (transaction: T) => boolean,
+): Promise<T> {
+  const deadline = Date.now() + TRANSACTION_LOOKUP_TIMEOUT_MS;
+  while (Date.now() < deadline) {
+    const request = new AbortController();
+    const transaction = await withDeadline(
+      getTransaction(request.signal),
+      deadline,
+      () => request.abort(),
+    );
+    if (transaction != null && hasMetadata(transaction)) return transaction;
+
+    const remaining = deadline - Date.now();
+    if (remaining <= 0) break;
+    await new Promise((resolve) =>
+      setTimeout(
+        resolve,
+        Math.min(TRANSACTION_LOOKUP_POLL_INTERVAL_MS, remaining),
+      ),
+    );
+  }
+  throw new Error(
+    `Transaction not found or meta is null after waiting ${TRANSACTION_LOOKUP_TIMEOUT_MS}ms`,
+  );
+}
+
 /**
  * Represents a connection to a Solana cluster (HTTP + WebSocket).
  * Provides RPC and subscription APIs for interacting with Solana nodes.
@@ -365,13 +428,17 @@ export class Connection {
   public async getCommitmentSignature(
     signature: Signature,
   ): Promise<Signature> {
-    const txSchedulingSgn = await this.rpc
-      .getTransaction(signature, {
-        encoding: "base64",
-        // Version 1 includes legacy and version 0 transactions as well.
-        maxSupportedTransactionVersion: 1,
-      })
-      .send();
+    const txSchedulingSgn = await getTransactionWithRetry(
+      (abortSignal) =>
+        this.rpc
+          .getTransaction(signature, {
+            encoding: "base64",
+            // Version 1 includes legacy and version 0 transactions as well.
+            maxSupportedTransactionVersion: 1,
+          })
+          .send({ abortSignal }),
+      (transaction) => transaction.meta != null,
+    );
 
     if (txSchedulingSgn?.meta == null) {
       throw new Error("Transaction not found or meta is null");

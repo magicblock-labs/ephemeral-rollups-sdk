@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { Connection } from "../connection"; // adjust path
 import * as utils from "../utils";
 import * as solanaKit from "@solana/kit";
@@ -69,6 +69,14 @@ const mockRpc = {
   getVoteAccount: vi.fn(),
 } as const as unknown as solanaKit.Rpc<solanaKit.SolanaRpcApi>;
 
+function mockTransactionLookup(
+  response: unknown,
+): ReturnType<typeof mockRpc.getTransaction> {
+  return {
+    send: vi.fn(async () => response),
+  } as unknown as ReturnType<typeof mockRpc.getTransaction>;
+}
+
 const mockRpcSubscriptions =
   {} as const as unknown as solanaKit.RpcSubscriptions<solanaKit.SolanaRpcSubscriptionsApi>;
 
@@ -115,6 +123,10 @@ vi.mock("@solana/transaction-confirmation", () => ({
 // Tests
 // ----------------------
 describe("Connection", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   beforeEach(() => {
     vi.mocked(utils.isRouter).mockResolvedValue(false);
     vi.mocked(solanaKit.createSolanaRpc).mockReturnValue(mockRpc);
@@ -312,6 +324,42 @@ describe("Connection", () => {
     const connection = await Connection.create("http://localhost");
     const sig = await connection.getCommitmentSignature(mockSignature);
     expect(sig).toBe(mockSignature);
+  });
+
+  it("retries transaction lookups until metadata is available", async () => {
+    vi.useFakeTimers();
+    vi.mocked(mockRpc.getTransaction).mockClear();
+    vi.mocked(mockRpc.getTransaction)
+      .mockReturnValueOnce(mockTransactionLookup(null))
+      .mockReturnValueOnce(mockTransactionLookup({ meta: null }))
+      .mockReturnValueOnce(
+        mockTransactionLookup({ meta: { err: null, logMessages: ["log1"] } }),
+      );
+
+    const connection = await Connection.create("http://localhost");
+    const result = connection.getCommitmentSignature(mockSignature);
+    await vi.advanceTimersByTimeAsync(2_000);
+
+    await expect(result).resolves.toBe(mockSignature);
+    expect(mockRpc.getTransaction).toHaveBeenCalledTimes(4);
+  });
+
+  it("fails after the scheduling transaction remains unavailable", async () => {
+    vi.useFakeTimers();
+    vi.mocked(mockRpc.getTransaction).mockClear();
+    vi.mocked(mockRpc.getTransaction).mockImplementation(() =>
+      mockTransactionLookup(null),
+    );
+
+    const connection = await Connection.create("http://localhost");
+    const result = connection.getCommitmentSignature(mockSignature);
+    const rejection = expect(result).rejects.toThrow(
+      "Transaction not found or meta is null after waiting 30000ms",
+    );
+    await vi.advanceTimersByTimeAsync(30_000);
+
+    await rejection;
+    expect(mockRpc.getTransaction).toHaveBeenCalledTimes(30);
   });
 
   it("should reject getCommitmentSignature when the scheduling transaction failed", async () => {

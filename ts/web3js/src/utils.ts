@@ -7,6 +7,9 @@ const OUTBOX_PROGRAM_ID = "outboxintent1111111111111111111111111111111";
 const OUTBOX_COMPLETION_TAG = 2;
 const SETTLEMENT_TIMEOUT_MS = 120_000;
 const POLL_INTERVAL_MS = 1_000;
+const TRANSACTION_LOOKUP_TIMEOUT_MS = 30_000;
+const TRANSACTION_LOOKUP_TIMEOUT_MESSAGE =
+  "Timed out waiting for transaction lookup";
 
 type AddressLike = string | { toBase58: () => string };
 
@@ -36,9 +39,10 @@ export async function GetCommitmentSignature(
   transactionSignature: string,
   ephemeralConnection: Connection,
 ): Promise<string> {
-  const schedulingTx = await getTransactionWithLogs(
-    ephemeralConnection,
-    transactionSignature,
+  const schedulingTx = await getTransactionWithRetry(
+    () => getTransactionWithLogs(ephemeralConnection, transactionSignature),
+    (transaction) => transaction.meta != null,
+    TRANSACTION_LOOKUP_TIMEOUT_MS,
   );
   if (schedulingTx?.meta == null) {
     throw new Error("Transaction not found or meta is null");
@@ -114,6 +118,54 @@ async function getTransactionWithLogs(
     // Version 1 includes legacy and version 0 transactions as well.
     maxSupportedTransactionVersion: 1,
   });
+}
+
+async function withDeadline<T>(
+  promise: Promise<T>,
+  deadline: number,
+): Promise<T> {
+  const remaining = deadline - Date.now();
+  if (remaining <= 0) {
+    void promise.catch(() => undefined);
+    throw new Error(TRANSACTION_LOOKUP_TIMEOUT_MESSAGE);
+  }
+
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => {
+      reject(new Error(TRANSACTION_LOOKUP_TIMEOUT_MESSAGE));
+    }, remaining);
+    promise.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (error: unknown) => {
+        clearTimeout(timer);
+        reject(error);
+      },
+    );
+  });
+}
+
+async function getTransactionWithRetry<T>(
+  getTransaction: () => Promise<T | null>,
+  hasMetadata: (transaction: T) => boolean,
+  timeoutMs: number,
+): Promise<T> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const transaction = await withDeadline(getTransaction(), deadline);
+    if (transaction != null && hasMetadata(transaction)) return transaction;
+
+    const remaining = deadline - Date.now();
+    if (remaining <= 0) break;
+    await new Promise((resolve) =>
+      setTimeout(resolve, Math.min(POLL_INTERVAL_MS, remaining)),
+    );
+  }
+  throw new Error(
+    `Transaction not found or meta is null after waiting ${timeoutMs}ms`,
+  );
 }
 
 async function waitForOutboxSignature(
