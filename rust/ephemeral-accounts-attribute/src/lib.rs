@@ -653,6 +653,7 @@ fn expand_accounts(item: TokenStream, naming: AccountNaming) -> TokenStream {
     let mut methods = Vec::new();
 
     for field in input.fields.iter() {
+        // validate rejects unnamed fields before this expansion loop runs.
         let name = field.ident.as_ref().unwrap();
         let ty = &field.ty;
         let mut attrs = field.attrs.clone();

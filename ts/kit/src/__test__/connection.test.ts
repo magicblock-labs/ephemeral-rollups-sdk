@@ -324,6 +324,11 @@ describe("Connection", () => {
     const connection = await Connection.create("http://localhost");
     const sig = await connection.getCommitmentSignature(mockSignature);
     expect(sig).toBe(mockSignature);
+    expect(mockRpc.getTransaction).toHaveBeenLastCalledWith(mockSignature, {
+      encoding: "base64",
+      commitment: "confirmed",
+      maxSupportedTransactionVersion: 1,
+    });
   });
 
   it("retries transaction lookups until metadata is available", async () => {
@@ -360,6 +365,90 @@ describe("Connection", () => {
 
     await rejection;
     expect(mockRpc.getTransaction).toHaveBeenCalledTimes(30);
+  });
+
+  it("aborts a pending settlement signature lookup at its deadline", async () => {
+    vi.useFakeTimers();
+    vi.mocked(mockRpc.getSignaturesForAddress).mockReset();
+    let abortSignal: AbortSignal | undefined;
+    vi.mocked(mockRpc.getSignaturesForAddress).mockReturnValueOnce({
+      send: vi.fn(
+        async ({ abortSignal: signal }: { abortSignal: AbortSignal }) => {
+          abortSignal = signal;
+          return new Promise<never>((_resolve, reject) => {
+            signal.addEventListener(
+              "abort",
+              () => {
+                reject(new Error("aborted"));
+              },
+              { once: true },
+            );
+          });
+        },
+      ),
+    } as unknown as ReturnType<typeof mockRpc.getSignaturesForAddress>);
+
+    const connection = await Connection.create("http://localhost");
+    const internal = connection as unknown as {
+      waitForOutboxSignature: (
+        address: solanaKit.Address,
+      ) => Promise<solanaKit.Signature>;
+    };
+    const result = internal.waitForOutboxSignature(
+      "outbox-address" as solanaKit.Address,
+    );
+    const rejection = expect(result).rejects.toThrow(
+      "Timed out waiting for settlement outbox outbox-address",
+    );
+
+    await vi.advanceTimersByTimeAsync(120_000);
+
+    await rejection;
+    expect(abortSignal?.aborted).toBe(true);
+  });
+
+  it("aborts a pending settlement transaction lookup at its deadline", async () => {
+    vi.useFakeTimers();
+    vi.mocked(mockRpc.getSignaturesForAddress).mockReset();
+    vi.mocked(mockRpc.getTransaction).mockReset();
+    let abortSignal: AbortSignal | undefined;
+    vi.mocked(mockRpc.getSignaturesForAddress).mockReturnValueOnce({
+      send: vi.fn(async () => [{ signature: mockSignature }]),
+    } as unknown as ReturnType<typeof mockRpc.getSignaturesForAddress>);
+    vi.mocked(mockRpc.getTransaction).mockReturnValueOnce({
+      send: vi.fn(
+        async ({ abortSignal: signal }: { abortSignal: AbortSignal }) => {
+          abortSignal = signal;
+          return new Promise<never>((_resolve, reject) => {
+            signal.addEventListener(
+              "abort",
+              () => {
+                reject(new Error("aborted"));
+              },
+              { once: true },
+            );
+          });
+        },
+      ),
+    } as unknown as ReturnType<typeof mockRpc.getTransaction>);
+
+    const connection = await Connection.create("http://localhost");
+    const internal = connection as unknown as {
+      waitForOutboxSignature: (
+        address: solanaKit.Address,
+      ) => Promise<solanaKit.Signature>;
+    };
+    const result = internal.waitForOutboxSignature(
+      "outbox-address" as solanaKit.Address,
+    );
+    const rejection = expect(result).rejects.toThrow(
+      "Timed out waiting for settlement outbox outbox-address",
+    );
+
+    await vi.advanceTimersByTimeAsync(120_000);
+
+    await rejection;
+    expect(abortSignal?.aborted).toBe(true);
   });
 
   it("should reject getCommitmentSignature when the scheduling transaction failed", async () => {

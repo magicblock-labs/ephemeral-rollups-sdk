@@ -1,5 +1,5 @@
 // eslint-disable-next-line @typescript-eslint/consistent-type-imports
-import { Connection, PublicKey } from "@solana/web3.js";
+import { Connection, PublicKey, type Finality } from "@solana/web3.js";
 import bs58 from "bs58";
 import { MAGIC_PROGRAM_ID } from "./constants";
 
@@ -12,6 +12,13 @@ const TRANSACTION_LOOKUP_TIMEOUT_MESSAGE =
   "Timed out waiting for transaction lookup";
 
 type AddressLike = string | { toBase58: () => string };
+
+class DeadlineExceededError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "DeadlineExceededError";
+  }
+}
 
 interface TransactionWithLogs {
   transaction?: {
@@ -40,7 +47,8 @@ export async function GetCommitmentSignature(
   ephemeralConnection: Connection,
 ): Promise<string> {
   const schedulingTx = await getTransactionWithRetry(
-    () => getTransactionWithLogs(ephemeralConnection, transactionSignature),
+    async () =>
+      getTransactionWithLogs(ephemeralConnection, transactionSignature),
     (transaction) => transaction.meta != null,
     TRANSACTION_LOOKUP_TIMEOUT_MS,
   );
@@ -68,6 +76,7 @@ export async function GetCommitmentSignature(
     const commitTx = await getTransactionWithLogs(
       ephemeralConnection,
       scheduledCommitSignature,
+      "confirmed",
     );
     if (commitTx?.meta == null) {
       throw new Error("Transaction not found or meta is null");
@@ -113,8 +122,10 @@ export async function GetCommitmentSignature(
 async function getTransactionWithLogs(
   connection: Connection,
   signature: string,
+  commitment?: Finality,
 ): Promise<TransactionWithLogs | null> {
   return connection.getParsedTransaction(signature, {
+    ...(commitment == null ? {} : { commitment }),
     // Version 1 includes legacy and version 0 transactions as well.
     maxSupportedTransactionVersion: 1,
   });
@@ -123,25 +134,35 @@ async function getTransactionWithLogs(
 async function withDeadline<T>(
   promise: Promise<T>,
   deadline: number,
+  timeoutMessage = TRANSACTION_LOOKUP_TIMEOUT_MESSAGE,
 ): Promise<T> {
+  // web3.js read methods lack per-request abort signals, so only this promise is bounded.
   const remaining = deadline - Date.now();
   if (remaining <= 0) {
     void promise.catch(() => undefined);
-    throw new Error(TRANSACTION_LOOKUP_TIMEOUT_MESSAGE);
+    throw new DeadlineExceededError(timeoutMessage);
   }
 
   return new Promise<T>((resolve, reject) => {
     const timer = setTimeout(() => {
-      reject(new Error(TRANSACTION_LOOKUP_TIMEOUT_MESSAGE));
+      reject(new DeadlineExceededError(timeoutMessage));
     }, remaining);
     promise.then(
       (value) => {
         clearTimeout(timer);
-        resolve(value);
+        if (Date.now() >= deadline) {
+          reject(new DeadlineExceededError(timeoutMessage));
+        } else {
+          resolve(value);
+        }
       },
       (error: unknown) => {
         clearTimeout(timer);
-        reject(error);
+        if (Date.now() >= deadline) {
+          reject(new DeadlineExceededError(timeoutMessage));
+        } else {
+          reject(error);
+        }
       },
     );
   });
@@ -174,20 +195,28 @@ async function waitForOutboxSignature(
 ): Promise<string> {
   const outbox = new PublicKey(outboxAddress);
   const deadline = Date.now() + SETTLEMENT_TIMEOUT_MS;
+  const timeoutMessage = `Timed out waiting for settlement outbox ${outboxAddress}`;
   const inspected = new Set<string>();
 
-  while (Date.now() <= deadline) {
-    const signatures = await connection.getSignaturesForAddress(outbox, {
-      limit: 1_000,
-    });
+  while (Date.now() < deadline) {
+    const signatures = await withDeadline(
+      connection.getSignaturesForAddress(outbox, { limit: 1_000 }),
+      deadline,
+      timeoutMessage,
+    );
 
     for (const item of signatures) {
       if (inspected.has(item.signature)) continue;
 
       let tx: TransactionWithLogs | null;
       try {
-        tx = await getTransactionWithLogs(connection, item.signature);
-      } catch {
+        tx = await withDeadline(
+          getTransactionWithLogs(connection, item.signature),
+          deadline,
+          timeoutMessage,
+        );
+      } catch (error) {
+        if (error instanceof DeadlineExceededError) throw error;
         continue;
       }
       if (tx?.meta == null) continue;
@@ -195,7 +224,12 @@ async function waitForOutboxSignature(
 
       if (tx.meta.err !== null) continue;
       const signature = signatureFromReceipt(tx, outboxAddress);
-      if (signature != null) return signature;
+      if (signature != null) {
+        if (Date.now() >= deadline) {
+          throw new DeadlineExceededError(timeoutMessage);
+        }
+        return signature;
+      }
     }
 
     const remaining = deadline - Date.now();
@@ -206,7 +240,7 @@ async function waitForOutboxSignature(
     }
   }
 
-  throw new Error(`Timed out waiting for settlement outbox ${outboxAddress}`);
+  throw new DeadlineExceededError(timeoutMessage);
 }
 
 function logsFromProgram(logs: readonly string[], programId: string): string[] {

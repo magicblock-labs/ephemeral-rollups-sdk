@@ -52,32 +52,52 @@ const TRANSACTION_LOOKUP_TIMEOUT_MS = 30_000;
 const TRANSACTION_LOOKUP_POLL_INTERVAL_MS = 1_000;
 const TRANSACTION_LOOKUP_TIMEOUT_MESSAGE =
   "Timed out waiting for transaction lookup";
+const SETTLEMENT_TIMEOUT_MS = 120_000;
+const SETTLEMENT_POLL_INTERVAL_MS = 1_000;
+
+class DeadlineExceededError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "DeadlineExceededError";
+  }
+}
 
 async function withDeadline<T>(
   promise: Promise<T>,
   deadline: number,
   cancel: () => void,
+  timeoutMessage = TRANSACTION_LOOKUP_TIMEOUT_MESSAGE,
 ): Promise<T> {
   const remaining = deadline - Date.now();
   if (remaining <= 0) {
     void promise.catch(() => undefined);
     cancel();
-    throw new Error(TRANSACTION_LOOKUP_TIMEOUT_MESSAGE);
+    throw new DeadlineExceededError(timeoutMessage);
   }
 
   return new Promise<T>((resolve, reject) => {
     const timer = setTimeout(() => {
       cancel();
-      reject(new Error(TRANSACTION_LOOKUP_TIMEOUT_MESSAGE));
+      reject(new DeadlineExceededError(timeoutMessage));
     }, remaining);
     promise.then(
       (value) => {
         clearTimeout(timer);
-        resolve(value);
+        if (Date.now() >= deadline) {
+          cancel();
+          reject(new DeadlineExceededError(timeoutMessage));
+        } else {
+          resolve(value);
+        }
       },
       (error: unknown) => {
         clearTimeout(timer);
-        reject(error);
+        if (Date.now() >= deadline) {
+          cancel();
+          reject(new DeadlineExceededError(timeoutMessage));
+        } else {
+          reject(error);
+        }
       },
     );
   });
@@ -93,7 +113,9 @@ async function getTransactionWithRetry<T>(
     const transaction = await withDeadline(
       getTransaction(request.signal),
       deadline,
-      () => request.abort(),
+      () => {
+        request.abort();
+      },
     );
     if (transaction != null && hasMetadata(transaction)) return transaction;
 
@@ -429,7 +451,7 @@ export class Connection {
     signature: Signature,
   ): Promise<Signature> {
     const txSchedulingSgn = await getTransactionWithRetry(
-      (abortSignal) =>
+      async (abortSignal) =>
         this.rpc
           .getTransaction(signature, {
             encoding: "base64",
@@ -463,6 +485,7 @@ export class Connection {
       const txCommitInfo = await this.rpc
         .getTransaction(scheduledCommitSgn, {
           encoding: "base64",
+          commitment: "confirmed",
           // Version 1 includes legacy and version 0 transactions as well.
           maxSupportedTransactionVersion: 1,
         })
@@ -505,27 +528,46 @@ export class Connection {
   private async waitForOutboxSignature(
     outboxAddress: Address,
   ): Promise<Signature> {
-    const deadline = Date.now() + 120_000;
+    const deadline = Date.now() + SETTLEMENT_TIMEOUT_MS;
+    const timeoutMessage = `Timed out waiting for settlement outbox ${outboxAddress}`;
     const inspected = new Set<string>();
 
-    while (Date.now() <= deadline) {
-      const signatures = await this.rpc
+    while (Date.now() < deadline) {
+      const signaturesRequest = new AbortController();
+      const signaturesPromise = this.rpc
         .getSignaturesForAddress(outboxAddress, { limit: 1_000 })
-        .send();
+        .send({ abortSignal: signaturesRequest.signal });
+      const signatures = await withDeadline(
+        signaturesPromise,
+        deadline,
+        () => {
+          signaturesRequest.abort();
+        },
+        timeoutMessage,
+      );
 
       for (const item of signatures) {
         if (inspected.has(item.signature)) continue;
 
         let tx;
+        const transactionRequest = new AbortController();
         try {
-          tx = await this.rpc
-            .getTransaction(item.signature, {
-              encoding: "jsonParsed",
-              // Outbox history may contain version 1 transactions from validator v2.
-              maxSupportedTransactionVersion: 1,
-            })
-            .send();
-        } catch {
+          tx = await withDeadline(
+            this.rpc
+              .getTransaction(item.signature, {
+                encoding: "jsonParsed",
+                // Outbox history may contain version 1 transactions from validator v2.
+                maxSupportedTransactionVersion: 1,
+              })
+              .send({ abortSignal: transactionRequest.signal }),
+            deadline,
+            () => {
+              transactionRequest.abort();
+            },
+            timeoutMessage,
+          );
+        } catch (error) {
+          if (error instanceof DeadlineExceededError) throw error;
           continue;
         }
         if (tx?.meta == null) continue;
@@ -533,18 +575,23 @@ export class Connection {
         if (tx.meta.err !== null) continue;
 
         const receiptSignature = signatureFromReceipt(tx, outboxAddress);
-        if (receiptSignature != null) return receiptSignature as Signature;
+        if (receiptSignature != null) {
+          if (Date.now() >= deadline) {
+            throw new DeadlineExceededError(timeoutMessage);
+          }
+          return receiptSignature as Signature;
+        }
       }
 
       const remaining = deadline - Date.now();
       if (remaining > 0) {
         await new Promise<void>((resolve) =>
-          setTimeout(resolve, Math.min(1_000, remaining)),
+          setTimeout(resolve, Math.min(SETTLEMENT_POLL_INTERVAL_MS, remaining)),
         );
       }
     }
 
-    throw new Error(`Timed out waiting for settlement outbox ${outboxAddress}`);
+    throw new DeadlineExceededError(timeoutMessage);
   }
 
   /**
