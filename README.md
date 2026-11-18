@@ -24,7 +24,7 @@ The Rust and TypeScript SDKs share a version number.
 | `0.19.x` | Reserved for possible v1-compatible releases with breaking SDK changes. | — |
 | `0.20.x` and later | Validator v2 release line | Recommended for new integrations. |
 
-`0.20.0-alpha.1` was the first release in the Validator v2 line. Version `1.0.0` is reserved for the planned major SDK redesign.
+Version `1.0.0` is reserved for the planned major SDK redesign.
 
 For Rust, choose the [compatibility features](rust/sdk/README.md#features) before
 integrating: `anchor` targets Anchor 1.0; older Anchor versions use `anchor-compat`.
