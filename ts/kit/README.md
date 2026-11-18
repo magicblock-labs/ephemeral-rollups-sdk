@@ -7,6 +7,20 @@ access control for `@solana/kit` 4.x.
 npm install @magicblock-labs/ephemeral-rollups-kit
 ```
 
+## SDK versioning for Validator v1 and v2
+
+The Rust and TypeScript SDKs share a version number.
+
+| SDK version line | Validator support | Guidance |
+| --- | --- | --- |
+| `0.17.x` | Validator v1 | — |
+| `0.18.x` | Validator v1 and v2 | Users are encouraged to migrate to `0.20.x` or later. |
+| `0.19.x` | Reserved for possible v1-compatible releases with breaking SDK changes. | — |
+| `0.20.x` and later | Validator v2 release line | Recommended for new integrations. |
+
+`0.20.0-alpha.1` was the first release in the Validator v2 line. Version `1.0.0`
+is reserved for the planned major SDK redesign.
+
 ```ts
 import { Connection } from "@magicblock-labs/ephemeral-rollups-kit";
 
