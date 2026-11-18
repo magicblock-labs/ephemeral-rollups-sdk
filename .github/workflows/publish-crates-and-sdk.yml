@@ -78,6 +78,12 @@ jobs:
           PACKAGE_NAME=$(node -p "require('./package.json').name")
           PACKAGE_VERSION=$(node -p "require('./package.json').version")
 
+          NPM_TAG=""
+          if [[ "${PACKAGE_VERSION}" == *-* ]]; then
+            NPM_TAG="${PACKAGE_VERSION#*-}"
+            NPM_TAG="${NPM_TAG%%.*}"
+          fi
+
           if npm view "${PACKAGE_NAME}@${PACKAGE_VERSION}" version >/dev/null 2>&1; then
             echo "${PACKAGE_NAME}@${PACKAGE_VERSION} is already published, skipping"
             exit 0
@@ -92,9 +98,17 @@ jobs:
           npm run build && npm run lint:fix
           if [ "${DRY_RUN}" = "true" ]; then
             echo "Running npm publish in dry-run mode"
-            npm publish --access public --dry-run
+            if [ -n "${NPM_TAG}" ]; then
+              npm publish --access public --tag "${NPM_TAG}" --dry-run
+            else
+              npm publish --access public --dry-run
+            fi
           else
-            npm publish --access public
+            if [ -n "${NPM_TAG}" ]; then
+              npm publish --access public --tag "${NPM_TAG}"
+            else
+              npm publish --access public
+            fi
           fi
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
@@ -106,6 +120,12 @@ jobs:
           PACKAGE_NAME=$(node -p "require('./package.json').name")
           PACKAGE_VERSION=$(node -p "require('./package.json').version")
 
+          NPM_TAG=""
+          if [[ "${PACKAGE_VERSION}" == *-* ]]; then
+            NPM_TAG="${PACKAGE_VERSION#*-}"
+            NPM_TAG="${NPM_TAG%%.*}"
+          fi
+
           if npm view "${PACKAGE_NAME}@${PACKAGE_VERSION}" version >/dev/null 2>&1; then
             echo "${PACKAGE_NAME}@${PACKAGE_VERSION} is already published, skipping"
             exit 0
@@ -120,9 +140,17 @@ jobs:
           npm run build && npm run lint:fix
           if [ "${DRY_RUN}" = "true" ]; then
             echo "Running npm publish in dry-run mode"
-            npm publish --access public --dry-run
+            if [ -n "${NPM_TAG}" ]; then
+              npm publish --access public --tag "${NPM_TAG}" --dry-run
+            else
+              npm publish --access public --dry-run
+            fi
           else
-            npm publish --access public
+            if [ -n "${NPM_TAG}" ]; then
+              npm publish --access public --tag "${NPM_TAG}"
+            else
+              npm publish --access public
+            fi
           fi
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
