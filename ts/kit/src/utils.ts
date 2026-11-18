@@ -57,8 +57,7 @@ export async function isRouter(clusterUrlHttp: string): Promise<boolean> {
 /**
  * Parses log messages from a scheduling transaction to extract the scheduled commit signature.
  *
- * This function looks for log messages containing the prefix `"ScheduledCommitSent signature: "`
- * and returns the signature following it.
+ * This function accepts both the indexed and unindexed scheduling log labels.
  *
  * @param logMessages - An array of log messages from a transaction's meta.
  * @returns The extracted `Signature` if found, or `null` if no matching log message exists.
@@ -66,10 +65,18 @@ export async function isRouter(clusterUrlHttp: string): Promise<boolean> {
 export function parseScheduleCommitsLogsMessage(
   logMessages: readonly string[],
 ): Signature | null {
+  const signaturePrefixes = [
+    "ScheduledCommitSent signature[0]: ",
+    "ScheduledCommitSent signature: ",
+  ];
   for (const message of logMessages) {
-    const signaturePrefix = "ScheduledCommitSent signature: ";
-    if (message.includes(signaturePrefix)) {
-      return message.split(signaturePrefix)[1] as Signature;
+    for (const signaturePrefix of signaturePrefixes) {
+      const index = message.indexOf(signaturePrefix);
+      if (index >= 0) {
+        return message
+          .slice(index + signaturePrefix.length)
+          .trim() as Signature;
+      }
     }
   }
   return null;

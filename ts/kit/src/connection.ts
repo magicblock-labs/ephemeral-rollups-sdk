@@ -35,12 +35,103 @@ import {
   parseCommitsLogsMessage,
   parseScheduleCommitsLogsMessage,
 } from "./utils";
+import { MAGIC_PROGRAM_ID } from "./constants";
+import {
+  logsFromProgram,
+  parseOutboxAddresses,
+  signatureFromReceipt,
+} from "./settlement";
 
 /** Type representing a recent blockhash and its lifetime validity. */
 type LatestBlockhash = Readonly<{
   blockhash: Blockhash;
   lastValidBlockHeight: bigint;
 }>;
+
+const TRANSACTION_LOOKUP_TIMEOUT_MS = 30_000;
+const TRANSACTION_LOOKUP_POLL_INTERVAL_MS = 1_000;
+const TRANSACTION_LOOKUP_TIMEOUT_MESSAGE =
+  "Timed out waiting for transaction lookup";
+const SETTLEMENT_TIMEOUT_MS = 120_000;
+const SETTLEMENT_POLL_INTERVAL_MS = 1_000;
+
+class DeadlineExceededError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "DeadlineExceededError";
+  }
+}
+
+async function withDeadline<T>(
+  promise: Promise<T>,
+  deadline: number,
+  cancel: () => void,
+  timeoutMessage = TRANSACTION_LOOKUP_TIMEOUT_MESSAGE,
+): Promise<T> {
+  const remaining = deadline - Date.now();
+  if (remaining <= 0) {
+    void promise.catch(() => undefined);
+    cancel();
+    throw new DeadlineExceededError(timeoutMessage);
+  }
+
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => {
+      cancel();
+      reject(new DeadlineExceededError(timeoutMessage));
+    }, remaining);
+    promise.then(
+      (value) => {
+        clearTimeout(timer);
+        if (Date.now() >= deadline) {
+          cancel();
+          reject(new DeadlineExceededError(timeoutMessage));
+        } else {
+          resolve(value);
+        }
+      },
+      (error: unknown) => {
+        clearTimeout(timer);
+        if (Date.now() >= deadline) {
+          cancel();
+          reject(new DeadlineExceededError(timeoutMessage));
+        } else {
+          reject(error);
+        }
+      },
+    );
+  });
+}
+
+async function getTransactionWithRetry<T>(
+  getTransaction: (abortSignal: AbortSignal) => Promise<T | null>,
+  hasMetadata: (transaction: T) => boolean,
+): Promise<T> {
+  const deadline = Date.now() + TRANSACTION_LOOKUP_TIMEOUT_MS;
+  while (Date.now() < deadline) {
+    const request = new AbortController();
+    const transaction = await withDeadline(
+      getTransaction(request.signal),
+      deadline,
+      () => {
+        request.abort();
+      },
+    );
+    if (transaction != null && hasMetadata(transaction)) return transaction;
+
+    const remaining = deadline - Date.now();
+    if (remaining <= 0) break;
+    await new Promise((resolve) =>
+      setTimeout(
+        resolve,
+        Math.min(TRANSACTION_LOOKUP_POLL_INTERVAL_MS, remaining),
+      ),
+    );
+  }
+  throw new Error(
+    `Transaction not found or meta is null after waiting ${TRANSACTION_LOOKUP_TIMEOUT_MS}ms`,
+  );
+}
 
 /**
  * Represents a connection to a Solana cluster (HTTP + WebSocket).
@@ -359,12 +450,17 @@ export class Connection {
   public async getCommitmentSignature(
     signature: Signature,
   ): Promise<Signature> {
-    const txSchedulingSgn = await this.rpc
-      .getTransaction(signature, {
-        encoding: "base64",
-        maxSupportedTransactionVersion: 0,
-      })
-      .send();
+    const txSchedulingSgn = await getTransactionWithRetry(
+      async (abortSignal) =>
+        this.rpc
+          .getTransaction(signature, {
+            encoding: "base64",
+            // Version 1 includes legacy and version 0 transactions as well.
+            maxSupportedTransactionVersion: 1,
+          })
+          .send({ abortSignal }),
+      (transaction) => transaction.meta != null,
+    );
 
     if (txSchedulingSgn?.meta == null) {
       throw new Error("Transaction not found or meta is null");
@@ -377,37 +473,125 @@ export class Connection {
         "Transaction failed; commitment was not scheduled (ScheduledCommitSent logs from earlier instructions are not reliable when the transaction errors)",
       );
     }
-    const scheduledCommitSgn = parseScheduleCommitsLogsMessage(
+    const magicLogs = logsFromProgram(
       txSchedulingSgn.meta.logMessages ?? [],
+      MAGIC_PROGRAM_ID,
     );
-    if (scheduledCommitSgn == null) {
-      throw new Error("ScheduledCommitSent signature not found");
-    }
-    await this.confirmTransaction(scheduledCommitSgn);
+    // Validator v1 logs the scheduled signature directly; v2 logs an outbox to poll.
+    const scheduledCommitSgn = parseScheduleCommitsLogsMessage(magicLogs);
+    if (scheduledCommitSgn != null) {
+      await this.confirmTransaction(scheduledCommitSgn);
 
-    const txCommitInfo = await this.rpc
-      .getTransaction(scheduledCommitSgn, {
-        encoding: "base64",
-        maxSupportedTransactionVersion: 0,
-      })
-      .send();
+      const txCommitInfo = await this.rpc
+        .getTransaction(scheduledCommitSgn, {
+          encoding: "base64",
+          commitment: "confirmed",
+          // Version 1 includes legacy and version 0 transactions as well.
+          maxSupportedTransactionVersion: 1,
+        })
+        .send();
 
-    if (txCommitInfo?.meta == null) {
-      throw new Error("Transaction not found or meta is null");
+      if (txCommitInfo?.meta == null) {
+        throw new Error("Transaction not found or meta is null");
+      }
+      if (txCommitInfo.meta.err != null) {
+        throw new Error(
+          "Scheduled commit transaction failed; commitment signature is not available",
+        );
+      }
+
+      const commitmentSignature = parseCommitsLogsMessage(
+        logsFromProgram(txCommitInfo.meta.logMessages ?? [], MAGIC_PROGRAM_ID),
+      );
+      if (commitmentSignature == null) {
+        throw new Error("Unable to find Commitment signature");
+      }
+      return commitmentSignature;
     }
-    if (txCommitInfo.meta.err != null) {
+
+    // Validator v2 publishes settlement receipts through the scheduled outbox.
+    const outboxAddresses = parseOutboxAddresses(magicLogs);
+    if (outboxAddresses.length > 1) {
       throw new Error(
-        "Scheduled commit transaction failed; commitment signature is not available",
+        "Scheduling transaction created multiple intents; this method returns one signature",
+      );
+    }
+    if (outboxAddresses.length === 0) {
+      throw new Error(
+        "Scheduled commit signature or settlement outbox not found",
       );
     }
 
-    const commitSignature = parseCommitsLogsMessage(
-      txCommitInfo.meta.logMessages ?? [],
-    );
-    if (commitSignature == null) {
-      throw new Error("Unable to find Commitment signature");
+    return this.waitForOutboxSignature(outboxAddresses[0] as Address);
+  }
+
+  private async waitForOutboxSignature(
+    outboxAddress: Address,
+  ): Promise<Signature> {
+    const deadline = Date.now() + SETTLEMENT_TIMEOUT_MS;
+    const timeoutMessage = `Timed out waiting for settlement outbox ${outboxAddress}`;
+    const inspected = new Set<string>();
+
+    while (Date.now() < deadline) {
+      const signaturesRequest = new AbortController();
+      const signaturesPromise = this.rpc
+        .getSignaturesForAddress(outboxAddress, { limit: 1_000 })
+        .send({ abortSignal: signaturesRequest.signal });
+      const signatures = await withDeadline(
+        signaturesPromise,
+        deadline,
+        () => {
+          signaturesRequest.abort();
+        },
+        timeoutMessage,
+      );
+
+      for (const item of signatures) {
+        if (inspected.has(item.signature)) continue;
+
+        let tx;
+        const transactionRequest = new AbortController();
+        try {
+          tx = await withDeadline(
+            this.rpc
+              .getTransaction(item.signature, {
+                encoding: "jsonParsed",
+                // Outbox history may contain version 1 transactions from validator v2.
+                maxSupportedTransactionVersion: 1,
+              })
+              .send({ abortSignal: transactionRequest.signal }),
+            deadline,
+            () => {
+              transactionRequest.abort();
+            },
+            timeoutMessage,
+          );
+        } catch (error) {
+          if (error instanceof DeadlineExceededError) throw error;
+          continue;
+        }
+        if (tx?.meta == null) continue;
+        inspected.add(item.signature);
+        if (tx.meta.err !== null) continue;
+
+        const receiptSignature = signatureFromReceipt(tx, outboxAddress);
+        if (receiptSignature != null) {
+          if (Date.now() >= deadline) {
+            throw new DeadlineExceededError(timeoutMessage);
+          }
+          return receiptSignature as Signature;
+        }
+      }
+
+      const remaining = deadline - Date.now();
+      if (remaining > 0) {
+        await new Promise<void>((resolve) =>
+          setTimeout(resolve, Math.min(SETTLEMENT_POLL_INTERVAL_MS, remaining)),
+        );
+      }
     }
-    return commitSignature;
+
+    throw new DeadlineExceededError(timeoutMessage);
   }
 
   /**

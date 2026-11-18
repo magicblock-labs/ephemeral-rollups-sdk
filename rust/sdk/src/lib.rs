@@ -18,6 +18,8 @@ pub mod delegate_args;
 pub mod ephem;
 #[cfg(any(feature = "anchor-support", feature = "modular-sdk",))]
 pub mod ephemeral_accounts;
+#[cfg(feature = "magic-accounts")]
+pub mod magic_accounts;
 pub mod types;
 pub mod utils;
 #[cfg(feature = "vrf")]

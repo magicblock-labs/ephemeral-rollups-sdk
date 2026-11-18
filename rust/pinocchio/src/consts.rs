@@ -8,11 +8,20 @@ pub const DELEGATION_PROGRAM_ID: Address = address!("DELeGGvXpWV2fqJUhqcF5ZSYMS4
 /// The magic program ID.
 pub const MAGIC_PROGRAM_ID: Address = address!("Magic11111111111111111111111111111111111111");
 
+/// Dedicated Magic Account program used by Validator v2.
+#[cfg(feature = "magic-accounts")]
+pub const MAGIC_ACCOUNT_PROGRAM_ID: Address =
+    address!("EphSystem1111111111111111111111111111111111");
+
 /// The magic context ID.
 pub const MAGIC_CONTEXT_ID: Address = address!("MagicContext1111111111111111111111111111111");
 
 /// The ephemeral vault ID (collects rent for ephemeral accounts).
 pub const EPHEMERAL_VAULT_ID: Address = address!("MagicVau1t999999999999999999999999999999999");
+
+/// Vault ID used by the dedicated Magic Account program.
+#[cfg(feature = "magic-accounts")]
+pub const MAGIC_ACCOUNT_VAULT_ID: Address = EPHEMERAL_VAULT_ID;
 
 /// Sentinel close authority marking a token account as a Magic ATA.
 pub const MAGIC_ATA_CLOSE_AUTHORITY: Address =

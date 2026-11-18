@@ -51,6 +51,9 @@ instruction = ["magicblock-delegation-program-api/instruction"]
 
 encryption = ["magicblock-delegation-program-api/encryption", "instruction"]
 
+# Opt in to the dedicated Magic Account program used by Validator v2.
+magic-accounts = ["dep:magicblock-magic-program-api-v2"]
+
 # backward compatability support (can be combined with [access-control | encryption])
 backward-compat = [
     "magicblock-delegation-program-api/backward-compat",
@@ -116,6 +119,7 @@ solana-system-interface = { workspace = true, optional = true }
 solana-sysvar = { workspace = true, optional = true }
 spl-associated-token-account-interface = { workspace = true, optional = true }
 magicblock-magic-program-api = { workspace = true }
+magicblock-magic-program-api-v2 = { workspace = true, optional = true }
 magicblock-delegation-program-api = { workspace = true, default-features = false }
 num-derive = { workspace = true, optional = true }
 num-traits = { workspace = true, optional = true }

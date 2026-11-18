@@ -15,6 +15,16 @@ pub const MAGIC_CONTEXT_ID: compat::Pubkey =
 pub const EPHEMERAL_VAULT_ID: compat::Pubkey =
     compat::Pubkey::new_from_array(EPHEMERAL_VAULT_PUBKEY.to_bytes());
 
+/// Vault ID used by the dedicated Magic Account program.
+#[cfg(feature = "magic-accounts")]
+pub const MAGIC_ACCOUNT_VAULT_ID: compat::Pubkey = EPHEMERAL_VAULT_ID;
+
+/// Dedicated Magic Account program used by Validator v2.
+#[cfg(feature = "magic-accounts")]
+pub const MAGIC_ACCOUNT_PROGRAM_ID: compat::Pubkey = compat::Pubkey::new_from_array(
+    magicblock_magic_program_api_v2::MAGIC_ACCOUNT_PROGRAM_ID.to_bytes(),
+);
+
 /// The permission program ID.
 pub const PERMISSION_PROGRAM_ID: compat::Pubkey =
     compat::Pubkey::from_str_const("ACLseoPoyC3cBqoUtkbjZ4aDrkurZW86v19pXz2XQnp1");

@@ -57,6 +57,7 @@ build_no_default() {
 build
 build_no_default "solana-system-interface"
 build_no_default "solana-system-interface,instruction"
+build "magic-accounts"
 
 build "backward-compat"
 build "vrf"
@@ -64,6 +65,8 @@ build "vrf,backward-compat"
 
 build "modular-sdk"
 build "modular-sdk,backward-compat"
+build "modular-sdk,magic-accounts"
+build "modular-sdk,magic-accounts,backward-compat"
 build "modular-sdk,access-control"
 build "modular-sdk,access-control,backward-compat"
 build "modular-sdk,spl"
@@ -73,11 +76,13 @@ build "modular-sdk,spl,access-control,backward-compat"
 build "anchor"
 build "anchor,vrf"
 build "anchor,anchor-debug"
+build "anchor,magic-accounts"
 build "anchor,access-control"
 build "anchor,access-control,anchor-debug"
 
 build "anchor-compat"
 build "anchor-compat,vrf"
+build "anchor-compat,magic-accounts"
 build "anchor-compat,access-control"
 
 ## anchor-lang-compat/anchor-debug currently fails inside anchor-lang 0.32 
