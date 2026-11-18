@@ -79,7 +79,13 @@ jobs:
           PACKAGE_VERSION=$(node -p "require('./package.json').version")
 
           NPM_TAG=""
-          if [[ "${PACKAGE_VERSION}" == *-* ]]; then
+          if [[ "${PACKAGE_VERSION}" == 0.18.* ]]; then
+            if [[ "${PACKAGE_VERSION}" == *-* ]]; then
+              NPM_TAG="legacy-alpha"
+            else
+              NPM_TAG="legacy"
+            fi
+          elif [[ "${PACKAGE_VERSION}" == *-* ]]; then
             NPM_TAG="${PACKAGE_VERSION#*-}"
             NPM_TAG="${NPM_TAG%%.*}"
           fi
@@ -121,7 +127,13 @@ jobs:
           PACKAGE_VERSION=$(node -p "require('./package.json').version")
 
           NPM_TAG=""
-          if [[ "${PACKAGE_VERSION}" == *-* ]]; then
+          if [[ "${PACKAGE_VERSION}" == 0.18.* ]]; then
+            if [[ "${PACKAGE_VERSION}" == *-* ]]; then
+              NPM_TAG="legacy-alpha"
+            else
+              NPM_TAG="legacy"
+            fi
+          elif [[ "${PACKAGE_VERSION}" == *-* ]]; then
             NPM_TAG="${PACKAGE_VERSION#*-}"
             NPM_TAG="${NPM_TAG%%.*}"
           fi
