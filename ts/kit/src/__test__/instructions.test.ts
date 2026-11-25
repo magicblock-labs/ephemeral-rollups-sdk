@@ -67,6 +67,7 @@ import {
   delegateBufferPdaFromDelegatedAccountAndOwnerProgram,
   delegationMetadataPdaFromDelegatedAccount,
   delegationRecordPdaFromDelegatedAccount,
+  escrowPdaFromEscrowAuthority,
   permissionPdaFromAccount,
 } from "../pda";
 
@@ -340,6 +341,17 @@ describe("Exposed Instructions (@solana/kit)", () => {
         role: AccountRole.WRITABLE,
       });
       expect(instruction.data).toEqual(new Uint8Array([23]));
+    });
+  });
+
+  describe("escrowPdaFromEscrowAuthority", () => {
+    it("should derive the escrow under the delegation program", async () => {
+      const escrow = await escrowPdaFromEscrowAuthority(
+        address("MAS1Dt9qreoRMQ14YQuhg8UTZMMzDdKhmkZMECCzk57"),
+        200,
+      );
+
+      expect(escrow).toBe("CmUuqGPTRjDuKRArLg6CTsKWV6Z5kFe25EUZhs1E7nVu");
     });
   });
 
