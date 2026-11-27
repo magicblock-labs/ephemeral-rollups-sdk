@@ -1,3 +1,10 @@
+//! Legacy magic-program cranks (deprecated in favour of [`super::hydra`]).
+//!
+//! **Deprecated:** verifying a crank by checking that the crank signer PDA
+//! (`crank_signer_pda(authority)`, seed `b"crank-executor"`) signed the
+//! instruction. Use `crank::hydra::require_hydra_crank` with the instructions
+//! sysvar instead.
+
 #![allow(deprecated)]
 
 pub use magicblock_magic_program_api::args::ScheduleTaskArgs;
