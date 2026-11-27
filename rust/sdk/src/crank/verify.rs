@@ -136,7 +136,9 @@ pub(crate) fn hydra_trigger_crank(
         return Ok(None);
     }
     let crank = first_account.ok_or(ProgramError::InvalidInstructionData)?;
-    Ok(Some(crank.try_into().expect("32 bytes")))
+    let mut out = [0u8; 32];
+    out.copy_from_slice(crank);
+    Ok(Some(out))
 }
 
 fn read_u16(data: &[u8], at: Option<usize>) -> Result<u16, ProgramError> {
