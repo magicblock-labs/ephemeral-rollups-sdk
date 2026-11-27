@@ -169,3 +169,8 @@ required-features = ["spl", "access-control", "modular-sdk"]
 [dev-dependencies]
 bincode = { workspace = true }
 sdk = { workspace = true }
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = [
+    "cfg(target_os, values(\"solana\"))",
+] }
